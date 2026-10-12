@@ -150,6 +150,23 @@ describe('BubblewrapCommandSandbox', () => {
     expect(sequence(subject.confine(['true'], scope), '--tmpfs', later)).toBe(true);
   });
 
+  it('binds each read-only directory by its canonical path, once, after the writable ones and the hidden ones, whether or not it exists yet', () => {
+    const snapshot = join(cache, 'references', 'tokens@v1');
+    const args = sandbox({ readOnlyDirectories: [snapshot, join(worktreeLink, 'references', 'icons@v2'), snapshot] }).confine(['true'], { workingDirectory: worktree, network: false });
+    const readOnly = args.flatMap((argument, index) => (argument === '--ro-bind-try' ? [args[index + 1]] : []));
+    expect(readOnly).toEqual([snapshot, join(worktree, 'references', 'icons@v2')]);
+    expect(args.indexOf('--ro-bind-try')).toBeGreaterThan(args.lastIndexOf('--bind-try'));
+    expect(args.indexOf('--ro-bind-try')).toBeGreaterThan(args.lastIndexOf('--tmpfs'));
+  });
+
+  it('binds no read-only directory unless one is granted', () => {
+    expect(sandbox().confine(['true'], { workingDirectory: worktree, network: false })).not.toContain('--ro-bind-try');
+  });
+
+  it.each(['/tmp/a"b', 'relative/references'])('refuses to bind %j as a read-only directory', (directory) => {
+    expect(() => sandbox({ readOnlyDirectories: [directory] }).confine(['true'], { workingDirectory: worktree, network: false })).toThrow(UnsafeSandboxPathError);
+  });
+
   it.each(['/', '/tmp/a"b', 'relative/cache'])('refuses to bind %j as a writable directory', (directory) => {
     expect(() => sandbox({ writableDirectories: [directory] }).confine(['true'], { workingDirectory: worktree, network: false })).toThrow(UnsafeSandboxPathError);
   });

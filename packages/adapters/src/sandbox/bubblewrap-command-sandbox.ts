@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import type { CommandSandbox, SandboxScope } from '@agent-factory/application';
 import { BUBBLEWRAP_EXECUTABLE, renderBubblewrapArguments, type BubblewrapPolicy } from './bubblewrap-arguments.ts';
 import { hiddenPaths } from './bubblewrap-hidden-paths.ts';
-import { canonicalDirectory } from './canonical-directory.ts';
+import { canonicalDirectory, canonicalFutureDirectory } from './canonical-directory.ts';
 import type { CommandSandboxSettings } from './command-sandbox-settings.ts';
 import { NO_ENGINE_SOCKETS } from './container-engine-sockets.ts';
 import { LINUX_PRIVATE_RUNTIME_PATHS } from './credential-paths.ts';
@@ -13,7 +13,8 @@ import { parsePathPattern, type PathPattern } from './path-patterns.ts';
  * directories, credential stores and the host's agent and container sockets hidden, and a private
  * network namespace (loopback only) unless the scope grants the network or shares the host's loopback with
  * the services of a stack, which on Linux means sharing the host's network. The container engine sockets
- * the settings grant are bound back in, whatever hides their directory.
+ * the settings grant are bound back in, whatever hides their directory, and so are the read-only directories, last,
+ * so that a writable parent leaves them read-only.
  *
  * A configured or temporary directory that does not exist when the command starts is not bound.
  *
@@ -40,6 +41,7 @@ export class BubblewrapCommandSandbox implements CommandSandbox {
       hiddenDirectories: hidden.directories,
       hiddenFiles: hidden.files,
       engineSockets: (this.settings.engineSockets ?? NO_ENGINE_SOCKETS)(),
+      readOnlyDirectories: [...new Set((this.settings.readOnlyDirectories ?? []).map(canonicalFutureDirectory))],
       network: scope.network || scope.hostLoopback === true,
     };
   }

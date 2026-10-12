@@ -8,6 +8,8 @@ export interface BubblewrapPolicy {
   readonly hiddenFiles: readonly string[];
   /** Container engine sockets bound back in after the hidden paths, so a hidden runtime directory still lets them through. */
   readonly engineSockets: readonly string[];
+  /** Directories mounted read-only after everything else, so neither a writable parent nor a hidden one changes what a command sees of them. */
+  readonly readOnlyDirectories: readonly string[];
   readonly network: boolean;
 }
 
@@ -24,6 +26,7 @@ const PROCESS_FILESYSTEM: readonly string[] = ['--proc', '/proc'];
 const BIND_OPTION = '--bind';
 const BIND_IF_PRESENT_OPTION = '--bind-try';
 const READ_ONLY_BIND_OPTION = '--ro-bind';
+const READ_ONLY_BIND_IF_PRESENT_OPTION = '--ro-bind-try';
 const MEMORY_FILESYSTEM_OPTION = '--tmpfs';
 const CHANGE_DIRECTORY_OPTION = '--chdir';
 
@@ -55,6 +58,7 @@ export function renderBubblewrapArguments(policy: BubblewrapPolicy): readonly st
     ...policy.hiddenDirectories.flatMap((directory) => [MEMORY_FILESYSTEM_OPTION, mountPoint(directory)]),
     ...policy.hiddenFiles.flatMap((file) => [READ_ONLY_BIND_OPTION, NULL_DEVICE, mountPoint(file)]),
     ...policy.engineSockets.flatMap((socket) => [BIND_IF_PRESENT_OPTION, mountPoint(socket), mountPoint(socket)]),
+    ...policy.readOnlyDirectories.flatMap((directory) => [READ_ONLY_BIND_IF_PRESENT_OPTION, mountPoint(directory), mountPoint(directory)]),
     CHANGE_DIRECTORY_OPTION,
     mountPoint(policy.workingDirectory),
     COMMAND_SEPARATOR,

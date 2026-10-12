@@ -7,6 +7,8 @@ export interface SeatbeltPolicy {
   readonly socketDirectories: readonly string[];
   /** Container engine sockets the command may connect to, even inside a directory whose reads are denied. */
   readonly engineSockets: readonly string[];
+  /** Directories the command may read, even inside a denied one, and may not write, even inside a writable one. */
+  readonly readOnlyDirectories: readonly string[];
   readonly deniedExecutables: readonly string[];
   readonly deniedServices: readonly string[];
   readonly blockedPorts: readonly number[];
@@ -71,6 +73,7 @@ export function renderSeatbeltProfile(policy: SeatbeltPolicy): string {
     ...policy.socketDirectories.map((directory) => `(remote unix-socket (subpath ${quoted(directory)}))`),
     ...policy.engineSockets.map((socket) => `(remote unix-socket (literal ${quoted(socket)}))`),
   ];
+  const readOnly = policy.readOnlyDirectories.map((directory) => `(subpath ${quoted(directory)})`);
   const nameService = policy.network ? [`(remote unix-socket (literal ${quoted(NAME_SERVICE_SOCKET)}))`] : [];
   const reachableSockets = [...sockets, ...nameService];
   const launchdSockets = LAUNCHD_SOCKET_DIRECTORIES.map((prefix) => `(remote unix-socket (regex ${prefixRegex(prefix)}))`);
@@ -79,9 +82,11 @@ export function renderSeatbeltProfile(policy: SeatbeltPolicy): string {
     '(allow default)',
     ...rule('deny', 'file-read*', policy.deniedReads.map(pathFilter)),
     ...rule('allow', 'file-read*', policy.engineSockets.map((socket) => `(literal ${quoted(socket)})`)),
+    ...rule('allow', 'file-read*', readOnly),
     '(deny file-write*)',
     ...rule('allow', 'file-write*', writable),
     ...rule('deny', 'file-write*', policy.deniedReads.map(pathFilter)),
+    ...rule('deny', 'file-write*', readOnly),
     ...rule('deny', 'mach-lookup', policy.deniedServices.map((service) => `(global-name ${quoted(service)})`)),
     ...rule('deny', 'process-exec', policy.deniedExecutables.map((executable) => `(literal ${quoted(executable)})`)),
     ...denyOutsideReach(policy.network ? INTERNET_REACH : LOOPBACK_REACH, reachableSockets),

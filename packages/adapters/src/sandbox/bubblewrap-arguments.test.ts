@@ -9,6 +9,7 @@ const POLICY: BubblewrapPolicy = {
   hiddenDirectories: ['/home/operator/.ssh', '/run/user'],
   hiddenFiles: ['/home/operator/.netrc'],
   engineSockets: [],
+  readOnlyDirectories: [],
   network: false,
 };
 
@@ -28,6 +29,8 @@ const UNSAFE_POLICIES: readonly UnsafePolicy[] = [
   { name: 'a carriage return', change: { workingDirectory: '/tmp/a\rb' } },
   { name: 'a null character', change: { writableDirectories: ['/tmp/a\u0000b'] } },
   { name: 'a relative engine socket', change: { engineSockets: ['docker.sock'] } },
+  { name: 'a relative read-only directory', change: { readOnlyDirectories: ['references/tokens@v1'] } },
+  { name: 'a quote in a read-only directory', change: { readOnlyDirectories: ['/tmp/a"b'] } },
 ];
 
 const OPTION_OPERAND_COUNTS: Readonly<Record<string, number>> = {
@@ -38,6 +41,7 @@ const OPTION_OPERAND_COUNTS: Readonly<Record<string, number>> = {
   '--unshare-uts': 0,
   '--unshare-net': 0,
   '--ro-bind': 2,
+  '--ro-bind-try': 2,
   '--bind': 2,
   '--bind-try': 2,
   '--dev': 1,
@@ -109,7 +113,7 @@ describe('renderBubblewrapArguments', () => {
   });
 
   it('writes nothing but the isolation, the root and the working directory for an empty policy', () => {
-    const args = renderBubblewrapArguments({ workingDirectory: '/work', writableDirectories: [], hiddenDirectories: [], hiddenFiles: [], engineSockets: [], network: true });
+    const args = renderBubblewrapArguments({ workingDirectory: '/work', writableDirectories: [], hiddenDirectories: [], hiddenFiles: [], engineSockets: [], readOnlyDirectories: [], network: true });
     expect(args).toEqual([...ISOLATION, ...ROOT_AND_SYSTEM_FILESYSTEMS, '--bind', '/work', '/work', '--chdir', '/work', '--']);
   });
 
@@ -119,6 +123,15 @@ describe('renderBubblewrapArguments', () => {
     expect(args.slice(socket - 1, socket + 2)).toEqual(['--bind-try', '/run/user/1000/docker.sock', '/run/user/1000/docker.sock']);
     expect(socket).toBeGreaterThan(args.indexOf('/run/user'));
     expect(socket).toBeGreaterThan(args.indexOf('/home/operator/.netrc'));
+    expect(args.slice(-3)).toEqual(['--chdir', '/factory/worktrees/slot-1', COMMAND_SEPARATOR]);
+  });
+
+  it('mounts each read-only directory on itself after everything else, so a writable parent and a hidden one leave it read-only', () => {
+    const args = renderBubblewrapArguments({ ...POLICY, writableDirectories: ['/home/operator/.agent-factory'], hiddenDirectories: ['/home/operator/.agent-factory/state'], readOnlyDirectories: ['/home/operator/.agent-factory/projects/storefront/references/tokens@v1'] });
+    const snapshot = args.indexOf('/home/operator/.agent-factory/projects/storefront/references/tokens@v1');
+    expect(args.slice(snapshot - 1, snapshot + 2)).toEqual(['--ro-bind-try', '/home/operator/.agent-factory/projects/storefront/references/tokens@v1', '/home/operator/.agent-factory/projects/storefront/references/tokens@v1']);
+    expect(snapshot).toBeGreaterThan(args.indexOf('/home/operator/.agent-factory'));
+    expect(snapshot).toBeGreaterThan(args.indexOf('/home/operator/.agent-factory/state'));
     expect(args.slice(-3)).toEqual(['--chdir', '/factory/worktrees/slot-1', COMMAND_SEPARATOR]);
   });
 
@@ -134,7 +147,7 @@ describe('renderBubblewrapArguments', () => {
   it('puts the read-only root before every mount that overlays it, and every hidden path after every writable one', () => {
     fc.assert(
       fc.property(safePath(), fc.array(safePath()), fc.array(safePath()), fc.array(safePath()), fc.boolean(), (working, writable, directories, files, network) => {
-        const args = renderBubblewrapArguments({ workingDirectory: working, writableDirectories: writable, hiddenDirectories: directories, hiddenFiles: files, engineSockets: [], network });
+        const args = renderBubblewrapArguments({ workingDirectory: working, writableDirectories: writable, hiddenDirectories: directories, hiddenFiles: files, engineSockets: [], readOnlyDirectories: [], network });
         const binds = [...indexesOf(args, '--bind'), ...indexesOf(args, '--bind-try')];
         const hides = [...indexesOf(args, '--tmpfs'), ...args.flatMap((argument, index) => (argument === '--ro-bind' && args[index + 1] === NULL_DEVICE ? [index] : []))];
         const root = args.indexOf('--ro-bind');
@@ -152,7 +165,7 @@ describe('renderBubblewrapArguments', () => {
   it('mounts every directory it is given on itself and nothing else', () => {
     fc.assert(
       fc.property(safePath(), fc.array(safePath()), (working, writable) => {
-        const args = renderBubblewrapArguments({ workingDirectory: working, writableDirectories: writable, hiddenDirectories: [], hiddenFiles: [], engineSockets: [], network: true });
+        const args = renderBubblewrapArguments({ workingDirectory: working, writableDirectories: writable, hiddenDirectories: [], hiddenFiles: [], engineSockets: [], readOnlyDirectories: [], network: true });
         const mounts = indexesOf(args, '--bind').concat(indexesOf(args, '--bind-try')).map((index) => args.slice(index + 1, index + 3));
         expect(mounts.every(([source, destination]) => source === destination)).toBe(true);
         expect(mounts.map(([source]) => source).sort()).toEqual([working, ...writable].sort());

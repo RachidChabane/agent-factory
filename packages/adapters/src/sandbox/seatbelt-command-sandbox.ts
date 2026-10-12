@@ -1,5 +1,5 @@
 import type { CommandSandbox, SandboxScope } from '@agent-factory/application';
-import { canonicalDirectory } from './canonical-directory.ts';
+import { canonicalDirectory, canonicalFutureDirectory } from './canonical-directory.ts';
 import type { CommandSandboxSettings } from './command-sandbox-settings.ts';
 import { NO_ENGINE_SOCKETS } from './container-engine-sockets.ts';
 import { KEYCHAIN_EXECUTABLE, KEYCHAIN_SERVICES } from './credential-paths.ts';
@@ -20,6 +20,7 @@ export class SeatbeltCommandSandbox implements CommandSandbox {
       temporaryDirectories: settings.temporaryDirectories.map(canonicalDirectory),
       blockedPorts: settings.blockedPorts,
       engineSockets: settings.engineSockets ?? NO_ENGINE_SOCKETS,
+      readOnlyDirectories: settings.readOnlyDirectories ?? [],
     };
   }
 
@@ -30,6 +31,7 @@ export class SeatbeltCommandSandbox implements CommandSandbox {
       writableDirectories: [...new Set([worktree, ...this.settings.temporaryDirectories, ...this.settings.writableDirectories])],
       socketDirectories: [...new Set([worktree, ...this.settings.temporaryDirectories])],
       engineSockets: this.settings.engineSockets(),
+      readOnlyDirectories: [...new Set(this.settings.readOnlyDirectories.map(canonicalFutureDirectory))],
       deniedExecutables: [KEYCHAIN_EXECUTABLE],
       deniedServices: KEYCHAIN_SERVICES,
       blockedPorts: this.settings.blockedPorts(),

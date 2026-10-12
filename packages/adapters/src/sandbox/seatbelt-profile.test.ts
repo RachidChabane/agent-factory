@@ -15,6 +15,7 @@ const POLICY: SeatbeltPolicy = {
   writableDirectories: ['/factory/worktrees/slot-1', '/private/tmp'],
   socketDirectories: ['/factory/worktrees/slot-1'],
   engineSockets: [],
+  readOnlyDirectories: [],
   deniedExecutables: ['/usr/bin/security'],
   deniedServices: ['com.apple.SecurityServer'],
   blockedPorts: [7430, 5199],
@@ -52,6 +53,25 @@ describe('renderSeatbeltProfile', () => {
     expect(profile).toContain('(deny file-read*\n  (subpath "/Users/operator/.docker"))\n(allow file-read*\n  (literal "/Users/operator/.docker/run/docker.sock"))');
     expect(profile).toContain('(require-not (require-any (remote unix-socket (subpath "/factory/worktrees/slot-1")) (remote unix-socket (literal "/Users/operator/.docker/run/docker.sock"))))');
     expect(profile.indexOf('(allow file-read*')).toBeLessThan(profile.indexOf('(deny file-write*)'));
+  });
+
+  it('grants reads of a read-only directory after the denies, and denies writes to it after the allowed ones', () => {
+    const profile = renderSeatbeltProfile({
+      ...POLICY,
+      deniedReads: [parsePathPattern('/factory/state', HOME)],
+      writableDirectories: ['/factory', '/private/tmp'],
+      readOnlyDirectories: ['/factory/projects/storefront/references/tokens@v1'],
+    });
+    const snapshot = '(subpath "/factory/projects/storefront/references/tokens@v1")';
+    expect(profile).toContain(`(allow file-read*\n  ${snapshot})`);
+    expect(profile).toContain(`(deny file-write*\n  ${snapshot})`);
+    expect(profile.indexOf(`(allow file-read*\n  ${snapshot})`)).toBeGreaterThan(profile.indexOf('(deny file-read*'));
+    expect(profile.indexOf(`(deny file-write*\n  ${snapshot})`)).toBeGreaterThan(profile.indexOf('(allow file-write*'));
+    expect(profile.trimEnd().endsWith(')')).toBe(true);
+  });
+
+  it('refuses a read-only directory that would break out of its string literal', () => {
+    expect(() => renderSeatbeltProfile({ ...POLICY, readOnlyDirectories: ['/tmp/a")(allow default'] })).toThrow(UnsafeSandboxPathError);
   });
 
   it('grants no engine socket unless one is given', () => {
@@ -114,5 +134,23 @@ describe('SeatbeltCommandSandbox', () => {
     expect(profile).toContain('(subpath "/factory/worktrees/slot-2")');
     expect(profile).toContain('(subpath "/factory/cache")');
     expect(profile).toContain('(remote ip "*:7430")');
+  });
+
+  it('names the read-only directories it is given by their canonical path, even before they exist', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'factory-seatbelt-readonly-')));
+    try {
+      await mkdir(join(root, 'real'));
+      await symlink(join(root, 'real'), join(root, 'link'));
+      const sandbox = new SeatbeltCommandSandbox({
+        deniedReads: [],
+        writableDirectories: [],
+        temporaryDirectories: [],
+        blockedPorts: () => [],
+        readOnlyDirectories: [join(root, 'link', 'references', 'tokens@v1'), join(root, 'real', 'references', 'tokens@v1')],
+      });
+      expect(sandbox.policy({ workingDirectory: join(root, 'real'), network: false }).readOnlyDirectories).toEqual([join(root, 'real', 'references', 'tokens@v1')]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
