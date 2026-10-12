@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { ReferencesNotReadyError } from './reference-errors.ts';
 import { materialiseReferences, requireReferences } from './materialise-references.ts';
@@ -25,6 +26,23 @@ describe('materialiseReferences', () => {
 
     expect(rebuilt).toMatchObject({ snapshot: { change: 'rebuilt' } });
     expect(unchanged).toMatchObject({ snapshot: { change: 'unchanged' } });
+  });
+
+  it('reports created, then unchanged while the ref names the same commit and rebuilt when it names another, and keeps the last commit', async () => {
+    const commits = fc.array(fc.constantFrom('a', 'b', 'c').map((letter) => letter.repeat(40)), { minLength: 1, maxLength: 12 });
+    await fc.assert(
+      fc.asyncProperty(commits, async (sequence) => {
+        const snapshots = new FakeReferenceSnapshots();
+        const changes: string[] = [];
+        for (const commit of sequence) {
+          snapshots.commit = commit;
+          const [outcome] = await materialiseReferences(snapshots, [TOKENS]);
+          changes.push(outcome?.ok === true ? outcome.snapshot.change : 'failed');
+        }
+        expect(changes).toEqual(sequence.map((commit, index) => (index === 0 ? 'created' : commit === sequence[index - 1] ? 'unchanged' : 'rebuilt')));
+        expect((await snapshots.inspect(TOKENS)).commit).toBe(sequence.at(-1));
+      }),
+    );
   });
 
   it('has nothing to report without references', async () => {
