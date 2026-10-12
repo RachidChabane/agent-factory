@@ -131,7 +131,7 @@ describe('ProjectSettingsView issue types', () => {
     expect(ui).toHaveTextContent('type:ui');
     expect(ui).toHaveTextContent('Fails on the base');
     expect(ui).toHaveTextContent('feat');
-    expect(ui).toHaveTextContent('an end-to-end journey');
+    expect(ui).toHaveTextContent('a browser journey');
   });
 
   it('writes the scope of a commit type that has one, and the proof of a type that needs none', async () => {
