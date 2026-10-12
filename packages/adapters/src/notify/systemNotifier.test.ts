@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fc from 'fast-check';
-import type { CommandResult, CommandRunner } from '@agent-factory/application';
+import type { CommandResult, CommandRunner, Notifier } from '@agent-factory/application';
 import { describe, expect, it } from 'vitest';
 import { CommandSpawnError } from '../process/errors.ts';
 import { UnsupportedPlatformError } from '../platform/supported-platform.ts';
@@ -50,6 +50,8 @@ class RecordingRunner implements CommandRunner {
 function notifierOn(platform: string, runner: CommandRunner): SystemNotifier {
   return new SystemNotifier({ platform, runner, environment: ENVIRONMENT, timeoutMs: TIMEOUT_MS });
 }
+
+const MEDIA = [{ label: 'checkout-flow · before · film.mp4', url: 'https://files.example.test/a/film.mp4' }];
 
 function missingExecutable(command: readonly string[]): CommandSpawnError {
   return new CommandSpawnError(command, Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' }));
@@ -165,6 +167,16 @@ describe('notification markup', () => {
 });
 
 describe('SystemNotifier on macOS', () => {
+  it('shows a notice with links as it shows one without: a toast cannot be clicked, so the links stay in the other channels and the cockpit', async () => {
+    const without = new RecordingRunner();
+    const withLinks = new RecordingRunner();
+    await notifierOn('darwin', without).notify(NOTICE_TITLE, NOTICE_BODY);
+    const channel: Notifier = notifierOn('darwin', withLinks);
+    await channel.notify(NOTICE_TITLE, NOTICE_BODY, 'http://127.0.0.1:7430/issues/42', MEDIA);
+    expect(withLinks.runs[0]?.command).toEqual(without.runs[0]?.command);
+    expect(JSON.stringify(withLinks.runs)).not.toContain('files.example.test');
+  });
+
   it('shows the notice with osascript, without a shell', async () => {
     const runner = new RecordingRunner();
     await notifierOn('darwin', runner).notify(NOTICE_TITLE, NOTICE_BODY);

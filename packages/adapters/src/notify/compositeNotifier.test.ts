@@ -1,4 +1,4 @@
-import type { Notifier } from '@agent-factory/application';
+import type { NoticeLink, Notifier } from '@agent-factory/application';
 import { describe, expect, it } from 'vitest';
 import { CompositeNotifier, type NotificationChannel } from './compositeNotifier.ts';
 import { NotificationChannelsFailedError, NotificationDeliveryError } from './errors.ts';
@@ -6,9 +6,11 @@ import { NOTICE_BODY, NOTICE_LINK, NOTICE_TITLE, SECRET_WEBHOOK_URL } from './te
 
 class RecordingChannel implements Notifier {
   readonly delivered: (readonly [string, string, string])[] = [];
+  readonly media: (readonly NoticeLink[])[] = [];
 
-  notify(title: string, body: string, link: string): Promise<void> {
+  notify(title: string, body: string, link: string, media: readonly NoticeLink[] = []): Promise<void> {
     this.delivered.push([title, body, link]);
+    this.media.push(media);
     return Promise.resolve();
   }
 }
@@ -38,6 +40,15 @@ describe('CompositeNotifier', () => {
     await new CompositeNotifier([channel('slack', first), channel('system', second)]).notify(NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK);
     expect(first.delivered).toEqual([[NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK]]);
     expect(second.delivered).toEqual([[NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK]]);
+  });
+
+  it('hands the links of the notice to every channel', async () => {
+    const first = new RecordingChannel();
+    const second = new RecordingChannel();
+    const media = [{ label: 'tour · after · film.mp4', url: 'https://files.example.test/a' }];
+    await new CompositeNotifier([channel('slack', first), channel('webhook', second)]).notify(NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK, media);
+    expect(first.media).toEqual([media]);
+    expect(second.media).toEqual([media]);
   });
 
   it('has nothing to deliver without a channel', async () => {

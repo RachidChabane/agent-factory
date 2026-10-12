@@ -73,7 +73,7 @@ const NOTIFY_SEND: NotificationTool = {
 
 const NOTIFICATION_TOOLS: PlatformTable<NotificationTool> = { darwin: OSASCRIPT, linux: NOTIFY_SEND };
 
-/** Desktop toasts carry no link: neither osascript nor notify-send can attach a click action to a notification. */
+/** Desktop toasts carry no link, neither to the cockpit nor to a notice's media: neither osascript nor notify-send can attach a click action to a notification. */
 export class SystemNotifier implements Notifier {
   private readonly settings: SystemNotifierSettings;
   private readonly tool: NotificationTool;
