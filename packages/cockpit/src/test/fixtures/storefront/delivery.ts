@@ -1,10 +1,10 @@
-import type { Deployment, DeploymentOutcome, EnvironmentView, HealthCheckView, HealthSample, WorkflowRun } from '../../../contract/index.ts';
+import type { DeliveredCommit, Deployment, DeploymentOutcome, EnvironmentView, HealthCheckView, HealthSample, WorkflowRun } from '../../../contract/index.ts';
 import { actionsRunUrl, workflowUrl } from '../forge-links.ts';
-import { ACTIONS_BOT_LOGIN, OPERATOR } from '../people.ts';
+import { ACTIONS_BOT_LOGIN, DANA, OPERATOR, RILEY } from '../people.ts';
 import { failedAfter, readOn } from '../readings.ts';
 import { environmentView } from '../seeds.ts';
 import { days, hours, seededRandom, SECOND_MS, type FixtureClock } from '../time.ts';
-import { mergeSha, PULL_REQUEST, OUTSIDE_PULL_REQUEST, RELEASE, TAG_SHA, headSha } from './ids.ts';
+import { ISSUE, mergeSha, PULL_REQUEST, OUTSIDE_PULL_REQUEST, RELEASE, TAG_SHA, headSha } from './ids.ts';
 
 const SHORT_SHA_LENGTH = 7;
 const SAMPLES_PER_DAY = 24;
@@ -50,6 +50,30 @@ function checkOf(name: string, url: string, series: readonly HealthSample[]): He
   return { name, url, latest: series.at(-1) ?? null, series: [...series] };
 }
 
+/** The commits the base branch received as squash merges, by pull request: what a deployment can bring. */
+const SHIPPED = {
+  orderHistoryPagination: { pullRequest: PULL_REQUEST.orderHistoryPagination, issue: ISSUE.orderHistoryPagination, headline: 'feat(orders): paginate the order history endpoint (#44)', author: 'Example Factory', minutesAgo: 15 },
+  cartBadgeSync: { pullRequest: PULL_REQUEST.cartBadgeSync, issue: ISSUE.cartBadgeSync, headline: 'fix(cart): keep the cart badge in sync after removing a line (#39)', author: 'Example Factory', minutesAgo: days(1) },
+  promoRounding: { pullRequest: PULL_REQUEST.promoRounding, issue: ISSUE.promoRounding, headline: 'fix(cart): round promo code discounts to the cent (#34)', author: 'Example Factory', minutesAgo: days(3) },
+  lockfileRefresh: { pullRequest: OUTSIDE_PULL_REQUEST.lockfileRefresh, issue: null, headline: 'chore(deps): refresh the lockfile (#54)', author: 'dependency-bot[bot]', minutesAgo: hours(1) },
+  apiReferenceResync: { pullRequest: OUTSIDE_PULL_REQUEST.apiReferenceResync, issue: null, headline: 'docs: resynchronise the API reference (#56)', author: RILEY.name, minutesAgo: hours(2) },
+  viteBump: { pullRequest: OUTSIDE_PULL_REQUEST.viteBump, issue: null, headline: 'chore(deps): bump vite to its latest minor release (#46)', author: 'dependency-bot[bot]', minutesAgo: days(4) },
+  footerLinks: { pullRequest: OUTSIDE_PULL_REQUEST.footerLinks, issue: null, headline: 'feat(footer): link the returns policy (#42)', author: DANA.name, minutesAgo: days(6) },
+  zodBump: { pullRequest: OUTSIDE_PULL_REQUEST.zodBump, issue: null, headline: 'chore(deps): bump zod (#43)', author: 'dependency-bot[bot]', minutesAgo: days(6) },
+} as const;
+
+function shipped(clock: FixtureClock, key: keyof typeof SHIPPED): DeliveredCommit {
+  const change = SHIPPED[key];
+  return {
+    sha: mergeSha(change.pullRequest),
+    headline: change.headline,
+    author: change.author,
+    committedAt: clock.minutesAgo(change.minutesAgo),
+    pullRequestNumber: change.pullRequest,
+    issueNumber: change.issue,
+  };
+}
+
 interface DeploymentSeed {
   readonly id: string;
   readonly ref: string;
@@ -58,6 +82,7 @@ interface DeploymentSeed {
   readonly outcome: DeploymentOutcome;
   readonly actor: string | null;
   readonly runId: string | null;
+  readonly changes: readonly DeliveredCommit[] | null;
   readonly tag?: boolean;
 }
 
@@ -71,54 +96,57 @@ function deploymentOf(clock: FixtureClock, seed: DeploymentSeed): Deployment {
     actor: seed.actor,
     outcome: seed.outcome,
     workflowUrl: seed.runId === null ? null : actionsRunUrl(seed.runId),
+    changes: seed.changes === null ? null : [...seed.changes],
   };
 }
 
-function developmentDeployments(clock: FixtureClock): { current: Deployment; history: Deployment[] } {
-  const branch = (id: string, pullRequest: number, minutesAgo: number, outcome: DeploymentOutcome, runId: string): Deployment =>
-    deploymentOf(clock, { id, ref: 'main', sha: mergeSha(pullRequest), minutesAgo, outcome, actor: ACTIONS_BOT_LOGIN, runId });
+type DeploymentReading = { current: Deployment; history: Deployment[]; pending: DeliveredCommit[] | null };
+
+function developmentDeployments(clock: FixtureClock): DeploymentReading {
+  const branch = (id: string, pullRequest: number, minutesAgo: number, outcome: DeploymentOutcome, runId: string, changes: readonly DeliveredCommit[] | null): Deployment =>
+    deploymentOf(clock, { id, ref: 'main', sha: mergeSha(pullRequest), minutesAgo, outcome, actor: ACTIONS_BOT_LOGIN, runId, changes });
   const history = [
-    branch('1204518', PULL_REQUEST.orderHistoryPagination, 15, 'in-progress', '9120446281'),
-    branch('1204512', OUTSIDE_PULL_REQUEST.lockfileRefresh, 48, 'success', '9120201733'),
-    branch('1204507', OUTSIDE_PULL_REQUEST.apiReferenceResync, 118, 'success', '9119887410'),
-    branch('1204499', PULL_REQUEST.cartBadgeSync, 148, 'success', '9119652208'),
-    branch('1204481', PULL_REQUEST.promoRounding, 296, 'success', '9118745093'),
-    branch('1204478', PULL_REQUEST.promoRounding, 298, 'failure', '9118733816'),
-    branch('1204402', OUTSIDE_PULL_REQUEST.viteBump, 838, 'success', '9116402957'),
+    branch('1204518', PULL_REQUEST.orderHistoryPagination, 15, 'in-progress', '9120446281', [shipped(clock, 'orderHistoryPagination')]),
+    branch('1204512', OUTSIDE_PULL_REQUEST.lockfileRefresh, 48, 'success', '9120201733', [shipped(clock, 'apiReferenceResync'), shipped(clock, 'lockfileRefresh')]),
+    branch('1204507', OUTSIDE_PULL_REQUEST.apiReferenceResync, 118, 'success', '9119887410', [shipped(clock, 'cartBadgeSync')]),
+    branch('1204499', PULL_REQUEST.cartBadgeSync, 148, 'success', '9119652208', [shipped(clock, 'promoRounding')]),
+    branch('1204481', PULL_REQUEST.promoRounding, 296, 'success', '9118745093', [shipped(clock, 'viteBump')]),
+    branch('1204478', PULL_REQUEST.promoRounding, 298, 'failure', '9118733816', [shipped(clock, 'viteBump')]),
+    branch('1204402', OUTSIDE_PULL_REQUEST.viteBump, 838, 'success', '9116402957', null),
   ];
   const current = history[1];
   if (current === undefined) throw new Error('the development history is empty');
-  return { current, history };
+  return { current, history, pending: [shipped(clock, 'orderHistoryPagination')] };
 }
 
-function stagingDeployments(clock: FixtureClock): { current: Deployment; history: Deployment[] } {
-  const tag = (id: string, ref: string, sha: string, minutesAgo: number, outcome: DeploymentOutcome, runId: string, actor: string | null = OPERATOR.login): Deployment =>
-    deploymentOf(clock, { id, ref, sha, minutesAgo, outcome, actor, runId, tag: true });
+function stagingDeployments(clock: FixtureClock): DeploymentReading {
+  const tag = (id: string, ref: string, sha: string, minutesAgo: number, outcome: DeploymentOutcome, runId: string, changes: readonly DeliveredCommit[] | null, actor: string | null = OPERATOR.login): Deployment =>
+    deploymentOf(clock, { id, ref, sha, minutesAgo, outcome, actor, runId, changes, tag: true });
   const history = [
-    tag('1203911', RELEASE.oneEightTwo, TAG_SHA.oneEightTwo, hours(22), 'success', '9114023388'),
-    tag('1203544', RELEASE.oneEightOne, TAG_SHA.oneEightOne, days(3), 'success', '9109553021'),
-    tag('1203538', RELEASE.oneEightOne, TAG_SHA.oneEightOne, days(3) + hours(1), 'failure', '9109498745'),
-    tag('1203102', RELEASE.oneEight, TAG_SHA.oneEight, days(5), 'success', '9103210976'),
-    tag('1201877', RELEASE.oneSeven, TAG_SHA.oneSeven, days(20), 'success', '9071154429'),
-    tag('1200931', '1.6.1', TAG_SHA.oneSixOne, days(33), 'success', '9040231170', null),
+    tag('1203911', RELEASE.oneEightTwo, TAG_SHA.oneEightTwo, hours(22), 'success', '9114023388', [shipped(clock, 'cartBadgeSync'), shipped(clock, 'lockfileRefresh')]),
+    tag('1203544', RELEASE.oneEightOne, TAG_SHA.oneEightOne, days(3), 'success', '9109553021', [shipped(clock, 'promoRounding')]),
+    tag('1203538', RELEASE.oneEightOne, TAG_SHA.oneEightOne, days(3) + hours(1), 'failure', '9109498745', [shipped(clock, 'promoRounding')]),
+    tag('1203102', RELEASE.oneEight, TAG_SHA.oneEight, days(5), 'success', '9103210976', [shipped(clock, 'footerLinks'), shipped(clock, 'zodBump')]),
+    tag('1201877', RELEASE.oneSeven, TAG_SHA.oneSeven, days(20), 'success', '9071154429', []),
+    tag('1200931', '1.6.1', TAG_SHA.oneSixOne, days(33), 'success', '9040231170', null, null),
   ];
   const current = history[0];
   if (current === undefined) throw new Error('the staging history is empty');
-  return { current, history };
+  return { current, history, pending: [shipped(clock, 'apiReferenceResync'), shipped(clock, 'orderHistoryPagination')] };
 }
 
-function productionDeployments(clock: FixtureClock): { current: Deployment; history: Deployment[] } {
-  const tag = (id: string, ref: string, sha: string, minutesAgo: number, runId: string): Deployment =>
-    deploymentOf(clock, { id, ref, sha, minutesAgo, outcome: 'success', actor: OPERATOR.login, runId, tag: true });
+function productionDeployments(clock: FixtureClock): DeploymentReading {
+  const tag = (id: string, ref: string, sha: string, minutesAgo: number, runId: string, changes: readonly DeliveredCommit[] | null): Deployment =>
+    deploymentOf(clock, { id, ref, sha, minutesAgo, outcome: 'success', actor: OPERATOR.login, runId, changes, tag: true });
   const history = [
-    tag('1203702', RELEASE.oneEight, TAG_SHA.oneEight, days(2), PRODUCTION_WORKFLOW_RUN.oneEight),
-    tag('1202011', RELEASE.oneSeven, TAG_SHA.oneSeven, days(21), PRODUCTION_WORKFLOW_RUN.oneSeven),
-    tag('1200988', '1.6.1', TAG_SHA.oneSixOne, days(33) - hours(2), '9041012266'),
-    tag('1199764', '1.6.0', TAG_SHA.oneSix, days(41), '9001788340'),
+    tag('1203702', RELEASE.oneEight, TAG_SHA.oneEight, days(2), PRODUCTION_WORKFLOW_RUN.oneEight, [shipped(clock, 'footerLinks'), shipped(clock, 'zodBump')]),
+    tag('1202011', RELEASE.oneSeven, TAG_SHA.oneSeven, days(21), PRODUCTION_WORKFLOW_RUN.oneSeven, []),
+    tag('1200988', '1.6.1', TAG_SHA.oneSixOne, days(33) - hours(2), '9041012266', null),
+    tag('1199764', '1.6.0', TAG_SHA.oneSix, days(41), '9001788340', null),
   ];
   const current = history[0];
   if (current === undefined) throw new Error('the production history is empty');
-  return { current, history };
+  return { current, history, pending: [shipped(clock, 'promoRounding'), shipped(clock, 'cartBadgeSync'), shipped(clock, 'lockfileRefresh'), shipped(clock, 'apiReferenceResync'), shipped(clock, 'orderHistoryPagination')] };
 }
 
 export function storefrontEnvironments(clock: FixtureClock): EnvironmentView[] {

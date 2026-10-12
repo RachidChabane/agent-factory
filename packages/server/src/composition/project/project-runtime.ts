@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import {
   ClaudeCodeHarness,
   claudeHarnessConfig,
+  DEFAULT_REMOTE_NAME,
   EventSourcedIssueStateStore,
   FileLogArchive,
   FileRolePromptCatalog,
@@ -196,7 +197,7 @@ export async function openProject(installation: InstallationContext, initial: Pr
       baseBranch: config.baseBranch,
       environment: gitEnvironment,
     }),
-    repository: new ProjectRepository(new GitObjects(config.clonePath, gitEnvironment), events, clock),
+    repository: new ProjectRepository(new GitObjects(config.clonePath, gitEnvironment), events, clock, [`${DEFAULT_REMOTE_NAME}/${config.baseBranch}`, config.baseBranch]),
     knowledge: new SourcesKnowledgePack(config.knowledge, config.clonePath, files),
     references,
     delivery: deliveryEnvironments(config),

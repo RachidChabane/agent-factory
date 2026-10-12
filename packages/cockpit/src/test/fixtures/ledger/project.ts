@@ -40,7 +40,7 @@ function environments(clock: FixtureClock): EnvironmentView[] {
       production: true,
       promotion: 'manual',
       status: 'down',
-      deployments: readOn({ current: null, history: [] }, clock.minutesAgo(DEPLOYMENTS_READ_MINUTES_AGO)),
+      deployments: readOn({ current: null, history: [], pending: null }, clock.minutesAgo(DEPLOYMENTS_READ_MINUTES_AGO)),
       health: [{ name: 'api', url: PRODUCTION_HEALTH_URL, latest: probes.at(-1) ?? null, series: probes }],
     }),
   ];

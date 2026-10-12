@@ -3,7 +3,7 @@ import { healthSamplesSince, type FactoryEventRecord } from '@agent-factory/appl
 import type { ProjectConfig } from '../config/agent-factory-config.ts';
 import type { Observed } from '../snapshot/cached-reading.ts';
 import { projectAudits, projectSkippedChanges } from './audit-views.ts';
-import { environmentView, type EnvironmentDeployments } from './environment-views.ts';
+import { environmentView, type EnvironmentDeployments, type MergedPullRequests } from './environment-views.ts';
 import { indexEvents } from './event-index.ts';
 import { pauseViews, projectSettingsView, schedulerView } from './installation-views.ts';
 import { issueJournals, projectIssues } from './issue-views.ts';
@@ -31,12 +31,22 @@ export interface ProjectViewProjection {
   readonly questions: ReadonlyMap<string, PendingQuestion>;
 }
 
+/** The pull requests of the factory that were squash-merged, by the sha of the commit that merged them. */
+function mergedPullRequests(journals: ReturnType<typeof issueJournals>): MergedPullRequests {
+  return new Map(
+    [...journals.values()].flatMap((journal) =>
+      journal.mergeSha === null || journal.pullRequest === null ? [] : [[journal.mergeSha, { pullRequestNumber: journal.pullRequest.number, issueNumber: journal.issueNumber }] as const],
+    ),
+  );
+}
+
 /** The cockpit's view of one project, from its own events (with the subjects it sees) and its readings. */
 export function projectView(project: ProjectConfig, records: readonly FactoryEventRecord[], context: ProjectSnapshotContext, readings: ProjectReadingsView): ProjectViewProjection {
   const index = indexEvents(records);
   const journals = issueJournals(index);
   const requests: RequestView[] = projectRequests(index, context);
   const requestOfIssue = new Map(requests.flatMap((request) => request.issueNumbers.map((issueNumber) => [issueNumber, request.id] as const)));
+  const merged = mergedPullRequests(journals);
   const healthSamples = healthSamplesSince(records, new Date(context.generatedAt.getTime() - HEALTH_SERIES_WINDOW_MS));
   const view: ProjectView = {
     id: project.id,
@@ -63,6 +73,7 @@ export function projectView(project: ProjectConfig, records: readonly FactoryEve
         environment,
         environment.deployments.kind === 'github' ? readings.deployments(environment.deployments.environment) : null,
         healthSamples.get(environment.name) ?? new Map(),
+        merged,
       ),
     ),
     releases: projectReleases(index, journals, context),

@@ -92,11 +92,25 @@ describe('the environments of the world', () => {
     expect(production.deployments?.value?.history.every((entry) => entry.workflowUrl !== null)).toBe(true);
   });
 
+  it('give every storefront environment the commits of its deployments, the empty and the unknown ones included, and those waiting behind the current one', () => {
+    for (const name of ['development', 'staging', 'production']) {
+      const read = required(environmentNamed(storefront, name).deployments?.value, `deployments of ${name}`);
+      const changes = read.history.map((entry) => entry.changes);
+      expect(changes.some((entry) => entry !== null && entry.length > 0), `${name} has a deployment with commits`).toBe(true);
+      expect(changes.some((entry) => entry === null), `${name} has a deployment whose commits are unknown`).toBe(true);
+      expect(read.pending, `${name} has commits waiting`).not.toBeNull();
+    }
+    const staging = required(environmentNamed(storefront, 'staging').deployments?.value, 'deployments of staging');
+    expect(staging.history.some((entry) => entry.changes?.length === 0)).toBe(true);
+    expect(staging.history.flatMap((entry) => entry.changes ?? []).some((commit) => commit.pullRequestNumber !== null && commit.issueNumber !== null)).toBe(true);
+    expect(staging.history.flatMap((entry) => entry.changes ?? []).some((commit) => commit.pullRequestNumber !== null && commit.issueNumber === null)).toBe(true);
+  });
+
   it('give the ledger an environment with no deployment source and one where nothing was deployed yet', () => {
     const staging = environmentNamed(ledger, 'staging');
     expect([staging.deployments, staging.status, staging.health]).toEqual([null, 'unknown', []]);
     const production = environmentNamed(ledger, 'production');
-    expect(production.deployments?.value).toEqual({ current: null, history: [] });
+    expect(production.deployments?.value).toEqual({ current: null, history: [], pending: null });
     expect(production.deployments?.error).toBeNull();
     expect(production.status).toBe('down');
     expect(production.health[0]?.series.every((sample) => !sample.ok && sample.statusCode === null)).toBe(true);

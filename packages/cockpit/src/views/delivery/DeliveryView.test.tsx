@@ -149,8 +149,8 @@ describe('DeliveryView deployments', () => {
   });
 
   it('says that no deployment has succeeded when the history holds only failures, and still lists them', async () => {
-    const failed: Deployment = { id: '77', version: 'abc1234', ref: 'main', sha: 'abc1234'.padEnd(40, '0'), deployedAt: clock.minutesAgo(30), actor: 'amorgan', outcome: 'failure', workflowUrl: null };
-    const snapshot = withEnvironment(STOREFRONT, 'staging', (environment) => ({ ...environment, deployments: { value: { current: null, history: [failed] }, readAt: clock.minutesAgo(2), error: null } }));
+    const failed: Deployment = { id: '77', version: 'abc1234', ref: 'main', sha: 'abc1234'.padEnd(40, '0'), deployedAt: clock.minutesAgo(30), actor: 'amorgan', outcome: 'failure', workflowUrl: null, changes: null };
+    const snapshot = withEnvironment(STOREFRONT, 'staging', (environment) => ({ ...environment, deployments: { value: { current: null, history: [failed], pending: null }, readAt: clock.minutesAgo(2), error: null } }));
     await openDelivery(STOREFRONT, { snapshot });
     const staging = environmentCard('staging');
     expect(within(staging).getByText('No deployment has succeeded yet')).toBeInTheDocument();
@@ -159,8 +159,8 @@ describe('DeliveryView deployments', () => {
   });
 
   it('offers no link for a deployment the forge gave no workflow run for', async () => {
-    const withoutRun: Deployment = { id: '78', version: '2.0.0', ref: '2.0.0', sha: 'f'.repeat(40), deployedAt: clock.minutesAgo(30), actor: 'unknown', outcome: 'success', workflowUrl: null };
-    const snapshot = withEnvironment(STOREFRONT, 'staging', (environment) => ({ ...environment, deployments: { value: { current: withoutRun, history: [withoutRun] }, readAt: clock.minutesAgo(2), error: null } }));
+    const withoutRun: Deployment = { id: '78', version: '2.0.0', ref: '2.0.0', sha: 'f'.repeat(40), deployedAt: clock.minutesAgo(30), actor: 'unknown', outcome: 'success', workflowUrl: null, changes: null };
+    const snapshot = withEnvironment(STOREFRONT, 'staging', (environment) => ({ ...environment, deployments: { value: { current: withoutRun, history: [withoutRun], pending: null }, readAt: clock.minutesAgo(2), error: null } }));
     await openDelivery(STOREFRONT, { snapshot });
     expect(within(environmentCard('staging')).queryByRole('link', { name: /Open the workflow run/ })).not.toBeInTheDocument();
   });

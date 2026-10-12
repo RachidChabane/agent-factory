@@ -11,6 +11,7 @@ const DEPLOYMENT: Deployment = {
   actor: 'amorgan',
   outcome: 'success',
   workflowUrl: null,
+  changes: null,
 };
 const READ_AT = '2026-10-12T09:50:00.000Z';
 
@@ -20,7 +21,7 @@ function environment(patch: Partial<EnvironmentView> = {}): EnvironmentView {
     production: false,
     promotion: 'batch',
     status: 'healthy',
-    deployments: { value: { current: DEPLOYMENT, history: [DEPLOYMENT] }, readAt: READ_AT, error: null },
+    deployments: { value: { current: DEPLOYMENT, history: [DEPLOYMENT], pending: null }, readAt: READ_AT, error: null },
     health: [],
     redeployable: true,
     workflowUrl: null,
@@ -34,7 +35,7 @@ describe('redeployAvailability', () => {
   });
 
   it('still offers it on the version of a reading whose latest read failed', () => {
-    const stale = environment({ deployments: { value: { current: DEPLOYMENT, history: [DEPLOYMENT] }, readAt: READ_AT, error: 'GitHub API request failed: 502' } });
+    const stale = environment({ deployments: { value: { current: DEPLOYMENT, history: [DEPLOYMENT], pending: null }, readAt: READ_AT, error: 'GitHub API request failed: 502' } });
     expect(redeployAvailability(stale)).toEqual({ kind: 'available', deployed: DEPLOYMENT });
   });
 
@@ -56,8 +57,8 @@ describe('redeployAvailability', () => {
     ['no deployment source', null],
     ['a source that was never read', { value: null, readAt: null, error: null }],
     ['a read that failed with nothing kept', { value: null, readAt: null, error: 'boom' }],
-    ['a source with nothing deployed', { value: { current: null, history: [] }, readAt: READ_AT, error: null }],
-    ['a history without any success', { value: { current: null, history: [{ ...DEPLOYMENT, outcome: 'failure' as const }] }, readAt: READ_AT, error: null }],
+    ['a source with nothing deployed', { value: { current: null, history: [], pending: null }, readAt: READ_AT, error: null }],
+    ['a history without any success', { value: { current: null, history: [{ ...DEPLOYMENT, outcome: 'failure' as const }], pending: null }, readAt: READ_AT, error: null }],
   ])('does not offer it with %s: there is no version to repeat', (_, deployments) => {
     expect(redeployAvailability(environment({ deployments }))).toEqual({ kind: 'nothing-deployed' });
   });
@@ -98,12 +99,12 @@ describe('confirmsDeployedVersion', () => {
 describe('isDeploymentInProgress', () => {
   it('is true when the newest deployment is still running', () => {
     const running = { ...DEPLOYMENT, id: '2', outcome: 'in-progress' as const };
-    expect(isDeploymentInProgress(environment({ deployments: { value: { current: DEPLOYMENT, history: [running, DEPLOYMENT] }, readAt: READ_AT, error: null } }))).toBe(true);
+    expect(isDeploymentInProgress(environment({ deployments: { value: { current: DEPLOYMENT, history: [running, DEPLOYMENT], pending: null }, readAt: READ_AT, error: null } }))).toBe(true);
   });
 
   it('is false when only an older deployment ran, and without a reading', () => {
     const running = { ...DEPLOYMENT, id: '2', outcome: 'in-progress' as const };
-    expect(isDeploymentInProgress(environment({ deployments: { value: { current: DEPLOYMENT, history: [DEPLOYMENT, running] }, readAt: READ_AT, error: null } }))).toBe(false);
+    expect(isDeploymentInProgress(environment({ deployments: { value: { current: DEPLOYMENT, history: [DEPLOYMENT, running], pending: null }, readAt: READ_AT, error: null } }))).toBe(false);
     expect(isDeploymentInProgress(environment({ deployments: null }))).toBe(false);
   });
 });

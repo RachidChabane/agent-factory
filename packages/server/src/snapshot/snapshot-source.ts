@@ -40,6 +40,7 @@ import { projectRuns, recordedRuns, type RecordedRun } from '../projections/run-
 import { imageKey, logKey, type ForgePullRequest, type PendingIssue, type ProjectSnapshotContext, type RunLogSummary } from '../projections/snapshot-context.ts';
 import { projectView, type ProjectViewProjection } from '../projections/project-view.ts';
 import { CachedReading, CachedReadings, COLD_READ_WAIT_MS, NEVER_READ, observedView, type Observed } from './cached-reading.ts';
+import { DeploymentCommits } from './deployment-commits.ts';
 import { ImageSizes } from './evidence-image-sizes.ts';
 import type { ImageSize } from './image-size.ts';
 
@@ -167,8 +168,13 @@ class ProjectReadings {
       clock,
       coldWaitMs,
     );
+    const deliveredCommits = new DeploymentCommits(project.repository);
     this.deployments = new CachedReadings<string, EnvironmentDeployments>(
-      async (target) => ({ records: await forge.deployments(target, DEPLOYMENT_HISTORY_LIMIT), tags: new Set((await forge.listTags()).map((tag) => tag.name)) }),
+      async (target) => {
+        const [records, tags] = await Promise.all([forge.deployments(target, DEPLOYMENT_HISTORY_LIMIT), forge.listTags()]);
+        const [changes, pending] = await Promise.all([deliveredCommits.changes(records), deliveredCommits.pending(records)]);
+        return { records, tags: new Set(tags.map((tag) => tag.name)), changes, pending };
+      },
       FORGE_READ_INTERVAL_MS,
       clock,
       coldWaitMs,
