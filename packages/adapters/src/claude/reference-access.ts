@@ -6,12 +6,13 @@ const PATH_SEPARATOR = '/';
 const ANY_ARGUMENTS = '*';
 const COPY_COMMAND = 'cp';
 const RECURSIVE_COPY_FLAG = '-R';
+const MAKE_DIRECTORY_COMMAND = 'mkdir -p';
 
 export const REFERENCE_PROMPT_HEADING = '# Reference repositories';
 export const REFERENCE_PROMPT_INTRODUCTION =
   'Other repositories that the specification cites are available as read-only snapshots on this machine, at the ref the specification names. Read their files with the Read, Grep and Glob tools.';
 export const REFERENCE_COPY_RULE =
-  'Copy a file with `cp <snapshot>/<file> <destination>` and a directory with `cp -R <snapshot>/<directory> <destination>`. A copy keeps the read-only mode of the original.';
+  'Copy a file with `cp <snapshot>/<file> <destination>` and a directory with `cp -R <snapshot>/<directory> <destination>`. A copy keeps the read-only mode of the original. Create a missing destination directory with `mkdir -p <directory>` first.';
 export const REFERENCE_READ_ONLY_RULE = 'Never modify a snapshot.';
 
 /** A reference whose snapshot is built, as an agent run sees it. */
@@ -29,12 +30,19 @@ export type ReferenceMounts = () => Promise<readonly ReferenceMount[]>;
 
 export const NO_REFERENCE_MOUNTS: ReferenceMounts = () => Promise.resolve([]);
 
-/** The shell commands that copy from a snapshot, and nothing broader: `cp` and `cp -R`, the source under the snapshot. */
+/**
+ * The shell commands that copy from a snapshot: `cp` and `cp -R` with the source under the snapshot, and `mkdir -p`
+ * to create the destination directory first. The sandbox still confines every write to the worktree.
+ */
 export function referenceCopyRules(mounts: readonly ReferenceMount[]): readonly string[] {
-  return mounts.flatMap((mount) => [
-    bashRule(`${COPY_COMMAND} ${mount.path}${PATH_SEPARATOR}${ANY_ARGUMENTS}`),
-    bashRule(`${COPY_COMMAND} ${RECURSIVE_COPY_FLAG} ${mount.path}${PATH_SEPARATOR}${ANY_ARGUMENTS}`),
-  ]);
+  if (mounts.length === 0) return [];
+  return [
+    bashRule(`${MAKE_DIRECTORY_COMMAND} ${ANY_ARGUMENTS}`),
+    ...mounts.flatMap((mount) => [
+      bashRule(`${COPY_COMMAND} ${mount.path}${PATH_SEPARATOR}${ANY_ARGUMENTS}`),
+      bashRule(`${COPY_COMMAND} ${RECURSIVE_COPY_FLAG} ${mount.path}${PATH_SEPARATOR}${ANY_ARGUMENTS}`),
+    ]),
+  ];
 }
 
 function mountLine(mount: ReferenceMount): string {

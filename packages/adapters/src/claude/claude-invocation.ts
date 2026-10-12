@@ -21,6 +21,7 @@ export const CLAUDE_FLAGS = {
   allowedTools: '--allowedTools',
   appendSystemPromptFile: '--append-system-prompt-file',
   resume: '--resume',
+  addDir: '--add-dir',
 } as const;
 
 const STREAM_JSON_OUTPUT = 'stream-json';
@@ -59,6 +60,7 @@ export function buildClaudeArguments(
   request: AgentRunRequest,
   files: ClaudeRunFiles,
   tools: ClaudeToolSelection,
+  additionalDirectories: readonly string[] = [],
 ): readonly string[] {
   return [
     ...CLAUDE_PRINT_MODE_INVOCATION,
@@ -80,6 +82,7 @@ export function buildClaudeArguments(
     tools.allowedTools.join(LIST_SEPARATOR),
     CLAUDE_FLAGS.appendSystemPromptFile,
     files.appendSystemPromptPath,
+    ...additionalDirectories.flatMap((directory) => [CLAUDE_FLAGS.addDir, directory]),
     ...(request.resumeSessionId === null ? [] : [CLAUDE_FLAGS.resume, request.resumeSessionId]),
   ];
 }

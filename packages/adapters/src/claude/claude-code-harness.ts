@@ -10,7 +10,7 @@ import { BoundedTail, GatePolicySchema, isWithin, parseGateDecisionLog, type Gat
 import { buildChildEnvironment, credentialVariablesIn, type ChildEnvironment } from './child-environment.ts';
 import { buildClaudeArguments } from './claude-invocation.ts';
 import { launchCommand, type ClaudeHarnessConfig } from './claude-harness-config.ts';
-import { referencePromptSection } from './reference-access.ts';
+import { referencePromptSection, type ReferenceMount } from './reference-access.ts';
 import { superviseProcess, type TerminationReason } from './process-supervisor.ts';
 import { decideOutcome, gateBlocksOf, type StopHookResponse } from './run-outcome.ts';
 import { ROLE_PERMISSIONS } from './role-permissions.ts';
@@ -43,6 +43,8 @@ interface PreparedRun {
   readonly rendered: RenderedRunSettings;
   readonly fingerprints: readonly FileFingerprint[];
   readonly gateRequired: boolean;
+  /** The snapshots this run may read, opened as directories of the session so that the file tools reach them. */
+  readonly references: readonly ReferenceMount[];
 }
 
 export class UnknownClaudeAccountError extends Error {
@@ -95,6 +97,7 @@ export class ClaudeCodeHarness implements AgentHarness {
             appendSystemPromptPath: workspace.appendSystemPromptPath,
           },
           prepared.rendered,
+          prepared.references.map((mount) => mount.path),
         ),
       ],
       { cwd: layout.worktree, env: environment, stdio: ['pipe', 'pipe', 'pipe'], detached: true },
@@ -168,7 +171,7 @@ export class ClaudeCodeHarness implements AgentHarness {
         appendedSystemPrompt(request.appendSystemPrompt, rendered.allowedTools, referencePromptSection(references, ROLE_PERMISSIONS[request.role].copiesReferences)),
       ),
     ]);
-    return { rendered, fingerprints, gateRequired };
+    return { rendered, fingerprints, gateRequired, references };
   }
 
   #environment(workspace: RunWorkspace, account: string | null): ChildEnvironment {
