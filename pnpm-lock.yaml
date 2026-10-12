@@ -30,6 +30,24 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@24.5.2)(jsdom@26.1.0)(yaml@2.8.1)
 
+  packages/adapters:
+    dependencies:
+      '@agent-factory/application':
+        specifier: workspace:*
+        version: link:../application
+      '@agent-factory/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@agent-factory/plugin':
+        specifier: workspace:*
+        version: link:../plugin
+      yaml:
+        specifier: 2.8.1
+        version: 2.8.1
+      zod:
+        specifier: 4.1.11
+        version: 4.1.11
+
   packages/application:
     dependencies:
       '@agent-factory/domain':

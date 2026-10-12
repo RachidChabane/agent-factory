@@ -1,5 +1,11 @@
-# Secret scanning configuration for gitleaks: the default rules.
+# Secret scanning configuration for gitleaks: the default rules, minus the message
+# identifiers that recorded Claude Code streams carry under a key that looks like a credential.
 title = "agent-factory"
 
 [extend]
 useDefault = true
+
+[[allowlists]]
+description = "Message identifiers of recorded Claude Code stream-json lines"
+regexTarget = "line"
+regexes = ['''"api_message_id":"msg_[A-Za-z0-9]+"''']

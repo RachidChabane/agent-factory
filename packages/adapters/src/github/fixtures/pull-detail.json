@@ -1,0 +1,13 @@
+{
+  "number": 280,
+  "title": "Stop pulling the private analytics package into the web image",
+  "body": "Fresh runners cannot build the web image: the package registry answers `403 Forbidden` when `npm ci` asks for the private `@example-org/analytics` package.\n\nNothing imports that package any more, so this change:\n\n1. removes it from `package.json` and the lock file;\n2. drops the token the compose build passed down for it;\n3. removes the matching secret from the image workflow call.",
+  "user": {
+    "login": "riley-chen"
+  },
+  "merge_commit_sha": "c0ffee18072fef5fff421873a53db40cd2d2dc9d",
+  "head": {
+    "ref": "chore/drop-analytics-package"
+  },
+  "labels": []
+}

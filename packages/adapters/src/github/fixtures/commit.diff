@@ -1,0 +1,52 @@
+diff --git a/.github/workflows/build-web-image.yml b/.github/workflows/build-web-image.yml
+index 77b585b1..ee93fc42 100644
+--- a/.github/workflows/build-web-image.yml
++++ b/.github/workflows/build-web-image.yml
+@@ -38,5 +38,3 @@ jobs:
+       image-dockerfile: ${{ matrix.dockerfile }}
+       image-tag: ${{ inputs.image_tag }}
+       push: ${{ inputs.push_image }}
+-    secrets:
+-      registry-token: ${{ secrets.ANALYTICS_REGISTRY_TOKEN }}
+diff --git a/docker-compose.yml b/docker-compose.yml
+index a0e23ecc..8effccfa 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -52,7 +52,6 @@ services:
+     environment:
+       DATABASE_HOST: db
+       CACHE_HOST: cache
+-      ANALYTICS_TOKEN: ${ANALYTICS_TOKEN:?}
+       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?}
+     depends_on:
+       - db
+diff --git a/package-lock.json b/package-lock.json
+index 96383df2..ee73e14e 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -9,7 +9,6 @@
+       "name": "storefront-web",
+       "version": "1.10.0",
+       "dependencies": {
+-        "@example-org/analytics": "^2.4.0",
+         "express": "^4.19.2",
+         "next": "^14.2.5",
+         "react": "^18.3.1"
+@@ -2204,17 +2203,6 @@
+       "integrity": "sha512-5EL0/8m2xOb1hdWk/btiHwXQPey0jRDBQHvzSZxeiBcZg9iCv1hK4UMqMIpOfHDLXfwuek7YkEJNCh6Ov+VSOw==",
+       "dev": true
+     },
+-    "node_modules/@example-org/analytics": {
+-      "version": "2.4.1",
+-      "resolved": "https://registry.example.com/@example-org/analytics/-/analytics-2.4.1.tgz",
+-      "integrity": "sha512-/wtBVCGqF2SLVgMBj/5+gUHJGOFMrF5iwWSIOGpP4RrGS1xUjUkSV8gYq7d+3kTSEhdJO8ah4Q6Hs1yEeE67zw==",
+-      "dependencies": {
+-        "tslib": "^2.6.3"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      }
+-    },
+     "node_modules/@next/env": {
+       "version": "14.2.5",
+       "resolved": "https://registry.example.com/@next/env/-/env-14.2.5.tgz",

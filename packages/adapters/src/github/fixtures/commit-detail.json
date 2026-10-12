@@ -1,0 +1,127 @@
+{
+  "sha": "c0ffee18072fef5fff421873a53db40cd2d2dc9d",
+  "node_id": "C_kwDORsVqbNoAKGMwZmZlZTE4MDcyZmVmNWZmZjQyMTg3M2E1M2RiNDBjZDJkMmRjOWQ",
+  "commit": {
+    "author": {
+      "name": "River Ops",
+      "email": "river.ops@example.com",
+      "date": "2026-10-09T15:22:02Z"
+    },
+    "committer": {
+      "name": "GitHub",
+      "email": "noreply@github.com",
+      "date": "2026-10-09T15:22:02Z"
+    },
+    "message": "Merge pull request #280 from example-org/chore/drop-analytics-package\n\nStop pulling the private analytics package into the web image",
+    "tree": {
+      "sha": "989107232835a89cba67f6802f6390c12116a9ab",
+      "url": "https://api.github.com/repos/example-org/storefront/git/trees/989107232835a89cba67f6802f6390c12116a9ab"
+    },
+    "url": "https://api.github.com/repos/example-org/storefront/git/commits/c0ffee18072fef5fff421873a53db40cd2d2dc9d",
+    "comment_count": 0,
+    "verification": {
+      "verified": true,
+      "reason": "valid",
+      "signature": "-----BEGIN PGP SIGNATURE-----\n\n2sUzAVoRzYwRj7s6XoMfw3snQvt+IEHcRq51q2/yZNcGnpSNt0ph/qUGfZJklXvo\nzyoCvTMfA2osqKE1kVGXjlBGd92WY2B0ef2t74eiHHKKngqVw35slhuOlaD7YbpY\nEI30NHq2qJgpx8kbFNlLrPnwt/hG0521A+k6hWQQWifEbbbl7DwmcMb1dHwIUqYH\ntUhbcm098ft254dOr+AtUq4uUQtNbLRPrOqc5999YYfajwp3CkZqFzENWAdtJTTH\nhX13YHn7WxNL1JzTIaBsHBWg7iwj9cSHr5L3DD+bEvw5EJG2KJCG7J/IbLVOq711\n7yU/Q6MASZnmhQTIcp/rY7Zgv4NhzDYc9HNvrL6jdIv4YBCqBChHXCYMTyVG6UY1\nSMmQtUahhoX5vtBFCzEPLFiBSi9fEEjYa+Min4YFcLc9iyHGkN4mjEzxhGEyaIdV\nGb4WXl34RVCM9UjqSHFzfzjZzwEzK2fk0SuK6G01rDSBJdoRXSQYXXrbpsrz1ECp\nx2sAStquIbWHV78suiFNjMuHyKiZXRSOOuawAI4EC9vtTQ8XbjLow/KPH2LWvjDk\nTqGm/qvDFCTgSxGfMWtHaf7YGa2X946jPAyeHRor3W4ZXGSz1rSOQeEkBvBnnQHi\nsnTmrH1Y34ok0ZgA50A/WUZN1NN2JJfbzwKtMLYqsF+rGsbqhlL5t9SgfcaLkgkR\niIWcdESFHFPU0p7IW3Mfa+Kb4cSvE8L87+Kjz9fewDVbI1W0izfQz4MDtV6lSnIz\n4TRzj/ZRr8PC0BZOeT+m\n=PNb6\n-----END PGP SIGNATURE-----\n",
+      "payload": "tree 989107232835a89cba67f6802f6390c12116a9ab\nparent cf9ec647e9d3fda10ef53363385c92728b3b07fc\nparent fc1ae0739e6aa011e21e9dde18878fc9686ec5a2\nauthor River Ops <river.ops@example.com> 1791559322 +0000\ncommitter GitHub <noreply@github.com> 1791559322 +0000\n\nMerge pull request #280 from example-org/chore/drop-analytics-package\n\nStop pulling the private analytics package into the web image",
+      "verified_at": "2026-10-09T15:22:03Z"
+    }
+  },
+  "url": "https://api.github.com/repos/example-org/storefront/commits/c0ffee18072fef5fff421873a53db40cd2d2dc9d",
+  "html_url": "https://github.com/example-org/storefront/commit/c0ffee18072fef5fff421873a53db40cd2d2dc9d",
+  "comments_url": "https://api.github.com/repos/example-org/storefront/commits/c0ffee18072fef5fff421873a53db40cd2d2dc9d/comments",
+  "author": {
+    "login": "river-ops",
+    "id": 1000002,
+    "node_id": "MDQ6VXNlcjEwMDAwMDI=",
+    "avatar_url": "https://avatars.example.com/u/1000002?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/river-ops",
+    "html_url": "https://github.com/river-ops",
+    "followers_url": "https://api.github.com/users/river-ops/followers",
+    "following_url": "https://api.github.com/users/river-ops/following{/other_user}",
+    "gists_url": "https://api.github.com/users/river-ops/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/river-ops/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/river-ops/subscriptions",
+    "organizations_url": "https://api.github.com/users/river-ops/orgs",
+    "repos_url": "https://api.github.com/users/river-ops/repos",
+    "events_url": "https://api.github.com/users/river-ops/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/river-ops/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "committer": {
+    "login": "web-flow",
+    "id": 1000020,
+    "node_id": "MDQ6VXNlcjEwMDAwMjA=",
+    "avatar_url": "https://avatars.example.com/u/1000020?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/web-flow",
+    "html_url": "https://github.com/web-flow",
+    "followers_url": "https://api.github.com/users/web-flow/followers",
+    "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+    "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+    "organizations_url": "https://api.github.com/users/web-flow/orgs",
+    "repos_url": "https://api.github.com/users/web-flow/repos",
+    "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/web-flow/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "parents": [
+    {
+      "sha": "cf9ec647e9d3fda10ef53363385c92728b3b07fc",
+      "url": "https://api.github.com/repos/example-org/storefront/commits/cf9ec647e9d3fda10ef53363385c92728b3b07fc",
+      "html_url": "https://github.com/example-org/storefront/commit/cf9ec647e9d3fda10ef53363385c92728b3b07fc"
+    },
+    {
+      "sha": "fc1ae0739e6aa011e21e9dde18878fc9686ec5a2",
+      "url": "https://api.github.com/repos/example-org/storefront/commits/fc1ae0739e6aa011e21e9dde18878fc9686ec5a2",
+      "html_url": "https://github.com/example-org/storefront/commit/fc1ae0739e6aa011e21e9dde18878fc9686ec5a2"
+    }
+  ],
+  "stats": {
+    "total": 15,
+    "additions": 0,
+    "deletions": 15
+  },
+  "files": [
+    {
+      "sha": "ee93fc42fa70d2038713523e0384f34359201a08",
+      "filename": ".github/workflows/build-web-image.yml",
+      "status": "modified",
+      "additions": 0,
+      "deletions": 2,
+      "changes": 2,
+      "blob_url": "https://github.com/example-org/storefront/blob/c0ffee18072fef5fff421873a53db40cd2d2dc9d/.github%2Fworkflows%2Fbuild-web-image.yml",
+      "raw_url": "https://github.com/example-org/storefront/raw/c0ffee18072fef5fff421873a53db40cd2d2dc9d/.github%2Fworkflows%2Fbuild-web-image.yml",
+      "contents_url": "https://api.github.com/repos/example-org/storefront/contents/.github%2Fworkflows%2Fbuild-web-image.yml?ref=c0ffee18072fef5fff421873a53db40cd2d2dc9d"
+    },
+    {
+      "sha": "8effccfa7e650bff6868c4bb43d455a12e7c6bf1",
+      "filename": "docker-compose.yml",
+      "status": "modified",
+      "additions": 0,
+      "deletions": 1,
+      "changes": 1,
+      "blob_url": "https://github.com/example-org/storefront/blob/c0ffee18072fef5fff421873a53db40cd2d2dc9d/docker-compose.yml",
+      "raw_url": "https://github.com/example-org/storefront/raw/c0ffee18072fef5fff421873a53db40cd2d2dc9d/docker-compose.yml",
+      "contents_url": "https://api.github.com/repos/example-org/storefront/contents/docker-compose.yml?ref=c0ffee18072fef5fff421873a53db40cd2d2dc9d"
+    },
+    {
+      "sha": "ee73e14ee8a69110defc4bd63de0a7a3f51e1327",
+      "filename": "package-lock.json",
+      "status": "modified",
+      "additions": 0,
+      "deletions": 12,
+      "changes": 12,
+      "blob_url": "https://github.com/example-org/storefront/blob/c0ffee18072fef5fff421873a53db40cd2d2dc9d/package-lock.json",
+      "raw_url": "https://github.com/example-org/storefront/raw/c0ffee18072fef5fff421873a53db40cd2d2dc9d/package-lock.json",
+      "contents_url": "https://api.github.com/repos/example-org/storefront/contents/package-lock.json?ref=c0ffee18072fef5fff421873a53db40cd2d2dc9d"
+    }
+  ]
+}

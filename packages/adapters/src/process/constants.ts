@@ -1,0 +1,4 @@
+export const DEFAULT_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+export const DEFAULT_KILL_GRACE_MS = 5_000;
+export const SIGNAL_EXIT_CODE_BASE = 128;
+export const FALLBACK_SIGNAL_NUMBER = 0;
