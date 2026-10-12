@@ -26,8 +26,8 @@ blocks the others, and the failure is logged with the channel's kind).
 
 - `system`: a desktop notification (`osascript` on macOS, `notify-send` on Linux).
 - `google-chat` and `slack`: incoming webhooks, with a message formatted for each.
-- `webhook`: a JSON `POST` of the notice (`title`, `body`, `severity`, `link`,
-  `occurredAt`) with optional headers.
+- `webhook`: a JSON `POST` of the notice (`title`, `body`, `link`) with optional
+  headers.
 
 Webhook URLs and header secrets are never written in the configuration file: they
 are references to environment variables (`{ fromEnvironment: NAME }`). Identical
