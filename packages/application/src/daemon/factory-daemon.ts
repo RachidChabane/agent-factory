@@ -3,8 +3,8 @@ import type { IssueState } from '@agent-factory/domain';
 import { loadAudit, loadAudits } from '../audit/audit-projection.ts';
 import type { AuditOutcome } from '../audit/audit-merge.ts';
 import { scanNewMerges, seedMergeCursor } from '../audit/watch-merges.ts';
-import { BudgetExhaustedError, type BudgetGovernor } from '../budget/budget-governor.ts';
-import { NOTICES, type OperatorNotifications, type PauseCause } from '../notifications/operator-notifications.ts';
+import { BudgetExhaustedError } from '../budget/budget-governor.ts';
+import { NOTICES, type OperatorNotifications } from '../notifications/operator-notifications.ts';
 import { issueStates } from '../pipeline/pipeline-capacity.ts';
 import { PipelineAbortedError } from '../pipeline/pipeline-errors.ts';
 import { loadJournal } from '../pipeline/pipeline-journal.ts';
@@ -13,9 +13,8 @@ import type { RunIssueOutcome } from '../pipeline/run-issue-outcome.ts';
 import type { Clock, EventStore, GitHubGateway, IssueRecord, IssueStateStore, OperationLog, Sleeper, WorktreePool } from '../ports.ts';
 import type { ReleaseDescriptor, ReleaseEvaluation } from '../release/evaluate-release.ts';
 import { watchReleases } from '../release/release-watch.ts';
-import { ResourcesUnavailableError, type AgentRunAdmission } from '../resources/agent-run-admission.ts';
+import { ResourcesUnavailableError } from '../resources/agent-run-admission.ts';
 import { closeOrphanRuns } from '../runs/orphan-runs.ts';
-import { SPEC_VALIDATED_LABEL } from '../spec/spec-format.ts';
 import { pendingChallenges } from '../requests/challenge-queue.ts';
 import {
   CONFIGURATION_RELOADED_EVENT,
@@ -29,7 +28,7 @@ import { DAEMON_STARTED_EVENT, DAEMON_STOPPED_EVENT, DAEMON_SUBJECT } from './da
 import { heldWorktrees } from './held-worktrees.ts';
 import { pausedIssues } from './issue-pause.ts';
 import { decideScheduling, type SchedulingDecision } from './issue-scheduling.ts';
-import { activePauses, pauseScheduling, resumeScheduling } from './pause-state.ts';
+import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 
 export const MAX_AUDIT_ATTEMPTS = 3;
 export const DEFAULT_RETRY_DELAY_MS = 5 * 60_000;
@@ -71,8 +70,7 @@ export interface DaemonDependencies {
   readonly pool: WorktreePool;
   readonly clock: Clock;
   readonly sleeper: Sleeper;
-  readonly admission: AgentRunAdmission;
-  readonly budget: BudgetGovernor;
+  readonly pauses: SchedulingPauses;
   readonly notifications: OperatorNotifications;
   readonly log: OperationLog;
   readonly pipelines: (signal: AbortSignal) => IssueDriver;
@@ -86,6 +84,8 @@ export interface DaemonSettings {
   readonly concurrency: number;
   readonly poolSize: number;
   readonly baseBranch: string;
+  /** The forge label that marks an issue whose specification the operator validated. */
+  readonly validatedLabel: string;
   readonly pollIntervalMs: number;
   readonly mergeWatchIntervalMs: number;
   readonly issueRefreshMs: number;
@@ -173,21 +173,33 @@ export class FactoryDaemon {
     });
   }
 
+  /** Runs this daemon alone: closes orphan runs, starts, ticks until the signal aborts, then stops. */
   async run(signal: AbortSignal): Promise<void> {
-    const { events, clock, github, log } = this.dependencies;
+    const { events, clock, log } = this.dependencies;
     const closed = await closeOrphanRuns(events, clock);
     if (closed.length > 0) log.info(`closed ${closed.length} agent run(s) left open by an earlier stop`);
-    await seedMergeCursor({ events, github }, this.settings.baseBranch);
-    await events.append(DAEMON_STARTED_EVENT, DAEMON_SUBJECT, { concurrency: this.concurrency, poolSize: this.settings.poolSize });
+    await this.start();
     try {
       while (!signal.aborted) {
         await this.tick(signal);
         await this.dependencies.sleeper.sleep(this.settings.pollIntervalMs, signal);
       }
     } finally {
-      await this.settle();
-      await events.append(DAEMON_STOPPED_EVENT, DAEMON_SUBJECT, { reason: STOP_REASON });
+      await this.stop();
     }
+  }
+
+  /** Seeds the merge watcher and records the start; an installation calls it once per project. */
+  async start(): Promise<void> {
+    const { events, github } = this.dependencies;
+    await seedMergeCursor({ events, github }, this.settings.baseBranch);
+    await events.append(DAEMON_STARTED_EVENT, DAEMON_SUBJECT, { concurrency: this.concurrency, poolSize: this.settings.poolSize });
+  }
+
+  /** Waits for the running work to settle and records the stop. */
+  async stop(): Promise<void> {
+    await this.settle();
+    await this.dependencies.events.append(DAEMON_STOPPED_EVENT, DAEMON_SUBJECT, { reason: STOP_REASON });
   }
 
   async tick(signal: AbortSignal): Promise<void> {
@@ -235,31 +247,8 @@ export class FactoryDaemon {
     }
   }
 
-  private async refreshPauses(): Promise<ReadonlyMap<PauseCause, unknown>> {
-    const { events, admission, budget } = this.dependencies;
-    const pauses = new Map<PauseCause, unknown>(await activePauses(events));
-    const resources = await admission.check();
-    await this.reconcile(pauses, 'resources', resources.admitted ? null : { reason: resources.reason, resumesAt: null });
-    const choice = await budget.check();
-    await this.reconcile(pauses, 'budget', choice.kind === 'selected' ? null : { reason: choice.reason, resumesAt: choice.resumesAt });
-    return pauses;
-  }
-
-  private async reconcile(
-    pauses: Map<PauseCause, unknown>,
-    cause: PauseCause,
-    refusal: { readonly reason: string; readonly resumesAt: Date | null } | null,
-  ): Promise<void> {
-    const { events, notifications } = this.dependencies;
-    if (refusal !== null && !pauses.has(cause)) {
-      await pauseScheduling(events, cause, refusal.reason, refusal.resumesAt);
-      pauses.set(cause, refusal);
-      await notifications.send(NOTICES.paused(cause, refusal.reason, refusal.resumesAt));
-    } else if (refusal === null && pauses.has(cause)) {
-      await resumeScheduling(events, cause);
-      pauses.delete(cause);
-      await notifications.send(NOTICES.resumed(cause));
-    }
+  private refreshPauses(): Promise<PauseSet> {
+    return this.dependencies.pauses.refresh();
   }
 
   private async stopPausedIssues(): Promise<void> {
@@ -297,7 +286,7 @@ export class FactoryDaemon {
 
   private async validatedIssues(now: number): Promise<readonly IssueRecord[]> {
     if (this.validated !== null && now - this.validated.at < this.settings.issueRefreshMs) return this.validated.issues;
-    const issues = await this.dependencies.github.listIssues(SPEC_VALIDATED_LABEL);
+    const issues = await this.dependencies.github.listIssues(this.settings.validatedLabel);
     this.validated = { at: now, issues };
     return issues;
   }

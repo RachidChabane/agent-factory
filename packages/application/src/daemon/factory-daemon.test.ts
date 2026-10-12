@@ -30,6 +30,7 @@ import { heldWorktrees } from './held-worktrees.ts';
 import { decideScheduling } from './issue-scheduling.ts';
 import { issueStates } from '../pipeline/pipeline-capacity.ts';
 import { pauseScheduling } from './pause-state.ts';
+import { MachineSchedulingPauses } from './scheduling-pauses.ts';
 
 const START = new Date('2026-10-10T08:00:00.000Z');
 const MINUTE_MS = 60_000;
@@ -37,6 +38,7 @@ const SETTINGS: DaemonSettings = {
   concurrency: 1,
   poolSize: 3,
   baseBranch: 'main',
+  validatedLabel: 'spec:validated',
   pollIntervalMs: 1_000,
   mergeWatchIntervalMs: 10 * MINUTE_MS,
   issueRefreshMs: 0,
@@ -147,6 +149,8 @@ function setup(
     },
   };
   const pool = new ReleasingPool();
+  const notifications = new OperatorNotifications(notifier, 'http://127.0.0.1:7430', { info: () => undefined, warn: () => undefined });
+  const admission = new AgentRunAdmission({ snapshot: () => Promise.resolve(resources) }, { minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' });
   const daemon = new FactoryDaemon(
     {
       events,
@@ -155,9 +159,8 @@ function setup(
       pool,
       clock,
       sleeper: { sleep: yieldingSleep },
-      admission: new AgentRunAdmission({ snapshot: () => Promise.resolve(resources) }, { minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' }),
-      budget,
-      notifications: new OperatorNotifications(notifier, 'http://127.0.0.1:7430', { info: () => undefined, warn: () => undefined }),
+      pauses: new MachineSchedulingPauses({ events, admission, budget, notifications }),
+      notifications,
       log: { info: () => undefined, warn: () => undefined },
       pipelines: (signal) => drivers.create(signal),
       audits: overrides.audits ?? null,
