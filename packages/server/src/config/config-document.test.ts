@@ -67,7 +67,7 @@ describe('editing the configuration document', () => {
     ]);
     const config = parse(edited);
     expect(projectOf(config, 'ledger').roles.implementer).toMatchObject({ model: 'claude-opus-4-1[1m]', effort: 'high', maxTurns: 80 });
-    expect(projectOf(config, 'storefront').roles.implementer.model).toBe('sonnet');
+    expect(projectOf(config, 'storefront').roles.implementer).toMatchObject({ model: 'opus', effort: 'low', escalation: { model: 'opus', effort: 'high' } });
   });
 
   it('creates the default roles section a file left to its defaults', () => {

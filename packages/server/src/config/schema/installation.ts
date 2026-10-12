@@ -169,12 +169,11 @@ export const CheckEnvironmentSchema = z.strictObject({
 });
 
 const OPUS = 'opus';
-const SONNET = 'sonnet';
 
-/** Role defaults: the judgement-heavy roles on the strongest model at medium effort, the implementer on a faster one. */
+/** Role defaults: every role on the strongest model, only the effort varies; the implementer starts low and escalates high. */
 export const DEFAULT_ROLES = {
   'acceptance-author': { model: OPUS, effort: 'medium', maxBudgetUsd: 8, maxTurns: 120, timeoutMinutes: 30 },
-  implementer: { model: SONNET, effort: 'medium', maxBudgetUsd: 10, maxTurns: 150, timeoutMinutes: 60, escalation: { model: OPUS, effort: 'high' } },
+  implementer: { model: OPUS, effort: 'low', maxBudgetUsd: 10, maxTurns: 150, timeoutMinutes: 60, escalation: { model: OPUS, effort: 'high' } },
   reviewer: { model: OPUS, effort: 'medium', maxBudgetUsd: 3, maxTurns: 60, timeoutMinutes: 20 },
   challenger: { model: OPUS, effort: 'high', maxBudgetUsd: 8, maxTurns: 150, timeoutMinutes: 40 },
   auditor: { model: OPUS, effort: 'medium', maxBudgetUsd: 4, maxTurns: 80, timeoutMinutes: 25 },

@@ -72,8 +72,8 @@ defaults:
   roles:
     acceptance-author: { model: opus, effort: medium, maxBudgetUsd: 8, maxTurns: 120, timeoutMinutes: 30 }
     implementer:
-      model: sonnet
-      effort: medium
+      model: opus
+      effort: low
       maxBudgetUsd: 10
       maxTurns: 150
       timeoutMinutes: 60

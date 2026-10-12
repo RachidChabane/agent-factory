@@ -126,8 +126,8 @@ describe('the configuration of a project', () => {
   });
 
   it('merges role overrides field by field over the installation defaults', () => {
-    const project = projectOf(parse(document({}, [minimalProject({ roles: { implementer: { model: 'opus', maxTurns: 200 } } })])), 'storefront');
-    expect(project.roles.implementer).toEqual({ model: 'opus', effort: 'medium', maxBudgetUsd: 10, maxTurns: 200, timeoutMs: 3_600_000, escalation: { model: 'opus', effort: 'high' } });
+    const project = projectOf(parse(document({}, [minimalProject({ roles: { implementer: { model: 'sonnet', maxTurns: 200 } } })])), 'storefront');
+    expect(project.roles.implementer).toEqual({ model: 'sonnet', effort: 'low', maxBudgetUsd: 10, maxTurns: 200, timeoutMs: 3_600_000, escalation: { model: 'opus', effort: 'high' } });
     expect(project.roles.reviewer.model).toBe('opus');
   });
 
