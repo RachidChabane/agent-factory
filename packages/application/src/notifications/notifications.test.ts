@@ -89,4 +89,21 @@ describe('operator notifications', () => {
       media,
     });
   });
+
+  it('words the notice of a gesture the delegate made, with its reason and its rule', () => {
+    expect(
+      NOTICES.gestureDelegated({
+        actor: 'orchestrator',
+        gesture: 'merge',
+        target: { kind: 'pull-request', number: 31 },
+        issueNumber: 12,
+        reason: 'a documentation change with a clean review',
+        rule: 'autonomy.merge for docs',
+      }),
+    ).toEqual({
+      title: 'orchestrator merged pull request #31',
+      body: 'Reason: a documentation change with a clean review. Allowed by autonomy.merge for docs.',
+      path: '/pull-requests/31',
+    });
+  });
 });

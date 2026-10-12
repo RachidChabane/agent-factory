@@ -14,6 +14,7 @@ import { ScoreReportSchema } from '../acceptance/score-report.ts';
 import { AGENT_RUN_OUTCOMES } from '../ports.ts';
 import { ReviewFindingSchema } from '../review/review-findings.ts';
 import { IssueSpecSchema } from '../spec/issue-spec-schema.ts';
+import { DelegationFieldsSchema } from '../autonomy/delegation.ts';
 
 export const PIPELINE_EVENTS = {
   specCaptured: 'pipeline.spec-captured',
@@ -214,6 +215,7 @@ export const CheckRewrittenSchema = z.object({
 export const DecisionAnsweredSchema = z.object({
   runId: z.string().min(1),
   answer: z.string().min(1),
+  ...DelegationFieldsSchema,
 });
 
 export const GateStepResultSchema = z.object({
@@ -310,7 +312,7 @@ export const EvidenceRemovedSchema = z.object({
   headSha: z.string().min(1),
 });
 
-export const PullRequestMergedSchema = z.object({ mergeSha: z.string().min(1) });
+export const PullRequestMergedSchema = z.object({ mergeSha: z.string().min(1), ...DelegationFieldsSchema });
 
 export const WorktreeReleasedSchema = z.object({ path: z.string().min(1) });
 

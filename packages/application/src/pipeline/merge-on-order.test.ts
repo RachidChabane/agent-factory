@@ -30,6 +30,30 @@ describe('MergeOnOrder', () => {
     expect((await scenario.journal()).worktree).toBeNull();
   });
 
+  it('records the delegate and its reason on the merge it made, and names it in the transition', async () => {
+    const { scenario, head } = await scenarioWithOpenPullRequest();
+    scenario.github.checkRuns = [{ name: 'ci', conclusion: 'success', url: 'https://ci.example/1', durationMs: null }];
+
+    await scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head, delegation: { actor: 'orchestrator', reason: 'a documentation change with a clean review' } });
+
+    const records = await scenario.events.read(`issue/${ISSUE_NUMBER}`, 0);
+    expect(records.findLast((record) => record.type === 'pipeline.pull-request-merged')?.payload).toMatchObject({
+      actor: 'orchestrator',
+      reason: 'a documentation change with a clean review',
+    });
+    const transitions = records.filter((record) => record.type === 'issue.transitioned').map((record) => record.payload);
+    expect(transitions).toContainEqual(expect.objectContaining({ to: 'ready-to-merge', reason: `orchestrator ordered the merge of ${head}` }));
+  });
+
+  it('keeps every guard of the merge for the delegate: the head, the checks', async () => {
+    const { scenario, head } = await scenarioWithOpenPullRequest();
+    const delegation = { actor: 'orchestrator', reason: 'a documentation change' };
+    await expect(scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: 'deadbeef', delegation })).rejects.toBeInstanceOf(MergeRefusedError);
+    scenario.github.checkRuns = [{ name: 'ci', conclusion: 'failure', url: 'https://ci.example/1', durationMs: null }];
+    await expect(scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head, delegation })).rejects.toThrow('checks failed: ci (failure)');
+    expect(scenario.github.merges).toEqual([]);
+  });
+
   it('refuses when the head moved since the operator reviewed it', async () => {
     const { scenario } = await scenarioWithOpenPullRequest();
     await expect(scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: 'deadbeef' })).rejects.toBeInstanceOf(

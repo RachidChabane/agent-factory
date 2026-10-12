@@ -1,6 +1,8 @@
 import type { AuditVerdict, PauseCause } from '@agent-factory/domain';
 import { SHORT_SHA_LENGTH } from '../audit/audit-issue-renderer.ts';
 import type { WorktreesFullPayload } from '../daemon/daemon-events.ts';
+import type { GestureMadePayload } from '../autonomy/autonomy-events.ts';
+import { describeGestureMade } from '../autonomy/gesture-sentence.ts';
 import type { NoticeLink, Notifier, OperationLog, PullRequestRef } from '../ports.ts';
 import { COCKPIT_PATHS, cockpitLink } from './cockpit-links.ts';
 
@@ -94,6 +96,11 @@ export const NOTICES = {
     title: `Request ${requestId} challenged`,
     body: `The report, the draft reply and ${specCount} proposed spec(s) wait for your review.`,
     path: COCKPIT_PATHS.request(requestId),
+  }),
+  gestureDelegated: (decision: GestureMadePayload): OperatorNotice => ({
+    title: describeGestureMade(decision),
+    body: `Reason: ${decision.reason}. Allowed by ${decision.rule}.`,
+    path: decision.target.kind === 'pull-request' ? COCKPIT_PATHS.pullRequest(decision.target.number) : COCKPIT_PATHS.issue(decision.target.number),
   }),
   pullRequestReady: (ready: ReadyNoticeFacts): OperatorNotice => ({
     title: `Pull request #${ready.pullRequest.number} is ready to merge`,
