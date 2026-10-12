@@ -28,3 +28,5 @@ export * from './delivery.ts';
 export * from './glob.ts';
 export * from './scheduling-pause.ts';
 export * from './release-version.ts';
+export * from './film-scenario.ts';
+export * from './film-forecast.ts';
