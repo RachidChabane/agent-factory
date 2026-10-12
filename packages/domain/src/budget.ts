@@ -84,3 +84,16 @@ export function assessDailySpend(spentUsd: number, capUsd: number | null, now: D
     resumesAt: startOfNextUtcDay(now),
   };
 }
+
+/** A daily spending cap is either absent or a positive amount; zero is never a cap. */
+export type DailyCap = { readonly kind: 'none' } | { readonly kind: 'usd'; readonly amount: number };
+
+export const NO_DAILY_CAP: DailyCap = { kind: 'none' };
+
+export function dailyCapAmount(cap: DailyCap): number | null {
+  return cap.kind === 'none' ? null : cap.amount;
+}
+
+export function dailyCapOfAmount(amount: number | null): DailyCap {
+  return amount === null ? NO_DAILY_CAP : { kind: 'usd', amount };
+}
