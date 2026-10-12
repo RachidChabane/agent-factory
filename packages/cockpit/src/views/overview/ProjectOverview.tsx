@@ -144,7 +144,7 @@ export function ProjectOverview() {
         <Section title={t('pause.heading')} id="overview-pauses">
           <PausePanel
             scopes={[
-              { project: project.id, pauses: project.pauses },
+              { project: project.id, pauses: project.pauses, shortage: project.scheduler.worktreeShortage },
               { project: null, pauses: snapshot.installation.pauses },
             ]}
           />

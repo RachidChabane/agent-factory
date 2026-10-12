@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 import { Plus, Search } from 'lucide-react';
 import { useBoard } from '../../app/derived.ts';
 import { useSnapshot } from '../../app/hooks.ts';
+import type { CockpitSnapshot } from '../../contract/index.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { BoardFilter } from '../../model/board.ts';
 import { EMPTY_BOARD_FILTER, filterBoard } from '../../model/board.ts';
@@ -11,7 +12,7 @@ import { PROJECT_QUERY_PARAMETER } from '../../model/routes.ts';
 import { Button } from '../../ui/components/Button.tsx';
 import { Kbd } from '../../ui/components/Kbd.tsx';
 import { NewRequestDialog } from '../../widgets/NewRequestDialog.tsx';
-import { PausePanel } from '../../widgets/PausePanel.tsx';
+import { PausePanel, type PauseScopeView } from '../../widgets/PausePanel.tsx';
 import { BoardColumns } from './BoardColumns.tsx';
 import { BoardFilterMenu } from './BoardFilterMenu.tsx';
 import { LiveRuns } from './LiveRuns.tsx';
@@ -19,6 +20,15 @@ import { ProjectFilter } from './ProjectFilter.tsx';
 
 const FOCUS_FILTER_KEY = '/';
 const EMPTY_FILTER: Omit<BoardFilter, 'project'> = { query: EMPTY_BOARD_FILTER.query, kinds: EMPTY_BOARD_FILTER.kinds, attentionOnly: EMPTY_BOARD_FILTER.attentionOnly };
+
+/** What stops the scheduler: the installation's pauses, and the projects whose pool of worktrees is full. */
+function schedulingScopes(snapshot: CockpitSnapshot, project: string | null): PauseScopeView[] {
+  const installation: PauseScopeView[] = snapshot.installation.pauses.length === 0 ? [] : [{ project: null, pauses: snapshot.installation.pauses }];
+  const shortages = snapshot.projects
+    .filter((candidate) => (project === null || candidate.id === project) && candidate.scheduler.worktreeShortage !== null)
+    .map((candidate): PauseScopeView => ({ project: candidate.id, heading: candidate.name, pauses: candidate.pauses, shortage: candidate.scheduler.worktreeShortage }));
+  return [...installation, ...shortages];
+}
 
 export function BoardView() {
   const { t } = useI18n();
@@ -31,6 +41,7 @@ export function BoardView() {
   const requested = searchParams.get(PROJECT_QUERY_PARAMETER);
   const project = snapshot.projects.some((candidate) => candidate.id === requested) ? requested : null;
   const visible = useMemo(() => filterBoard(board, { ...filter, project }), [board, filter, project]);
+  const scheduling = useMemo(() => schedulingScopes(snapshot, project), [snapshot, project]);
 
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -77,7 +88,7 @@ export function BoardView() {
           <BoardFilterMenu filter={filter} onChange={(next) => setFilter({ ...filter, ...next })} />
         </div>
       </header>
-      {snapshot.installation.pauses.length === 0 ? null : <PausePanel scopes={[{ project: null, pauses: snapshot.installation.pauses }]} />}
+      {scheduling.length === 0 ? null : <PausePanel scopes={scheduling} />}
       <LiveRuns project={project} query={filter.query} />
       <BoardColumns board={visible} showProject={project === null && snapshot.projects.length > 1} />
       <NewRequestDialog open={creating} onClose={() => setCreating(false)} projectId={project} pickProject />

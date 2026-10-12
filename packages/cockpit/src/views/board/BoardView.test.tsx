@@ -342,6 +342,36 @@ describe('BoardView new request', () => {
   });
 });
 
+describe('BoardView scheduling', () => {
+  const SHORTAGE = {
+    since: '2026-10-12T09:40:00.000Z',
+    poolSize: 3,
+    waiting: [31],
+    holders: [{ issueNumber: 22, state: 'pr-open' as const, pullRequestNumber: 22 }],
+  };
+
+  it('names a project whose pool of worktrees is full, with the issues that wait and the ones that hold the worktrees', async () => {
+    const snapshot = mapProject(fixtureSnapshot(), 'ledger', (project) => ({ ...project, scheduler: { worktreeShortage: SHORTAGE } }));
+    await openBoard('/', { snapshot });
+    const scope = screen.getByRole('region', { name: 'Ledger' });
+    expect(within(scope).getByText('No free worktree')).toBeInTheDocument();
+    expect(within(scope).getByRole('link', { name: '#31' })).toHaveAttribute('href', '/projects/ledger/issues/31');
+    expect(within(scope).getByRole('link', { name: 'pull request #22' })).toHaveAttribute('href', '/projects/ledger/pull-requests/22');
+    expect(screen.getByRole('region', { name: 'Whole installation' })).toBeInTheDocument();
+  });
+
+  it('shows no worktree notice for a project the board is filtered away from', async () => {
+    const snapshot = mapProject(fixtureSnapshot(), 'ledger', (project) => ({ ...project, scheduler: { worktreeShortage: SHORTAGE } }));
+    await openBoard('/?project=storefront', { snapshot });
+    expect(screen.queryByText('No free worktree')).not.toBeInTheDocument();
+  });
+
+  it('shows no worktree notice while every project has room', async () => {
+    await openBoard();
+    expect(screen.queryByText('No free worktree')).not.toBeInTheDocument();
+  });
+});
+
 describe('BoardView with a single project', () => {
   it('hides the project filter and the project tags', async () => {
     const snapshot = fixtureSnapshot();

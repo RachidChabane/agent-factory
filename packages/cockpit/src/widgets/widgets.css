@@ -193,6 +193,16 @@
   color: var(--text-subtle);
 }
 
+.worktree-shortage__holders {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-13);
+}
+.worktree-shortage__holder {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* tools */
 .tool-list__summary {
   padding: var(--space-3) var(--space-4);

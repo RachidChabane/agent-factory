@@ -1,5 +1,5 @@
 import { Pause, Play } from 'lucide-react';
-import type { PauseView } from '../contract/index.ts';
+import type { PauseView, WorktreeShortageView } from '../contract/index.ts';
 import type { Translate } from '../i18n/create-i18n.ts';
 import { useI18n } from '../i18n/I18nProvider.tsx';
 import { isDraining } from '../model/actions.ts';
@@ -9,11 +9,16 @@ import { Card } from '../ui/components/Card.tsx';
 import { CommandButton } from './CommandButton.tsx';
 import { DrainControl } from './DrainControl.tsx';
 import { Time } from './Time.tsx';
+import { WorktreeShortageRow } from './WorktreeShortageRow.tsx';
 
 export interface PauseScopeView {
   /** The project the pauses belong to; null for the whole installation. */
   readonly project: string | null;
   readonly pauses: readonly PauseView[];
+  /** What names the scope when the panel shows several projects; the generic heading of its kind otherwise. */
+  readonly heading?: string | undefined;
+  /** Validated issues of the project that wait because every worktree of its pool is held. */
+  readonly shortage?: WorktreeShortageView | null | undefined;
 }
 
 function PauseRow({ pause }: { readonly pause: PauseView }) {
@@ -33,20 +38,21 @@ function PauseRow({ pause }: { readonly pause: PauseView }) {
   );
 }
 
-function scopeState(pauses: readonly PauseView[], t: Translate): string {
-  if (pauses.length === 0) return t('pause.runningState');
-  return isDraining(pauses) ? t('pause.drainingState') : t('pause.pausedState');
+function scopeState(pauses: readonly PauseView[], shortage: WorktreeShortageView | null, t: Translate): string {
+  if (pauses.length > 0) return isDraining(pauses) ? t('pause.drainingState') : t('pause.pausedState');
+  return shortage === null ? t('pause.runningState') : t('pause.worktrees.state');
 }
 
 function ScopeSection({ scope, heading }: { readonly scope: PauseScopeView; readonly heading: string }) {
   const { t } = useI18n();
   const operatorPause = scope.pauses.some((pause) => pause.cause === 'operator');
   const installation = scope.project === null;
+  const shortage = scope.shortage ?? null;
   return (
     <section className="pause-scope" aria-label={heading}>
       <header className="pause-scope__header">
         <h3 className="pause-scope__title">{heading}</h3>
-        <Badge tone={scope.pauses.length === 0 ? 'success' : 'waiting'}>{scopeState(scope.pauses, t)}</Badge>
+        <Badge tone={scope.pauses.length === 0 && shortage === null ? 'success' : 'waiting'}>{scopeState(scope.pauses, shortage, t)}</Badge>
         {operatorPause ? (
           <CommandButton command="scheduler.resume" body={{ project: scope.project }} size="sm" variant="primary" icon={<Play size={13} />}>
             {installation ? t('pause.resumeInstallation') : t('pause.resumeProject')}
@@ -58,11 +64,12 @@ function ScopeSection({ scope, heading }: { readonly scope: PauseScopeView; read
         )}
         {installation ? <DrainControl appearance="button" /> : null}
       </header>
-      {scope.pauses.length === 0 ? null : (
+      {scope.pauses.length === 0 && (shortage === null || scope.project === null) ? null : (
         <ul className="pause-scope__list">
           {scope.pauses.map((pause) => (
             <PauseRow key={`${pause.scope}-${pause.cause}`} pause={pause} />
           ))}
+          {shortage === null || scope.project === null ? null : <WorktreeShortageRow project={scope.project} shortage={shortage} />}
         </ul>
       )}
     </section>
@@ -79,7 +86,7 @@ export function PausePanel({ scopes }: PausePanelProps) {
   return (
     <Card className="pause-panel" aria-label={t('pause.heading')}>
       {scopes.map((scope) => (
-        <ScopeSection key={scope.project ?? 'installation'} scope={scope} heading={scope.project === null ? t('pause.installationHeading') : t('pause.projectHeading')} />
+        <ScopeSection key={scope.project ?? 'installation'} scope={scope} heading={scope.heading ?? (scope.project === null ? t('pause.installationHeading') : t('pause.projectHeading'))} />
       ))}
     </Card>
   );
