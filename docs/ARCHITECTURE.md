@@ -120,8 +120,9 @@ the cockpit parses what it receives.
   files at the cited tag or commit, never from the repository itself
   ([ADR 0031](adr/0031-reference-repositories.md)). Every role of the project reads its
   snapshots, in Claude Code's own sandbox and in the operating system's sandbox of the
-  commands; the acceptance author and the implementer copy from them with `cp` and
-  `cp -R`; nothing writes to one, and no other project reads them.
+  commands, and each run opens them as added directories of its session; the acceptance
+  author and the implementer copy from them with `cp` and `cp -R`, after `mkdir -p` for
+  a missing destination directory; nothing writes to one, and no other project reads them.
 
 ## A factory home
 

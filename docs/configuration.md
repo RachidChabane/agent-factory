@@ -212,8 +212,10 @@ bring the snapshots up to date first, the same way.
 
 Every role of the project reads its snapshots, in Claude Code's own sandbox and in the
 operating system's sandbox of setup, gate and acceptance commands; no role writes to one.
-The acceptance author and the implementer may also run `cp <snapshot>/<file> <destination>`
-and `cp -R <snapshot>/<directory> <destination>`. The files of a snapshot have no write
+Every run opens the snapshots as added directories of its session. The acceptance author and
+the implementer may also run `cp <snapshot>/<file> <destination>` and
+`cp -R <snapshot>/<directory> <destination>`, after `mkdir -p <directory>` for a destination
+directory that does not exist. The files of a snapshot have no write
 permission and a copy keeps that mode. Each run's prompt lists the project's snapshots with
 their repository, ref, commit and path, and the cockpit's project settings list them with their
 ref, the commit it resolved to, the state of the snapshot (ready, ref missing from the
