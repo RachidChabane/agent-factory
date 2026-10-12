@@ -1,0 +1,21 @@
+# Agent Factory
+
+> An agentic software factory for any repository: it drives Claude Code agents from a validated issue specification to a pull request that carries its own proof (checks that failed on the base and pass on the branch, evidence before and after, an independent review), merged only on the operator's order, with a live cockpit to follow and steer every step across several projects. TypeScript on Node.js 24, macOS and Linux, Apache-2.0.
+
+Run it from a clone: `script/setup` (dependencies and the cockpit build), then `script/factory start --demo` plays two fictional projects with a fake Claude and no account, cockpit on http://127.0.0.1:7431. On a real repository: `script/factory init` inspects it and writes `~/.agent-factory/config.yaml`, `script/factory validate` checks the tools, the forge and the gate, `script/factory start` runs the factory and serves the cockpit on http://127.0.0.1:7430. Agents and check commands run confined by the operating system's sandbox (sandbox-exec, bubblewrap); subscription usage is read from Claude Code's own report and pauses the factory before a limit.
+
+## Docs
+
+- [README](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/README.md): what it is, the five-minute start, screenshots
+- [Architecture](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/docs/ARCHITECTURE.md): processes, packages, the cycle of an issue, ports and adapters, the cockpit, confinement, tests
+- [Configuration reference](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/docs/configuration.md): every key of config.yaml, its default and meaning
+- [Operator guide](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/docs/operator-guide.md): a day with the factory, the cockpit, requests, decisions, merges, releases
+- [Add a project](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/docs/adding-a-project.md): init, the gate, issue types, the sandbox, a stack, rehearsal on a local forge
+- [Contributing](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/CONTRIBUTING.md): the front-door scripts, tests, code rules
+
+## Optional
+
+- [Configuration schema](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/schema/config.schema.json): JSON Schema of config.yaml
+- [Example configuration](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/config/config.example.yaml)
+- [Fake Claude](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/packages/fake-claude/README.md): the scenario format the tests and the demonstration use
+- [Design decisions](https://github.com/RachidChabane/agent-factory/tree/main/docs/adr)

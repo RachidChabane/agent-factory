@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Installs the dependencies from the lockfile and activates the repository's git hooks.
+# Installs the dependencies from the lockfile, builds the cockpit the factory serves, and activates the repository's
+# git hooks.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source script/lib/heavy.sh
 
 run_heavy pnpm install --frozen-lockfile
+run_heavy pnpm --filter @agent-factory/cockpit run build
 if git rev-parse --git-dir > /dev/null 2>&1; then
   git config core.hooksPath .githooks
 fi
