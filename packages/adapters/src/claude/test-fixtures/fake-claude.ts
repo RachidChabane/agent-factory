@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { argv, env, exit, stdin, stdout, stderr } from 'node:process';
-import { keepAliveWhileParentLives } from './keep-alive.ts';
+import { keepAlive, keepAliveWhileParentLives } from './keep-alive.ts';
 import {
   FAKE_FAILURE_EXIT_CODE,
   FAKE_FAILURE_MESSAGE,
@@ -15,6 +15,7 @@ import {
   FAKE_OVERSIZED_LINE_CHARACTERS,
   FAKE_SESSION_ID,
   FAKE_SUCCESS_RESULT,
+  FAKE_UNWATCHED_FLAG,
   type FakeMode,
 } from './fake-claude-protocol.ts';
 
@@ -26,6 +27,12 @@ const USAGE_RESET_IN_MS = 3_600_000;
 const INTERRUPTED_EXIT_CODE = 130;
 const GRANDCHILD_SLEEP_SECONDS = '120';
 const INIT_LINE = { type: 'system', subtype: 'init', session_id: FAKE_SESSION_ID, model: 'fake-model' };
+
+/** A fake that waits for ever ends with its parent, unless the test that started it says otherwise. */
+function keepRunning(): void {
+  if (argv.includes(FAKE_UNWATCHED_FLAG)) keepAlive();
+  else keepAliveWhileParentLives();
+}
 
 function valueAfter(flag: string): string | undefined {
   const index = argv.indexOf(flag);
@@ -62,12 +69,12 @@ const behaviours: Readonly<Record<FakeMode, () => Promise<void>>> = {
     exit(FAKE_FAILURE_EXIT_CODE);
   },
   hang: async () => {
-    keepAliveWhileParentLives();
+    keepRunning();
     process.once('SIGINT', () => exit(INTERRUPTED_EXIT_CODE));
     emit(INIT_LINE);
   },
   stubborn: async () => {
-    keepAliveWhileParentLives();
+    keepRunning();
     process.on('SIGINT', () => undefined);
     process.on('SIGTERM', () => undefined);
     const grandchild = spawn('sleep', [GRANDCHILD_SLEEP_SECONDS], { stdio: 'ignore' });

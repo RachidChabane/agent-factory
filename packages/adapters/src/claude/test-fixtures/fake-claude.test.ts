@@ -1,17 +1,19 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
 import { isAlive, killIfAlive, waitUntilGone } from '../../process/testSupport.ts';
-import { FAKE_CLAUDE_SCRIPT, FAKE_LOGGED_IN_STATUS, FAKE_MODE_FLAG, FAKE_MODES } from './fake-claude-protocol.ts';
+import { FAKE_CLAUDE_SCRIPT, FAKE_LOGGED_IN_STATUS, FAKE_MODE_FLAG, FAKE_MODES, FAKE_UNWATCHED_FLAG } from './fake-claude-protocol.ts';
 
 const execFileAsync = promisify(execFile);
 const ANSWER_DEADLINE_MS = 20_000;
+/** Long enough for the fake to have checked its parent twice. */
+const ORPHAN_OBSERVATION_MS = 2_500;
 
 /** A process that starts the fake as a detached child, as a command runner does, and reports its id once the fake has answered. */
 const HOST_SCRIPT = `
 const { spawn } = require('node:child_process');
-const [script, flag, mode] = process.argv.slice(1);
-const fake = spawn(process.execPath, [script, flag, mode], { detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
+const [script, ...flags] = process.argv.slice(1);
+const fake = spawn(process.execPath, [script, ...flags], { detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
 fake.stdout.once('data', () => console.log(fake.pid));
 setInterval(() => undefined, 1000);
 `;
@@ -33,14 +35,25 @@ describe('a fake claude that waits for ever', () => {
     for (const pid of started.splice(0)) killIfAlive(pid);
   });
 
-  it('ends once the process that started it is gone, however that process died', async () => {
-    const host = spawn(process.execPath, ['-e', HOST_SCRIPT, FAKE_CLAUDE_SCRIPT, FAKE_MODE_FLAG, 'hang'], { stdio: ['ignore', 'pipe', 'inherit'] });
+  async function startedByAHost(...flags: readonly string[]): Promise<{ readonly host: ChildProcess; readonly fakePid: number }> {
+    const host = spawn(process.execPath, ['-e', HOST_SCRIPT, FAKE_CLAUDE_SCRIPT, FAKE_MODE_FLAG, 'hang', ...flags], { stdio: ['ignore', 'pipe', 'inherit'] });
     if (host.pid !== undefined) started.push(host.pid);
     const fakePid = Number.parseInt(await firstLine(host.stdout), 10);
     started.push(fakePid);
     expect(isAlive(fakePid)).toBe(true);
+    return { host, fakePid };
+  }
+
+  it('ends once the process that started it is gone, however that process died', async () => {
+    const { host, fakePid } = await startedByAHost();
     host.kill('SIGKILL');
     expect(await waitUntilGone(fakePid)).toBe(true);
+  });
+
+  it('stays up when the test that started it asks for it, so a test sees what its subject leaves behind', async () => {
+    const { host, fakePid } = await startedByAHost(FAKE_UNWATCHED_FLAG);
+    host.kill('SIGKILL');
+    expect(await waitUntilGone(fakePid, ORPHAN_OBSERVATION_MS)).toBe(false);
   });
 });
 

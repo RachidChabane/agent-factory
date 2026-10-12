@@ -1,6 +1,6 @@
 import { exit } from 'node:process';
 
-const PARENT_CHECK_MS = 1_000;
+const KEEP_ALIVE_TICK_MS = 1_000;
 const ORPHANED_EXIT_CODE = 1;
 /** Read as soon as the module loads: a parent that dies while the process is still starting must still be noticed. */
 const STARTED_BY = process.ppid;
@@ -12,5 +12,10 @@ const STARTED_BY = process.ppid;
 export function keepAliveWhileParentLives(): void {
   setInterval(() => {
     if (process.ppid !== STARTED_BY) exit(ORPHANED_EXIT_CODE);
-  }, PARENT_CHECK_MS);
+  }, KEEP_ALIVE_TICK_MS);
+}
+
+/** Keeps the process running whether or not the process that started it is: for a test of that process's own cleanup. */
+export function keepAlive(): void {
+  setInterval(() => undefined, KEEP_ALIVE_TICK_MS);
 }

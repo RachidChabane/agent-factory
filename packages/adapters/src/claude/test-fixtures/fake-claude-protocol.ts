@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 export const FAKE_CLAUDE_SCRIPT = fileURLToPath(new URL('./fake-claude.ts', import.meta.url));
 export const FAKE_MODE_FLAG = '--fake-mode';
 export const FAKE_FIXTURE_FLAG = '--fake-fixture';
+/** Keeps a fake that waits for ever running after its parent is gone, for a test that checks the parent's own cleanup. */
+export const FAKE_UNWATCHED_FLAG = '--fake-unwatched';
 export const FAKE_MODES = ['replay', 'echo', 'fail', 'hang', 'stubborn', 'flood', 'tamper'] as const;
 export type FakeMode = (typeof FAKE_MODES)[number];
 
