@@ -2,6 +2,7 @@
   "name": "@agent-factory/plugin",
   "version": "0.0.0",
   "private": true,
+  "description": "What runs inside an agent session: the Stop-hook gate, the guard of frozen checks and the role prompts.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

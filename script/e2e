@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Runs both end-to-end suites: the fictional example project from spec to merge through the command line, then every
+# cockpit command clicked in a real browser against a running factory, in demo and rehearsal modes.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+script/e2e-example
+script/e2e-cockpit

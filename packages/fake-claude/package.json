@@ -2,6 +2,7 @@
   "name": "@agent-factory/fake-claude",
   "version": "0.0.0",
   "private": true,
+  "description": "A deterministic stand-in for the Claude Code CLI that plays a scenario file, for tests and the demonstration.",
   "type": "module",
   "bin": {
     "fake-claude": "./src/main.ts"

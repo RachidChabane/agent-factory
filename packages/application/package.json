@@ -2,6 +2,7 @@
   "name": "@agent-factory/application",
   "version": "0.0.0",
   "private": true,
+  "description": "The use cases of the factory and the ports they need: the issue pipeline, requests and their challenge, audits, releases, delivery, the daemons.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

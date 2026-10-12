@@ -2,6 +2,7 @@
   "name": "@agent-factory/adapters",
   "version": "0.0.0",
   "private": true,
+  "description": "The implementations of the ports: GitHub through gh and the local forge, git, the Claude Code harness, the sandboxes, SQLite, notifications, tool probes, process supervision.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

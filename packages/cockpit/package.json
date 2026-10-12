@@ -2,6 +2,7 @@
   "name": "@agent-factory/cockpit",
   "version": "0.0.0",
   "private": true,
+  "description": "The cockpit of the factory, a React application, and the contract it shares with the server.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

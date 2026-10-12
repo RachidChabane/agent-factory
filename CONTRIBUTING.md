@@ -25,16 +25,21 @@ Every verb is a shebang script in `script/`, also reachable as `pnpm run <verb>`
 
 | Script | Does |
 |---|---|
-| `script/setup` | install the dependencies from the lockfile and activate the git hooks |
-| `script/lint` | ESLint, type-check every package, shellcheck, actionlint |
+| `script/setup` | install the dependencies from the lockfile, build the cockpit, and activate the git hooks |
+| `script/lint` | ESLint, type-check every package, the schema and notices freshness, shellcheck, actionlint |
 | `script/test` | unit, property, contract and integration tests of every package |
-| `script/e2e` | end-to-end runs: the example project with the fake `claude`, and the cockpit journeys |
+| `script/e2e` | both end-to-end suites below |
+| `script/e2e-example` | the fictional example project from spec to merge through the command line, with the fake `claude` |
+| `script/e2e-cockpit` | every cockpit command clicked in a real browser against a running factory, in demo and rehearsal modes |
 | `script/scan` | denylist scan of the working tree and the whole history, then gitleaks |
-| `script/screenshots` | regenerate the README screenshots from the demonstration mode (`--check` verifies they are current) |
+| `script/screenshots` | regenerate the README screenshots from the demonstration (`--check` verifies they are current) |
+| `script/schema` | regenerate `schema/config.schema.json` from the configuration's schema (`--check` verifies it) |
+| `script/third-party-notices` | regenerate `THIRD_PARTY_NOTICES.md` from the production dependencies (`--check` verifies it) |
+| `script/lockfile` | rewrite `pnpm-lock.yaml` without installing anything |
 | `script/ci` | everything CI runs, in the same order |
 | `script/factory` | the product's command line (`script/factory help`) |
 | `script/start` | start the factory and its cockpit (`--demo` for the demonstration mode) |
-| `script/release` | write the changelog, commit and tag a release |
+| `script/release` | write the changelog section, set the version, commit and tag a release from `main` |
 
 Run `script/ci` before you push. The `pre-push` hook runs the scans on what a push
 carries and refuses the push on a finding.

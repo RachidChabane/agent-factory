@@ -2,6 +2,7 @@
   "name": "@agent-factory/domain",
   "version": "0.0.0",
   "private": true,
+  "description": "The model of the factory: issue and release lifecycles, issue types and proof strategies, budgets, retry and admission policies, the release gate. No input or output.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
