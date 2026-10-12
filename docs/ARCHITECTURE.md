@@ -102,6 +102,36 @@ The contract (`packages/cockpit/src/contract`) is the single definition of what
 crosses the wire: the server's projections parse their output with it in tests, and
 the cockpit parses what it receives.
 
+How the cockpit loads, caches and shares its stream:
+
+- **One document load.** Menu entries are router links: moving between views never
+  reloads the document, never fetches the snapshot again and never reopens the event
+  stream. A view is a lazy chunk, fetched once.
+- **One snapshot, one stream per browser.** A tab fetches the snapshot once, then opens
+  `GET /api/events?after=<snapshot sequence>`; after a disconnection it reconnects
+  with `after=<last applied sequence>`, and the history is never replayed from the
+  start. The tabs of one browser elect a leader through a Web Lock: the leader holds
+  the only event stream and relays its frames to the other tabs over a
+  BroadcastChannel, and a waiting tab takes over when the leader closes. A browser
+  serves six HTTP/1.1 connections per host, so a stream per tab would leave the
+  seventh tab without a connection. A browser without locks or channels keeps one
+  stream per tab.
+- **The snapshot never waits on a forge.** Every reading of something outside the log is
+  cached with the time it was read. A value past its interval is served at once, with
+  its old read time, and read again behind the request, one read per key at a time and
+  every key concurrently. A reading nobody has completed, or that an event outdated, is
+  waited for at most three seconds; past that the snapshot carries it empty (`null`,
+  never a stand-in) and the read ends in the background. The factory builds the first
+  snapshot as it starts.
+- **Errors never blank the page.** Every view and the application sit in an error
+  boundary that shows the message with a retry. A lazy chunk that fails to load offers
+  a document reload, because the browser caches a rejected dynamic import.
+- **Cache policy.** Files under `/assets/` carry a content hash and are
+  `public, max-age=31536000, immutable`; a missing path under `/assets/` answers 404,
+  never the page. The HTML shell and every JSON answer are `no-store`. Other static
+  files, evidence and attachments are `no-cache` with a weak `ETag` and answer `304`
+  while it matches. Source maps are built hidden: the bundle does not reference them.
+
 ## Confinement
 
 - Agent runs: Claude Code's own sandbox and permission settings, generated per run
