@@ -6,6 +6,7 @@ import { CommitScanLimitError, GitHubCommandError, GitHubPayloadError, PullReque
 import { FakeGh, readFixture, readFixtureJson, type FakeGhRule } from './fakeGh.ts';
 import { buildGhEnvironment } from './ghEnvironment.ts';
 import { GhCliGateway } from './ghCliGateway.ts';
+import { TIMER_SLEEPER } from './transientRetries.ts';
 
 const OWNER = 'example-org';
 const REPOSITORY = 'storefront';
@@ -15,6 +16,7 @@ const ISSUE_NUMBER = 194;
 const KNOWN_COMMIT = 'c0ffee1';
 
 const FixtureCommitsSchema = z.array(z.object({ sha: z.string() }));
+const QUICK_RETRIES = { delaysMs: [1, 1], sleeper: TIMER_SLEEPER };
 
 describe('GhCliGateway', () => {
   let fake: FakeGh | undefined;
@@ -33,6 +35,7 @@ describe('GhCliGateway', () => {
       baseBranch: BASE_BRANCH,
       environment: gh.environment,
       ghExecutable: gh.executable,
+      retry: QUICK_RETRIES,
     });
     return { gateway, gh };
   }
@@ -338,9 +341,10 @@ describe('GhCliGateway', () => {
       expect(await gateway.branchHead('gone')).toBeNull();
     });
 
-    it('rethrows a branch lookup failure other than not found', async () => {
-      const { gateway } = await gatewayWith([{ contains: ['/branches/'], exitCode: 1, stderr: 'gh: Server Error (HTTP 500)' }]);
+    it('rethrows a branch lookup failure other than not found, once its tries are spent', async () => {
+      const { gateway, gh } = await gatewayWith([{ contains: ['/branches/'], exitCode: 1, stderr: 'gh: Server Error (HTTP 500)' }]);
       await expect(gateway.branchHead('main')).rejects.toBeInstanceOf(GitHubCommandError);
+      expect((await gh.commandLines()).filter((line) => line.includes('/branches/'))).toHaveLength(QUICK_RETRIES.delaysMs.length + 1);
     });
 
     it('lists every open pull request ascending by number', async () => {

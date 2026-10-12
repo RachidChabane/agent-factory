@@ -2,6 +2,7 @@ export class GitHubCommandError extends Error {
   readonly args: readonly string[];
   readonly exitCode: number;
   readonly stderr: string;
+  readonly timedOut: boolean;
 
   constructor(args: readonly string[], exitCode: number, stderr: string, timedOut: boolean) {
     const reason = timedOut ? 'timed out' : `exited with ${exitCode}`;
@@ -10,6 +11,7 @@ export class GitHubCommandError extends Error {
     this.args = args;
     this.exitCode = exitCode;
     this.stderr = stderr;
+    this.timedOut = timedOut;
   }
 }
 

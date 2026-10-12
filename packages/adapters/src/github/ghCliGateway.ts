@@ -35,6 +35,7 @@ import {
 } from './constants.ts';
 import { CommitScanLimitError, GitHubCommandError, GitHubPayloadError, PullRequestHeadMovedError } from './errors.ts';
 import { withClosingLines } from './pullRequestConventions.ts';
+import { DEFAULT_RETRY_SETTINGS, withTransientRetries, type RetrySettings } from './transientRetries.ts';
 import {
   BranchResponseSchema,
   CheckRunsPagesSchema,
@@ -45,7 +46,9 @@ import {
   CommitStatusPagesSchema,
   DeploymentListSchema,
   DeploymentStatusListSchema,
+  CommentListSchema,
   IssueListPagesSchema,
+  IssueListSchema,
   IssueResponseSchema,
   LabelListPagesSchema,
   OpenPullRequestListSchema,
@@ -70,6 +73,8 @@ const DEPLOYMENT_STATE_OF: Readonly<Record<string, DeploymentState>> = {
 };
 const NO_STATUS_STATE: DeploymentState = 'in-progress';
 const GITHUB_WEB_ORIGIN = 'https://github.com';
+const READ_METHOD = 'GET';
+const RECENT_ITEMS = 20;
 
 export interface GhCliGatewaySettings {
   readonly owner: string;
@@ -78,6 +83,8 @@ export interface GhCliGatewaySettings {
   readonly environment: Readonly<Record<string, string>>;
   readonly ghExecutable?: string;
   readonly workingDirectory?: string;
+  /** How calls that fail for a transient reason are tried again; reads always, writes only where a duplicate cannot happen. */
+  readonly retry?: RetrySettings;
 }
 
 type FieldValue = string | number | readonly string[];
@@ -119,11 +126,10 @@ export class GhCliGateway implements GitHubGateway {
   }
 
   async createIssue(title: string, body: string, labels: readonly string[]): Promise<IssueRecord> {
-    const created = await this.apiJson(`${this.repositoryPath}/issues`, IssueResponseSchema, 'issue creation', {
-      method: 'POST',
-      fields: { title, body, labels },
-    });
-    return toIssueRecord(created, []);
+    return this.retrying(
+      async () => toIssueRecord(await this.apiJson(`${this.repositoryPath}/issues`, IssueResponseSchema, 'issue creation', { method: 'POST', fields: { title, body, labels } }), []),
+      () => this.recentIssue(title, body),
+    );
   }
 
   async addBlockedBy(issueNumber: number, blockingIssueNumber: number): Promise<void> {
@@ -134,36 +140,47 @@ export class GhCliGateway implements GitHubGateway {
       IssueResponseSchema,
       `issue #${blockingIssueNumber}`,
     );
-    await this.api(`${this.repositoryPath}/issues/${issueNumber}/dependencies/blocked_by`, {
-      method: 'POST',
-      fields: { issue_id: blocking.id },
-    });
+    await this.retrying(
+      async () => {
+        await this.api(`${this.repositoryPath}/issues/${issueNumber}/dependencies/blocked_by`, { method: 'POST', fields: { issue_id: blocking.id } });
+      },
+      async () => ((await this.blockedByOf(issueNumber)).includes(blockingIssueNumber) ? undefined : null),
+    );
   }
 
   async setLabels(issueNumber: number, add: readonly string[], remove: readonly string[]): Promise<void> {
     if (add.length > 0) {
-      await this.api(`${this.repositoryPath}/issues/${issueNumber}/labels`, { method: 'POST', fields: { labels: add } });
+      await this.retrying(() => this.api(`${this.repositoryPath}/issues/${issueNumber}/labels`, { method: 'POST', fields: { labels: add } }));
     }
     if (remove.length === 0) return;
-    const pages = await this.apiJson(
-      `${this.repositoryPath}/issues/${issueNumber}/labels?per_page=${PAGE_SIZE}`,
-      LabelListPagesSchema,
-      `labels of issue #${issueNumber}`,
-      { paginate: true },
-    );
-    const present = new Set(pages.flat().map((label) => label.name));
+    const present = await this.labelsOf(issueNumber);
     for (const label of remove.filter((name) => present.has(name))) {
-      await this.api(`${this.repositoryPath}/issues/${issueNumber}/labels/${encodeURIComponent(label)}`, { method: 'DELETE' });
+      await this.retrying(
+        () => this.api(`${this.repositoryPath}/issues/${issueNumber}/labels/${encodeURIComponent(label)}`, { method: 'DELETE' }),
+        async () => ((await this.labelsOf(issueNumber)).has(label) ? null : ''),
+      );
     }
   }
 
   async comment(issueNumber: number, body: string): Promise<void> {
-    await this.api(`${this.repositoryPath}/issues/${issueNumber}/comments`, { method: 'POST', fields: { body } });
+    await this.retrying(
+      async () => {
+        await this.api(`${this.repositoryPath}/issues/${issueNumber}/comments`, { method: 'POST', fields: { body } });
+      },
+      async () => ((await this.recentCommentBodies(issueNumber)).includes(body) ? undefined : null),
+    );
   }
 
   async openPullRequest(draft: PullRequestDraft): Promise<PullRequestRef> {
+    return this.retrying(
+      () => this.createPullRequest(draft),
+      () => this.findOpenPullRequest(draft.branch),
+    );
+  }
+
+  private async createPullRequest(draft: PullRequestDraft): Promise<PullRequestRef> {
     const labels = [...new Set(draft.labels)];
-    const created = await this.gh([
+    const created = await this.ghOnce([
       'pr',
       'create',
       '--repo',
@@ -255,7 +272,7 @@ export class GhCliGateway implements GitHubGateway {
   }
 
   async updatePullRequestBody(number: number, body: string): Promise<void> {
-    await this.api(`${this.repositoryPath}/pulls/${number}`, { method: 'PATCH', fields: { body } });
+    await this.retrying(() => this.api(`${this.repositoryPath}/pulls/${number}`, { method: 'PATCH', fields: { body } }));
   }
 
   async checks(ref: string): Promise<readonly CheckRunSummary[]> {
@@ -296,21 +313,13 @@ export class GhCliGateway implements GitHubGateway {
       `head of pull request #${number}`,
     );
     if (head.headRefOid !== expectedHeadSha) throw new PullRequestHeadMovedError(number, expectedHeadSha, head.headRefOid);
-    await this.gh([
-      'pr',
-      'merge',
-      String(number),
-      '--repo',
-      this.repositorySlug,
-      '--squash',
-      '--match-head-commit',
-      expectedHeadSha,
-    ]);
-    const merged = await this.ghJson(
-      ['pr', 'view', String(number), '--repo', this.repositorySlug, '--json', 'mergeCommit'],
-      PullRequestMergeViewSchema,
-      `merge commit of pull request #${number}`,
+    const mergeCommit = () =>
+      this.ghJson(['pr', 'view', String(number), '--repo', this.repositorySlug, '--json', 'mergeCommit'], PullRequestMergeViewSchema, `merge commit of pull request #${number}`);
+    await this.retrying(
+      () => this.ghOnce(['pr', 'merge', String(number), '--repo', this.repositorySlug, '--squash', '--match-head-commit', expectedHeadSha]),
+      async () => ((await mergeCommit()).mergeCommit === null ? null : ''),
     );
+    const merged = await mergeCommit();
     if (merged.mergeCommit === null) {
       throw new GitHubPayloadError(`merge commit of pull request #${number}`, new Error('mergeCommit is null'));
     }
@@ -379,7 +388,7 @@ export class GhCliGateway implements GitHubGateway {
 
   async dispatchWorkflow(dispatch: WorkflowDispatch): Promise<WorkflowDispatchReceipt> {
     const fields = Object.entries(dispatch.inputs).flatMap(([name, value]) => [WORKFLOW_DISPATCH_FIELD_FLAG, `${name}=${value}`]);
-    await this.gh(['workflow', 'run', dispatch.workflow, '--repo', this.repositorySlug, '--ref', dispatch.ref, ...fields]);
+    await this.ghOnce(['workflow', 'run', dispatch.workflow, '--repo', this.repositorySlug, '--ref', dispatch.ref, ...fields]);
     return { simulated: false, url: `${GITHUB_WEB_ORIGIN}/${this.repositorySlug}/actions/workflows/${dispatch.workflow}` };
   }
 
@@ -438,19 +447,54 @@ export class GhCliGateway implements GitHubGateway {
     return parsePayload(await this.api(path, request), schema, what);
   }
 
+  /** A read is tried again on a transient failure; a write runs once, and its caller decides how to try it again. */
   private api(path: string, request: ApiRequest = {}): Promise<string> {
-    const args = ['api', path, '--method', request.method ?? 'GET'];
+    const method = request.method ?? READ_METHOD;
+    const args = ['api', path, '--method', method];
     if (request.paginate === true) args.push('--paginate', '--slurp');
     for (const [name, value] of Object.entries(request.headers ?? {})) args.push('-H', `${name}: ${value}`);
     for (const [key, value] of Object.entries(request.fields ?? {})) args.push(...fieldArguments(key, value));
-    return this.gh(args);
+    return method === READ_METHOD ? this.gh(args) : this.ghOnce(args);
   }
 
   private async ghJson<S extends z.ZodType>(args: readonly string[], schema: S, what: string): Promise<z.infer<S>> {
     return parsePayload(await this.gh(args), schema, what);
   }
 
-  private async gh(args: readonly string[]): Promise<string> {
+  private retrying<T>(call: () => Promise<T>, landed?: () => Promise<T | null>): Promise<T> {
+    return withTransientRetries(call, this.settings.retry ?? DEFAULT_RETRY_SETTINGS, landed);
+  }
+
+  private async labelsOf(issueNumber: number): Promise<ReadonlySet<string>> {
+    const pages = await this.apiJson(`${this.repositoryPath}/issues/${issueNumber}/labels?per_page=${PAGE_SIZE}`, LabelListPagesSchema, `labels of issue #${issueNumber}`, { paginate: true });
+    return new Set(pages.flat().map((label) => label.name));
+  }
+
+  /** The issue a failed creation may have opened anyway: the newest open issue with the same title and body. */
+  private async recentIssue(title: string, body: string): Promise<IssueRecord | null> {
+    const recent = await this.apiJson(
+      `${this.repositoryPath}/issues?state=open&sort=created&direction=desc&per_page=${RECENT_ITEMS}`,
+      IssueListSchema,
+      'recent issues',
+    );
+    const found = recent.find((issue) => issue.pull_request === undefined && issue.title === title && (issue.body ?? '') === body);
+    return found === undefined ? null : toIssueRecord(found, []);
+  }
+
+  private async recentCommentBodies(issueNumber: number): Promise<readonly string[]> {
+    const comments = await this.apiJson(
+      `${this.repositoryPath}/issues/${issueNumber}/comments?sort=created&direction=desc&per_page=${RECENT_ITEMS}`,
+      CommentListSchema,
+      `comments of issue #${issueNumber}`,
+    );
+    return comments.map((comment) => comment.body ?? '');
+  }
+
+  private gh(args: readonly string[]): Promise<string> {
+    return this.retrying(() => this.ghOnce(args));
+  }
+
+  private async ghOnce(args: readonly string[]): Promise<string> {
     const result = await this.runner.run(
       [this.settings.ghExecutable ?? GH_EXECUTABLE, ...args],
       this.settings.workingDirectory ?? process.cwd(),

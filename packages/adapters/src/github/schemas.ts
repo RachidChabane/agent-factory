@@ -13,7 +13,9 @@ export const IssueResponseSchema = z.object({
 });
 export type IssueResponse = z.infer<typeof IssueResponseSchema>;
 
-export const IssueListPagesSchema = z.array(z.array(IssueResponseSchema));
+export const IssueListSchema = z.array(IssueResponseSchema);
+export const IssueListPagesSchema = z.array(IssueListSchema);
+export const CommentListSchema = z.array(z.object({ body: z.string().nullable() }));
 export const LabelListPagesSchema = z.array(z.array(z.object({ name: z.string() })));
 
 export const PullRequestViewSchema = z.object({
