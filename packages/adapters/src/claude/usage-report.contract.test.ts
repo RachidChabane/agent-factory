@@ -37,13 +37,13 @@ describe('the usage report of the Claude Code CLI', () => {
   it('runs the usage command under the account directory and stamps the reading with its read time', async () => {
     const runner = new ScriptedRunner();
     runner.result = { ...runner.result, stdout: await readFile(FIXTURE, 'utf8') };
-    const source = new ClaudeUsageReport(runner, { now: () => READ_AT }, {
+    const source = new ClaudeUsageReport(() => runner, { now: () => READ_AT }, {
       command: ['claude'],
       accountDirectories: { primary: '/home/operator/.claude-primary' },
       environment: { PATH: '/usr/bin' },
       workingDirectory: '/tmp',
     });
-    const reading = await source.read('primary');
+    const reading = await source.read('primary', new AbortController().signal);
     expect(runner.calls[0]).toEqual({ command: ['claude', ...USAGE_REPORT_ARGUMENTS], env: { PATH: '/usr/bin', CLAUDE_CONFIG_DIR: '/home/operator/.claude-primary' } });
     expect(reading).toMatchObject({ account: 'primary', source: 'usage-report', readAt: READ_AT });
     expect(reading.limits).toHaveLength(3);
@@ -52,7 +52,7 @@ describe('the usage report of the Claude Code CLI', () => {
   it('reports a timeout as a login to do', async () => {
     const runner = new ScriptedRunner();
     runner.result = { ...runner.result, timedOut: true, exitCode: 1 };
-    const source = new ClaudeUsageReport(runner, { now: () => READ_AT }, { command: ['claude'], accountDirectories: {}, environment: {}, workingDirectory: '/tmp' });
-    await expect(source.read('default')).rejects.toThrow('probably waiting for a login');
+    const source = new ClaudeUsageReport(() => runner, { now: () => READ_AT }, { command: ['claude'], accountDirectories: {}, environment: {}, workingDirectory: '/tmp' });
+    await expect(source.read('default', new AbortController().signal)).rejects.toThrow('probably waiting for a login');
   });
 });

@@ -164,3 +164,21 @@ describe('SourcesKnowledgePack', () => {
     expect(text).toBe('## docs/context.md (repository)\n\nFrom the workspace.');
   });
 });
+
+describe('the documents of a knowledge source', () => {
+  it('lists the Markdown documents of a directory with their first heading as title', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'knowledge-documents-'));
+    try {
+      await writeFile(join(root, 'checkout.md'), '# Checkout flow\n\nThe cart becomes an order.\n');
+      await writeFile(join(root, 'notes.md'), 'No heading here.\n');
+      const pack = new SourcesKnowledgePack([{ kind: 'path', path: root }], root);
+      expect(await pack.documents({ kind: 'path', path: root })).toEqual([
+        { path: join(root, 'checkout.md'), title: 'Checkout flow', bytes: 44 },
+        { path: join(root, 'notes.md'), title: 'notes.md', bytes: 17 },
+      ]);
+      await expect(pack.documents({ kind: 'path', path: join(root, 'missing') })).rejects.toThrow('no such file or directory');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});

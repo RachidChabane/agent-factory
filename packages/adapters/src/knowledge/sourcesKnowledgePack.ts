@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { KnowledgePack, WorkspaceFiles } from '@agent-factory/application';
 import { NodeWorkspaceFiles } from '../fs/nodeWorkspaceFiles.ts';
 import { PathOutsideWorktreeError } from '../git/errors.ts';
@@ -41,6 +41,24 @@ function isDirectoryError(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === DIRECTORY_CODE;
 }
 
+/** One document of a knowledge source, as the cockpit lists it. */
+export interface KnowledgeDocument {
+  readonly path: string;
+  readonly title: string;
+  readonly bytes: number;
+}
+
+const TITLE_LINE = /^#\s+(.+)$/m;
+
+function titleOf(path: string, content: string): string {
+  return TITLE_LINE.exec(content)?.[1]?.trim() ?? basename(path);
+}
+
+async function documentOf(path: string): Promise<KnowledgeDocument> {
+  const content = await readFile(path, UTF8);
+  return { path, title: titleOf(path, content), bytes: Buffer.byteLength(content, UTF8) };
+}
+
 export class SourcesKnowledgePack implements KnowledgePack {
   private readonly sources: readonly KnowledgeSource[];
   private readonly repositoryRoot: string;
@@ -55,6 +73,29 @@ export class SourcesKnowledgePack implements KnowledgePack {
   async read(): Promise<string> {
     const sections = await Promise.all(this.sources.map((source) => this.sectionsOf(source)));
     return sections.flat().join(SECTION_SEPARATOR);
+  }
+
+  /** The documents of one source; a source that cannot be read throws with the reason. */
+  async documents(source: KnowledgeSource): Promise<readonly KnowledgeDocument[]> {
+    if (source.kind === 'repository') {
+      const content = await this.files.readText(this.repositoryRoot, source.path);
+      if (content === null) throw new Error(SOURCE_UNAVAILABLE_REASONS.notFound);
+      return [{ path: source.path, title: titleOf(source.path, content), bytes: Buffer.byteLength(content, UTF8) }];
+    }
+    switch (await kindOf(source.path)) {
+      case 'file':
+        return [await documentOf(source.path)];
+      case 'directory':
+        return Promise.all((await listMarkdownFileNames(source.path)).map((name) => documentOf(join(source.path, name))));
+      case 'missing':
+        throw new Error(SOURCE_UNAVAILABLE_REASONS.notFound);
+      case 'other':
+        throw new Error(SOURCE_UNAVAILABLE_REASONS.neitherFileNorDirectory);
+    }
+  }
+
+  get sourceList(): readonly KnowledgeSource[] {
+    return this.sources;
   }
 
   private sectionsOf(source: KnowledgeSource): Promise<readonly string[]> {

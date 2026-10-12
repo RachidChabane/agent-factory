@@ -17,6 +17,9 @@ import {
 } from './fake-claude-protocol.ts';
 
 const SETTINGS_FLAG = '--settings';
+const PRINT_FLAG = '-p';
+const USAGE_PROMPT = '/usage';
+const USAGE_RESET_IN_MS = 3_600_000;
 const INTERRUPTED_EXIT_CODE = 130;
 const KEEP_ALIVE_MS = 1_000;
 const GRANDCHILD_SLEEP_SECONDS = '120';
@@ -94,8 +97,21 @@ function isFakeMode(value: string | undefined): value is FakeMode {
   return FAKE_MODES.some((mode) => mode === value);
 }
 
+/** The usage report the real CLI answers locally, whatever its agents would do. */
+function usageReport(): void {
+  const resetsAt = new Date(Date.now() + USAGE_RESET_IN_MS).toISOString();
+  emit(INIT_LINE);
+  emit({
+    type: 'assistant',
+    session_id: FAKE_SESSION_ID,
+    usage_report: { rate_limits: { limits: [{ kind: 'session', percent: 12, resets_at: resetsAt }, { kind: 'weekly_all', percent: 34, resets_at: resetsAt }] } },
+  });
+  emit(FAKE_SUCCESS_RESULT);
+}
+
 const mode = valueAfter(FAKE_MODE_FLAG);
 if (!isFakeMode(mode)) {
   throw new Error(`unknown fake mode ${String(mode)}`);
 }
-await behaviours[mode]();
+if (valueAfter(PRINT_FLAG) === USAGE_PROMPT) usageReport();
+else await behaviours[mode]();

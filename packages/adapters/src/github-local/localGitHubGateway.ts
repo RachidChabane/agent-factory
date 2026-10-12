@@ -217,6 +217,11 @@ export class LocalGitHubGateway implements GitHubGateway {
     return (await this.repository.tags()).map((tag) => ({ name: tag.name, sha: tag.sha }));
   }
 
+  /** A local forge runs no workflows. */
+  workflowRuns(): Promise<null> {
+    return Promise.resolve(null);
+  }
+
   async updatePullRequestBody(number: number, body: string): Promise<void> {
     await this.requirePullRequest(number);
     await this.files.writePullRequestBody(number, body);

@@ -100,6 +100,26 @@ export const BranchResponseSchema = z.object({ commit: z.object({ sha: z.string(
 
 export const TagListPagesSchema = z.array(z.array(z.object({ name: z.string(), commit: z.object({ sha: z.string() }) })));
 
+export const WorkflowRunListSchema = z.object({
+  workflow_runs: z.array(
+    z.object({
+      id: z.number().int(),
+      name: z.string().nullable(),
+      display_title: z.string(),
+      head_branch: z.string().nullable(),
+      head_sha: z.string(),
+      event: z.string(),
+      status: z.enum(['queued', 'in_progress', 'completed', 'waiting', 'requested', 'pending']),
+      conclusion: z.string().nullable(),
+      actor: z.object({ login: z.string() }).nullable().optional(),
+      run_started_at: z.iso.datetime({ offset: true }).nullable().optional(),
+      created_at: z.iso.datetime({ offset: true }),
+      updated_at: z.iso.datetime({ offset: true }),
+      html_url: z.string(),
+    }),
+  ),
+});
+
 export const DeploymentListSchema = z.array(
   z.object({
     id: z.number().int(),

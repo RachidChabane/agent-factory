@@ -358,6 +358,46 @@ describe('GhCliGateway', () => {
       ]);
     });
 
+    it('lists the latest workflow runs with their actor and times', async () => {
+      const listed = {
+        workflow_runs: [
+          {
+            id: 901,
+            name: 'CI',
+            display_title: 'feat: add the wishlist',
+            head_branch: 'main',
+            head_sha: 'abc123',
+            event: 'push',
+            status: 'completed',
+            conclusion: 'success',
+            actor: { login: 'riley-chen' },
+            run_started_at: '2026-10-12T08:00:00Z',
+            created_at: '2026-10-12T07:59:50Z',
+            updated_at: '2026-10-12T08:04:10Z',
+            html_url: 'https://github.com/example-org/storefront/actions/runs/901',
+          },
+        ],
+      };
+      const { gateway, gh } = await gatewayWith([{ contains: [`${REPO_PATH}/actions/runs?per_page=20`], stdout: JSON.stringify(listed) }]);
+      expect(await gateway.workflowRuns(20)).toEqual([
+        {
+          id: '901',
+          workflow: 'CI',
+          title: 'feat: add the wishlist',
+          branch: 'main',
+          sha: 'abc123',
+          trigger: 'push',
+          status: 'completed',
+          conclusion: 'success',
+          actor: 'riley-chen',
+          startedAt: new Date('2026-10-12T08:00:00Z'),
+          updatedAt: new Date('2026-10-12T08:04:10Z'),
+          url: 'https://github.com/example-org/storefront/actions/runs/901',
+        },
+      ]);
+      expect((await gh.calls())[0]?.args.slice(0, 2)).toEqual(['api', `${REPO_PATH}/actions/runs?per_page=20`]);
+    });
+
     it('lists every tag across pages with the commit it points to', async () => {
       const pages = [
         [{ name: 'v2', commit: { sha: 'sha2', url: 'u' } }],

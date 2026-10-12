@@ -13,8 +13,7 @@ import type {
   PullRequestRef,
   TagRef,
   WorkflowDispatch,
-  WorkflowDispatchReceipt,
-} from '@agent-factory/application';
+  WorkflowDispatchReceipt, WorkflowRunRecord } from '@agent-factory/application';
 import type { z } from 'zod';
 import { conclusionOfCheckRun, conclusionOfCommitStatus } from './checkConclusions.ts';
 import {
@@ -56,6 +55,7 @@ import {
   PullRequestMergeViewSchema,
   PullRequestViewSchema,
   TagListPagesSchema,
+  WorkflowRunListSchema,
   type IssueResponse,
 } from './schemas.ts';
 
@@ -381,6 +381,24 @@ export class GhCliGateway implements GitHubGateway {
     const fields = Object.entries(dispatch.inputs).flatMap(([name, value]) => [WORKFLOW_DISPATCH_FIELD_FLAG, `${name}=${value}`]);
     await this.gh(['workflow', 'run', dispatch.workflow, '--repo', this.repositorySlug, '--ref', dispatch.ref, ...fields]);
     return { simulated: false, url: `${GITHUB_WEB_ORIGIN}/${this.repositorySlug}/actions/workflows/${dispatch.workflow}` };
+  }
+
+  async workflowRuns(limit: number): Promise<readonly WorkflowRunRecord[]> {
+    const listed = await this.apiJson(`${this.repositoryPath}/actions/runs?per_page=${limit}`, WorkflowRunListSchema, 'workflow runs');
+    return listed.workflow_runs.map((run) => ({
+      id: String(run.id),
+      workflow: run.name ?? run.display_title,
+      title: run.display_title,
+      branch: run.head_branch ?? '',
+      sha: run.head_sha,
+      trigger: run.event,
+      status: run.status === 'in_progress' || run.status === 'completed' ? run.status : 'queued',
+      conclusion: run.conclusion,
+      actor: run.actor?.login ?? null,
+      startedAt: new Date(run.run_started_at ?? run.created_at),
+      updatedAt: new Date(run.updated_at),
+      url: run.html_url,
+    }));
   }
 
   async pullRequestDetails(number: number): Promise<PullRequestDetails> {

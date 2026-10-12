@@ -112,7 +112,7 @@ export { FileRunLogStore, RunLogEventSchema, UnsafeRunIdError, RUN_LOG_EXTENSION
 export { ProcessLock, LockHeldError, lockHolder, isProcessAlive } from './fs/processLock.ts';
 export { GitBaseCheckouts, UnsafeCheckoutNameError, type GitBaseCheckoutsSettings } from './git/gitBaseCheckouts.ts';
 export { FileKnowledgePack } from './knowledge/fileKnowledgePack.ts';
-export { SourcesKnowledgePack, SOURCE_UNAVAILABLE_REASONS, type KnowledgeSource } from './knowledge/sourcesKnowledgePack.ts';
+export { SourcesKnowledgePack, type KnowledgeDocument, SOURCE_UNAVAILABLE_REASONS, type KnowledgeSource } from './knowledge/sourcesKnowledgePack.ts';
 export { BUILT_IN_CREDENTIAL_PATHS, KEYCHAIN_EXECUTABLE, KEYCHAIN_SERVICES, LINUX_PRIVATE_RUNTIME_PATHS } from './sandbox/credential-paths.ts';
 export { concretePaths, parsePathPattern, RelativePathPatternError, type PathPattern } from './sandbox/path-patterns.ts';
 export { UnsafeSandboxPathError } from './sandbox/unsafe-sandbox-path.ts';
@@ -136,3 +136,4 @@ export { CliToolProber, DEFAULT_TOOL_PROBE_TIMEOUT_MS, type ToolProbeSettings } 
 export { DeclarativeToolProber, type DeclaredTool, type DeclarativeToolProbeSettings } from './tools/declarative-tool-prober.ts';
 export { InvalidToolDeclarationError } from './tools/errors.ts';
 export { RoutingToolProber } from './tools/routing-tool-prober.ts';
+export { ClaudeUsageReport, parseUsageReport, USAGE_PROMPT, USAGE_REPORT_ARGUMENTS, USAGE_REPORT_TIMEOUT_MS, UsageReportError, type AbortableRunner, type ClaudeUsageReportSettings } from './claude/usage-report.ts';

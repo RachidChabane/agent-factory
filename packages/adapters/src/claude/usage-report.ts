@@ -73,22 +73,25 @@ export interface ClaudeUsageReportSettings {
   readonly timeoutMs?: number;
 }
 
+/** A command runner whose commands stop when the signal aborts. */
+export type AbortableRunner = (signal: AbortSignal) => CommandRunner;
+
 /** Reads an account's subscription usage by asking the Claude Code CLI for its usage report. */
 export class ClaudeUsageReport implements UsageReportSource {
-  private readonly runner: CommandRunner;
+  private readonly runnerFor: AbortableRunner;
   private readonly clock: Clock;
   private readonly settings: ClaudeUsageReportSettings;
 
-  constructor(runner: CommandRunner, clock: Clock, settings: ClaudeUsageReportSettings) {
-    this.runner = runner;
+  constructor(runnerFor: AbortableRunner, clock: Clock, settings: ClaudeUsageReportSettings) {
+    this.runnerFor = runnerFor;
     this.clock = clock;
     this.settings = settings;
   }
 
-  async read(account: string): Promise<UsageReading> {
+  async read(account: string, signal: AbortSignal): Promise<UsageReading> {
     const directory = this.settings.accountDirectories[account];
     const environment = directory === undefined ? this.settings.environment : { ...this.settings.environment, [CLAUDE_CONFIG_DIRECTORY_VARIABLE]: directory };
-    const result = await this.runner.run(
+    const result = await this.runnerFor(signal).run(
       [...this.settings.command, ...USAGE_REPORT_ARGUMENTS],
       this.settings.workingDirectory,
       this.settings.timeoutMs ?? USAGE_REPORT_TIMEOUT_MS,
