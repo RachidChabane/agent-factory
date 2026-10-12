@@ -88,7 +88,7 @@ describe('acceptance manifest', () => {
 
   it('requires checks for types whose before proof must fail on base', () => {
     expect(problems({ ...MANIFEST, command: null, checks: [] })).toEqual([
-      'a ui issue needs at least one acceptance check (an end-to-end journey (for example Playwright) asserting what the criterion says is visible or possible, capturing the screenshots the expected proof names)',
+      "a ui issue needs at least one acceptance check (a browser journey (for example Playwright) under the repository's end-to-end test directory when it has one, otherwise component tests in its existing user-interface test layout, asserting what the criterion says is visible or possible and capturing the screenshots the expected proof names)",
     ]);
   });
 

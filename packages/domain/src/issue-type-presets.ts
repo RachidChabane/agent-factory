@@ -33,7 +33,7 @@ export const DEFAULT_ISSUE_TYPES: readonly IssueTypeDefinition[] = [
   preset(
     'ui',
     'fails-on-base',
-    'an end-to-end journey (for example Playwright) asserting what the criterion says is visible or possible, capturing the screenshots the expected proof names',
+    "a browser journey (for example Playwright) under the repository's end-to-end test directory when it has one, otherwise component tests in its existing user-interface test layout, asserting what the criterion says is visible or possible and capturing the screenshots the expected proof names",
     commit('feat'),
     { evidence: ['acceptance-tests', 'screenshots', 'diff-stat'] },
   ),
