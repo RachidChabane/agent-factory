@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useLocation } from 'react-router';
-import type { ForgeKind } from '../contract/index.ts';
+import type { CockpitSnapshot, ForgeKind } from '../contract/index.ts';
 import type { AttentionItem } from '../model/attention.ts';
 import { auditNeedsOperator, deriveAttention, releaseNeedsOperator } from '../model/attention.ts';
 import type { Board } from '../model/board.ts';
@@ -10,10 +10,26 @@ import { PROJECT_QUERY_PARAMETER, projectOfPath } from '../model/routes.ts';
 import { useNow } from './context.tsx';
 import { useMaybeSnapshot, useSnapshot } from './hooks.ts';
 
+interface BoardAt {
+  readonly now: number;
+  readonly board: Board;
+}
+
+const boards = new WeakMap<CockpitSnapshot, BoardAt>();
+
+/** The board of a snapshot at a moment, derived once whichever component asks. */
+export function boardOf(snapshot: CockpitSnapshot, now: number): Board {
+  const known = boards.get(snapshot);
+  if (known?.now === now) return known.board;
+  const board = deriveBoard(snapshot, now);
+  boards.set(snapshot, { now, board });
+  return board;
+}
+
 export function useBoard(): Board {
   const snapshot = useSnapshot();
   const now = useNow();
-  return useMemo(() => deriveBoard(snapshot, now), [snapshot, now]);
+  return useMemo(() => boardOf(snapshot, now), [snapshot, now]);
 }
 
 const NO_ATTENTION: readonly AttentionItem[] = [];
