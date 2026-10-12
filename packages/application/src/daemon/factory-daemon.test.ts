@@ -379,7 +379,7 @@ describe('FactoryDaemon', () => {
     expect(drivers.started).toEqual([1]);
     concurrency = 2;
     await events.append(SETTINGS_CHANGED_EVENT, SETTINGS_SUBJECT, {
-      change: { kind: 'limits', concurrentIssues: 2, minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' },
+      change: { kind: 'concurrency', project: 'storefront', issues: 2, ceiling: 3 },
       operator: 'operator',
       backupPath: '/factory/config-backups/config.yaml',
     });

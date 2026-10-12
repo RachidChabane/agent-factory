@@ -23,6 +23,7 @@ export async function requestOnDemandAudit(dependencies: OnDemandAuditDependenci
     commitMessage: commit.message,
     authorLogin: commit.authorLogin,
     pullRequestNumber: commit.pullRequestNumber,
+    pullRequestBranch: commit.pullRequestBranch,
   };
   await events.append(AUDIT_DETECTED_EVENT, auditSubject(commit.sha), payload);
   return { auditId: commit.sha, alreadyRecorded: false };

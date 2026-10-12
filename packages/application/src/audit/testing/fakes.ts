@@ -151,6 +151,10 @@ export class FakeGitHubGateway implements GitHubGateway {
   comment(): never {
     throw new Error('not used');
   }
+  workflowRuns(): Promise<null> {
+    return Promise.resolve(null);
+  }
+
   openPullRequest(): never {
     throw new Error('not used');
   }

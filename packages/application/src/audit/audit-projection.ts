@@ -39,6 +39,7 @@ export interface AuditRecord {
   readonly commitMessage: string;
   readonly authorLogin: string | null;
   readonly pullRequestNumber: number | null;
+  readonly pullRequestBranch: string | null;
   readonly state: AuditState;
   readonly conclusion: AuditConclusion | null;
   readonly failureCount: number;
@@ -59,6 +60,7 @@ function startRecord(event: FactoryEventRecord): AuditRecord {
     commitMessage: detected.commitMessage,
     authorLogin: detected.authorLogin,
     pullRequestNumber: detected.pullRequestNumber,
+    pullRequestBranch: detected.pullRequestBranch,
     state: 'detected',
     conclusion: null,
     failureCount: 0,

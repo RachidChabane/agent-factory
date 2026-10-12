@@ -9,6 +9,7 @@ const AUDIT: AuditRecord = {
   commitMessage: 'Tweak the build image workflow\n\nlonger description',
   authorLogin: 'alice',
   pullRequestNumber: null,
+  pullRequestBranch: null,
   state: 'challenge',
   conclusion: null,
   failureCount: 0,

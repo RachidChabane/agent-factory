@@ -5,7 +5,7 @@ import { RecordingHarness } from '../runs/recording-harness.ts';
 import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT, runSubject } from '../runs/run-events.ts';
 import { agentRunRequest, InMemoryRunLogStore, SteppingClock } from '../runs/test-support.ts';
 import { CONFIGURATION_RELOADED_EVENT, SETTINGS_CHANGED_EVENT, SETTINGS_SUBJECT } from '../settings/settings-events.ts';
-import { InstallationDaemon, type InstallationReload, type ProjectScheduler } from './installation-daemon.ts';
+import { InstallationDaemon, type InstallationReload, type InstallationTask, type ProjectScheduler } from './installation-daemon.ts';
 import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 
 const START = new Date('2026-03-02T09:00:00.000Z');
@@ -48,7 +48,7 @@ class FixedPauses implements SchedulingPauses {
   }
 }
 
-function setup() {
+function setup(extraTasks: readonly InstallationTask[] = []) {
   const events = new InMemoryEventStore();
   const clock = new SteppingClock(START);
   const shop = new RecordingProject('shop');
@@ -71,7 +71,7 @@ function setup() {
           return Promise.resolve(reload);
         },
       },
-      tasks: [{ name: 'refreshing usage', run: () => Promise.resolve(void tasksRun.push('usage')) }],
+      tasks: [{ name: 'refreshing usage', run: () => Promise.resolve(void tasksRun.push('usage')) }, ...extraTasks],
       projects: [shop, docs],
     },
     { pollIntervalMs: 1 },
@@ -113,9 +113,55 @@ describe('InstallationDaemon', () => {
     expect([...daemon.currentPauses().keys()]).toEqual(['resources']);
   });
 
+  it('ticks the projects while a task is still running, and never starts that task twice at once', async () => {
+    let finish: () => void = () => undefined;
+    let started = 0;
+    const slow: InstallationTask = {
+      name: 'sampling the health of shop',
+      run: () => {
+        started += 1;
+        return new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+      },
+    };
+    const { shop, daemon } = setup([slow]);
+    const signal = new AbortController().signal;
+    await daemon.tick(signal);
+    await daemon.tick(signal);
+    expect(shop.calls).toEqual(['tick', 'tick']);
+    expect(started).toBe(1);
+    finish();
+    await daemon.settled();
+    await daemon.tick(signal);
+    expect(started).toBe(2);
+  });
+
+  it('waits for the tasks still running before it reports itself stopped', async () => {
+    let finished = false;
+    const slow: InstallationTask = {
+      name: 'refreshing a slow account',
+      run: (signal) =>
+        new Promise<void>((resolve) => {
+          signal.addEventListener('abort', () => {
+            finished = true;
+            resolve();
+          });
+        }),
+    };
+    const { events, daemon } = setup([slow]);
+    const controller = new AbortController();
+    const running = daemon.run(controller.signal);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    controller.abort();
+    await running;
+    expect(finished).toBe(true);
+    expect(events.records.at(-1)?.type).toBe('daemon.stopped');
+  });
+
   it('applies a settings change once and hands each project its reloaded concurrency', async () => {
     const { events, shop, docs, reloads, daemon } = setup();
-    await events.append(SETTINGS_CHANGED_EVENT, SETTINGS_SUBJECT, { change: { kind: 'limits' } });
+    await events.append(SETTINGS_CHANGED_EVENT, SETTINGS_SUBJECT, { change: { kind: 'resources' } });
     await daemon.tick(new AbortController().signal);
     await daemon.tick(new AbortController().signal);
     expect(reloads).toHaveLength(1);

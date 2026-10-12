@@ -3,6 +3,7 @@ import type { AgentHarness, AgentRunEvent, AgentRunRequest, AgentRunResult } fro
 import { InMemoryEventStore, runResult } from '../audit/testing/fakes.ts';
 import { BudgetExhaustedError, BudgetGovernor } from '../budget/budget-governor.ts';
 import { USAGE_READ_EVENT } from '../budget/budget-events.ts';
+import { UsageRefresher, type UsageFreshener } from '../budget/usage-refresher.ts';
 import { AgentRunAdmission, ResourcesUnavailableError } from '../resources/agent-run-admission.ts';
 import { GovernedHarness } from './governed-harness.ts';
 import { closeOrphanRuns, ORPHAN_RUN_DETAIL } from './orphan-runs.ts';
@@ -29,6 +30,15 @@ class EventfulHarness implements AgentHarness {
   }
 }
 
+class CountingFreshener implements UsageFreshener {
+  calls = 0;
+
+  ensureFresh(): Promise<void> {
+    this.calls += 1;
+    return Promise.resolve();
+  }
+}
+
 function setup(accounts: readonly string[] = [], freeMemoryPercent = 80) {
   const events = new InMemoryEventStore();
   const clock = new SteppingClock(START);
@@ -39,13 +49,44 @@ function setup(accounts: readonly string[] = [], freeMemoryPercent = 80) {
     { snapshot: () => Promise.resolve({ freeMemoryPercent, pressure: 'normal' }) },
     { minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' },
   );
-  const harness = new GovernedHarness(new RecordingHarness(base, events, clock, logs), admission, governor);
-  return { events, clock, logs, base, governor, harness };
+  const freshener = new CountingFreshener();
+  const harness = new GovernedHarness(new RecordingHarness(base, events, clock, logs), admission, governor, freshener);
+  return { events, clock, logs, base, governor, harness, freshener, admission };
 }
 
 const SIGNAL = new AbortController().signal;
 
 describe('recording and governing agent runs', () => {
+  it('reads the usage an account has before the run, and starts nothing when it is above a threshold', async () => {
+    const { events, clock, logs, base, governor, admission } = setup(['primary']);
+    const reads: string[] = [];
+    const source = {
+      read: (account: string) => {
+        reads.push(account);
+        return Promise.resolve({
+          account,
+          source: 'usage-report' as const,
+          readAt: clock.now(),
+          limits: [{ kind: 'weekly_all' as const, scope: null, utilization: 0.91, resetsAt: IN_TWO_DAYS }],
+        });
+      },
+    };
+    const silent = { info: () => undefined, warn: () => undefined };
+    const refresher = new UsageRefresher(governor, source, events, clock, silent, { refreshMs: 10 * 60_000 });
+    const harness = new GovernedHarness(new RecordingHarness(base, events, clock, logs), admission, governor, refresher);
+    await expect(harness.run(agentRunRequest(), () => undefined, SIGNAL)).rejects.toThrow(BudgetExhaustedError);
+    expect(reads).toEqual(['primary']);
+    expect(base.requests).toEqual([]);
+    expect(events.records.filter((record) => record.type === RUN_STARTED_EVENT)).toEqual([]);
+  });
+
+  it('asks for fresh usage before every run', async () => {
+    const { harness, freshener } = setup();
+    await harness.run(agentRunRequest(), () => undefined, SIGNAL);
+    await harness.run(agentRunRequest(), () => undefined, SIGNAL);
+    expect(freshener.calls).toBe(2);
+  });
+
   it('records the run as started and finished around the harness and logs every event', async () => {
     const { events, logs, base, harness } = setup();
     base.events = [
@@ -143,7 +184,7 @@ describe('recording and governing agent runs', () => {
     const clock = new SteppingClock(START);
     const capped = new BudgetGovernor(events, clock, { accounts: [], thresholds: THRESHOLDS, dailyCap: { kind: 'usd', amount: 0.5 }, perRunCapUsd: null, staleAfterMs: STALE_AFTER_MS });
     const base = new EventfulHarness();
-    const harness = new GovernedHarness(new RecordingHarness(base, events, clock, new InMemoryRunLogStore(clock)), new AgentRunAdmission({ snapshot: () => Promise.resolve({ freeMemoryPercent: 80, pressure: 'normal' }) }, { minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' }), capped);
+    const harness = new GovernedHarness(new RecordingHarness(base, events, clock, new InMemoryRunLogStore(clock)), new AgentRunAdmission({ snapshot: () => Promise.resolve({ freeMemoryPercent: 80, pressure: 'normal' }) }, { minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' }), capped, new CountingFreshener());
     base.result = runResult({ runId: 'run-1', costUsd: 0.6 });
     await harness.run(agentRunRequest(), () => undefined, SIGNAL);
     expect(await capped.spentToday()).toBeCloseTo(0.6);

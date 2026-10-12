@@ -1,10 +1,12 @@
 import type { Clock, EventStore, OperationLog, Sleeper } from '../ports.ts';
 import { closeOrphanRuns } from '../runs/orphan-runs.ts';
+import { DAEMON_STARTED_EVENT, DAEMON_STOPPED_EVENT, DAEMON_SUBJECT } from './daemon-events.ts';
 import { CONFIGURATION_RELOADED_EVENT, ConfigurationReloadedPayloadSchema, SETTINGS_CHANGED_EVENT, SETTINGS_SUBJECT } from '../settings/settings-events.ts';
 import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 
 const FIRST_SEQUENCE = 0;
 const NO_PAUSES: PauseSet = new Map();
+const STOP_REASON = 'the installation stopped';
 
 /** What an installation needs from the daemon of one project. */
 export interface ProjectScheduler {
@@ -59,6 +61,8 @@ export class InstallationDaemon {
   private readonly dependencies: InstallationDaemonDependencies;
   private readonly settings: InstallationDaemonSettings;
   private pausesNow: PauseSet = NO_PAUSES;
+  /** Each task's run still going on: a slow read never holds up scheduling, and a task never runs twice at once. */
+  private readonly inFlight = new Map<string, Promise<void>>();
 
   constructor(dependencies: InstallationDaemonDependencies, settings: InstallationDaemonSettings) {
     this.dependencies = dependencies;
@@ -78,6 +82,7 @@ export class InstallationDaemon {
     const { events, clock, log, projects, sleeper } = this.dependencies;
     const closed = await closeOrphanRuns(events, clock);
     if (closed.length > 0) log.info(`closed ${closed.length} agent run(s) left open by an earlier stop`);
+    await events.append(DAEMON_STARTED_EVENT, DAEMON_SUBJECT, { projects: projects.map((project) => project.projectId) });
     for (const project of projects) await project.start();
     try {
       while (!signal.aborted) {
@@ -85,16 +90,33 @@ export class InstallationDaemon {
         await sleeper.sleep(this.settings.pollIntervalMs, signal);
       }
     } finally {
-      await Promise.allSettled(projects.map((project) => project.stop()));
+      await Promise.allSettled([...projects.map((project) => project.stop()), ...this.inFlight.values()]);
+      await events.append(DAEMON_STOPPED_EVENT, DAEMON_SUBJECT, { reason: STOP_REASON });
     }
   }
 
   async tick(signal: AbortSignal): Promise<void> {
-    const { tasks, pauses, projects } = this.dependencies;
-    for (const task of tasks) await this.guard(task.name, () => task.run(signal));
+    const { pauses, projects } = this.dependencies;
+    this.startTasks(signal);
     await this.guard('reloading the configuration', () => this.applyPendingSettings());
     this.pausesNow = (await this.guard('deciding the machine pauses', () => pauses.refresh())) ?? this.pausesNow;
     await Promise.all(projects.map((project) => this.guard(`ticking project ${project.projectId}`, () => project.tick(signal))));
+  }
+
+  /** Starts every task whose previous run has finished, without waiting for it. */
+  private startTasks(signal: AbortSignal): void {
+    for (const task of this.dependencies.tasks) {
+      if (this.inFlight.has(task.name)) continue;
+      const running = this.guard(task.name, () => task.run(signal)).then(() => {
+        this.inFlight.delete(task.name);
+      });
+      this.inFlight.set(task.name, running);
+    }
+  }
+
+  /** Settles once every task started so far has finished its run. */
+  async settled(): Promise<void> {
+    await Promise.allSettled([...this.inFlight.values()]);
   }
 
   private async applyPendingSettings(): Promise<void> {

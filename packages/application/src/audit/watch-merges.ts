@@ -60,6 +60,7 @@ function detectedPayload(commit: CommitSummary, reason: AuditDetectedPayload['re
     commitMessage: commit.message,
     authorLogin: commit.authorLogin,
     pullRequestNumber: commit.pullRequestNumber,
+    pullRequestBranch: commit.pullRequestBranch,
   };
 }
 

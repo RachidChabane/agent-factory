@@ -33,6 +33,7 @@ export const AuditDetectedPayloadSchema = z.object({
   commitMessage: z.string(),
   authorLogin: z.string().nullable(),
   pullRequestNumber: z.number().int().nullable(),
+  pullRequestBranch: z.string().nullable().default(null),
 });
 export type AuditDetectedPayload = z.infer<typeof AuditDetectedPayloadSchema>;
 

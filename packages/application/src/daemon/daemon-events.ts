@@ -9,6 +9,8 @@ export const SCHEDULER_RESUMED_EVENT = 'scheduler.resumed';
 
 export const DaemonStartedPayloadSchema = z.object({ concurrency: z.number().int().positive(), poolSize: z.number().int().positive() });
 export const DaemonStoppedPayloadSchema = z.object({ reason: z.string() });
+/** The start of an installation's daemon, in the installation's own log. */
+export const InstallationStartedPayloadSchema = z.object({ projects: z.array(z.string()) });
 
 export const SchedulerPausedPayloadSchema = z.object({
   cause: z.enum(PAUSE_CAUSES),

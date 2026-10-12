@@ -15,6 +15,11 @@ import type { AccountUsage, BudgetGovernor } from './budget-governor.ts';
 const FIRST_SEQUENCE = 0;
 const REPORT_SOURCE = 'usage-report';
 
+/** Makes sure the usage an agent run is admitted on was read, not guessed. */
+export interface UsageFreshener {
+  ensureFresh(signal: AbortSignal): Promise<void>;
+}
+
 export interface UsageRefresherSettings {
   readonly refreshMs: number;
 }
@@ -29,7 +34,7 @@ function message(error: unknown): string {
  * shows has reset or gone stale, and on the operator's demand. A failed read is recorded,
  * so the cockpit says why the figures are old instead of showing them as current.
  */
-export class UsageRefresher implements InstallationTask {
+export class UsageRefresher implements InstallationTask, UsageFreshener {
   readonly name = 'refreshing subscription usage';
   private readonly governor: BudgetGovernor;
   private readonly source: UsageReportSource;
@@ -48,20 +53,30 @@ export class UsageRefresher implements InstallationTask {
   }
 
   async run(signal: AbortSignal): Promise<void> {
-    const attempts = await this.lastAttempts();
-    const now = this.clock.now().getTime();
-    for (const account of await this.governor.usage()) {
-      const last = attempts.get(account.account) ?? null;
-      const due = last === null || now - last >= this.settings.refreshMs;
-      const unreliable = needsRefresh(account.limits) && (last === null || now - last >= this.settings.refreshMs / 2);
-      if (due || unreliable) await this.readAccount(account.account, signal);
-    }
+    await this.readAccountsWhere(signal, (account, last, now) => last === null || now - last >= this.settings.refreshMs || this.unreliable(account, last, now));
+  }
+
+  /** Before an agent run: reads every account whose usage is unknown, stale or from a reset window, unless a read was just tried. */
+  async ensureFresh(signal: AbortSignal): Promise<void> {
+    await this.readAccountsWhere(signal, (account, last, now) => this.unreliable(account, last, now));
   }
 
   /** Reads every account now, whatever the interval, and returns the usage it leads to. */
   async refreshNow(signal: AbortSignal): Promise<readonly AccountUsage[]> {
     for (const account of this.governor.accountNames()) await this.readAccount(account, signal);
     return this.governor.usage();
+  }
+
+  private unreliable(account: AccountUsage, last: number | null, now: number): boolean {
+    return needsRefresh(account.limits) && (last === null || now - last >= this.settings.refreshMs / 2);
+  }
+
+  private async readAccountsWhere(signal: AbortSignal, due: (account: AccountUsage, last: number | null, now: number) => boolean): Promise<void> {
+    const attempts = await this.lastAttempts();
+    const now = this.clock.now().getTime();
+    for (const account of await this.governor.usage()) {
+      if (due(account, attempts.get(account.account) ?? null, now)) await this.readAccount(account.account, signal);
+    }
   }
 
   private async readAccount(account: string, signal: AbortSignal): Promise<void> {

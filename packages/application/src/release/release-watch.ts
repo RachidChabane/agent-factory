@@ -33,9 +33,9 @@ export const ReleaseDetectedPayloadSchema = z.object({
   pullRequestNumber: z.number().int().positive().nullable(),
   title: z.string(),
   /** When the forge created the release pull request, or the time of the tagged commit. */
-  createdAt: z.iso.datetime({ offset: true }).nullable(),
+  createdAt: z.iso.datetime({ offset: true }).nullable().default(null),
   /** The published tag of the version a release pull request announces; such a pull request is never pending. */
-  supersededBy: z.string().nullable(),
+  supersededBy: z.string().nullable().default(null),
 });
 export type ReleaseDetectedPayload = z.infer<typeof ReleaseDetectedPayloadSchema>;
 

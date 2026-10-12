@@ -425,6 +425,10 @@ export class InMemoryGitHub implements GitHubGateway {
         })),
     );
   }
+  workflowRuns(): Promise<null> {
+    return Promise.resolve(null);
+  }
+
   listTags(): Promise<readonly TagRef[]> {
     return Promise.resolve([]);
   }

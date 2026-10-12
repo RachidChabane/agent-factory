@@ -14,7 +14,7 @@ class RecordingDocument implements SettingsDocument {
   }
 }
 
-const ROLE: SettingsChange = { kind: 'role', role: 'reviewer', model: 'opus', effort: 'high', maxBudgetUsd: 3, maxTurns: 60 };
+const ROLE: SettingsChange = { kind: 'role', project: null, role: 'reviewer', model: 'opus', effort: 'high', maxBudgetUsd: 3, maxTurns: 60 };
 
 describe('settings changes', () => {
   it('writes a valid change to the document and records who changed what, with the backup', async () => {
@@ -30,7 +30,7 @@ describe('settings changes', () => {
   it('refuses a change outside the sane bounds before touching the document', async () => {
     const events = new InMemoryEventStore();
     const document = new RecordingDocument();
-    const change: SettingsChange = { kind: 'limits', concurrentIssues: 1, minimumFreeMemoryPercent: 5, pauseAbovePressure: 'critical' };
+    const change: SettingsChange = { kind: 'resources', minimumFreeMemoryPercent: 5, pauseAbovePressure: 'critical', maxConcurrentRuns: 1 };
     const refused = new ChangeSettings({ events, document }).change(change, 'alex');
     await expect(refused).rejects.toBeInstanceOf(SettingsChangeRefusedError);
     await expect(refused).rejects.toMatchObject({ problems: [expect.stringContaining('free-memory'), expect.stringContaining('critical')] });

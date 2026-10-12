@@ -85,4 +85,19 @@ describe('UsageRefresher', () => {
     expect(events.typesOf('usage/')).toEqual([USAGE_READ_FAILED_EVENT]);
     expect(warnings).toEqual(['reading the usage of primary failed: claude is not logged in']);
   });
+
+  it('reads before an agent run only the accounts whose usage is unknown or stale, and not again right after a failed read', async () => {
+    const { clock, source, refresher } = setup();
+    await refresher.ensureFresh(SIGNAL);
+    expect(source.reads).toEqual(['primary', 'second']);
+    await refresher.ensureFresh(SIGNAL);
+    expect(source.reads).toEqual(['primary', 'second']);
+    clock.set(new Date(START.getTime() + 31 * MINUTE_MS));
+    source.failure = new Error('not logged in');
+    await refresher.ensureFresh(SIGNAL);
+    expect(source.reads).toEqual(['primary', 'second', 'primary', 'second']);
+    clock.set(new Date(START.getTime() + 32 * MINUTE_MS));
+    await refresher.ensureFresh(SIGNAL);
+    expect(source.reads).toHaveLength(4);
+  });
 });

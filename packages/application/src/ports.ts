@@ -193,6 +193,25 @@ export interface DeploymentRecord {
   readonly environmentUrl: string | null;
 }
 
+export const WORKFLOW_RUN_STATUSES = ['queued', 'in_progress', 'completed'] as const;
+export type WorkflowRunStatus = (typeof WORKFLOW_RUN_STATUSES)[number];
+
+/** One run of a CI workflow of the repository, as the forge reports it. */
+export interface WorkflowRunRecord {
+  readonly id: string;
+  readonly workflow: string;
+  readonly title: string;
+  readonly branch: string;
+  readonly sha: string;
+  readonly trigger: string;
+  readonly status: WorkflowRunStatus;
+  readonly conclusion: string | null;
+  readonly actor: string | null;
+  readonly startedAt: Date;
+  readonly updatedAt: Date;
+  readonly url: string;
+}
+
 export interface WorkflowDispatch {
   readonly workflow: string;
   readonly ref: string;
@@ -225,6 +244,8 @@ export interface GitHubGateway {
   listTags(): Promise<readonly TagRef[]>;
   deployments(environment: string, limit: number): Promise<readonly DeploymentRecord[]>;
   dispatchWorkflow(dispatch: WorkflowDispatch): Promise<WorkflowDispatchReceipt>;
+  /** The latest runs of the repository's workflows, newest first; null when the forge runs no workflows. */
+  workflowRuns(limit: number): Promise<readonly WorkflowRunRecord[] | null>;
 }
 
 export interface CommandResult {
