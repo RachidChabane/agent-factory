@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectView } from '../../contract/index.ts';
+import { STOREFRONT_ID } from '../../test/fixtures/project-ids.ts';
 import { pullRequestView } from '../../test/fixtures/seeds.ts';
-import { pullRequestTarget } from './audit-links.ts';
+import { fixtureSnapshot } from '../../test/render.tsx';
+import { publishedIssueTarget, pullRequestTarget } from './audit-links.ts';
 
 type LinkedProject = Pick<ProjectView, 'id' | 'pullRequests'>;
 
@@ -48,5 +50,25 @@ describe('pullRequestTarget', () => {
       kind: 'forge',
       href: 'https://forge.example.com/example-org/ledger/pull/22',
     });
+  });
+});
+
+describe('publishedIssueTarget', () => {
+  const storefront = fixtureSnapshot().projects.find((candidate) => candidate.id === STOREFRONT_ID);
+  if (storefront === undefined) throw new Error('the fixture world has no storefront');
+  const [listed] = storefront.issues;
+  if (listed === undefined) throw new Error('the storefront of the fixture world lists no issue');
+  const unlisted = Math.max(...storefront.issues.map((issue) => issue.number)) + 1;
+
+  it('leads to the page of the cockpit for an issue the factory lists', () => {
+    expect(publishedIssueTarget(storefront, listed.number)).toEqual({ kind: 'internal', to: `/projects/${STOREFRONT_ID}/issues/${listed.number}` });
+  });
+
+  it('leads nowhere for an issue the factory does not list', () => {
+    expect(publishedIssueTarget(storefront, unlisted)).toEqual({ kind: 'unlinked' });
+  });
+
+  it('keeps the issues of the project apart from those of another that share a number', () => {
+    expect(publishedIssueTarget({ id: 'ledger', issues: [] }, listed.number)).toEqual({ kind: 'unlinked' });
   });
 });

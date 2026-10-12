@@ -14,3 +14,10 @@ export function pullRequestTarget(project: Pick<ProjectView, 'id' | 'pullRequest
   if (project.pullRequests.some((pullRequest) => pullRequest.number === number)) return { kind: 'internal', to: paths.pullRequest(project.id, number) };
   return forgeUrl === null || forgeUrl.length === 0 ? { kind: 'unlinked' } : { kind: 'forge', href: forgeUrl };
 }
+
+export type IssueTarget = Exclude<PullRequestTarget, { readonly kind: 'forge' }>;
+
+/** Where the number of an issue published from an audit leads: to the page of the cockpit when the factory lists that issue, else nowhere. */
+export function publishedIssueTarget(project: Pick<ProjectView, 'id' | 'issues'>, number: number): IssueTarget {
+  return project.issues.some((issue) => issue.number === number) ? { kind: 'internal', to: paths.issue(project.id, number) } : { kind: 'unlinked' };
+}

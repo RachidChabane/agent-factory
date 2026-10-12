@@ -303,6 +303,13 @@ describe('AuditsView issue draft', () => {
     expect(within(draft()).queryByText('No issue drafted')).not.toBeInTheDocument();
   });
 
+  it('names an issue published from an audit without a link when the factory does not list it', async () => {
+    const snapshot = withProject(STOREFRONT, (view) => ({ ...view, issues: view.issues.filter((issue) => issue.number !== 75) }));
+    await openAudit(AUDIT.httpClient, { snapshot });
+    expect(within(draft()).getByText('Published as issue #75')).toBeInTheDocument();
+    expect(within(draft()).queryByRole('link')).not.toBeInTheDocument();
+  });
+
   it('links the issue to the issue of the same number in its own project', async () => {
     const snapshot = withAudit(LEDGER, AUDIT.ledgerRewrite, (audit) => ({ ...audit, publishedIssueNumber: 19 }));
     await openAudit(AUDIT.ledgerRewrite, { snapshot }, LEDGER);
