@@ -2,6 +2,7 @@ import { issueResumer } from '../../composition/project/project-use-cases.ts';
 import type { CliContext } from '../cli-context.ts';
 import { COMMAND_NAMES } from '../command-line.ts';
 import { EXIT_CODES } from '../output.ts';
+import { runningFactory } from './factory-running.ts';
 import { itemName, nextCommand, selectedProject, withProjectSession } from './project-session.ts';
 
 export async function resumeCommand(issueNumber: number, answer: string | null, requested: string | null, context: CliContext): Promise<number> {
@@ -12,9 +13,12 @@ export async function resumeCommand(issueNumber: number, answer: string | null, 
     const checks = outcome.checksReauthored ? '; the acceptance checks will be written again from the base' : '';
     const decision = outcome.decisionAnswered ? '; the implementer will continue with the answer to its decision request' : '';
     const feedback = outcome.feedbackCycleGranted ? '; one fresh session on the escalation profile addresses the pending feedback' : '';
-    context.output.line(
-      `${itemName(project.config, issueNumber)} resumed at ${outcome.resumedAt}: ${spec}${checks}${decision}${feedback}. Run "${nextCommand(selected, COMMAND_NAMES.runIssue, String(issueNumber))}" to continue.`,
-    );
+    const running = await runningFactory(selected.config);
+    const next =
+      running === null
+        ? `Run "${nextCommand(selected, COMMAND_NAMES.runIssue, String(issueNumber))}" to continue, or start the factory.`
+        : `The factory running as process ${running} continues it at its next tick.`;
+    context.output.line(`${itemName(project.config, issueNumber)} resumed at ${outcome.resumedAt}: ${spec}${checks}${decision}${feedback}. ${next}`);
     return EXIT_CODES.ok;
   });
 }
