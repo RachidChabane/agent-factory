@@ -2,7 +2,7 @@
   "name": "@agent-factory/plugin",
   "version": "0.0.0",
   "private": true,
-  "description": "What runs inside an agent session: the Stop-hook gate, the guard of frozen checks and the role prompts.",
+  "description": "What runs inside an agent session (the Stop-hook gate, the guard of frozen checks, the role prompts) and the Claude Code plugin that adds the orchestrator agent and its skills.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

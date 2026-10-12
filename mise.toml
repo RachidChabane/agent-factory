@@ -5,7 +5,7 @@ description = "Install the dependencies from the lockfile, build the cockpit and
 run = "script/setup"
 
 [tasks.lint]
-description = "ESLint, type-check every package, the schema and notices freshness, shellcheck, actionlint"
+description = "ESLint, type-check every package, the schema and notices freshness, the plugin manifests, shellcheck, actionlint"
 run = "script/lint"
 
 [tasks.test]
