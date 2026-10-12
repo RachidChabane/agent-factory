@@ -1,10 +1,11 @@
-import { COMMIT_KINDS } from '@agent-factory/domain';
+import { COMMIT_KINDS, filmScenarioOf } from '@agent-factory/domain';
 import type { CommitKind, IssueSpec, IssueType } from '@agent-factory/domain';
 import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import type { IssueRecord, SpecReader } from '../ports.ts';
 import { blockText, isBlank, parseList, splitLevelTwoSections, type ListKind, type MarkdownSection } from './markdown-blocks.ts';
 import { SpecFormatError, type SpecProblem } from './spec-errors.ts';
 import {
+  filmScenarioProblem,
   SPEC_SECTION_HEADINGS,
   SPEC_SECTION_KEYS,
   sectionKeyOf,
@@ -109,6 +110,19 @@ function readKind(labels: readonly string[], kindPrefix: string, problems: SpecP
   return kind;
 }
 
+/** The scenarios the issue's film labels declare, each once, in the order the labels give them. */
+function readFilms(labels: readonly string[], problems: SpecProblem[]): readonly string[] {
+  const films: string[] = [];
+  for (const label of labels) {
+    const scenario = filmScenarioOf(label);
+    if (scenario === null) continue;
+    const refusal = filmScenarioProblem(scenario);
+    if (refusal === null) films.push(scenario);
+    else problems.push(problem('invalid-film-label', null, `label "${label}" is not usable: ${refusal}`));
+  }
+  return [...new Set(films)];
+}
+
 /** What a spec is read from: the parts of an issue the forge gives, whatever else it records. */
 export type SpecSource = Pick<IssueRecord, 'number' | 'title' | 'body' | 'labels' | 'blockedBy'>;
 
@@ -125,6 +139,7 @@ export function parseIssueSpec(issue: SpecSource, conventions: ProjectConvention
   for (const key of SPEC_SECTION_KEYS) readSection(key, found.get(key), problems, contents);
   const type = readType(issue.labels, conventions, problems);
   const commitKind = readKind(issue.labels, conventions.labels.kindPrefix, problems);
+  const films = readFilms(issue.labels, problems);
   const { need, expectedProof } = contents.text;
   const { acceptanceCriteria, outOfScope } = contents.lists;
   if (
@@ -147,6 +162,7 @@ export function parseIssueSpec(issue: SpecSource, conventions: ProjectConvention
     expectedProof,
     dependsOn: [...new Set(issue.blockedBy)].sort((a, b) => a - b),
     commitKind,
+    films,
   };
 }
 

@@ -104,6 +104,8 @@ export interface SourceControl {
   commitAll(worktree: Worktree, message: string): Promise<string>;
   commitPaths(worktree: Worktree, paths: readonly string[], message: string): Promise<string>;
   hashFiles(worktree: Worktree, paths: readonly string[]): Promise<readonly FrozenCheck[]>;
+  /** Restores the listed paths to the last commit and removes the ones it does not hold, touching nothing else. */
+  discardPaths(worktree: Worktree, paths: readonly string[]): Promise<void>;
   push(worktree: Worktree): Promise<void>;
   checkoutBaseCopy(worktree: Worktree, paths: readonly string[]): Promise<string>;
 }

@@ -6,6 +6,7 @@ import { fenced, inlineCode } from './markdown.ts';
 import type { GateSettings, NamedCommand, RepositoryCoordinates } from './pipeline-settings.ts';
 
 const PARAGRAPH = '\n\n';
+const NEWLINE = '\n';
 const JSON_INFO = 'json';
 const JSON_INDENT = 2;
 export const NO_FROZEN_CHECK = 'This issue has no frozen acceptance check.';
@@ -22,6 +23,7 @@ export const ROLE_PROMPT_PLACEHOLDERS = {
   decisionRequest: 'decisionRequest',
   issueTypes: 'issueTypes',
   gate: 'gate',
+  films: 'films',
 } as const;
 
 const RUNNER_DESCRIPTIONS: Readonly<Record<TestRunner, string>> = {
@@ -74,12 +76,26 @@ export function issueTypesValue(typology: IssueTypology): string {
   return typology.ids().join(LIST_SEPARATOR);
 }
 
-export function acceptanceAuthorValues(repository: RepositoryCoordinates, spec: IssueSpec, type: IssueTypeDefinition): RolePromptValues {
+const FILMS_RULE =
+  'A film that the spec declares in its `Films:` header, or that the expected proof names, is recorded by the factory itself against the base and the head once the pull request is open: never try to produce one, and never write a check for what only a film can show.';
+
+/** The rule a project that films adds to the acceptance author's rules, as a bullet ending in a newline; empty when it films nothing. */
+export function filmsValue(filmsRecorded: boolean): string {
+  return filmsRecorded ? `- ${FILMS_RULE}${NEWLINE}` : '';
+}
+
+export function acceptanceAuthorValues(
+  repository: RepositoryCoordinates,
+  spec: IssueSpec,
+  type: IssueTypeDefinition,
+  filmsRecorded: boolean,
+): RolePromptValues {
   return {
     [ROLE_PROMPT_PLACEHOLDERS.repository]: repositoryValue(repository),
     [ROLE_PROMPT_PLACEHOLDERS.spec]: specValue(spec),
     [ROLE_PROMPT_PLACEHOLDERS.checkGuidance]: type.checks,
     [ROLE_PROMPT_PLACEHOLDERS.runners]: runnersValue(),
+    [ROLE_PROMPT_PLACEHOLDERS.films]: filmsValue(filmsRecorded),
   };
 }
 

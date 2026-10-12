@@ -56,6 +56,8 @@ export interface OutboundContent {
   readonly diff?: string;
   readonly title?: string;
   readonly body?: string;
+  /** Files about to be committed, each under the path it will have on the branch. */
+  readonly documents?: readonly ScanDocument[];
 }
 
 export class OutboundSecretScan {
@@ -70,6 +72,7 @@ export class OutboundSecretScan {
       ...(content.diff === undefined ? [] : addedLines(content.diff)),
       ...(content.title === undefined ? [] : [textDocument(PULL_REQUEST_TITLE_ORIGIN, content.title)]),
       ...(content.body === undefined ? [] : [textDocument(PULL_REQUEST_BODY_ORIGIN, content.body)]),
+      ...(content.documents ?? []),
     ];
     const findings = scanForSecrets(documents, await this.source.knownSecrets());
     if (findings.length === 0) return;

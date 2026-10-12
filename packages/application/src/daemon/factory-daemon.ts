@@ -9,6 +9,10 @@ import { NOTICES, type OperatorNotifications } from '../notifications/operator-n
 import { issueStates } from '../pipeline/pipeline-capacity.ts';
 import { PipelineAbortedError } from '../pipeline/pipeline-errors.ts';
 import { loadJournal } from '../pipeline/pipeline-journal.ts';
+import { FilmRefusedError } from '../film/film-errors.ts';
+import type { FilmOrder } from '../film/film-order.ts';
+import type { FilmRunner } from '../film/film-runner.ts';
+import { closeOrphanFilms } from '../film/orphan-films.ts';
 import { recordExternalMerge } from '../pipeline/record-external-merge.ts';
 import type { RunIssueOutcome } from '../pipeline/run-issue-outcome.ts';
 import type { Clock, EventStore, GitHubGateway, IssueRecord, IssueStateStore, OperationLog, Sleeper, WorktreePool } from '../ports.ts';
@@ -29,6 +33,7 @@ import { DAEMON_STARTED_EVENT, DAEMON_STOPPED_EVENT, DAEMON_SUBJECT } from './da
 import { heldWorktrees } from './held-worktrees.ts';
 import { pausedIssues } from './issue-pause.ts';
 import { decideScheduling, type SchedulingDecision } from './issue-scheduling.ts';
+import { SLOTS_FREE, type SchedulingHold } from './scheduling-hold.ts';
 import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 
 export const MAX_AUDIT_ATTEMPTS = 3;
@@ -77,6 +82,8 @@ export interface DaemonDependencies {
   readonly pipelines: (signal: AbortSignal) => IssueDriver;
   readonly audits: AuditRunner | null;
   readonly challenges: RequestChallenger | null;
+  /** The films of the project; their queue is the installation's. Null when the project films nothing. */
+  readonly films: FilmRunner | null;
   readonly releases: ReleaseEvaluator;
   readonly configuration: ConfigurationSource | null;
   /** Stops the stacks an earlier factory left running; says how many it stopped. */
@@ -203,11 +210,29 @@ export class FactoryDaemon {
     }
   }
 
+  /** Orders a film of a pull request of the project; the installation's queue records it. */
+  async orderFilm(order: FilmOrder): Promise<void> {
+    const { films } = this.dependencies;
+    if (films === null) throw new FilmRefusedError(order.issueNumber, 'films are not configured; add evidence.films to the project');
+    await films.order(order);
+  }
+
+  /** Fails the films a stopped factory left recording and renders the placeholders of the queued ones again. */
+  private async recoverFilms(): Promise<void> {
+    const { events, films, log } = this.dependencies;
+    const closed = await closeOrphanFilms(events);
+    if (closed.length > 0) log.info(`closed the film of ${closed.map((number) => `issue #${number}`).join(', ')} left open by an earlier stop`);
+    if (films === null) return;
+    const refresh = await films.refreshBodies();
+    for (const failure of refresh.failed) log.warn(`the film placeholder of issue #${failure.issueNumber} could not be refreshed: ${failure.reason}`);
+  }
+
   /** Seeds the merge watcher and records the start; an installation calls it once per project. */
   async start(): Promise<void> {
     const { events, github, log } = this.dependencies;
     const reclaimed = await this.dependencies.reclaimStacks();
     if (reclaimed > 0) log.warn(`stopped ${reclaimed} stack(s) an earlier factory left running`);
+    await this.guard('recovering the films', () => this.recoverFilms());
     await seedMergeCursor({ events, github }, this.settings.baseBranch);
     await events.append(DAEMON_STARTED_EVENT, DAEMON_SUBJECT, { concurrency: this.concurrency, poolSize: this.settings.poolSize });
   }
@@ -218,14 +243,15 @@ export class FactoryDaemon {
     await this.dependencies.events.append(DAEMON_STOPPED_EVENT, DAEMON_SUBJECT, { reason: STOP_REASON });
   }
 
-  async tick(signal: AbortSignal): Promise<void> {
+  /** One round of the project's work; `hold` says whether a film of the installation holds its slots. */
+  async tick(signal: AbortSignal, hold: SchedulingHold = SLOTS_FREE): Promise<void> {
     await this.guard('reloading the configuration', () => this.reloadConfiguration());
     await this.guard('watching merges and releases', () => this.watch());
     const pauses = await this.refreshPauses();
     await this.guard('pausing issues', () => this.stopPausedIssues());
     if (pauses.size > 0 || signal.aborted) return;
-    const decision = await this.guard('scheduling issues', () => this.schedule(signal));
-    if (decision === null) return;
+    const decision = await this.guard('scheduling issues', () => this.schedule(signal, hold));
+    if (decision === null || hold.slotsHeld) return;
     const idle = decision.resume.length + decision.start.length + decision.waiting.length === 0;
     if (!idle) return;
     const challenging = await this.guard('starting a request challenge', () => this.maybeChallenge(signal));
@@ -278,7 +304,7 @@ export class FactoryDaemon {
     }
   }
 
-  private async schedule(signal: AbortSignal): Promise<SchedulingDecision> {
+  private async schedule(signal: AbortSignal, hold: SchedulingHold): Promise<SchedulingDecision> {
     const { events, clock, log } = this.dependencies;
     const now = clock.now().getTime();
     for (const [issueNumber, until] of this.deferredUntil) {
@@ -295,7 +321,7 @@ export class FactoryDaemon {
         inProcess: new Set(this.running.keys()),
         deferred: new Set([...this.deferredUntil.keys(), ...paused]),
         heldWorktrees: await heldWorktrees(events),
-        busySlots: this.running.size + (this.backgroundTask === null ? 0 : 1),
+        busySlots: hold.slotsHeld ? this.concurrency : this.running.size + (this.backgroundTask === null ? 0 : 1),
       },
       { concurrency: this.concurrency, poolSize: this.settings.poolSize },
     );

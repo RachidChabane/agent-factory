@@ -2,7 +2,8 @@ import { assertRequestTransition, issueSubject } from '@agent-factory/domain';
 import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import type { EventStore, GitHubGateway, IssueRecord, WorkspaceFiles } from '../ports.ts';
 import { ISSUE_CREATED_EVENT, type IssueCreatedPayload } from '../spec/issue-events.ts';
-import { parseSpecFile, specFileProblems, type SpecFile } from '../spec/spec-file.ts';
+import { parseSpecFile, specFileLabels, specFileProblems, type SpecFile } from '../spec/spec-file.ts';
+import { filmScenarioProblem } from '../spec/spec-format.ts';
 import { RequestNotFoundError } from './errors.ts';
 import { renderSpecFile, type ProposedSpecDraft } from './proposed-spec-file.ts';
 import {
@@ -39,6 +40,8 @@ export interface SpecOrigin {
 export interface IssueCreationPlan {
   readonly title: string;
   readonly labels: readonly string[];
+  /** The film scenarios the spec declares, also present as film labels in `labels`. */
+  readonly films: readonly string[];
   readonly body: string;
   readonly origin: SpecOrigin | null;
 }
@@ -106,9 +109,13 @@ export function planIssueCreation(text: string, origin: SpecOrigin | null, conve
   if (file.labels.includes(validated)) {
     throw new SpecFileRefusedError(`it carries ${validated}; only the operator adds that label, on the created issue`);
   }
+  for (const scenario of file.films) {
+    const refusal = filmScenarioProblem(scenario);
+    if (refusal !== null) throw new SpecFileRefusedError(`Films: "${scenario}" is refused: ${refusal}`);
+  }
   const problems = specFileProblems(file, conventions);
   if (problems.length > 0) throw new SpecFileRefusedError(problems.map((problem) => problem.message).join('; '));
-  return { title: file.title, labels: [...new Set([conventions.labels.factory, ...file.labels])], body: file.body, origin };
+  return { title: file.title, labels: [...new Set([conventions.labels.factory, ...specFileLabels(file)])], films: file.films, body: file.body, origin };
 }
 
 export async function createIssueFromPlan(

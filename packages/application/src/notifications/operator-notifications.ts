@@ -64,6 +64,16 @@ export const NOTICES = {
     body: `The report, the draft reply and ${specCount} proposed spec(s) wait for your review.`,
     path: COCKPIT_PATHS.request(requestId),
   }),
+  filmFinished: (issueNumber: number, pullRequestNumber: number, scenario: string): OperatorNotice => ({
+    title: `Films of scenario ${scenario} recorded for issue #${issueNumber}`,
+    body: `Pull request #${pullRequestNumber} carries the before and after recordings.`,
+    path: COCKPIT_PATHS.pullRequest(pullRequestNumber),
+  }),
+  filmFailed: (issueNumber: number, scenario: string, reason: string): OperatorNotice => ({
+    title: `Films of scenario ${scenario} failed for issue #${issueNumber}`,
+    body: reason,
+    path: COCKPIT_PATHS.issue(issueNumber),
+  }),
   failed: (what: string, reason: string): OperatorNotice => ({
     title: `Factory error: ${what}`,
     body: reason,

@@ -8,6 +8,8 @@ import { CONFIGURATION_EDITED_EVENT, CONFIGURATION_RELOAD_FAILED_EVENT, CONFIGUR
 import { DAEMON_STARTED_EVENT, DAEMON_STOPPED_EVENT, DAEMON_SUBJECT, SCHEDULER_RESUMED_EVENT } from './daemon-events.ts';
 import { InstallationDaemon, requestDrain, type InstallationReload, type InstallationTask, type ProjectScheduler } from './installation-daemon.ts';
 import { activePauses } from './pause-state.ts';
+import type { FilmTick, InstallationFilms } from './film-lane.ts';
+import { SLOTS_FREE, SLOTS_HELD, type SchedulingHold } from './scheduling-hold.ts';
 import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 
 const START = new Date('2026-03-02T09:00:00.000Z');
@@ -28,8 +30,11 @@ class RecordingProject implements ProjectScheduler {
     return Promise.resolve();
   }
 
-  tick(): Promise<void> {
+  readonly holds: boolean[] = [];
+
+  tick(_signal: AbortSignal, hold: SchedulingHold): Promise<void> {
     this.calls.push('tick');
+    this.holds.push(hold.slotsHeld);
     return this.failTick ? Promise.reject(new Error('forge unreachable')) : Promise.resolve();
   }
 
@@ -55,7 +60,7 @@ class FixedPauses implements SchedulingPauses {
   }
 }
 
-function setup(extraTasks: readonly InstallationTask[] = []) {
+function setup(extraTasks: readonly InstallationTask[] = [], films: InstallationFilms | null = null) {
   const events = new InMemoryEventStore();
   const clock = new SteppingClock(START);
   const shop = new RecordingProject('shop');
@@ -82,6 +87,7 @@ function setup(extraTasks: readonly InstallationTask[] = []) {
       },
       tasks: [{ name: 'refreshing usage', run: () => Promise.resolve(void tasksRun.push('usage')) }, ...extraTasks],
       projects: [shop, docs],
+      films,
     },
     { pollIntervalMs: 1 },
   );
@@ -241,5 +247,89 @@ describe('InstallationDaemon', () => {
     const { shop, daemon } = setup();
     expect(daemon.project('shop')).toBe(shop);
     expect(daemon.project('billing')).toBeNull();
+  });
+
+  it('hands every project the hold its films ask for, and tells the films which work runs', async () => {
+    class ScriptedFilms implements InstallationFilms {
+      readonly ticks: FilmTick[] = [];
+      hold: SchedulingHold = SLOTS_HELD;
+      recording = false;
+
+      isRecording(): boolean {
+        return this.recording;
+      }
+
+      tick(input: FilmTick): Promise<SchedulingHold> {
+        this.ticks.push(input);
+        return Promise.resolve(this.hold);
+      }
+
+      settle(): Promise<void> {
+        return Promise.resolve();
+      }
+    }
+    const films = new ScriptedFilms();
+    const { shop, docs, pauses, daemon } = setup([], films);
+    docs.busy = true;
+    pauses.pauses = new Map([['budget', { reason: 'spent' }]]);
+
+    await daemon.tick(new AbortController().signal);
+    films.hold = SLOTS_FREE;
+    await daemon.tick(new AbortController().signal);
+
+    expect(shop.holds).toEqual([true, false]);
+    expect(docs.holds).toEqual([true, false]);
+    expect(films.ticks.map((tick) => tick.workRunning)).toEqual([true, true]);
+    expect([...(films.ticks[0]?.pauses.keys() ?? [])]).toEqual(['budget']);
+  });
+
+  it('leaves the slots free when the films fail to decide', async () => {
+    const failing: InstallationFilms = {
+      isRecording: () => false,
+      tick: () => Promise.reject(new Error('the log is locked')),
+      settle: () => Promise.resolve(),
+    };
+    const { shop, warnings, daemon } = setup([], failing);
+    await daemon.tick(new AbortController().signal);
+    expect(shop.holds).toEqual([false]);
+    expect(warnings).toEqual(['running the films failed: the log is locked']);
+  });
+
+  it('does not drain while a film records, and waits for it to end before it stops', async () => {
+    let recording = true;
+    const films: InstallationFilms = {
+      isRecording: () => recording,
+      tick: () => Promise.resolve(SLOTS_HELD),
+      settle: () => Promise.resolve(),
+    };
+    const { events, daemon } = setup([], films);
+    const controller = new AbortController();
+    const running = daemon.run(controller.signal);
+    while (!events.typesOf(DAEMON_SUBJECT).includes(DAEMON_STARTED_EVENT)) await new Promise((resolve) => setTimeout(resolve, 1));
+    await requestDrain(events, 'Alex Morgan');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(events.typesOf(DAEMON_SUBJECT)).not.toContain(DAEMON_STOPPED_EVENT);
+    recording = false;
+    await running;
+    expect(events.typesOf(DAEMON_SUBJECT)).toContain(DAEMON_STOPPED_EVENT);
+  });
+
+  it('waits for the film recording when the signal aborts', async () => {
+    let settled = false;
+    const films: InstallationFilms = {
+      isRecording: () => false,
+      tick: () => Promise.resolve(SLOTS_FREE),
+      settle: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 15));
+        settled = true;
+      },
+    };
+    const { daemon } = setup([], films);
+    const controller = new AbortController();
+    const running = daemon.run(controller.signal);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    controller.abort();
+    await running;
+    expect(settled).toBe(true);
   });
 });

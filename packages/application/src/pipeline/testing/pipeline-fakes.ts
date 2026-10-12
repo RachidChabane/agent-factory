@@ -209,6 +209,17 @@ export class InMemorySourceControl implements SourceControl {
     return Promise.resolve(sha);
   }
 
+  discardPaths(worktree: Worktree, paths: readonly string[]): Promise<void> {
+    const head = this.head(worktree).snapshot;
+    const tree = this.workspace.tree(worktree.path);
+    for (const path of paths) {
+      const committed = head.get(path);
+      if (committed === undefined) tree.delete(path);
+      else tree.set(path, committed);
+    }
+    return Promise.resolve();
+  }
+
   hashFiles(worktree: Worktree, paths: readonly string[]): Promise<readonly FrozenCheck[]> {
     const tree = this.workspace.tree(worktree.path);
     try {
@@ -468,8 +479,12 @@ export class InMemoryGitHub implements GitHubGateway {
   commitDiff(): Promise<CommitDiff> {
     throw new Error('not used');
   }
-  pullRequestDetails(): Promise<PullRequestDetails> {
-    throw new Error('not used');
+  pullRequestDetails(number: number): Promise<PullRequestDetails> {
+    const entry = this.opened.find((candidate) => candidate.ref.number === number);
+    if (entry === undefined) return Promise.reject(new Error(`no pull request #${number}`));
+    const body = this.bodyUpdates.findLast((update) => update.number === number)?.body ?? entry.draft.body;
+    const merged = this.merges.some((merge) => merge.number === number);
+    return Promise.resolve({ number, title: entry.draft.title, body, authorLogin: null, state: merged ? 'merged' : 'open' });
   }
 }
 

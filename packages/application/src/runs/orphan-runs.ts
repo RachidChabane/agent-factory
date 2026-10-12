@@ -1,4 +1,4 @@
-import type { Clock, EventStore } from '../ports.ts';
+import type { Clock, EventStore, FactoryEventRecord } from '../ports.ts';
 import { DEFAULT_ACCOUNT_NAME } from '../budget/budget-governor.ts';
 import { ZERO_USAGE } from './recording-harness.ts';
 import {
@@ -14,10 +14,15 @@ import {
 const FIRST_SEQUENCE = 0;
 export const ORPHAN_RUN_DETAIL = 'the factory stopped before the run ended';
 
-export async function closeOrphanRuns(events: EventStore, clock: Clock): Promise<readonly string[]> {
+/** The runs the log shows started and not ended. */
+export async function openRunStarts(events: EventStore): Promise<readonly FactoryEventRecord[]> {
   const records = await events.read(RUN_SUBJECT_PREFIX, FIRST_SEQUENCE);
   const finished = new Set(records.filter((record) => record.type === RUN_FINISHED_EVENT).map((record) => record.subject));
-  const orphans = records.filter((record) => record.type === RUN_STARTED_EVENT && !finished.has(record.subject));
+  return records.filter((record) => record.type === RUN_STARTED_EVENT && !finished.has(record.subject));
+}
+
+export async function closeOrphanRuns(events: EventStore, clock: Clock): Promise<readonly string[]> {
+  const orphans = await openRunStarts(events);
   const closed: string[] = [];
   for (const orphan of orphans) {
     const started = RunStartedPayloadSchema.parse(orphan.payload);

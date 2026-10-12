@@ -12,6 +12,7 @@ export const SPEC_PROBLEM_CODES = [
   'multiple-type-labels',
   'multiple-kind-labels',
   'unknown-kind-label',
+  'invalid-film-label',
 ] as const;
 export type SpecProblemCode = (typeof SPEC_PROBLEM_CODES)[number];
 

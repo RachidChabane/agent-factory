@@ -1,6 +1,7 @@
 import { DEFAULT_ISSUE_TYPES, IssueTypology, type EscalationProfile, type IssueSpec } from '@agent-factory/domain';
 import { DEFAULT_PROJECT_CONVENTIONS, type ProjectConventions } from '../../conventions/project-conventions.ts';
 import { ISSUE_OPENED_AT, StubPromptCatalog } from '../../audit/testing/fakes.ts';
+import { SteppingClock } from '../../runs/test-support.ts';
 import { RUNNER_REPORTING } from '../../acceptance/test-reports/test-report-reader.ts';
 import { ACCEPTANCE_REPORT_DIRECTORY } from '../../acceptance/structured-command.ts';
 import type { AgentRunRequest, IssueRecord, Worktree } from '../../ports.ts';
@@ -60,6 +61,7 @@ export function acceptanceTestId(title: string): string {
   return `${CHECK_PATH} > ${title}`;
 }
 export const MANIFEST_PATH = '.factory/acceptance.json';
+export const SCENARIO_START = new Date('2026-10-12T12:00:00.000Z');
 export const NO_FINDINGS = 'The change is sound.\n\n```json\n{ "findings": [] }\n```';
 
 export const SPEC: IssueSpec = {
@@ -72,6 +74,7 @@ export const SPEC: IssueSpec = {
   expectedProof: 'A Playwright journey with a screenshot of the header.',
   dependsOn: [],
   commitKind: null,
+  films: [],
 };
 
 export const MANIFEST = {
@@ -144,7 +147,9 @@ export class PipelineScenario {
   readonly github = new InMemoryGitHub(this.sourceControl);
   readonly harness = new ScriptedRoleHarness();
   readonly runner = new ScriptedCommandRunner();
-  readonly events = new InMemoryEventStore();
+  /** The time every event of the scenario is recorded at; tests move it to age the log. */
+  readonly clock = new SteppingClock(SCENARIO_START);
+  readonly events = new InMemoryEventStore(this.clock);
   readonly states = new EventSourcedIssueStates(this.events);
   readonly logs = new InMemoryLogArchive();
   readonly resources = new AdjustableResources();

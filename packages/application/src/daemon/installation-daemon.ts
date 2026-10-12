@@ -1,4 +1,6 @@
 import type { Clock, EventStore, FactoryEventRecord, OperationLog, Sleeper } from '../ports.ts';
+import type { InstallationFilms } from './film-lane.ts';
+import { SLOTS_FREE, type SchedulingHold } from './scheduling-hold.ts';
 import { closeOrphanRuns } from '../runs/orphan-runs.ts';
 import { DAEMON_STARTED_EVENT, DAEMON_STOPPED_EVENT, DAEMON_SUBJECT } from './daemon-events.ts';
 import {
@@ -22,7 +24,8 @@ const DRAIN_CAUSE = 'drain';
 export interface ProjectScheduler {
   readonly projectId: string;
   start(): Promise<void>;
-  tick(signal: AbortSignal): Promise<void>;
+  /** One round of the project's work; `hold` says whether a film holds its slots. */
+  tick(signal: AbortSignal, hold: SchedulingHold): Promise<void>;
   stop(): Promise<void>;
   updateConcurrency(concurrency: number): void;
   /** Whether no issue, challenge or audit of the project is running. */
@@ -54,6 +57,8 @@ export interface InstallationDaemonDependencies {
   readonly configuration: InstallationConfigurationSource | null;
   readonly tasks: readonly InstallationTask[];
   readonly projects: readonly ProjectScheduler[];
+  /** The films of the projects that film, in one queue; null when no project films. */
+  readonly films: InstallationFilms | null;
 }
 
 export interface InstallationDaemonSettings {
@@ -78,7 +83,8 @@ function handledThrough(settings: readonly FactoryEventRecord[]): number {
 /**
  * Drives every project of an installation from one loop: closes runs a previous stop left
  * open, starts each project, then at each tick runs the installation's own tasks, applies
- * settings changes, decides the machine pauses once and lets every project schedule its work.
+ * settings changes, decides the machine pauses once, lets the films take their turn and then
+ * lets every project schedule its work, unless a film holds its slots.
  */
 export class InstallationDaemon {
   private readonly dependencies: InstallationDaemonDependencies;
@@ -112,11 +118,11 @@ export class InstallationDaemon {
     try {
       while (!signal.aborted && !drained) {
         await this.tick(signal);
-        drained = this.pausesNow.has(DRAIN_CAUSE) && projects.every((project) => project.isIdle()) && this.inFlight.size === 0;
+        drained = this.pausesNow.has(DRAIN_CAUSE) && projects.every((project) => project.isIdle()) && this.inFlight.size === 0 && !this.filmRecording();
         if (!drained) await sleeper.sleep(this.settings.pollIntervalMs, signal);
       }
     } finally {
-      await Promise.allSettled([...projects.map((project) => project.stop()), ...this.inFlight.values()]);
+      await Promise.allSettled([...projects.map((project) => project.stop()), ...this.inFlight.values(), this.dependencies.films?.settle()]);
       if (drained) await resumeScheduling(events, DRAIN_CAUSE);
       await events.append(DAEMON_STOPPED_EVENT, DAEMON_SUBJECT, { reason: drained ? DRAINED_REASON : STOP_REASON });
     }
@@ -129,7 +135,20 @@ export class InstallationDaemon {
     const refreshed = (await this.guard('deciding the machine pauses', () => pauses.refresh())) ?? this.pausesNow;
     const drain = (await activePauses(this.dependencies.events)).get(DRAIN_CAUSE);
     this.pausesNow = drain === undefined ? refreshed : new Map([...refreshed, [DRAIN_CAUSE, drain]]);
-    await Promise.all(projects.map((project) => this.guard(`ticking project ${project.projectId}`, () => project.tick(signal))));
+    const hold = await this.filmHold(signal);
+    await Promise.all(projects.map((project) => this.guard(`ticking project ${project.projectId}`, () => project.tick(signal, hold))));
+  }
+
+  private filmRecording(): boolean {
+    return this.dependencies.films?.isRecording() ?? false;
+  }
+
+  /** Lets the films take their turn; the slots they hold are kept from every project. */
+  private async filmHold(signal: AbortSignal): Promise<SchedulingHold> {
+    const { films, projects } = this.dependencies;
+    if (films === null) return SLOTS_FREE;
+    const workRunning = projects.some((project) => !project.isIdle());
+    return (await this.guard('running the films', () => films.tick({ pauses: this.pausesNow, workRunning }, signal))) ?? SLOTS_FREE;
   }
 
   /** Starts every task whose previous run has finished, without waiting for it. */

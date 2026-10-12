@@ -22,6 +22,13 @@ import {
   EvidenceCommittedSchema,
   EvidenceRemovedSchema,
   ExternalFeedbackReceivedSchema,
+  FilmCommittedSchema,
+  FilmFailedSchema,
+  FilmFinishedSchema,
+  FilmPushedSchema,
+  FilmQueuedSchema,
+  FilmStageEnteredSchema,
+  FilmStartedSchema,
   GateCompletedSchema,
   ImplementerAttemptFinishedSchema,
   IssueTransitionedPayloadSchema,
@@ -42,6 +49,9 @@ import {
   type CheckRewrittenRecord,
   type DecisionAnswerRecord,
   type FileFingerprint,
+  type FilmFinishedRecord,
+  type FilmRunningStage,
+  FACTORY_FILM_OPERATOR,
   type EvidenceRecord,
   type EvidenceRemovalRecord,
   type ExternalFeedbackRecord,
@@ -59,6 +69,27 @@ export interface CheckRewriteProgress {
   readonly fingerprint: readonly FileFingerprint[] | null;
   readonly authored: CheckRewriteAuthoredRecord | null;
   readonly proved: boolean;
+}
+
+export const FILM_ORDER_STATUSES = ['queued', 'running', 'finished', 'failed'] as const;
+export type FilmOrderStatus = (typeof FILM_ORDER_STATUSES)[number];
+
+/** One scenario ordered for the pull request of an issue, and how far its film has come. */
+export interface FilmOrderState {
+  readonly scenario: string;
+  readonly operator: string;
+  readonly status: FilmOrderStatus;
+  readonly stage: FilmRunningStage | null;
+  /** The sequence of the event that queued the film in the installation's log: films run in this order. */
+  readonly queuedSequence: number;
+  readonly queuedAt: string;
+  readonly startedAt: string | null;
+  readonly updatedAt: string;
+  readonly reason: string | null;
+}
+
+export function isFilmPending(order: FilmOrderState): boolean {
+  return order.status === 'queued' || order.status === 'running';
 }
 
 export interface PipelineJournal {
@@ -95,6 +126,8 @@ export interface PipelineJournal {
   readonly checkRewrite: CheckRewriteProgress | null;
   readonly checkRewrites: readonly CheckRewrittenRecord[];
   readonly attemptEpoch: number;
+  readonly films: readonly FilmFinishedRecord[];
+  readonly filmOrders: readonly FilmOrderState[];
 }
 
 export class JournalCorruptError extends Error {
@@ -140,6 +173,8 @@ function emptyJournal(issueNumber: number): Draft {
     checkRewrite: null,
     checkRewrites: [],
     attemptEpoch: 0,
+    films: [],
+    filmOrders: [],
   };
 }
 
@@ -150,6 +185,31 @@ function parse<S extends z.ZodType>(schema: S, event: FactoryEventRecord): z.inf
 }
 
 type Reducer = (journal: Draft, event: FactoryEventRecord) => void;
+type FilmOrderFields = Omit<FilmOrderState, 'scenario' | 'updatedAt'>;
+
+function upsertFilmOrder(journal: Draft, scenario: string, fields: FilmOrderFields, event: FactoryEventRecord): void {
+  const order: FilmOrderState = { scenario, ...fields, updatedAt: event.occurredAt.toISOString() };
+  const known = journal.filmOrders.some((candidate) => candidate.scenario === scenario);
+  journal.filmOrders = known ? journal.filmOrders.map((candidate) => (candidate.scenario === scenario ? order : candidate)) : [...journal.filmOrders, order];
+}
+
+function settleFilmOrder(journal: Draft, scenario: string, status: 'finished' | 'failed', reason: string | null, event: FactoryEventRecord): void {
+  const known = journal.filmOrders.find((candidate) => candidate.scenario === scenario);
+  upsertFilmOrder(
+    journal,
+    scenario,
+    {
+      operator: known?.operator ?? FACTORY_FILM_OPERATOR,
+      status,
+      stage: null,
+      queuedSequence: known?.queuedSequence ?? event.sequence,
+      queuedAt: known?.queuedAt ?? event.occurredAt.toISOString(),
+      startedAt: known?.startedAt ?? null,
+      reason,
+    },
+    event,
+  );
+}
 
 const REDUCERS: Readonly<Record<string, Reducer>> = {
   [ISSUE_TRANSITIONED_EVENT]: (journal, event) => {
@@ -249,6 +309,8 @@ const REDUCERS: Readonly<Record<string, Reducer>> = {
     journal.implementationCommit = null;
     journal.evidence = null;
     journal.pullRequestBodySha = null;
+    journal.films = [];
+    journal.filmOrders = [];
   },
   [PIPELINE_EVENTS.pullRequestUpdated]: (journal, event) => {
     journal.pullRequestBodySha = parse(PullRequestUpdatedSchema, event).headSha;
@@ -283,6 +345,55 @@ const REDUCERS: Readonly<Record<string, Reducer>> = {
     journal.pullRequestBodySha = null;
     journal.checkRewrite = null;
     journal.checkRewrites = [...journal.checkRewrites, rewritten];
+    journal.films = [];
+    journal.filmOrders = [];
+  },
+  [PIPELINE_EVENTS.filmQueued]: (journal, event) => {
+    const queued = parse(FilmQueuedSchema, event);
+    upsertFilmOrder(
+      journal,
+      queued.scenario,
+      { operator: queued.operator, status: 'queued', stage: null, queuedSequence: event.sequence, queuedAt: event.occurredAt.toISOString(), startedAt: null, reason: null },
+      event,
+    );
+  },
+  [PIPELINE_EVENTS.filmStarted]: (journal, event) => {
+    const started = parse(FilmStartedSchema, event);
+    const queued = journal.filmOrders.find((order) => order.scenario === started.scenario && order.status === 'queued');
+    upsertFilmOrder(
+      journal,
+      started.scenario,
+      {
+        operator: started.operator,
+        status: 'running',
+        stage: 'recording-base',
+        queuedSequence: queued?.queuedSequence ?? event.sequence,
+        queuedAt: queued?.queuedAt ?? event.occurredAt.toISOString(),
+        startedAt: event.occurredAt.toISOString(),
+        reason: null,
+      },
+      event,
+    );
+  },
+  [PIPELINE_EVENTS.filmStageEntered]: (journal, event) => {
+    const entered = parse(FilmStageEnteredSchema, event);
+    const running = journal.filmOrders.find((order) => order.scenario === entered.scenario && order.status === 'running');
+    if (running !== undefined) upsertFilmOrder(journal, entered.scenario, { ...running, stage: entered.stage }, event);
+  },
+  [PIPELINE_EVENTS.filmCommitted]: (journal, event) => {
+    journal.lastCommitSha = parse(FilmCommittedSchema, event).sha;
+  },
+  [PIPELINE_EVENTS.filmPushed]: (journal, event) => {
+    journal.pushedHead = parse(FilmPushedSchema, event).headSha;
+  },
+  [PIPELINE_EVENTS.filmFinished]: (journal, event) => {
+    const finished = parse(FilmFinishedSchema, event);
+    journal.films = [...journal.films.filter((film) => film.scenario !== finished.scenario), finished];
+    settleFilmOrder(journal, finished.scenario, 'finished', null, event);
+  },
+  [PIPELINE_EVENTS.filmFailed]: (journal, event) => {
+    const failed = parse(FilmFailedSchema, event);
+    settleFilmOrder(journal, failed.scenario, 'failed', failed.reason, event);
   },
   [PIPELINE_EVENTS.pullRequestMerged]: (journal, event) => {
     journal.mergeSha = parse(PullRequestMergedSchema, event).mergeSha;

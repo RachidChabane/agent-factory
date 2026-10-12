@@ -99,8 +99,16 @@ describe('request decisions', () => {
     const text = renderSpecFile(DRAFT, CONVENTIONS).content;
     expect(() => planIssueCreation(text.replace('Labels: type:ui', 'Labels: type:ui, spec:validated'), null, CONVENTIONS)).toThrow(SpecFileRefusedError);
     expect(() => planIssueCreation(text.replace('Labels: type:ui', 'Labels: bug'), null, CONVENTIONS)).toThrow('none of the type labels of this project');
+    expect(() => planIssueCreation(text.replace('Labels: type:ui', 'Labels: type:ui\nFilms: ../escape'), null, CONVENTIONS)).toThrow('Films: "../escape" is refused');
     const github = new FakeGitHubGateway();
     const issue = await createIssueFromPlan({ events, github }, planIssueCreation(text, null, CONVENTIONS));
     expect(github.createdIssues).toEqual([{ title: 'Link the conversation', body: issue.body, labels: ['factory', 'type:ui'] }]);
+  });
+
+  it('plans an issue with a film label for each scenario its spec file declares', () => {
+    const text = renderSpecFile(DRAFT, CONVENTIONS).content.replace('Labels: type:ui', 'Labels: type:ui\nFilms: checkout-flow, order.history');
+    const plan = planIssueCreation(text, null, CONVENTIONS);
+    expect(plan.films).toEqual(['checkout-flow', 'order.history']);
+    expect(plan.labels).toEqual(['factory', 'type:ui', 'film:checkout-flow', 'film:order.history']);
   });
 });

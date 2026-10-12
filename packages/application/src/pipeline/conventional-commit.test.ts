@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ISSUE_TYPES, IssueTypology, type IssueSpec, type IssueTypeDefinition } from '@agent-factory/domain';
 import { DEFAULT_PROJECT_CONVENTIONS, type ProjectConventions } from '../conventions/project-conventions.ts';
-import { commitKindFor, conventionalSubject, implementationCommitMessage, pullRequestTitle } from './conventional-commit.ts';
+import { commitKindFor, conventionalSubject, filmsCommitMessage, implementationCommitMessage, pullRequestTitle } from './conventional-commit.ts';
 
 const MINIMUM_SUBJECT_LENGTH = 3;
 /** What a conventional-commit linter accepts as a subject: no leading capital, no trailing period. */
@@ -36,6 +36,7 @@ const SPEC: IssueSpec = {
   expectedProof: 'p',
   dependsOn: [],
   commitKind: null,
+  films: [],
 };
 
 const word = fc.stringMatching(/^[A-Za-z][A-Za-z0-9.-]{0,9}$/);
@@ -86,5 +87,11 @@ describe('conventional pull request titles', () => {
         expect(conventionalSubject(candidate)).toMatch(LINTED_SUBJECT);
       }),
     );
+  });
+});
+
+describe('filmsCommitMessage', () => {
+  it('is an evidence commit that names the scenario and the issue', () => {
+    expect(filmsCommitMessage(42, 'checkout-flow')).toBe('chore(evidence): add behaviour films of scenario checkout-flow for #42');
   });
 });

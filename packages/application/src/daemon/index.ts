@@ -6,3 +6,5 @@ export * from './issue-scheduling.ts';
 export * from './pause-state.ts';
 export * from './scheduling-pauses.ts';
 export * from './installation-daemon.ts';
+export * from './scheduling-hold.ts';
+export * from './film-lane.ts';

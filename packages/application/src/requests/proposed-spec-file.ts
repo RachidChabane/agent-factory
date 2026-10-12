@@ -57,6 +57,7 @@ function toIssueSpec(draft: ProposedSpecDraft): IssueSpec {
     expectedProof: draft.expectedProof,
     dependsOn: [],
     commitKind: null,
+    films: [],
   };
 }
 

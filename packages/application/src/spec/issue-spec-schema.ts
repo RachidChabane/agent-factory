@@ -11,4 +11,5 @@ export const IssueSpecSchema = z.object({
   expectedProof: z.string().min(1),
   dependsOn: z.array(z.number().int().positive()),
   commitKind: z.enum(COMMIT_KINDS).nullable().default(null),
+  films: z.array(z.string().min(1)).default([]),
 });

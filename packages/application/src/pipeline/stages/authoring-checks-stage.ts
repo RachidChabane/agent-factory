@@ -100,7 +100,7 @@ export class AuthoringChecksStage implements PipelineStage {
     if (pending !== null) return { prompt: beforeProofCorrectionPrompt(pending.reason), resumeSessionId: pending.sessionId };
     const { dependencies, settings } = context.toolkit;
     const type = issueTypeOfSpec(context, spec);
-    const rendered = dependencies.roles.render('acceptance-author', acceptanceAuthorValues(settings.repository, spec, type));
+    const rendered = dependencies.roles.render('acceptance-author', acceptanceAuthorValues(settings.repository, spec, type, context.toolkit.films !== null));
     return { prompt: withAddendum(rendered, scoreOutputAddendum(type)), resumeSessionId: null };
   }
 

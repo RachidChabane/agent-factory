@@ -1,4 +1,5 @@
 import type { IssueState } from '@agent-factory/domain';
+import type { FilmBodies } from '../../film/film-bodies.ts';
 import type { PipelineDependencies } from '../pipeline-dependencies.ts';
 import type { AgentRuns } from '../agent-runs.ts';
 import type { EvidenceCollector } from '../evidence.ts';
@@ -22,6 +23,8 @@ export interface PipelineToolkit {
   readonly evidence: EvidenceCollector;
   readonly bodies: PullRequestBodyRenderer;
   readonly stacks: IssueStacks;
+  /** Announces and renders the films of the pull request; null when the project films nothing. */
+  readonly films: FilmBodies | null;
 }
 
 export interface StageContext {

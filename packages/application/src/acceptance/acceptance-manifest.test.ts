@@ -26,6 +26,7 @@ const SPEC: IssueSpec = {
   expectedProof: 'A Playwright journey.',
   dependsOn: [],
   commitKind: null,
+  films: [],
 };
 
 const MANIFEST = {

@@ -52,3 +52,7 @@ export function evidenceCommitMessage(spec: IssueSpec): string {
 export function evidenceRemovalCommitMessage(issueNumber: number): string {
   return conventionalHeader(EVIDENCE_COMMIT_TYPE, EVIDENCE_COMMIT_SCOPE, `remove proof of #${issueNumber} before merge`);
 }
+
+export function filmsCommitMessage(issueNumber: number, scenario: string): string {
+  return conventionalHeader(EVIDENCE_COMMIT_TYPE, EVIDENCE_COMMIT_SCOPE, `add behaviour films of scenario ${scenario} for #${issueNumber}`);
+}
