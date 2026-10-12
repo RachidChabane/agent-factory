@@ -21,6 +21,9 @@ export const CHILD_VARIABLES = {
 
 const ENABLED = '1';
 
+/** Variables a project's environment may not pass to an agent: each one would override a setting the factory gives per role. */
+export const ROLE_OVERRIDING_VARIABLES: readonly string[] = ['CLAUDE_CODE_EFFORT_LEVEL'];
+
 export const CREDENTIAL_VARIABLE_PATTERNS: readonly RegExp[] = [
   /^GH_/,
   /^GITHUB_/,
@@ -60,9 +63,10 @@ export function buildChildEnvironment(
       return value === undefined ? [] : [[name, value]];
     }),
   );
+  const tools = Object.fromEntries(Object.entries(options.toolEnvironment ?? {}).filter(([name]) => !ROLE_OVERRIDING_VARIABLES.includes(name)));
   return {
     ...inherited,
-    ...options.toolEnvironment,
+    ...tools,
     [CHILD_VARIABLES.githubConfigDirectory]: options.githubConfigDirectory,
     ...(options.claudeConfigDirectory === null ? {} : { [CHILD_VARIABLES.claudeConfigDirectory]: options.claudeConfigDirectory }),
     [CHILD_VARIABLES.maxSubagentSpawnDepth]: String(options.maxSubagentSpawnDepth),

@@ -84,6 +84,12 @@ describe('buildChildEnvironment', () => {
     expect(credentialVariablesIn(withTools)).toEqual([]);
   });
 
+  it("never lets the project's environment override the effort the role gives the agent", () => {
+    const environment = buildChildEnvironment({}, { ...OPTIONS, toolEnvironment: { CLAUDE_CODE_EFFORT_LEVEL: 'max', CI: '1' } });
+    expect(environment).not.toHaveProperty('CLAUDE_CODE_EFFORT_LEVEL');
+    expect(environment.CI).toBe('1');
+  });
+
   it('uses the default Claude login when no account is selected', () => {
     expect(environment).not.toHaveProperty(CHILD_VARIABLES.claudeConfigDirectory);
   });
