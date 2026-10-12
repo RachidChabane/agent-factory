@@ -7,7 +7,7 @@ on:
       verb:
         description: The script/<verb> to run
         type: choice
-        options: [lint, test, e2e, screenshots, scan, ci, lockfile]
+        options: [lint, test, e2e, e2e-example, e2e-cockpit, screenshots, scan, ci, lockfile]
         required: true
       args:
         description: Extra arguments for the script, split on whitespace

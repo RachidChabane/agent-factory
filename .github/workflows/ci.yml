@@ -58,3 +58,56 @@ jobs:
         run: script/lint
       - name: Test
         run: script/test
+
+  e2e-example:
+    name: Example project end to end
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","mac-mini"]') || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Take the storefront example from a spec to a merged pull request
+        run: script/e2e-example
+
+  e2e-cockpit:
+    name: Cockpit end-to-end
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","mac-mini"]') || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install the system libraries of the browser
+        if: runner.os == 'Linux'
+        run: pnpm exec playwright install-deps chromium
+      - name: Click every button against a running factory
+        run: script/e2e-cockpit
+      - name: Keep the traces and logs of a failed run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-cockpit
+          path: build/e2e/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  screenshots:
+    name: Screenshots are current
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","mac-mini"]') || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Check that the screenshots match the cockpit and the demonstration
+        run: script/screenshots --check

@@ -16,6 +16,14 @@ runs:
           echo "npm_config_store_dir=${RUNNER_TOOL_CACHE}/pnpm-store"
           echo "PLAYWRIGHT_BROWSERS_PATH=${RUNNER_TOOL_CACHE}/ms-playwright"
         } >> "$GITHUB_ENV"
+    - name: Give the command sandbox what it needs on Linux
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq bubblewrap
+        # Ubuntu lets only programs with an AppArmor profile create user namespaces, which bubblewrap needs.
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
     - name: Install the dependencies
       shell: bash
       run: script/setup
