@@ -4,7 +4,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import { BARE_REPOSITORY_SUFFIX, type LocalCheckMode } from '@agent-factory/adapters';
-import type { NamedCommand, StackSettings } from '@agent-factory/application';
+import type { NamedCommand, ReferenceSource, StackSettings } from '@agent-factory/application';
 import {
   DEFAULT_ISSUE_TYPES,
   NO_DAILY_CAP,
@@ -30,7 +30,15 @@ export const CONFIG_FILE_NAME = 'config.yaml';
 export const PROJECTS_DIRECTORY = 'projects';
 export const RUN_LOG_DIRECTORY = 'runs';
 export const INSTALLATION_DIRECTORIES = { state: 'state', runs: 'runs', logs: 'logs', cache: 'cache' } as const;
-export const PROJECT_DIRECTORIES = { worktrees: 'worktrees', checkouts: 'checkouts', logs: 'logs', evidence: 'evidence', requests: 'requests', knowledge: 'knowledge' } as const;
+export const PROJECT_DIRECTORIES = {
+  worktrees: 'worktrees',
+  checkouts: 'checkouts',
+  logs: 'logs',
+  evidence: 'evidence',
+  requests: 'requests',
+  knowledge: 'knowledge',
+  references: 'references',
+} as const;
 const HOME_PREFIX = '~/';
 const HOME_ONLY = '~';
 const MILLISECONDS_PER_MINUTE = 60_000;
@@ -152,11 +160,21 @@ export interface ProjectConfig {
   readonly roles: RoleSettingsMap;
   readonly prompts: Readonly<Partial<Record<AgentRole, string>>>;
   readonly knowledge: readonly KnowledgeSourceConfig[];
+  /** The repositories specifications cite, each with the local clone its snapshot is taken from. */
+  readonly references: readonly ReferenceSource[];
   readonly evidence: { readonly maxFileBytes: number; readonly maxTotalBytes: number };
   readonly delivery: { readonly release: ReleaseModelConfig; readonly environments: readonly EnvironmentConfig[]; readonly healthIntervalMs: number };
   readonly audits: { readonly ignore: readonly { readonly name: string; readonly branches: readonly string[]; readonly authors: readonly string[] }[] };
   readonly tools: readonly ToolCheckConfig[];
-  readonly directories: { readonly checkouts: string; readonly logs: string; readonly evidence: string; readonly requests: string; readonly knowledge: string };
+  readonly directories: {
+    readonly checkouts: string;
+    readonly logs: string;
+    readonly evidence: string;
+    readonly requests: string;
+    readonly knowledge: string;
+    /** Where the snapshots of the project's references are kept, one directory per name and ref. */
+    readonly references: string;
+  };
 }
 
 export interface AgentFactoryConfig {
@@ -401,6 +419,7 @@ function resolveProject(raw: RawProject, config: RawAgentFactoryConfig, home: st
     roles: resolveRoles(config.defaults.roles, raw.roles),
     prompts: Object.fromEntries(Object.entries(raw.prompts).map(([role, path]) => [role, at(path)])),
     knowledge: raw.knowledge.map((source) => ('path' in source ? { kind: 'path', path: at(source.path) } : { kind: 'repository', path: source.repository })),
+    references: raw.references.map((reference) => ({ name: reference.name, repository: reference.repository, ref: reference.ref, source: at(reference.source) })),
     evidence: raw.evidence,
     delivery: { release: raw.delivery.release, environments: raw.delivery.environments.map(environmentConfig), healthIntervalMs: minutes(raw.delivery.healthIntervalMinutes) },
     audits: raw.audits,
@@ -411,6 +430,7 @@ function resolveProject(raw: RawProject, config: RawAgentFactoryConfig, home: st
       evidence: join(directory, PROJECT_DIRECTORIES.evidence),
       requests: join(directory, PROJECT_DIRECTORIES.requests),
       knowledge: join(directory, PROJECT_DIRECTORIES.knowledge),
+      references: join(directory, PROJECT_DIRECTORIES.references),
     },
   };
 }

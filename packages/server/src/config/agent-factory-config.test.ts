@@ -1,3 +1,5 @@
+import fc from 'fast-check';
+import { isReferenceName, isReferenceRevision } from '@agent-factory/domain';
 import { describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
 import { configProblems, parseAgentFactoryConfig, projectOf, UnknownProjectError } from './agent-factory-config.ts';
@@ -226,5 +228,80 @@ describe('the configuration of a project', () => {
     const service = { name: 'web', run: 'npm run dev', ready: 'true' };
     expect(configProblems(document({}, [minimalProject({ stack: { issueTypes: ['mobile'] } })]))).toContain('projects.0.stack.issueTypes: issue type mobile is not an issue type of the project');
     expect(configProblems(document({}, [minimalProject({ stack: { services: [service, service] } })]))).toContain('projects.0.stack.services: service web is declared twice');
+  });
+});
+
+describe('the reference repositories of a project', () => {
+  const TOKENS = { name: 'design-tokens', repository: 'example-org/design-tokens', ref: 'v1.0.0', source: '~/src/design-tokens' };
+
+  function withReferences(...references: readonly Record<string, unknown>[]): Record<string, unknown> {
+    return document({}, [minimalProject({ references })]);
+  }
+
+  it('defaults to no reference and keeps the snapshots in the project directory', () => {
+    const project = projectOf(parse(document()), 'storefront');
+    expect(project.references).toEqual([]);
+    expect(project.directories.references).toBe(`${HOME}/projects/storefront/references`);
+  });
+
+  it('reads each reference and resolves the clone it is taken from like any other path of the project', () => {
+    const project = projectOf(parse(withReferences(TOKENS, { ...TOKENS, name: 'icons', repository: 'example-org/icons', ref: 'v2', source: 'sources/icons' })), 'storefront');
+    expect(project.references).toEqual([
+      { name: 'design-tokens', repository: 'example-org/design-tokens', ref: 'v1.0.0', source: '/home/operator/src/design-tokens' },
+      { name: 'icons', repository: 'example-org/icons', ref: 'v2', source: `${HOME}/projects/storefront/sources/icons` },
+    ]);
+  });
+
+  it('accepts a commit id as the ref', () => {
+    const commit = '1d3e4a9ce003af09489551fd6398fc44c24069cc';
+    expect(projectOf(parse(withReferences({ ...TOKENS, ref: commit })), 'storefront').references[0]?.ref).toBe(commit);
+  });
+
+  it('refuses a name that is not a lowercase slug', () => {
+    for (const name of ['Tokens', 'tokens/assets', '../tokens', 'tokens assets', 'tokens_assets', '']) {
+      expect(configProblems(withReferences({ ...TOKENS, name })), name).toEqual([expect.stringMatching(/^projects\.0\.references\.0\.name: /)]);
+    }
+    expect(configProblems(withReferences({ ...TOKENS, name: 'Tokens' }))[0]).toContain('lowercase letters and digits');
+  });
+
+  it('refuses a repository that is not owner/name', () => {
+    for (const repository of ['design-tokens', 'a/b/c', 'example-org/', 'example org/tokens']) {
+      expect(configProblems(withReferences({ ...TOKENS, repository })), repository).toEqual([expect.stringMatching(/^projects\.0\.references\.0\.repository: must be owner\/name/)]);
+    }
+  });
+
+  it('refuses a ref that could pass for an option, leave its directory or widen a rule', () => {
+    for (const ref of ['-rf', '--output=x', '../x', 'a/b', 'a b', 'a*', 'a?', '.hidden', 'a..b']) {
+      expect(configProblems(withReferences({ ...TOKENS, ref })), ref).toEqual([expect.stringMatching(/^projects\.0\.references\.0\.ref: must be a tag or commit/)]);
+    }
+  });
+
+  it('refuses a missing key, an unknown key, and a source that is empty', () => {
+    expect(configProblems(withReferences({ name: 'design-tokens', repository: 'example-org/design-tokens', ref: 'v1.0.0' }))).toEqual([expect.stringMatching(/references\.0\.source/)]);
+    expect(configProblems(withReferences({ ...TOKENS, fetch: true }))).toHaveLength(1);
+    expect(configProblems(withReferences({ ...TOKENS, source: ' ' }))).toEqual([expect.stringMatching(/references\.0\.source/)]);
+  });
+
+  it('refuses two references of one project with the same name, and allows the same name in two projects', () => {
+    expect(configProblems(withReferences(TOKENS, { ...TOKENS, ref: 'v2.0.0' }))).toEqual(['projects.0.references: reference design-tokens is declared twice']);
+    const ledger = minimalProject({ id: 'ledger', name: 'Ledger', forge: { kind: 'github', repository: 'example-org/ledger' }, references: [TOKENS] });
+    expect(configProblems(document({}, [minimalProject({ references: [TOKENS] }), ledger]))).toEqual([]);
+  });
+
+  it('keeps the references of one project out of the other', () => {
+    const ledger = minimalProject({ id: 'ledger', name: 'Ledger', forge: { kind: 'github', repository: 'example-org/ledger' } });
+    const config = parse(document({}, [minimalProject({ references: [TOKENS] }), ledger]));
+    expect(projectOf(config, 'storefront').references).toHaveLength(1);
+    expect(projectOf(config, 'ledger').references).toEqual([]);
+  });
+
+  it('only accepts names and refs the domain rules accept', () => {
+    fc.assert(
+      fc.property(fc.string(), fc.string(), (name, ref) => {
+        const accepted = configProblems(withReferences({ ...TOKENS, name, ref })).length === 0;
+        return !accepted || (isReferenceName(name) && isReferenceRevision(ref));
+      }),
+      { numRuns: 300 },
+    );
   });
 });

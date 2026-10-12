@@ -79,6 +79,7 @@ applies at the next tick, and the cockpit lists what waits for a restart.
 | `roles` | the installation's | overrides per role; see [Roles](#roles) |
 | `prompts` | the built-in prompts | a file per role whose text replaces the built-in prompt |
 | `knowledge` | `[]` | sources of the knowledge pack given to agents: `{ path }` (a file or directory) or `{ repository: <path in the repo> }` |
+| `references` | `[]` | other repositories the specifications cite, read as snapshots: `{ name, repository, ref, source }`; see [References](#references) |
 | `evidence.maxFileBytes` / `maxTotalBytes` | 5 MB / 40 MB | limits of the evidence committed to a pull request |
 | `delivery` | none | see [Delivery](#delivery) |
 | `audits.ignore` | `[]` | other automations of the repository: `{ name, branches?: [globs], authors?: [globs] }`; their changes are recorded, not audited |
@@ -146,6 +147,38 @@ for its fresh restart. By default every role runs on Opus; the implementer start
 | `docker` | `true` lets agents and commands drive the machine's container engine. A container can mount any directory the engine shares and reach any network: what runs through the engine is not confined |
 
 `agent-factory validate` reports each project's grants on its `sandbox` line.
+
+### References
+
+A specification sometimes cites another repository at a given version: the legacy
+application at its production tag, a library whose interface the change must follow
+([ADR 0031](adr/0031-reference-repositories.md)). Agents and check commands have no
+network, so the factory gives them a read-only snapshot of its files instead.
+
+| Key | Meaning |
+|---|---|
+| `name` | lowercase letters and digits in groups separated by single hyphens; unique in the project |
+| `repository` | the `owner/name` the specifications cite |
+| `ref` | a tag or a commit id of the clone at `source` |
+| `source` | the path of a local clone that holds the ref |
+
+`agent-factory start` and `agent-factory validate` extract the files at `ref` (`git archive`,
+without `.git`) into `projects/<id>/references/<name>@<ref>/`, and record the commit the ref
+resolves to in `<name>@<ref>.commit` beside it. A snapshot is rebuilt only when it is missing
+or the ref resolves to another commit, and the previous one stays until the new one is
+complete. When `source` does not hold the ref, `start` refuses to start and `validate` fails
+the project's `reference <name>` line, both naming `git -C <source> fetch --tags`. The
+agent commands that run an agent (`run-issue`, `resume`, `request`, `audit`, `pr-feedback`)
+bring the snapshots up to date first, the same way.
+
+Every role of the project reads its snapshots, in Claude Code's own sandbox and in the
+operating system's sandbox of setup, gate and acceptance commands; no role writes to one.
+The acceptance author and the implementer may also run `cp <snapshot>/<file> <destination>`
+and `cp -R <snapshot>/<directory> <destination>`. The files of a snapshot have no write
+permission and a copy keeps that mode. Each run's prompt lists the project's snapshots with
+their repository, ref, commit and path, and the cockpit's project settings list them with their
+ref, the commit it resolved to, the state of the snapshot (ready, ref missing from the
+source, not built) and when it was read. Another project never reads them.
 
 ### Stack
 

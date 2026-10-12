@@ -1621,6 +1621,40 @@
               ]
             }
           },
+          "references": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                },
+                "repository": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+$"
+                },
+                "ref": {
+                  "type": "string",
+                  "maxLength": 128,
+                  "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9._-]*$"
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "name",
+                "repository",
+                "ref",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
           "evidence": {
             "default": {},
             "type": "object",

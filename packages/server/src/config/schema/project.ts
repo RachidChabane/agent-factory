@@ -16,6 +16,12 @@ import {
   EVIDENCE_KINDS,
   PROMOTION_POLICIES,
   PROOF_STRATEGIES,
+  REFERENCE_NAME_MAX_LENGTH,
+  REFERENCE_NAME_PATTERN,
+  REFERENCE_NAME_RULE,
+  REFERENCE_REVISION_MAX_LENGTH,
+  REFERENCE_REVISION_PATTERN,
+  REFERENCE_REVISION_RULE,
   REVIEW_FOCUSES,
   isProductionLookingName,
 } from '@agent-factory/domain';
@@ -209,6 +215,16 @@ const StackSchema = z
     for (const name of uniqueBy(stack.services, (service) => service.name)) context.addIssue({ code: 'custom', path: ['services'], message: `service ${name} is declared twice` });
   });
 
+/** Another repository that specifications cite, read as a snapshot of the files of a local clone at a tag or a commit. */
+const ReferenceSchema = z.strictObject({
+  name: z.string().max(REFERENCE_NAME_MAX_LENGTH).regex(REFERENCE_NAME_PATTERN, `must be ${REFERENCE_NAME_RULE}`),
+  /** The `owner/name` the specifications cite. */
+  repository: RepositorySlug,
+  ref: z.string().max(REFERENCE_REVISION_MAX_LENGTH).regex(REFERENCE_REVISION_PATTERN, `must be ${REFERENCE_REVISION_RULE}`),
+  /** A local clone that holds the ref; `git -C <source> fetch --tags` brings a missing tag in. */
+  source: PathString,
+});
+
 const KnowledgeSourceSchema = z.union([z.strictObject({ path: PathString }), z.strictObject({ repository: PathString })]);
 
 const RoleKey = z.enum(AGENT_ROLES);
@@ -247,6 +263,7 @@ export const ProjectSchema = z
     roles: z.partialRecord(RoleKey, RoleOverrideSchema).default({}),
     prompts: z.partialRecord(RoleKey, PathString).default({}),
     knowledge: z.array(KnowledgeSourceSchema).default([]),
+    references: z.array(ReferenceSchema).default([]),
     evidence: z
       .strictObject({
         maxFileBytes: z.number().int().positive().default(DEFAULT_EVIDENCE_MAX_FILE_BYTES),
@@ -268,6 +285,9 @@ export const ProjectSchema = z
     for (const id of uniqueBy(types, (type) => type.id)) context.addIssue({ code: 'custom', path: ['issueTypes'], message: `issue type ${id} is declared twice` });
     const labels = types.map((type) => type.label ?? `${project.conventions.labels.typePrefix}${type.id}`);
     for (const label of uniqueBy(labels, (label) => label)) context.addIssue({ code: 'custom', path: ['issueTypes'], message: `label ${label} marks two issue types` });
+    for (const name of uniqueBy(project.references, (reference) => reference.name)) {
+      context.addIssue({ code: 'custom', path: ['references'], message: `reference ${name} is declared twice` });
+    }
     const typeIds = new Set(project.issueTypes?.map((type) => type.id) ?? DEFAULT_ISSUE_TYPES.map((type) => type.id));
     for (const id of project.stack?.issueTypes ?? []) {
       if (!typeIds.has(id)) context.addIssue({ code: 'custom', path: ['stack', 'issueTypes'], message: `issue type ${id} is not an issue type of the project` });

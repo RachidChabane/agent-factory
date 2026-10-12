@@ -160,6 +160,17 @@ projects:
       implementer: { model: opus }
     knowledge:
       - path: docs/product
+    # Other repositories the specs cite ("the icons of example-org/design-tokens at v1.0.0"). At start and in
+    # `agent-factory validate`, each becomes a read-only snapshot of the files at "ref", taken from the local clone at
+    # "source" and kept in projects/storefront/references/<name>@<ref>; run `git -C <source> fetch --tags` when that
+    # clone lacks the ref. Every agent of the project reads the snapshots, the acceptance author and the implementer also
+    # copy files from them into their worktree (cp, cp -R), and nothing writes to one.
+    # "name" is a lowercase slug, unique in the project; "ref" is a tag or a commit id.
+    references:
+      - name: design-tokens
+        repository: example-org/design-tokens
+        ref: v1.0.0
+        source: ~/src/design-tokens
     delivery:
       release: { kind: tags, tagPattern: "v*" }
       environments:
