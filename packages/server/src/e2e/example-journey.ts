@@ -5,7 +5,6 @@ import { createdIssueNumber, mergedPullRequest, openedPullRequest, validationFai
 import { EXAMPLE_ISSUE, mergedFiles, renderSpecDocument } from './example-story.ts';
 import { expectEqual, expectIncludesAll, expectMatch, expectThat } from './expectations.ts';
 import { expectSucceeded } from './factory-cli.ts';
-import { ForgeChecksStage } from './forge-checks-stage.ts';
 import { joinItems, shortSha } from './format.ts';
 import type { JourneyCollaborators, ReviewedPullRequest } from './journey-collaborators.ts';
 import { MergeVerification } from './merge-verification.ts';
@@ -21,12 +20,10 @@ const EVIDENCE_BUNDLE_FILES: readonly string[] = [ACCEPTANCE_TESTS_FILE, AFTER_L
  */
 export class ExampleJourney {
   private readonly collaborators: JourneyCollaborators;
-  private readonly forgeChecks: ForgeChecksStage;
   private readonly mergeVerification: MergeVerification;
 
   constructor(collaborators: JourneyCollaborators) {
     this.collaborators = collaborators;
-    this.forgeChecks = new ForgeChecksStage(collaborators);
     this.mergeVerification = new MergeVerification(collaborators);
   }
 
@@ -37,7 +34,6 @@ export class ExampleJourney {
     const issue = await this.createIssue(specPath);
     const pullRequest = await this.openPullRequest(issue);
     await this.evidenceOnReviewedHead(pullRequest);
-    await this.forgeChecks.run(pullRequest);
     const mergeSha = await this.merge(pullRequest);
     await this.mergeVerification.verify(pullRequest, mergeSha);
   }

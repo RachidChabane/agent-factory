@@ -1,4 +1,4 @@
-import { COMMAND_NAMES, EXPECTED_HEAD_OPTION, ISSUE_SUBCOMMANDS, NOW_FLAG, OFFLINE_FLAG, START_FLAG } from '../cli/command-line.ts';
+import { COMMAND_NAMES, EXPECTED_HEAD_OPTION, ISSUE_SUBCOMMANDS, OFFLINE_FLAG, START_FLAG } from '../cli/command-line.ts';
 
 /** The arguments of each factory command the example run gives, spelled with the command line's own vocabulary. */
 
@@ -20,12 +20,4 @@ export function mergePullRequest(pullRequestNumber: number, expectedHeadSha: str
 
 export function issueStatus(issueNumber: number): readonly string[] {
   return [COMMAND_NAMES.status, String(issueNumber)];
-}
-
-export function startFactory(): readonly string[] {
-  return [COMMAND_NAMES.start];
-}
-
-export function stopFactoryNow(): readonly string[] {
-  return [COMMAND_NAMES.stop, NOW_FLAG];
 }

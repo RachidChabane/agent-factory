@@ -4,14 +4,17 @@ import { itemName } from '../cli/commands/project-session.ts';
 import { issueStatus } from './cli-commands.ts';
 import { STATUS_FIELDS, statusFields } from './cli-output.ts';
 import { EXAMPLE_ISSUE, mergedFiles } from './example-story.ts';
-import { expectContains, expectEqual, expectMatch, expectThat } from './expectations.ts';
+import { ExpectationFailed, expectContains, expectEqual, expectMatch, expectSameItems, expectThat } from './expectations.ts';
 import { expectSucceeded } from './factory-cli.ts';
-import { joinItems, shortSha } from './format.ts';
+import { joinItems, lastLines, shortSha } from './format.ts';
 import type { JourneyCollaborators, ReviewedPullRequest } from './journey-collaborators.ts';
+import type { GateOutcome } from './local-forge.ts';
 import { ASSERTION_FAILURE_CODE, BEFORE_PROOF_LOG, failedTestCount } from './proof-log.ts';
 import { PATH_SEPARATOR, pathsUnder } from './tree-paths.ts';
 
 const MISSING = '(missing)';
+const NO_LOG = '(no log)';
+const GATE_LOG_LINES = 40;
 const VALID_PROOF = /^valid\b/;
 
 /** What the forge, the repository, the logs and `status` show once the pull request has been merged. */
@@ -32,6 +35,7 @@ export class MergeVerification {
     await journal.step('issue closed on the forge', () => this.issueClosed(pullRequest), () => this.issueName(pullRequest));
     const status = await journal.step('status reports the merge', () => this.statusReportsMerge(pullRequest, mergeSha), () => `State: merged, Merged as: ${shortSha(mergeSha)}`);
     await journal.step('pipeline gate passed', async () => this.pipelineGatePassed(status), (attempt) => attempt);
+    await journal.step('forge checks passed on the reviewed head', () => this.forgeChecksPassed(pullRequest), (outcome) => `${joinItems(outcome.steps.map((step) => step.name))} on ${shortSha(pullRequest.headSha)}`);
     await journal.step('frozen checks failed on the base by assertion', () => this.failedOnBaseByAssertion(pullRequest, status), (count) => `all ${count} checks failed`);
   }
 
@@ -90,6 +94,27 @@ export class MergeVerification {
     const passed = `attempt ${EXAMPLE_ISSUE.attempts.length} passed`;
     expectEqual('status reports the gate of the pipeline as passed', passed, status.get(STATUS_FIELDS.lastGate) ?? MISSING);
     return passed;
+  }
+
+  /** The gate the merge ran on the reviewed head, as the local forge recorded it. */
+  private async forgeChecksPassed(pullRequest: ReviewedPullRequest): Promise<GateOutcome> {
+    const { forge, world } = this.collaborators;
+    const { headSha } = pullRequest;
+    const commit = shortSha(headSha);
+    const outcome = await forge.gateOutcome(headSha);
+    if (outcome === null) throw new ExpectationFailed(`the forge recorded the checks of the reviewed head ${commit}`, `a record for ${headSha}`, 'no record');
+    const { gate } = world.project;
+    expectSameItems(
+      'the forge recorded one check per command of the project gate',
+      [...gate.commandsBeforeAcceptance, ...gate.commandsAfterAcceptance].map((command) => command.name),
+      outcome.steps.map((step) => step.name),
+    );
+    const failedSteps = outcome.steps.filter((step) => !step.passed).map((step) => step.name);
+    if (failedSteps.length > 0) {
+      const log = (await forge.gateLog(headSha)) ?? NO_LOG;
+      throw new ExpectationFailed(`every check recorded for the reviewed head ${commit} passed`, 'all passed', `failed: ${joinItems(failedSteps)}\n${lastLines(log.trimEnd(), GATE_LOG_LINES)}`);
+    }
+    return outcome;
   }
 
   private issueName(pullRequest: ReviewedPullRequest): string {

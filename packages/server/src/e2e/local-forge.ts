@@ -93,17 +93,11 @@ export class LocalForge {
     return parseRecord(IssueSchema, frontMatterOf(await readRequired(path), path), path);
   }
 
-  /** What the gate of a commit found, or null while the forge holds no complete record of it. */
+  /** What the gate of a commit found, or null when the forge holds no record of it. */
   async gateOutcome(sha: string): Promise<GateOutcome | null> {
     const path = join(this.directory, CHECKS_DIRECTORY, `${sha}${RECORD_EXTENSION}`);
     const text = await readOptional(path);
-    if (text === null) return null;
-    try {
-      return parseRecord(GateOutcomeSchema, JSON.parse(text), path);
-    } catch (error) {
-      if (error instanceof SyntaxError) return null;
-      throw error;
-    }
+    return text === null ? null : parseRecord(GateOutcomeSchema, JSON.parse(text), path);
   }
 
   /** What the gate of a commit printed, or null when it has not run. */

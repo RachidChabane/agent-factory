@@ -80,10 +80,8 @@ describe('LocalForge', () => {
     expect(await forge.gateLog(SHA)).toBe('$ node --test\n[exit code 1]\n');
   });
 
-  it('finds no outcome for a commit whose gate has not finished writing it', async () => {
+  it('finds no outcome and no log for a commit whose gate has not run', async () => {
     expect(await forge.gateOutcome(SHA)).toBeNull();
     expect(await forge.gateLog(SHA)).toBeNull();
-    await put(`checks/${SHA}.json`, '{ "sha": "4961');
-    expect(await forge.gateOutcome(SHA)).toBeNull();
   });
 });

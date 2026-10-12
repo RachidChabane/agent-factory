@@ -21,17 +21,6 @@ export interface CliRun {
   readonly killed: boolean;
 }
 
-/** A command that keeps running until it is asked to stop or killed. */
-export interface LaunchedCommand {
-  /** Settles when the command has ended, whatever the way; it does not reject. */
-  readonly finished: Promise<CliRun>;
-  /** Ends the command and everything it started. */
-  kill(): void;
-}
-
-/** Builds the runner of commands that are killed when the signal aborts. */
-export type RunnerFor = (signal: AbortSignal) => CommandRunner;
-
 export interface FactoryCliSettings {
   /** The module that runs the command line. */
   readonly entry: string;
@@ -66,52 +55,31 @@ export function expectSucceeded(run: CliRun): CliRun {
  */
 export class FactoryCli {
   private readonly settings: FactoryCliSettings;
-  private readonly runnerFor: RunnerFor;
-  private readonly lifetime: AbortSignal;
+  private readonly runner: CommandRunner;
   private readonly runs: CliRun[] = [];
 
-  constructor(settings: FactoryCliSettings, runnerFor: RunnerFor, lifetime: AbortSignal) {
+  constructor(settings: FactoryCliSettings, runner: CommandRunner) {
     this.settings = settings;
-    this.runnerFor = runnerFor;
-    this.lifetime = lifetime;
+    this.runner = runner;
   }
 
   /** Runs a command to its end. */
-  run(args: readonly string[]): Promise<CliRun> {
-    return this.execute(args, this.lifetime, this.settings.commandTimeoutMs);
-  }
-
-  /** Starts a command that is left running; the run ends at `lifetimeLimitMs` at the latest. */
-  launch(args: readonly string[], lifetimeLimitMs: number): LaunchedCommand {
-    const controller = new AbortController();
+  async run(args: readonly string[]): Promise<CliRun> {
+    const command = describeCommand(args);
     const startedAt = performance.now();
-    const finished = this.execute(args, AbortSignal.any([this.lifetime, controller.signal]), lifetimeLimitMs).catch((error: unknown) =>
-      this.unfinished(describeCommand(args), startedAt, `could not start: ${error instanceof Error ? error.message : String(error)}`, false),
-    );
-    return { finished, kill: () => controller.abort() };
+    const { entry, workingDirectory, environment, commandTimeoutMs } = this.settings;
+    try {
+      const result = await this.runner.run([process.execPath, entry, ...args], workingDirectory, commandTimeoutMs, environment);
+      return this.record({ command, exitCode: result.exitCode, output: `${result.stdout}${result.stderr}`, durationMs: result.durationMs, timedOut: result.timedOut, killed: false });
+    } catch (error) {
+      if (!(error instanceof CommandAbortedError)) throw error;
+      return this.record({ command, exitCode: NOT_EXITED, output: '', durationMs: Math.round(performance.now() - startedAt), timedOut: false, killed: true });
+    }
   }
 
   /** Every command run so far that has ended, in the order it ended. */
   transcript(): readonly CliRun[] {
     return this.runs;
-  }
-
-  private async execute(args: readonly string[], signal: AbortSignal, timeoutMs: number): Promise<CliRun> {
-    const command = describeCommand(args);
-    const startedAt = performance.now();
-    const { entry, workingDirectory, environment } = this.settings;
-    try {
-      const result = await this.runnerFor(signal).run([process.execPath, entry, ...args], workingDirectory, timeoutMs, environment);
-      return this.record({ command, exitCode: result.exitCode, output: `${result.stdout}${result.stderr}`, durationMs: result.durationMs, timedOut: result.timedOut, killed: false });
-    } catch (error) {
-      if (!(error instanceof CommandAbortedError)) throw error;
-      return this.unfinished(command, startedAt, '', true);
-    }
-  }
-
-  /** A run that has no exit code: the command never started, or was ended before it exited. */
-  private unfinished(command: string, startedAt: number, output: string, killed: boolean): CliRun {
-    return this.record({ command, exitCode: NOT_EXITED, output, durationMs: Math.round(performance.now() - startedAt), timedOut: false, killed });
   }
 
   private record(run: CliRun): CliRun {

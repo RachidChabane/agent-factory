@@ -31,11 +31,10 @@ export interface LocalForgeLocation {
 
 /**
  * A factory home with the storefront on a local forge and the fake Claude playing the storefront's
- * scripted agents, on a port that was free when the world was made.
+ * scripted agents.
  */
 export interface ExampleWorld {
   readonly home: string;
-  readonly port: number;
   readonly project: ProjectConfig;
   readonly forge: LocalForgeLocation;
   /** Writes a file the operator has at hand, outside the factory's home, and returns its path. */
@@ -76,7 +75,6 @@ export async function createExampleWorld(settings: ExampleWorldSettings): Promis
     const project = projectOf(world.config, STOREFRONT_ID);
     return {
       home,
-      port,
       project,
       forge: localForgeOf(project),
       writeOperatorFile: async (name, content) => {

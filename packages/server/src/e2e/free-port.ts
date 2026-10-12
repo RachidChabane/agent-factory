@@ -1,6 +1,6 @@
 import { createServer } from 'node:net';
-import { LOOPBACK_ADDRESS } from './loopback.ts';
 
+const LOOPBACK_ADDRESS = '127.0.0.1';
 const ANY_PORT = 0;
 
 /** A TCP port of the loopback interface that nothing listens on right now. */

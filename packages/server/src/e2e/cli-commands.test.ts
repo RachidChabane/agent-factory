@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseCommandLine, type CliCommand } from '../cli/command-line.ts';
-import { createStartedIssue, issueStatus, mergePullRequest, runIssue, startFactory, stopFactoryNow, validateOffline } from './cli-commands.ts';
+import { createStartedIssue, issueStatus, mergePullRequest, runIssue, validateOffline } from './cli-commands.ts';
 
 const SPEC_PATH = '/operator/category-filter.md';
 const HEAD_SHA = '4961798ec085a3693f294496970c3b7926e925c8';
@@ -32,10 +32,5 @@ describe('the factory commands of the example run', () => {
 
   it('read the status of an issue', () => {
     expect(commandOf(issueStatus(1))).toEqual({ kind: 'status', issueNumber: 1 });
-  });
-
-  it('start the factory on the configured port and stop it at once', () => {
-    expect(commandOf(startFactory())).toEqual({ kind: 'start', demo: false, port: null });
-    expect(commandOf(stopFactoryNow())).toEqual({ kind: 'stop', now: true });
   });
 });
