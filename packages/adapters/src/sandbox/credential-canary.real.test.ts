@@ -175,7 +175,7 @@ describe('pre-push secret scan on a real branch', () => {
         baseBranch: TEST_BASE_BRANCH,
         environment: TEST_GIT_ENVIRONMENT,
       });
-      const sourceControl = new GitSourceControl(testRunner(), { environment: TEST_GIT_ENVIRONMENT, identity: TEST_IDENTITY, scratchDirectory: repositories.scratch });
+      const sourceControl = new GitSourceControl(testRunner(), { environment: TEST_GIT_ENVIRONMENT, identity: TEST_IDENTITY, branchPrefix: 'factory/', scratchDirectory: repositories.scratch });
       const worktree: Worktree = await pool.acquire(7, 'factory/7-leak');
       const token = ['gh', 'p_', 'K3v9Qm2Xz7Lp4Wn8Rt6Y'.repeat(2)].join('');
       await writeFile(join(worktree.path, 'src/settings.ts'), `export const githubToken = '${token}';\n`);

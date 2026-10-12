@@ -4,7 +4,6 @@ export const DEFAULT_PRESERVED_DIRECTORIES: readonly string[] = ['node_modules',
 export const GIT_COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 export const LEASE_FILE_NAME = 'leases.json';
 export const SLOT_DIRECTORY_PREFIX = 'slot-';
-export const FACTORY_BRANCH_PREFIX = 'factory/';
 export const SHA256_ALGORITHM = 'sha256';
 export const BASE_COPY_DIRECTORY_PREFIX = 'factory-base-copy-';
 export const SCRATCH_INDEX_FILE_NAME = 'index';

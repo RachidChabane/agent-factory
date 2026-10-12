@@ -98,11 +98,11 @@ describe('LocalGitHubGateway', () => {
   describe('issues', () => {
     it('creates numbered issue files with their front matter and reads them back', async () => {
       const github = gateway();
-      const first = await github.createIssue('Serve the domain', SPEC_BODY, ['type:infra-ci', 'spec:validated', 'type:infra-ci']);
+      const first = await github.createIssue('Serve the domain', SPEC_BODY, ['type:infra', 'spec:validated', 'type:infra']);
       const second = await github.createIssue('Another', SPEC_BODY, []);
       expect([first.number, second.number]).toEqual([1, 2]);
       expect(await readFile(join(directory, 'issues', '1.md'), 'utf8')).toBe(
-        ['---', 'title: Serve the domain', 'labels:', '  - type:infra-ci', '  - spec:validated', 'state: open', 'blockedBy: []', '---', '', SPEC_BODY].join(
+        ['---', 'title: Serve the domain', 'labels:', '  - type:infra', '  - spec:validated', 'state: open', 'blockedBy: []', '---', '', SPEC_BODY].join(
           '\n',
         ),
       );
@@ -110,7 +110,7 @@ describe('LocalGitHubGateway', () => {
         number: 1,
         title: 'Serve the domain',
         body: SPEC_BODY,
-        labels: ['type:infra-ci', 'spec:validated'],
+        labels: ['type:infra', 'spec:validated'],
         state: 'open',
         blockedBy: [],
       });
@@ -163,13 +163,13 @@ describe('LocalGitHubGateway', () => {
 
     it('opens a pull request in the shared number space with its rendered body', async () => {
       const github = gateway();
-      await github.createIssue('Serve the domain', SPEC_BODY, ['type:infra-ci']);
+      await github.createIssue('Serve the domain', SPEC_BODY, ['type:infra']);
       const head = await pushBranch('src/app.txt', 'changed\n', 'ci(infra): serve the domain');
       const opened = await github.openPullRequest({
         branch: BRANCH,
         title: 'ci(infra): serve the domain',
         body: 'Proof attached.',
-        labels: ['type:infra-ci'],
+        labels: ['factory', 'type:infra'],
         closes: [1],
       });
       expect(opened.number).toBe(2);
@@ -181,7 +181,7 @@ describe('LocalGitHubGateway', () => {
         title: 'ci(infra): serve the domain',
         head: BRANCH,
         base: TEST_BASE_BRANCH,
-        labels: ['factory', 'type:infra-ci'],
+        labels: ['factory', 'type:infra'],
         closes: [1],
         state: 'open',
         author: TEST_IDENTITY.name,
@@ -207,7 +207,7 @@ describe('LocalGitHubGateway', () => {
 
     it('squash-merges the reviewed head into the base branch and closes the linked issues', async () => {
       const github = gateway();
-      await github.createIssue('Serve the domain', SPEC_BODY, ['type:infra-ci']);
+      await github.createIssue('Serve the domain', SPEC_BODY, ['type:infra']);
       const baseBefore = bareHead(TEST_BASE_BRANCH);
       await pushBranch('src/app.txt', 'one\n', 'test(infra): add acceptance checks for #1');
       const head = await pushBranch('src/new.txt', 'two\n', 'ci(infra): serve the domain');
@@ -254,7 +254,7 @@ describe('LocalGitHubGateway', () => {
       const seed = bareHead(TEST_BASE_BRANCH);
       await repositories.pushToRemote('docs/direct.md', 'direct\n', 'docs: direct push');
       const head = await pushBranch('src/app.txt', 'merged\n', 'ci(infra): serve the domain');
-      const opened = await github.openPullRequest({ branch: BRANCH, title: 'ci(infra): serve the domain', body: 'b', labels: ['type:infra-ci'], closes: [] });
+      const opened = await github.openPullRequest({ branch: BRANCH, title: 'ci(infra): serve the domain', body: 'b', labels: ['factory', 'type:infra'], closes: [] });
       const mergeSha = await github.squashMerge(opened.number, head);
 
       const commits = await github.commitsSince(TEST_BASE_BRANCH, seed);
@@ -264,7 +264,7 @@ describe('LocalGitHubGateway', () => {
         authorLogin: TEST_IDENTITY.name,
         pullRequestNumber: 1,
         pullRequestBranch: BRANCH,
-        pullRequestLabels: ['factory', 'type:infra-ci'],
+        pullRequestLabels: ['factory', 'type:infra'],
       });
       expect(commits[0]).toMatchObject({ pullRequestNumber: null, pullRequestBranch: null, pullRequestLabels: [] });
       expect(await github.commitsSince(TEST_BASE_BRANCH, mergeSha)).toEqual([]);
@@ -281,7 +281,7 @@ describe('LocalGitHubGateway', () => {
       const seed = bareHead(TEST_BASE_BRANCH);
       await repositories.pushToRemote('docs/direct.md', 'direct\n', 'docs: direct push');
       const head = await pushBranch('src/app.txt', 'merged\n', 'ci(infra): serve the domain');
-      const opened = await github.openPullRequest({ branch: BRANCH, title: 'ci(infra): serve the domain', body: 'b', labels: ['type:infra-ci'], closes: [] });
+      const opened = await github.openPullRequest({ branch: BRANCH, title: 'ci(infra): serve the domain', body: 'b', labels: ['factory', 'type:infra'], closes: [] });
       const mergeSha = await github.squashMerge(opened.number, head);
       const [direct] = await github.commitsSince(TEST_BASE_BRANCH, seed);
 
@@ -293,7 +293,7 @@ describe('LocalGitHubGateway', () => {
 
   describe('branches, open pull requests and tags', () => {
     const OTHER_BRANCH = 'factory/2-another';
-    const PULL_REQUEST_LABELS = ['type:infra-ci'];
+    const PULL_REQUEST_LABELS = ['factory', 'type:infra'];
 
     it('reports the head of an existing branch and null for a missing one', async () => {
       const github = gateway();
@@ -309,8 +309,8 @@ describe('LocalGitHubGateway', () => {
       const second = await github.openPullRequest({ branch: OTHER_BRANCH, title: 'feat: second', body: 'b', labels: [], closes: [] });
 
       expect(await github.listOpenPullRequests()).toEqual([
-        { number: first.number, title: 'feat: first', branch: BRANCH, headSha: firstHead, url: first.url, labels: ['factory', ...PULL_REQUEST_LABELS] },
-        { number: second.number, title: 'feat: second', branch: OTHER_BRANCH, headSha: secondHead, url: second.url, labels: ['factory'] },
+        { number: first.number, title: 'feat: first', branch: BRANCH, headSha: firstHead, url: first.url, labels: PULL_REQUEST_LABELS },
+        { number: second.number, title: 'feat: second', branch: OTHER_BRANCH, headSha: secondHead, url: second.url, labels: [] },
       ]);
     });
 

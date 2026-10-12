@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import type { Worktree } from '@agent-factory/application';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BranchNotPushableError, NothingToCommitError, PathOutsideWorktreeError, WorktreeBranchMismatchError } from './errors.ts';
+
+const FACTORY_BRANCH_PREFIX = 'factory/';
 import { GitSourceControl } from './gitSourceControl.ts';
 import { GitWorktreePool } from './gitWorktreePool.ts';
 import {
@@ -37,6 +39,7 @@ describe('GitSourceControl', () => {
     sourceControl = new GitSourceControl(testRunner(), {
       environment: TEST_GIT_ENVIRONMENT,
       identity: TEST_IDENTITY,
+      branchPrefix: FACTORY_BRANCH_PREFIX,
       scratchDirectory: repositories.scratch,
     });
     worktree = await pool.acquire(12, FACTORY_BRANCH);
@@ -135,6 +138,16 @@ describe('GitSourceControl', () => {
       await expect(sourceControl.push({ ...worktree, branch })).rejects.toBeInstanceOf(BranchNotPushableError);
     }
     expect(git(repositories.remote, 'branch', '--list').includes('feature')).toBe(false);
+  });
+
+  it('pushes only the branches of the prefix the project names', async () => {
+    const custom = new GitSourceControl(testRunner(), {
+      environment: TEST_GIT_ENVIRONMENT,
+      identity: TEST_IDENTITY,
+      branchPrefix: 'bots/factory-',
+      scratchDirectory: repositories.scratch,
+    });
+    await expect(custom.push(worktree)).rejects.toThrow('only branches starting with "bots/factory-" may be pushed');
   });
 
   it('refuses to push when the worktree is on another branch than the lease', async () => {

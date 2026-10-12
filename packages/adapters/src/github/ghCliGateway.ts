@@ -35,7 +35,7 @@ import {
   WORKFLOW_DISPATCH_FIELD_FLAG,
 } from './constants.ts';
 import { CommitScanLimitError, GitHubCommandError, GitHubPayloadError, PullRequestHeadMovedError } from './errors.ts';
-import { withClosingLines, withFactoryLabel } from './pullRequestConventions.ts';
+import { withClosingLines } from './pullRequestConventions.ts';
 import {
   BranchResponseSchema,
   CheckRunsPagesSchema,
@@ -162,7 +162,7 @@ export class GhCliGateway implements GitHubGateway {
   }
 
   async openPullRequest(draft: PullRequestDraft): Promise<PullRequestRef> {
-    const labels = withFactoryLabel(draft.labels);
+    const labels = [...new Set(draft.labels)];
     const created = await this.gh([
       'pr',
       'create',

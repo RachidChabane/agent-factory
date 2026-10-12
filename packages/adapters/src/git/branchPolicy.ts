@@ -1,5 +1,4 @@
-import { FACTORY_BRANCH_PREFIX } from './constants.ts';
-
-export function isFactoryBranch(branch: string): boolean {
-  return branch.startsWith(FACTORY_BRANCH_PREFIX) && branch.length > FACTORY_BRANCH_PREFIX.length;
+/** Whether a branch belongs to the factory: it starts with the project's branch prefix and names something after it. */
+export function isFactoryBranch(branch: string, branchPrefix: string): boolean {
+  return branch.startsWith(branchPrefix) && branch.length > branchPrefix.length;
 }

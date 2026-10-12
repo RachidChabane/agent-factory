@@ -17,7 +17,6 @@ export const GH_FIXED_ENVIRONMENT: Readonly<Record<string, string>> = {
 export const PAGE_SIZE = 100;
 export const MAX_COMMIT_PAGES = 10;
 export const LISTED_ISSUE_STATE = 'open';
-export const FACTORY_LABEL = 'factory';
 export const EXIT_CODE_OK = 0;
 
 export const CHECK_RUN_COMPLETED_STATUS = 'completed';

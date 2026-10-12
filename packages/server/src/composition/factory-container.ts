@@ -167,7 +167,7 @@ export async function openFactory(config: FactoryConfig, environment: SourceEnvi
         environment: gitEnvironment,
         size: config.worktreePool.size,
       }),
-      sourceControl: new GitSourceControl(runner, { environment: gitEnvironment, identity: config.github.commitIdentity }),
+      sourceControl: new GitSourceControl(runner, { environment: gitEnvironment, identity: config.github.commitIdentity, branchPrefix: settings.conventions.branchPrefix }),
       harness: new GovernedHarness(recorded, admission, budget),
       roles: await FileRolePromptCatalog.load(ROLE_PROMPTS_DIRECTORY),
       runner,

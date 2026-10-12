@@ -12,9 +12,9 @@ const frontMatter = fc.record({
 
 describe('front matter documents', () => {
   it('renders a readable issue file', () => {
-    const text = renderFrontMatter({ title: 'Serve the domain', labels: ['type:infra-ci'], state: 'open', blockedBy: [] }, '## Need\n\nIt.\n');
+    const text = renderFrontMatter({ title: 'Serve the domain', labels: ['type:infra'], state: 'open', blockedBy: [] }, '## Need\n\nIt.\n');
     expect(text).toBe(
-      ['---', 'title: Serve the domain', 'labels:', '  - type:infra-ci', 'state: open', 'blockedBy: []', '---', '', '## Need', '', 'It.', ''].join('\n'),
+      ['---', 'title: Serve the domain', 'labels:', '  - type:infra', 'state: open', 'blockedBy: []', '---', '', '## Need', '', 'It.', ''].join('\n'),
     );
   });
 

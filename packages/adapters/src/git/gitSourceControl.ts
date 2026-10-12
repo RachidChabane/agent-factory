@@ -5,7 +5,7 @@ import { join, sep } from 'node:path';
 import type { CommandRunner, SourceControl, Worktree } from '@agent-factory/application';
 import type { FrozenCheck } from '@agent-factory/domain';
 import { isFactoryBranch } from './branchPolicy.ts';
-import { BASE_COPY_DIRECTORY_PREFIX, DEFAULT_REMOTE_NAME, FACTORY_BRANCH_PREFIX, NUL, SCRATCH_INDEX_FILE_NAME, SHA256_ALGORITHM } from './constants.ts';
+import { BASE_COPY_DIRECTORY_PREFIX, DEFAULT_REMOTE_NAME, NUL, SCRATCH_INDEX_FILE_NAME, SHA256_ALGORITHM } from './constants.ts';
 import { BranchNotPushableError, NothingToCommitError, WorktreeBranchMismatchError } from './errors.ts';
 import { toRelativeInside } from '../paths/inside-root.ts';
 import { GitCli } from './gitCli.ts';
@@ -18,6 +18,8 @@ export interface GitIdentity {
 export interface GitSourceControlSettings {
   readonly environment: Readonly<Record<string, string>>;
   readonly identity: GitIdentity;
+  /** Only branches starting with this prefix are ever pushed. */
+  readonly branchPrefix: string;
   readonly remoteName?: string;
   readonly scratchDirectory?: string;
 }
@@ -29,10 +31,12 @@ export class GitSourceControl implements SourceControl {
   private readonly identity: GitIdentity;
   private readonly remoteName: string;
   private readonly scratchDirectory: string;
+  private readonly branchPrefix: string;
 
   constructor(runner: CommandRunner, settings: GitSourceControlSettings) {
     this.git = new GitCli(runner, settings.environment);
     this.identity = settings.identity;
+    this.branchPrefix = settings.branchPrefix;
     this.remoteName = settings.remoteName ?? DEFAULT_REMOTE_NAME;
     this.scratchDirectory = settings.scratchDirectory ?? tmpdir();
   }
@@ -103,7 +107,7 @@ export class GitSourceControl implements SourceControl {
   }
 
   async push(worktree: Worktree): Promise<void> {
-    if (!isFactoryBranch(worktree.branch)) throw new BranchNotPushableError(worktree.branch, FACTORY_BRANCH_PREFIX);
+    if (!isFactoryBranch(worktree.branch, this.branchPrefix)) throw new BranchNotPushableError(worktree.branch, this.branchPrefix);
     const checkedOut = await this.git.runTrimmed(worktree.path, ['rev-parse', '--abbrev-ref', 'HEAD']);
     if (checkedOut !== worktree.branch) throw new WorktreeBranchMismatchError(worktree.branch, checkedOut);
     await this.git.run(worktree.path, ['push', '--no-verify', '--set-upstream', this.remoteName, worktree.branch]);

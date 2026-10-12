@@ -161,7 +161,7 @@ describe('GhCliGateway', () => {
         branch: 'factory/194-look',
         title: 'feat: look',
         body: 'Proof attached.',
-        labels: ['ui'],
+        labels: ['factory', 'ui'],
         closes: [194, 195],
       });
       expect(ref).toEqual({ number: 300, url: prUrl, headSha: 'abc123' });
@@ -192,7 +192,7 @@ describe('GhCliGateway', () => {
         { contains: ['pr', 'create'], stdout: `${prUrl}\n` },
         { contains: ['pr', 'view'], stdout: JSON.stringify({ number: 300, url: prUrl, headRefOid: 'abc123' }) },
       ]);
-      await gateway.openPullRequest({ branch: 'factory/1-a', title: 't', body: 'Closes #1', labels: ['factory'], closes: [1] });
+      await gateway.openPullRequest({ branch: 'factory/1-a', title: 't', body: 'Closes #1', labels: ['factory', 'factory'], closes: [1] });
       const create = (await gh.calls())[0]?.args ?? [];
       expect(create[create.indexOf('--body') + 1]).toBe('Closes #1');
       expect(create.filter((argument) => argument === 'factory')).toHaveLength(1);

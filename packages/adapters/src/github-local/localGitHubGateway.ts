@@ -18,7 +18,7 @@ import type {
 } from '@agent-factory/application';
 import type { GitIdentity } from '../git/gitSourceControl.ts';
 import { PullRequestHeadMovedError } from '../github/errors.ts';
-import { withClosingLines, withFactoryLabel } from '../github/pullRequestConventions.ts';
+import { withClosingLines } from '../github/pullRequestConventions.ts';
 import { LOCAL_CHECK_NAME, type LocalCheckMode } from './constants.ts';
 import { LocalMergeConflictError, LocalPullRequestRefusedError, LocalRecordNotFoundError } from './errors.ts';
 import { LocalBareRepository, type LocalCommit } from './localBareRepository.ts';
@@ -168,7 +168,7 @@ export class LocalGitHubGateway implements GitHubGateway {
       title: draft.title,
       head: draft.branch,
       base: this.settings.baseBranch,
-      labels: [...withFactoryLabel(draft.labels)],
+      labels: [...new Set(draft.labels)],
       closes: [...draft.closes],
       state: OPEN_STATE,
       author: this.settings.identity.name,
