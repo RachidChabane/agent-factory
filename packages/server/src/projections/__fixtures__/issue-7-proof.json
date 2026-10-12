@@ -1,0 +1,230 @@
+{
+  "worktree": {
+    "path": "/home/operator/factory/worktrees/slot-1",
+    "branch": "factory/7-refuse-checkout-when-stock-cannot-be-read",
+    "baseSha": "5e1c0a9b7d3f2e4a6c8b0d1f3e5a7c9b1d3f5a7c"
+  },
+  "spec": {
+    "number": 7,
+    "title": "Refuse checkout when stock levels cannot be read",
+    "type": "security",
+    "need": "When stock enforcement is on, a shopper cannot buy an item that is out of stock by taking advantage of an inventory service error.",
+    "acceptanceCriteria": [
+      "With stock enforcement on, when the stock level of an item cannot be read, the checkout is refused and the shopper sees that stock is temporarily unavailable.",
+      "The refusal is logged as one record that names the order and the cause; the log format is unchanged.",
+      "With stock enforcement off, an inventory service error does not block checkouts.",
+      "An order whose items are all in stock with a readable inventory is not affected."
+    ],
+    "outOfScope": [
+      "Turning stock enforcement on in production.",
+      "Changing reorder thresholds."
+    ],
+    "expectedProof": "A test that simulates an inventory service error with enforcement on: the checkout is accepted on main and refused on the branch.",
+    "dependsOn": [],
+    "commitKind": null
+  },
+  "manifest": {
+    "runner": "pytest",
+    "checks": [
+      {
+        "criterion": 1,
+        "paths": [
+          "api/tests/integration/stock/test_stock_unreadable_refusal.py"
+        ],
+        "description": "With stock enforcement on and the inventory raising an OSError or a database error, the checkout ends with a refusal telling the shopper that stock is temporarily unavailable.",
+        "onBase": "fails"
+      },
+      {
+        "criterion": 2,
+        "paths": [
+          "api/tests/integration/stock/test_stock_unreadable_refusal.py"
+        ],
+        "description": "The refused checkout emits exactly one warning-or-higher log record that names the order and the cause, with the usual record fields.",
+        "onBase": "fails"
+      },
+      {
+        "criterion": 3,
+        "paths": [
+          "api/tests/integration/stock/test_stock_unreadable_unaffected.py"
+        ],
+        "description": "With stock enforcement off or absent, an inventory error lets the checkout through.",
+        "onBase": "passes"
+      },
+      {
+        "criterion": 4,
+        "paths": [
+          "api/tests/integration/stock/test_stock_unreadable_unaffected.py"
+        ],
+        "description": "With enforcement on, an order whose stock is readable and sufficient is accepted with no warning logged.",
+        "onBase": "passes"
+      }
+    ],
+    "command": [
+      "uv",
+      "run",
+      "--offline",
+      "--directory",
+      "api",
+      "pytest",
+      "tests/integration/stock/test_stock_unreadable_refusal.py",
+      "tests/integration/stock/test_stock_unreadable_unaffected.py"
+    ],
+    "evidence": [],
+    "score": null
+  },
+  "beforeProof": {
+    "checksExpressible": true,
+    "exitCode": 1,
+    "checksFailedOnBase": true,
+    "scoreReport": null,
+    "baseScore": null,
+    "logName": "before-proof.log",
+    "evaluation": {
+      "valid": true,
+      "kind": "fails-on-base"
+    },
+    "evidence": [],
+    "runner": "pytest",
+    "tests": [
+      {
+        "id": "tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_1_unreadable_stock_refuses_the_checkout_with_stock_temporarily_unavailable[os-error]",
+        "file": "tests/integration/stock/test_stock_unreadable_refusal.py",
+        "criteria": [
+          1,
+          2
+        ],
+        "outcome": "failed",
+        "failureKind": "assertion",
+        "failureMessage": "AssertionError: the checkout was accepted\nassert False\n +  where False = isinstance(None, <class 'storefront_api.checkout.Refusal'>)\n +    where <class 'storefront_api.checkout.Refusal'> = checkout.Refusal"
+      },
+      {
+        "id": "tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_1_unreadable_stock_refuses_the_checkout_with_stock_temporarily_unavailable[database-error]",
+        "file": "tests/integration/stock/test_stock_unreadable_refusal.py",
+        "criteria": [
+          1,
+          2
+        ],
+        "outcome": "failed",
+        "failureKind": "assertion",
+        "failureMessage": "AssertionError: the checkout was accepted\nassert False\n +  where False = isinstance(None, <class 'storefront_api.checkout.Refusal'>)\n +    where <class 'storefront_api.checkout.Refusal'> = checkout.Refusal"
+      },
+      {
+        "id": "tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_2_the_refusal_is_logged_once_naming_the_order_and_the_cause[os-error]",
+        "file": "tests/integration/stock/test_stock_unreadable_refusal.py",
+        "criteria": [
+          1,
+          2
+        ],
+        "outcome": "failed",
+        "failureKind": "assertion",
+        "failureMessage": "AssertionError: no refusal record was logged\nassert 0 == 1\n +  where 0 = len([])"
+      },
+      {
+        "id": "tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_2_the_refusal_is_logged_once_naming_the_order_and_the_cause[database-error]",
+        "file": "tests/integration/stock/test_stock_unreadable_refusal.py",
+        "criteria": [
+          1,
+          2
+        ],
+        "outcome": "failed",
+        "failureKind": "assertion",
+        "failureMessage": "AssertionError: no refusal record was logged\nassert 0 == 1\n +  where 0 = len([])"
+      },
+      {
+        "id": "tests/integration/stock/test_stock_unreadable_unaffected.py::test_criterion_3_enforcement_off_an_inventory_error_does_not_block_checkouts[flag-off-os-error]",
+        "file": "tests/integration/stock/test_stock_unreadable_unaffected.py",
+        "criteria": [
+          3,
+          4
+        ],
+        "outcome": "passed",
+        "failureKind": null,
+        "failureMessage": null
+      },
+      {
+        "id": "tests/integration/stock/test_stock_unreadable_unaffected.py::test_criterion_3_enforcement_off_an_inventory_error_does_not_block_checkouts[flag-off-database-error]",
+        "file": "tests/integration/stock/test_stock_unreadable_unaffected.py",
+        "criteria": [
+          3,
+          4
+        ],
+        "outcome": "passed",
+        "failureKind": null,
+        "failureMessage": null
+      },
+      {
+        "id": "tests/integration/stock/test_stock_unreadable_unaffected.py::test_criterion_3_enforcement_off_an_inventory_error_does_not_block_checkouts[flag-absent-os-error]",
+        "file": "tests/integration/stock/test_stock_unreadable_unaffected.py",
+        "criteria": [
+          3,
+          4
+        ],
+        "outcome": "passed",
+        "failureKind": null,
+        "failureMessage": null
+      },
+      {
+        "id": "tests/integration/stock/test_stock_unreadable_unaffected.py::test_criterion_3_enforcement_off_an_inventory_error_does_not_block_checkouts[flag-absent-database-error]",
+        "file": "tests/integration/stock/test_stock_unreadable_unaffected.py",
+        "criteria": [
+          3,
+          4
+        ],
+        "outcome": "passed",
+        "failureKind": null,
+        "failureMessage": null
+      },
+      {
+        "id": "tests/integration/stock/test_stock_unreadable_unaffected.py::test_criterion_4_a_checkout_with_readable_stock_is_not_affected",
+        "file": "tests/integration/stock/test_stock_unreadable_unaffected.py",
+        "criteria": [
+          3,
+          4
+        ],
+        "outcome": "passed",
+        "failureKind": null,
+        "failureMessage": null
+      }
+    ]
+  },
+  "gateTests": [
+    {
+      "id": "tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_1_unreadable_stock_refuses_the_checkout_with_stock_temporarily_unavailable[os-error]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_1_unreadable_stock_refuses_the_checkout_with_stock_temporarily_unavailable[database-error]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_2_the_refusal_is_logged_once_naming_the_order_and_the_cause[os-error]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_2_the_refusal_is_logged_once_naming_the_order_and_the_cause[database-error]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/integration/stock/test_stock_unreadable_unaffected.py::test_criterion_3_enforcement_off_an_inventory_error_does_not_block_checkouts[flag-off-os-error]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/integration/stock/test_stock_unreadable_unaffected.py::test_criterion_3_enforcement_off_an_inventory_error_does_not_block_checkouts[flag-off-database-error]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/integration/stock/test_stock_unreadable_unaffected.py::test_criterion_3_enforcement_off_an_inventory_error_does_not_block_checkouts[flag-absent-os-error]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/integration/stock/test_stock_unreadable_unaffected.py::test_criterion_3_enforcement_off_an_inventory_error_does_not_block_checkouts[flag-absent-database-error]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/integration/stock/test_stock_unreadable_unaffected.py::test_criterion_4_a_checkout_with_readable_stock_is_not_affected",
+      "outcome": "passed"
+    }
+  ],
+  "beforeLog": "$ uv run --offline --directory api pytest tests/integration/stock/test_stock_unreadable_refusal.py tests/integration/stock/test_stock_unreadable_unaffected.py --junitxml=/home/operator/factory/worktrees/slot-1/.factory/reports/pytest.xml -o junit_family=xunit1\n============================= test session starts ==============================\nplatform darwin -- Python 3.13.5, pytest-8.4.2, pluggy-1.6.0\nrootdir: /home/operator/factory/worktrees/slot-1/api\nconfigfile: pyproject.toml\nplugins: anyio-4.10.0, asyncio-1.2.0\ncollected 9 items\n\ntests/integration/stock/test_stock_unreadable_refusal.py FFFF                                     [ 44%]\ntests/integration/stock/test_stock_unreadable_unaffected.py .....                                [100%]\n\n=================================== FAILURES ===================================\n_ test_criterion_1_unreadable_stock_refuses_the_checkout_with_stock_temporarily_unavailable[os-error] _\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a2c4e10>\n\n    async def test_criterion_1_unreadable_stock_refuses_the_checkout_with_stock_temporarily_unavailable(monkeypatch, error):\n        order, stock = await _checkout(monkeypatch, error)\n\n>       assert isinstance(order, checkout.Refusal), \"the checkout was accepted\"\nE       AssertionError: the checkout was accepted\nE       assert False\nE        +  where False = isinstance(None, <class 'storefront_api.checkout.Refusal'>)\nE        +    where <class 'storefront_api.checkout.Refusal'> = checkout.Refusal\n\ntests/integration/stock/test_stock_unreadable_refusal.py:58: AssertionError\n------------------------------ Captured log call -------------------------------\nERROR    storefront_api.checkout.stock:stock.py:142 Stock check failed, accepting the order: OSError: inventory service is unreachable\n_ test_criterion_1_unreadable_stock_refuses_the_checkout_with_stock_temporarily_unavailable[database-error] _\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a2c4e10>\n\n    async def test_criterion_1_unreadable_stock_refuses_the_checkout_with_stock_temporarily_unavailable(monkeypatch, error):\n        order, stock = await _checkout(monkeypatch, error)\n\n>       assert isinstance(order, checkout.Refusal), \"the checkout was accepted\"\nE       AssertionError: the checkout was accepted\nE       assert False\nE        +  where False = isinstance(None, <class 'storefront_api.checkout.Refusal'>)\nE        +    where <class 'storefront_api.checkout.Refusal'> = checkout.Refusal\n\ntests/integration/stock/test_stock_unreadable_refusal.py:58: AssertionError\n------------------------------ Captured log call -------------------------------\nERROR    storefront_api.checkout.stock:stock.py:142 Stock check failed, accepting the order: OperationalError: inventory database is unreachable\n_ test_criterion_2_the_refusal_is_logged_once_naming_the_order_and_the_cause[os-error] _\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a2c4e10>\n\n    async def test_criterion_2_the_refusal_is_logged_once_naming_the_order_and_the_cause(monkeypatch, error):\n        order, stock = await _checkout(monkeypatch, error)\n\n>       assert len(records) == 1, \"no refusal record was logged\"\nE       AssertionError: no refusal record was logged\nE       assert 0 == 1\nE        +  where 0 = len([])\n\ntests/integration/stock/test_stock_unreadable_refusal.py:58: AssertionError\n------------------------------ Captured log call -------------------------------\nERROR    storefront_api.checkout.stock:stock.py:142 Stock check failed, accepting the order: OSError: inventory service is unreachable\n_ test_criterion_2_the_refusal_is_logged_once_naming_the_order_and_the_cause[database-error] _\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a2c4e10>\n\n    async def test_criterion_2_the_refusal_is_logged_once_naming_the_order_and_the_cause(monkeypatch, error):\n        order, stock = await _checkout(monkeypatch, error)\n\n>       assert len(records) == 1, \"no refusal record was logged\"\nE       AssertionError: no refusal record was logged\nE       assert 0 == 1\nE        +  where 0 = len([])\n\ntests/integration/stock/test_stock_unreadable_refusal.py:58: AssertionError\n------------------------------ Captured log call -------------------------------\nERROR    storefront_api.checkout.stock:stock.py:142 Stock check failed, accepting the order: OperationalError: inventory database is unreachable\n- generated xml file: /home/operator/factory/worktrees/slot-1/.factory/reports/pytest.xml -\n=========================== short test summary info ============================\nFAILED tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_1_unreadable_stock_refuses_the_checkout_with_stock_temporarily_unavailable[os-error]\nFAILED tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_1_unreadable_stock_refuses_the_checkout_with_stock_temporarily_unavailable[database-error]\nFAILED tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_2_the_refusal_is_logged_once_naming_the_order_and_the_cause[os-error]\nFAILED tests/integration/stock/test_stock_unreadable_refusal.py::test_criterion_2_the_refusal_is_logged_once_naming_the_order_and_the_cause[database-error]\n========================= 4 failed, 5 passed in 0.91s ==========================\n[exit code 1 after 2380 ms]\n",
+  "gateLog": "$ uv run --offline --directory api pytest tests/integration/stock/test_stock_unreadable_refusal.py tests/integration/stock/test_stock_unreadable_unaffected.py --junitxml=/home/operator/factory/worktrees/slot-1/.factory/reports/pytest.xml -o junit_family=xunit1\n============================= test session starts ==============================\nplatform darwin -- Python 3.13.5, pytest-8.4.2, pluggy-1.6.0\nrootdir: /home/operator/factory/worktrees/slot-1/api\nconfigfile: pyproject.toml\nplugins: anyio-4.10.0, asyncio-1.2.0\ncollected 9 items\n\ntests/integration/stock/test_stock_unreadable_refusal.py ....                                     [ 44%]\ntests/integration/stock/test_stock_unreadable_unaffected.py .....                                [100%]\n\n- generated xml file: /home/operator/factory/worktrees/slot-1/.factory/reports/pytest.xml -\n============================== 9 passed in 1.02s ===============================\n[exit code 0 after 2611 ms]\n"
+}

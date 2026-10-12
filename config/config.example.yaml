@@ -1,0 +1,147 @@
+# Copy to ~/.agent-factory/config.yaml (or $FACTORY_HOME/config.yaml) and replace the placeholders.
+# Relative paths resolve against the factory home; "~/" resolves against your home directory.
+
+target:
+  owner: example-owner
+  name: example-repository
+  clonePath: ~/src/example-repository
+  baseBranch: main
+  # Setup and gate commands run under sandbox-exec: no network unless the command names why it needs it.
+  setupCommands:
+    - name: install
+      run: pnpm install --frozen-lockfile
+      network: downloads the locked dependencies from the package registry
+
+worktreePool:
+  directory: worktrees
+  size: 3
+
+concurrency:
+  issues: 1
+  ceiling: 3
+
+# No agent run starts below this free memory or with memory pressure above pauseAbovePressure (normal or warn).
+resources:
+  minimumFreeMemoryPercent: 40
+  pauseAbovePressure: normal
+
+roles:
+  acceptance-author:
+    model: sonnet
+    effort: medium
+    maxBudgetUsd: 3
+    maxTurns: 60
+    timeoutMinutes: 30
+  implementer:
+    model: sonnet
+    effort: high
+    maxBudgetUsd: 8
+    maxTurns: 120
+    timeoutMinutes: 60
+    escalation:
+      model: opus
+      effort: xhigh
+  reviewer:
+    model: sonnet
+    effort: high
+    maxBudgetUsd: 2
+    maxTurns: 40
+    timeoutMinutes: 20
+
+gate:
+  commandsBeforeAcceptance:
+    - name: lint
+      run: mise run lint
+  commandsAfterAcceptance: []
+  timeoutMinutes: 30
+  niceness: 10
+  environment:
+    passthrough: [PATH, HOME, LANG, TERM, TMPDIR, USER, MISE_DATA_DIR, MISE_CONFIG_DIR, MISE_CACHE_DIR, MISE_STATE_DIR]
+    set:
+      MISE_TRUSTED_CONFIG_PATHS: ~/.agent-factory/worktrees
+      UV_CACHE_DIR: ~/.agent-factory/cache/uv
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
+
+# Commit type: a "kind:<type>" label on the issue wins; otherwise "types" below, otherwise
+# feat for ui, engine-api, skill-prompt and data, fix for security, build for dependencies,
+# docs for doc, chore for release, refactor for refactor, and for infra-ci feat when the change
+# touches one of deploymentPaths, ci otherwise.
+conventionalCommits:
+  defaultScope: repo
+  scopes:
+    ui: app
+    engine-api: agent
+    skill-prompt: agent
+    infra-ci: ci
+    doc: docs
+    dependencies: deps
+  types: {}
+  deploymentPaths: [infrastructure/**, environments/**]
+
+# Agent runs and check commands never read the built-in credential stores (~/.ssh, ~/.config/gcloud,
+# ~/.config/gh, ~/.docker, ~/.aws, ~/.netrc, ~/.npmrc, ~/.claude*, ~/Library/Keychains, ...) nor the paths
+# listed here; a trailing * matches every entry starting with that path. Check commands write only their
+# worktree, the temporary directories, claude.writableDirectories and the directories listed here.
+sandbox:
+  deniedReadPaths: []
+  writableDirectories: [~/.local/state/mise, ~/Library/Caches/mise, ~/.npm, ~/Library/Caches/node-gyp]
+
+# Before a push or a pull request write, the diff and the pull request body are scanned for secret
+# patterns and for the exact values of credential-like environment variables and of these keychain items.
+secretScan:
+  keychainServices: [gh:github.com]
+
+directories:
+  state: state
+  runs: runs
+  logs: logs
+  evidence: evidence
+
+github:
+  mode: remote
+  localDirectory: github
+  localChecks: none
+  commitIdentity:
+    name: Example Factory
+    email: factory@example.invalid
+
+claude:
+  command: [claude]
+  niceness: 10
+  writableDirectories: [cache]
+  # Each account is a Claude login: CLAUDE_CONFIG_DIR=<configDir> claude /login
+  accounts:
+    - name: primary
+      configDir: ~/.claude-primary
+    - name: secondary
+      configDir: ~/.claude-secondary
+
+budget:
+  fiveHourPauseUtilization: 0.90
+  sevenDayPauseUtilization: 0.85
+  dailyCapUsd: 150
+  perRunCapUsd: 10
+
+daemon:
+  pollIntervalSeconds: 30
+  mergeWatchIntervalMinutes: 10
+  issueRefreshSeconds: 120
+
+notifications:
+  googleChatWebhookUrl:
+    fromEnvironment: AGENT_FACTORY_GOOGLE_CHAT_WEBHOOK_URL
+  dedupeWindowMinutes: 30
+
+server:
+  host: 127.0.0.1
+  port: 7430
+  publicUrl: http://127.0.0.1:7430
+
+# The cockpit shows these environments from their GitHub deployments and redeploys dev and prep on the
+# operator's order through this workflow. Production is never deployed by the factory.
+delivery:
+  workflow: delivery.yml
+  environments:
+    dev: { name: example-dev, url: https://dev.example.invalid }
+    prep: { name: example-prep, url: https://prep.example.invalid }
+    prod: { name: example-prod, url: https://example.invalid }

@@ -1,6 +1,3 @@
 packages:
-  - packages/domain
-  - packages/plugin
-  - packages/application
-  - packages/adapters
+  - packages/*
   - tools/*
