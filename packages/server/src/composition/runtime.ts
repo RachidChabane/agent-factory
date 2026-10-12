@@ -20,6 +20,8 @@ export function factoryLockPath(stateDirectory: string): string {
 export interface RuntimeOptions {
   readonly stream?: EventStreamSettings;
   readonly cockpitDirectory?: string;
+  /** Builds the first snapshot as the server starts, so that the first page does not wait for the forges. */
+  readonly warmSnapshot?: boolean;
 }
 
 export interface RunningFactory {
@@ -39,6 +41,9 @@ export function createHttpServer(runtime: InstallationRuntime, daemons: RunningD
   const source = new SnapshotSource(runtime);
   const cursor = new SequenceCursor(runtime.events);
   const { config } = runtime;
+  if (options.warmSnapshot === true) {
+    void source.snapshot().catch((error: unknown) => runtime.log.warn(`the first snapshot failed: ${error instanceof Error ? error.message : String(error)}`));
+  }
   return new FactoryHttpServer(
     {
       events: runtime.events,

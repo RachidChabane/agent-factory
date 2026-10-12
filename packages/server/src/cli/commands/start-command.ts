@@ -23,7 +23,7 @@ export async function serveInstallation(config: AgentFactoryConfig, overrides: I
     await requireProjectReferences(context, config.projects);
     const runtime = await context.openInstallation(config, overrides);
     try {
-      const running = await startFactory(runtime, controller.signal);
+      const running = await startFactory(runtime, controller.signal, { warmSnapshot: true });
       const projects = runtime.projects.map((project) => project.id).join(', ');
       context.output.line(`Factory started on ${projects}; cockpit at http://${running.address.address}:${running.address.port} (${config.server.publicUrl})`);
       const companionDone = companion === null ? Promise.resolve() : companion(runtime, running, controller.signal);
