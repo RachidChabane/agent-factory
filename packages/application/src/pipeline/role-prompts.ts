@@ -3,7 +3,7 @@ import { ACCEPTANCE_MANIFEST_PATH, usesBaseScore } from '../acceptance/acceptanc
 import { DECISION_REQUEST_PATH } from './decision-request.ts';
 import { formatSpecSections } from '../spec/render-spec-body.ts';
 import { fenced, inlineCode } from './markdown.ts';
-import type { RepositoryCoordinates } from './pipeline-settings.ts';
+import type { GateSettings, NamedCommand, RepositoryCoordinates } from './pipeline-settings.ts';
 
 const PARAGRAPH = '\n\n';
 const JSON_INFO = 'json';
@@ -21,6 +21,7 @@ export const ROLE_PROMPT_PLACEHOLDERS = {
   diff: 'diff',
   decisionRequest: 'decisionRequest',
   issueTypes: 'issueTypes',
+  gate: 'gate',
 } as const;
 
 const RUNNER_DESCRIPTIONS: Readonly<Record<TestRunner, string>> = {
@@ -32,6 +33,7 @@ const RUNNER_DESCRIPTIONS: Readonly<Record<TestRunner, string>> = {
 };
 const LIST_SEPARATOR = ', ';
 const LAST_SEPARATOR = ' or ';
+const FROZEN_CHECKS_STEP = 'the frozen acceptance checks';
 
 export interface CheckContent {
   readonly path: string;
@@ -58,6 +60,15 @@ export function runnersValue(): string {
   return `${descriptions.slice(0, -1).join(LIST_SEPARATOR)}${LAST_SEPARATOR}${descriptions.at(-1) ?? ''}`;
 }
 
+function gateStep(command: NamedCommand): string {
+  return command.network === undefined ? inlineCode(command.run) : `${inlineCode(command.run)} (with network access: ${command.network.reason})`;
+}
+
+/** The gate's steps in the order the factory runs them, each command with the network access the project grants it. */
+export function gateValue(gate: GateSettings): string {
+  return [...gate.commandsBeforeAcceptance.map(gateStep), FROZEN_CHECKS_STEP, ...gate.commandsAfterAcceptance.map(gateStep)].join(LIST_SEPARATOR);
+}
+
 /** The issue type ids a challenger may propose, in the project's order. */
 export function issueTypesValue(typology: IssueTypology): string {
   return typology.ids().join(LIST_SEPARATOR);
@@ -76,12 +87,14 @@ export function implementerValues(
   repository: RepositoryCoordinates,
   spec: IssueSpec,
   checks: readonly CheckContent[],
+  gate: GateSettings,
 ): RolePromptValues {
   return {
     [ROLE_PROMPT_PLACEHOLDERS.repository]: repositoryValue(repository),
     [ROLE_PROMPT_PLACEHOLDERS.spec]: specValue(spec),
     [ROLE_PROMPT_PLACEHOLDERS.checks]: checksValue(checks),
     [ROLE_PROMPT_PLACEHOLDERS.decisionRequest]: inlineCode(DECISION_REQUEST_PATH),
+    [ROLE_PROMPT_PLACEHOLDERS.gate]: gateValue(gate),
   };
 }
 
@@ -91,7 +104,12 @@ export function reviewerValues(
   checks: readonly CheckContent[],
   diff: string,
 ): RolePromptValues {
-  return { ...implementerValues(repository, spec, checks), [ROLE_PROMPT_PLACEHOLDERS.diff]: diff };
+  return {
+    [ROLE_PROMPT_PLACEHOLDERS.repository]: repositoryValue(repository),
+    [ROLE_PROMPT_PLACEHOLDERS.spec]: specValue(spec),
+    [ROLE_PROMPT_PLACEHOLDERS.checks]: checksValue(checks),
+    [ROLE_PROMPT_PLACEHOLDERS.diff]: diff,
+  };
 }
 
 export function scoreOutputAddendum(type: IssueTypeDefinition): string | null {

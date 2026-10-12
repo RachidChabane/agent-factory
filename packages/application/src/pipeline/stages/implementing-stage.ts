@@ -135,7 +135,7 @@ export class ImplementingStage implements PipelineStage {
     if (plan.correction !== null) return implementerCorrectionPrompt(spec, plan.correction);
     const { dependencies, settings } = context.toolkit;
     const checks = await readCheckContents(context, worktree, frozen);
-    const rendered = dependencies.roles.render('implementer', implementerValues(settings.repository, spec, checks));
+    const rendered = dependencies.roles.render('implementer', implementerValues(settings.repository, spec, checks, settings.gate));
     if (answered !== null) return withAddendum(rendered, answeredDecisionAddendum(decisionText(answered.request), answered.answer));
     const rewrite = context.journal.checkRewrites.at(-1);
     if (plan.mode === 'initial' && rewrite !== undefined && rewrite.nextAttempt === plan.attempt) {

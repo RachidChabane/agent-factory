@@ -9,6 +9,13 @@ import { FileRolePromptCatalog, placeholdersOf, RolePromptMissingError, UnknownP
 
 const PLUGIN_ROLES_DIRECTORY = fileURLToPath(new URL('../../../plugin/roles/', import.meta.url));
 const REPOSITORY = { owner: 'acme', name: 'widgets' };
+const GATE = {
+  commandsBeforeAcceptance: [{ name: 'lint', run: 'npm run lint' }],
+  commandsAfterAcceptance: [{ name: 'schemas', run: 'npm run check:schemas', network: { reason: 'downloads the schemas it validates against' } }],
+  commandTimeoutMs: 600_000,
+  environment: {},
+  niceness: 10,
+};
 const SPEC: IssueSpec = {
   number: 42,
   title: 'Link mockups to their conversation',
@@ -56,7 +63,7 @@ describe('FileRolePromptCatalog', () => {
     const checks = [{ path: 'app/e2e/link.spec.ts', content: 'test()' }];
     const rendered = [
       catalog.render('acceptance-author', { ...acceptanceAuthorValues(REPOSITORY, SPEC, DEFAULT_PROJECT_CONVENTIONS.typology.get('ui')) }),
-      catalog.render('implementer', { ...implementerValues(REPOSITORY, SPEC, checks) }),
+      catalog.render('implementer', { ...implementerValues(REPOSITORY, SPEC, checks, GATE) }),
       catalog.render('reviewer', { ...reviewerValues(REPOSITORY, SPEC, checks, 'diff --git a/x b/x') }),
     ];
     for (const prompt of rendered) {
@@ -65,6 +72,9 @@ describe('FileRolePromptCatalog', () => {
       expect(prompt).toContain('# Issue #42: Link mockups to their conversation (type ui)');
     }
     expect(rendered[2]).toContain('diff --git a/x b/x');
+    expect(rendered[1]).toContain(
+      'runs the repository\'s gate in a sandbox of its own: `npm run lint`, the frozen acceptance checks, `npm run check:schemas` (with network access: downloads the schemas it validates against).',
+    );
   });
 
   it('renders the shipped auditor and challenger templates with their values', async () => {
