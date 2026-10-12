@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  scan:
+    name: Denylist and secret scan
+    # A private repository runs on the maintainer's self-hosted macOS runner; a public one on GitHub's runners.
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","mac-mini"]') || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Install the pinned scanners
+        run: |
+          script/install-tool gitleaks >> "$GITHUB_PATH"
+          script/install-tool actionlint >> "$GITHUB_PATH"
+      - name: Lint the workflows
+        run: actionlint
+      - name: Scan the working tree and the whole history
+        run: script/scan

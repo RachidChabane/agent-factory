@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared by the scripts that start heavy work (installs, builds, test suites, browsers).
 # Sourcing it refuses to continue while the machine is short of memory, and
 # `run_heavy` runs a command at a lower scheduling priority.
