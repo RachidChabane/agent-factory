@@ -566,7 +566,9 @@ export const AuditViewSchema = z.object({
   branch: z.string().nullable(),
   state: z.enum(AUDIT_STATES),
   detectedAt: IsoDateTimeSchema,
-  changedFiles: z.array(z.string()),
+  /** The files the change touched, as read from the forge; null until they are read. */
+  changedFiles: z.array(z.string()).nullable(),
+  /** The issue type whose paths the change touches first, once its files are read. */
   suggestedType: IssueTypeIdSchema.nullable(),
   releaseId: z.string().nullable(),
   conclusion: AuditConclusionViewSchema.nullable(),
