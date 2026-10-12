@@ -74,6 +74,23 @@ describe('rehearsal on a local forge', () => {
   );
 
   it(
+    'creates an issue as a draft, or validated when the operator orders it started',
+    async () => {
+      const source = join(home, 'source');
+      await mkdir(source);
+      seedRepository(source, null);
+      expect(await runCli(['rehearsal', 'init', source], context())).toBe(0);
+      await writeFile(join(home, 'spec.md'), SPEC_FILE);
+      expect(await runCli(['issue', 'create', 'spec.md'], context())).toBe(0);
+      expect(captured.lines.at(-1)).toBe('gadgets#1 created on the local forge of acme/gadgets (' + `${home}/projects/gadgets/forge) [factory, type:infra]; validate it (spec:validated) once you have reviewed it`);
+      expect(await runCli(['issue', 'create', 'spec.md', '--start'], context())).toBe(0);
+      expect(captured.lines.at(-1)).toBe('gadgets#2 created on the local forge of acme/gadgets (' + `${home}/projects/gadgets/forge) [factory, type:infra] and validated: the factory takes it at its next tick`);
+      expect(await readFile(`${home}/projects/gadgets/forge/issues/2.md`, 'utf8')).toContain('  - spec:validated');
+    },
+    REAL_GIT_TEST_TIMEOUT_MS,
+  );
+
+  it(
     'validates a clone of the local forge without asking GitHub anything',
     async () => {
       const source = join(home, 'source');

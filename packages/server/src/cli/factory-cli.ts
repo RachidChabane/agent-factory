@@ -60,7 +60,7 @@ async function dispatch({ project, command }: CommandLine, context: CliContext):
     case 'request-challenge':
       return requestChallengeCommand(command.requestId, project, context);
     case 'issue-create':
-      return issueCreateCommand(command.specPath, command.confirmed, project, context);
+      return issueCreateCommand(command.specPath, { confirmed: command.confirmed, start: command.start }, project, context);
     case 'issue-abandon':
       return issueAbandonCommand(command.issueNumber, command.reason, project, context);
     case 'pr-feedback':

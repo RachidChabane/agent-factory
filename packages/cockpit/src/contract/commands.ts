@@ -49,7 +49,8 @@ export const COMMAND_BODY_SCHEMAS = {
   'request.challenge': RequestRefSchema,
   'request.decline': RequestRefSchema.extend({ reason: z.string().min(1) }),
   'request.update-spec': RequestRefSchema.extend({ specId: z.string().min(1), spec: SpecDraftSchema }),
-  'request.accept': RequestRefSchema.extend({ specIds: z.array(z.string().min(1)).min(1) }),
+  /** `start` is the operator's explicit order to validate the created issues at once, so the factory takes them. */
+  'request.accept': RequestRefSchema.extend({ specIds: z.array(z.string().min(1)).min(1), start: z.boolean().default(false) }),
   'issue.validate-spec': IssueRefSchema,
   'issue.start': IssueRefSchema,
   'issue.pause': IssueRefSchema,

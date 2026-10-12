@@ -31,6 +31,7 @@ export const PROJECT_OPTION = '--project';
 export const IMAGES_OPTION = '--images';
 export const REQUESTER_OPTION = '--requester';
 export const CONFIRM_FLAG = '--confirm';
+export const START_FLAG = '--start';
 export const AUTHOR_OPTION = '--author';
 export const EXPECTED_HEAD_OPTION = '--expected-head';
 export const LABELS_OPTION = '--labels';
@@ -77,7 +78,7 @@ export const USAGE = [
   'Work items',
   '  request add <file> [--images <dir>] [--requester <name>]   store a product request with its images',
   '  request challenge <id>                       challenge a stored request and draft its specs, report and reply',
-  '  issue create <spec.md> [--confirm]           create an issue from a spec file; on GitHub it needs --confirm',
+  '  issue create <spec.md> [--confirm] [--start] create an issue from a spec file (on GitHub it needs --confirm); --start validates it at once',
   '  issue abandon <issue> --reason <text>        stop the factory work on an escalated issue and free its worktree',
   '  pr feedback <pull-request> <file> --author <name>   record review feedback and start a new cycle',
   '  audit <commit> [<commit>...]                 audit commits of the base branch, one at a time',
@@ -104,7 +105,7 @@ export type CliCommand =
   | { readonly kind: 'rehearsal-add-issue'; readonly specPath: string; readonly labels: readonly string[] }
   | { readonly kind: 'request-add'; readonly path: string; readonly imagesDirectory: string | null; readonly requester: string }
   | { readonly kind: 'request-challenge'; readonly requestId: string }
-  | { readonly kind: 'issue-create'; readonly specPath: string; readonly confirmed: boolean }
+  | { readonly kind: 'issue-create'; readonly specPath: string; readonly confirmed: boolean; readonly start: boolean }
   | { readonly kind: 'issue-abandon'; readonly issueNumber: number; readonly reason: string }
   | { readonly kind: 'pr-feedback'; readonly pullRequestNumber: number; readonly path: string; readonly author: string }
   | { readonly kind: 'audit'; readonly commits: readonly string[] }
@@ -241,9 +242,9 @@ function parseIssue(rest: readonly string[]): ParsedCommand {
   const [subcommand, ...arguments_] = rest;
   switch (subcommand) {
     case ISSUE_SUBCOMMANDS.create:
-      return withOptions(arguments_, [], [CONFIRM_FLAG], ({ positional, flags }) => {
+      return withOptions(arguments_, [], [CONFIRM_FLAG, START_FLAG], ({ positional, flags }) => {
         const problem = exactly(positional, ['spec file']);
-        return problem === null ? done({ kind: 'issue-create', specPath: positional[0] ?? '', confirmed: flags.has(CONFIRM_FLAG) }) : failure(problem);
+        return problem === null ? done({ kind: 'issue-create', specPath: positional[0] ?? '', confirmed: flags.has(CONFIRM_FLAG), start: flags.has(START_FLAG) }) : failure(problem);
       });
     case ISSUE_SUBCOMMANDS.abandon:
       return withOptions(arguments_, [REASON_OPTION], [], ({ positional, values }) => {

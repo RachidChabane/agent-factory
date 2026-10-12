@@ -174,7 +174,11 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
   'request.accept': command(COMMAND_BODY_SCHEMAS['request.accept'], async (body, context) => {
     const project = projectOf(context, body.project);
     const created = await acceptProposedSpecs(project.dependencies, requestDecisionSettings(project), body.requestId, body.specIds);
-    return created.length === 0 ? 'Every accepted spec already had its issue' : `Issue(s) ${created.map((issue) => `#${issue.number}`).join(LIST_SEPARATOR)} created on ${project.id}`;
+    if (created.length === 0) return 'Every accepted spec already had its issue';
+    const numbers = created.map((issue) => `#${issue.number}`).join(LIST_SEPARATOR);
+    if (!body.start) return `Issue(s) ${numbers} created on ${project.id}; validate their specs to let the factory take them`;
+    for (const issue of created) await validateSpec(project.dependencies, issue.number, context.operator, project.conventions);
+    return startedByDaemon(context, `Issue(s) ${numbers} created on ${project.id} and validated`);
   }),
   'issue.validate-spec': command(COMMAND_BODY_SCHEMAS['issue.validate-spec'], async (body, context) => {
     const project = projectOf(context, body.project);
