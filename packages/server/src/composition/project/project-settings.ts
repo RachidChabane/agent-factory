@@ -1,6 +1,7 @@
 import type { PipelineSettings, ProjectConventions, RoleProfile } from '@agent-factory/application';
 import { IssueTypology } from '@agent-factory/domain';
 import type { AgentFactoryConfig, ProjectConfig, RoleSettings } from '../../config/agent-factory-config.ts';
+import { forgeFileLinks } from './forge.ts';
 
 export type SourceEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -33,6 +34,7 @@ export function checkEnvironment(project: ProjectConfig, source: SourceEnvironme
 export function pipelineSettings(config: AgentFactoryConfig, project: ProjectConfig, source: SourceEnvironment): PipelineSettings {
   return {
     repository: project.repository,
+    fileLinks: forgeFileLinks(project, config.server.publicUrl),
     setupCommands: project.setupCommands,
     roles: {
       'acceptance-author': roleProfile(project.roles['acceptance-author']),

@@ -69,6 +69,8 @@ export interface PipelineJournal {
   readonly spec: IssueSpec | null;
   readonly branch: string | null;
   readonly worktree: Worktree | null;
+  /** The base commit the issue's latest worktree started from, kept once the worktree is released. */
+  readonly baseSha: string | null;
   readonly workspacePrepared: boolean;
   readonly manifest: AcceptanceManifest | null;
   readonly beforeProof: BeforeProofRecord | null;
@@ -113,6 +115,7 @@ function emptyJournal(issueNumber: number): Draft {
     spec: null,
     branch: null,
     worktree: null,
+    baseSha: null,
     workspacePrepared: false,
     manifest: null,
     beforeProof: null,
@@ -165,6 +168,7 @@ const REDUCERS: Readonly<Record<string, Reducer>> = {
   [PIPELINE_EVENTS.worktreeAcquired]: (journal, event) => {
     const worktree = parse(WorktreeAcquiredSchema, event);
     journal.worktree = worktree;
+    journal.baseSha = worktree.baseSha;
     journal.lastCommitSha = journal.lastCommitSha ?? worktree.baseSha;
   },
   [PIPELINE_EVENTS.workspacePrepared]: (journal, event) => {

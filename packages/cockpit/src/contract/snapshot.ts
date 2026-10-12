@@ -390,13 +390,31 @@ export const ExternalFeedbackSchema = z.object({
 });
 export type ExternalFeedback = z.infer<typeof ExternalFeedbackSchema>;
 
+/** A file the change touched; its patch is read on demand from the pull request's diff. */
 export const ChangedFileSchema = z.object({
   path: z.string(),
   additions: CountSchema,
   deletions: CountSchema,
-  patch: z.string(),
 });
 export type ChangedFile = z.infer<typeof ChangedFileSchema>;
+
+export const FilePatchSchema = z.object({
+  path: z.string(),
+  patch: z.string(),
+  /** Whether the patch was cut because the file's change is too large to show whole. */
+  truncated: z.boolean(),
+});
+export type FilePatchView = z.infer<typeof FilePatchSchema>;
+
+/** What a pull request changes, from the base it started from to its head, read from the factory's clone. */
+export const PullRequestDiffSchema = z.object({
+  pullRequestNumber: IssueNumberSchema,
+  baseSha: z.string(),
+  headSha: z.string(),
+  readAt: IsoDateTimeSchema,
+  files: z.array(FilePatchSchema),
+});
+export type PullRequestDiff = z.infer<typeof PullRequestDiffSchema>;
 
 export const CheckRunViewSchema = z.object({
   name: z.string(),

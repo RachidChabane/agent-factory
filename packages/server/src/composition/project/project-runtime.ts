@@ -5,6 +5,7 @@ import {
   FileLogArchive,
   FileRolePromptCatalog,
   GitBaseCheckouts,
+  GitObjects,
   GitSourceControl,
   GitWorktreePool,
   LayeredRolePromptCatalog,
@@ -38,6 +39,7 @@ import { baseWorkspaces } from './base-workspaces.ts';
 import { agentDeniedReadPaths, agentShellCommands, commandSandbox, knownSecretSource, projectEngineSockets } from './confinement.ts';
 import { deliveryEnvironments, monitoredEnvironments, releaseGateHealth } from './delivery.ts';
 import { openForge, projectGitEnvironment } from './forge.ts';
+import { ProjectRepository } from './project-repository.ts';
 import { localGateChecks } from './local-checks.ts';
 import { pipelineSettings } from './project-settings.ts';
 
@@ -53,6 +55,8 @@ export interface ProjectRuntime {
   readonly dependencies: PipelineDependencies;
   readonly forge: GitHubGateway;
   readonly checkouts: BaseCheckouts;
+  /** The commits of the project's repository, read from the factory's clone. */
+  readonly repository: ProjectRepository;
   readonly knowledge: SourcesKnowledgePack;
   readonly delivery: readonly DeliveryEnvironment[];
   readonly releaseHealth: readonly EnvironmentHealth[];
@@ -166,6 +170,7 @@ export async function openProject(installation: InstallationContext, initial: Pr
       baseBranch: config.baseBranch,
       environment: gitEnvironment,
     }),
+    repository: new ProjectRepository(new GitObjects(config.clonePath, gitEnvironment), events, clock),
     knowledge: new SourcesKnowledgePack(config.knowledge, config.clonePath, files),
     delivery: deliveryEnvironments(config),
     releaseHealth: releaseGateHealth(config),

@@ -1,12 +1,13 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { PullRequestBodyRenderer, type PullRequestBodyInput } from './pull-request-body.ts';
+import { webForgeFileLinks } from './testing/file-links.ts';
 
 const GOLDEN = new URL('./__fixtures__/pull-request-body.golden.md', import.meta.url);
 const UPDATE_GOLDEN = process.env['UPDATE_GOLDEN'] === '1';
 
 const INPUT: PullRequestBodyInput = {
-  repository: { owner: 'acme', name: 'widgets' },
+  fileLinks: webForgeFileLinks('https://github.com', 'acme', 'widgets'),
   spec: {
     number: 42,
     title: 'Link mockups to their conversation',

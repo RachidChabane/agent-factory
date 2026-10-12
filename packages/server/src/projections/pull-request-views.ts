@@ -31,7 +31,8 @@ const RED_GREEN_ID = 'red-green';
 const EVAL_SCORES_ID = 'eval-scores';
 const ACCEPTANCE_TESTS_ID = 'acceptance-tests';
 const NO_COMMAND = 'gate';
-const NO_PATCH = '';
+/** A proof is only recorded on a worktree, so its base is always known; this never shows. */
+const NO_BASE_SHA = '';
 const FIRST_CRITERION = 1;
 
 function isImage(path: string): boolean {
@@ -55,17 +56,11 @@ function worktreePathsOf(journal: PipelineJournal, records: readonly FactoryEven
 }
 
 function changedFiles(journal: PipelineJournal): ChangedFile[] {
-  return (journal.evidence?.changes ?? []).map((change) => ({ path: change.path, additions: change.added, deletions: change.removed, patch: NO_PATCH }));
+  return (journal.evidence?.changes ?? []).map((change) => ({ path: change.path, additions: change.added, deletions: change.removed }));
 }
 
 function mean(values: readonly number[]): number {
   return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function baseShaOf(journal: PipelineJournal, records: readonly FactoryEventRecord[]): string {
-  if (journal.worktree !== null) return journal.worktree.baseSha;
-  const acquired = lastOf(records, PIPELINE_EVENTS.worktreeAcquired);
-  return WorktreeAcquiredSchema.safeParse(acquired?.payload).data?.baseSha ?? '';
 }
 
 function evidenceOf(journal: PipelineJournal, context: ProjectSnapshotContext, records: readonly FactoryEventRecord[]): Evidence[] {
@@ -99,7 +94,7 @@ function evidenceOf(journal: PipelineJournal, context: ProjectSnapshotContext, r
       command: display(command ?? NO_COMMAND),
       before: {
         outcome: proof.checksFailedOnBase ? 'failed' : 'passed',
-        sha: baseShaOf(journal, records),
+        sha: journal.baseSha ?? NO_BASE_SHA,
         log: display(logText(context, issueNumber, proof.logName)),
         summary: proof.tests.length === 0 ? null : baseRunSummary(proof.tests),
       },

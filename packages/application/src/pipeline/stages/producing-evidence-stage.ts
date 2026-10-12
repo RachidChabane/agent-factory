@@ -147,7 +147,7 @@ export class ProducingEvidenceStage implements PipelineStage {
     const gate = requireFact(journal, gateRecord(journal, attempt), 'passing gate');
     const review = requireFact(journal, reviewRecord(journal, attempt), 'review');
     return toolkit.bodies.render({
-      repository: toolkit.settings.repository,
+      fileLinks: toolkit.settings.fileLinks,
       spec,
       branch,
       baseSha: worktree.baseSha,

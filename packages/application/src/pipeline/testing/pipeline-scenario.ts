@@ -12,6 +12,7 @@ import type { PipelineDependencies } from '../pipeline-dependencies.ts';
 import { loadJournal, type PipelineJournal } from '../pipeline-journal.ts';
 import type { PipelineSettings } from '../pipeline-settings.ts';
 import { IssuePipeline, type IssuePipelineOptions } from '../run-issue.ts';
+import { webForgeFileLinks } from './file-links.ts';
 import {
   AdjustableResources,
   EventSourcedIssueStates,
@@ -91,6 +92,7 @@ export const SCENARIO_CONVENTIONS: ProjectConventions = {
 
 export const SETTINGS: PipelineSettings = {
   repository: { owner: 'acme', name: 'widgets' },
+  fileLinks: webForgeFileLinks('https://github.com', 'acme', 'widgets'),
   setupCommands: [{ name: 'install', run: SETUP_COMMAND, network: { reason: 'downloads the dependencies from the registry' } }],
   roles: {
     'acceptance-author': { model: 'sonnet', effort: 'medium', maxBudgetUsd: 2, maxTurns: 40, timeoutMs: 600_000 },

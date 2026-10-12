@@ -8,13 +8,17 @@ import {
   API_EVENTS_PATH,
   API_PROJECTS_PATH,
   API_RUNS_PATH,
+  DIFF_SEGMENT,
   EVIDENCE_SEGMENT,
   FORGE_SEGMENT,
+  PULL_REQUESTS_SEGMENT,
+  REPOSITORY_FILE_SEGMENT,
   REQUESTS_SEGMENT,
   COMMAND_TOKEN_HEADER,
   COMMAND_TOKEN_META_NAME,
   API_STATE_PATH,
   type CockpitSnapshot,
+  type PullRequestDiff,
   type TelemetrySample,
 } from '@agent-factory/cockpit';
 import { EVIDENCE_CACHE_ISSUE_PREFIX, type EventStore, type OperationLog, type RunLogStore } from '@agent-factory/application';
@@ -22,7 +26,7 @@ import type { RemoteAccessConfig } from '../config/agent-factory-config.ts';
 import { EventStreamConnection, runLogJson, type EventStreamSettings } from './event-stream.ts';
 import { identify } from './identity.ts';
 import { CommandToken } from './command-token.ts';
-import { isFile, resolveInside, sendFile } from './static-files.ts';
+import { contentTypeOf, isFile, resolveInside, sendFile } from './static-files.ts';
 
 export const INDEX_FILE = 'index.html';
 export const MAX_COMMAND_BODY_BYTES = 32 * 1024 * 1024;
@@ -53,6 +57,10 @@ export interface HttpServerDependencies {
   snapshot(): Promise<CockpitSnapshot>;
   telemetry(): Promise<TelemetrySample>;
   command(name: string, body: unknown, operator: string): Promise<CommandOutcome>;
+  /** A file as a commit of the project's repository holds it; null when the project, the commit or the file is unknown. */
+  repositoryFile(project: string, sha: string, path: string): Promise<Uint8Array | null>;
+  /** What a pull request of the factory changes, file by file; null when the project or the pull request is unknown. */
+  pullRequestDiff(project: string, pullRequestNumber: number): Promise<PullRequestDiff | null>;
 }
 
 /** Where a project keeps the files the cockpit links to. */
@@ -244,12 +252,26 @@ export class FactoryHttpServer {
     }
   }
 
-  /** Serves `/api/projects/<project>/evidence/<issue>/<path>` and `/api/projects/<project>/requests/<request>/<path>`. */
+  /**
+   * Serves `/api/projects/<project>/evidence/<issue>/<path>`, `/api/projects/<project>/requests/<request>/<path>`,
+   * `/api/projects/<project>/forge/<path>`, `/api/projects/<project>/blob/<sha>/<path>` and
+   * `/api/projects/<project>/pull-requests/<number>/diff`.
+   */
   private async projectFile(response: ServerResponse, path: string): Promise<void> {
     const [project, segment, owner, ...rest] = path.slice(API_PROJECTS_PATH.length + 1).split(PATH_SEPARATOR).map(decodeURIComponent);
     const directories = project === undefined ? null : this.settings.projectDirectories(project);
-    if (directories === null || owner === undefined) {
+    if (project === undefined || directories === null || owner === undefined) {
       sendJson(response, HTTP.notFound, { error: `no file at ${path}` });
+      return;
+    }
+    if (segment === REPOSITORY_FILE_SEGMENT && rest.length > 0) {
+      await this.repositoryFile(response, project, owner, rest.join(PATH_SEPARATOR), path);
+      return;
+    }
+    if (segment === PULL_REQUESTS_SEGMENT && POSITIVE_INTEGER.test(owner) && rest.length === 1 && rest[0] === DIFF_SEGMENT) {
+      const diff = await this.dependencies.pullRequestDiff(project, Number(owner));
+      if (diff === null) sendJson(response, HTTP.notFound, { error: `the factory knows no pull request #${owner} of ${project}` });
+      else sendJson(response, HTTP.ok, diff);
       return;
     }
     if (segment === FORGE_SEGMENT && directories.forge !== null) {
@@ -270,6 +292,22 @@ export class FactoryHttpServer {
       return;
     }
     await this.sendInside(response, requestRoot, rest.join(PATH_SEPARATOR), path);
+  }
+
+  private async repositoryFile(response: ServerResponse, project: string, sha: string, filePath: string, path: string): Promise<void> {
+    let bytes: Uint8Array | null;
+    try {
+      bytes = await this.dependencies.repositoryFile(project, sha, filePath);
+    } catch (error) {
+      sendJson(response, HTTP.badRequest, { error: errorText(error) });
+      return;
+    }
+    if (bytes === null) {
+      sendJson(response, HTTP.notFound, { error: `no file at ${path}` });
+      return;
+    }
+    response.writeHead(HTTP.ok, { 'content-type': contentTypeOf(filePath), 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=3600' });
+    response.end(bytes);
   }
 
   private async sendInside(response: ServerResponse, root: string, relativePath: string, path: string): Promise<void> {

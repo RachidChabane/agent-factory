@@ -36,8 +36,16 @@ export interface RepositoryCoordinates {
   readonly name: string;
 }
 
+/** Where the project's forge shows a file of a commit: the links of a pull request body. */
+export interface ForgeFileLinks {
+  file(sha: string, path: string): string;
+  /** The file's own bytes, for an image the body shows inline. */
+  rawFile(sha: string, path: string): string;
+}
+
 export interface PipelineSettings {
   readonly repository: RepositoryCoordinates;
+  readonly fileLinks: ForgeFileLinks;
   readonly setupCommands: readonly NamedCommand[];
   readonly roles: Readonly<Record<PipelineRole, RoleProfile>>;
   readonly implementerEscalation: EscalationProfile;

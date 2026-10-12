@@ -8,10 +8,8 @@ import type { DiffStatEntry } from './diff-stat.ts';
 import type { BeforeProofRecord, EvidenceBundle, EvidenceFile, EvidencePhase } from './journal-events.ts';
 import { inlineCode, tableCell } from './markdown.ts';
 import type { AttemptCounts } from './pipeline-journal.ts';
-import type { RepositoryCoordinates } from './pipeline-settings.ts';
+import type { ForgeFileLinks } from './pipeline-settings.ts';
 
-export const GITHUB_WEB_ORIGIN = 'https://github.com';
-export const RAW_QUERY = '?raw=true';
 export const SHORT_HASH_LENGTH = 12;
 export const SCORE_DECIMALS = 2;
 export const IMAGE_EXTENSIONS: readonly string[] = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
@@ -26,13 +24,12 @@ export const PULL_REQUEST_SECTIONS = {
 
 const PARAGRAPH = '\n\n';
 const NEWLINE = '\n';
-const PATH_SEPARATOR = '/';
 const LINK_SEPARATOR = ' · ';
 const NO_RISK = 'None reported.';
 const NOT_PRODUCED = 'not produced';
 
 export interface PullRequestBodyInput {
-  readonly repository: RepositoryCoordinates;
+  readonly fileLinks: ForgeFileLinks;
   readonly spec: IssueSpec;
   readonly branch: string;
   readonly baseSha: string;
@@ -58,18 +55,6 @@ export interface ExternalFeedbackSummary {
 
 function shortSha(sha: string): string {
   return sha.slice(0, SHORT_SHA_LENGTH);
-}
-
-function encodePath(path: string): string {
-  return path.split(PATH_SEPARATOR).map(encodeURIComponent).join(PATH_SEPARATOR);
-}
-
-export function blobUrl(repository: RepositoryCoordinates, sha: string, path: string): string {
-  return `${GITHUB_WEB_ORIGIN}/${repository.owner}/${repository.name}/blob/${sha}/${encodePath(path)}`;
-}
-
-export function rawBlobUrl(repository: RepositoryCoordinates, sha: string, path: string): string {
-  return `${blobUrl(repository, sha, path)}${RAW_QUERY}`;
 }
 
 function isImage(path: string): boolean {
@@ -109,8 +94,8 @@ function evidenceCell(input: PullRequestBodyInput, file: EvidenceFile | undefine
   if (file === undefined) return NOT_PRODUCED;
   const alt = `${file.caption}, ${phase}`;
   return isImage(file.sourcePath)
-    ? `![${alt}](${rawBlobUrl(input.repository, input.evidenceSha, file.bundlePath)})`
-    : `[${file.sourcePath}](${blobUrl(input.repository, input.evidenceSha, file.bundlePath)})`;
+    ? `![${alt}](${input.fileLinks.rawFile(input.evidenceSha, file.bundlePath)})`
+    : `[${file.sourcePath}](${input.fileLinks.file(input.evidenceSha, file.bundlePath)})`;
 }
 
 function evidenceTable(input: PullRequestBodyInput): string | null {
@@ -125,7 +110,7 @@ function evidenceTable(input: PullRequestBodyInput): string | null {
 }
 
 function logLinks(input: PullRequestBodyInput): string | null {
-  const link = (label: string, path: string): string => `[${label}](${blobUrl(input.repository, input.evidenceSha, path)})`;
+  const link = (label: string, path: string): string => `[${label}](${input.fileLinks.file(input.evidenceSha, path)})`;
   const candidates: readonly (readonly [string, string | null])[] = [
     ['before log', input.bundle.beforeLogPath],
     ['after log', input.bundle.afterLogPath],

@@ -22,6 +22,7 @@ import {
   EXIT_CODE_OK,
   GH_COMMAND_TIMEOUT_MS,
   GH_EXECUTABLE,
+  GITHUB_WEB_ORIGIN,
   LATEST_DEPLOYMENT_STATUS_COUNT,
   LISTED_ISSUE_STATE,
   MAX_COMMIT_PAGES,
@@ -72,7 +73,6 @@ const DEPLOYMENT_STATE_OF: Readonly<Record<string, DeploymentState>> = {
   inactive: 'inactive',
 };
 const NO_STATUS_STATE: DeploymentState = 'in-progress';
-const GITHUB_WEB_ORIGIN = 'https://github.com';
 const READ_METHOD = 'GET';
 const RECENT_ITEMS = 20;
 

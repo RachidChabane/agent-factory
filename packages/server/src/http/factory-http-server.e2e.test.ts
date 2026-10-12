@@ -8,6 +8,9 @@ import {
   COMMAND_TOKEN_HEADER,
   COMMAND_TOKEN_META_NAME,
   CommandRejectedSchema,
+  PullRequestDiffSchema,
+  pullRequestDiffPath,
+  repositoryFilePath,
   RunLogLineSchema,
   RunLogPageSchema,
   StreamEventSchema,
@@ -181,6 +184,22 @@ describe('the factory HTTP server end to end, with two projects', () => {
       const widgets = projectIn(snapshot, FIRST_PROJECT);
       expect(widgets.issues.find((entry) => entry.number === issue)?.state).toBe('pr-open');
       expect(widgets.pullRequests).toHaveLength(1);
+      const pullRequest = widgets.pullRequests[0];
+      const diff = PullRequestDiffSchema.parse(await (await fetch(`${base}${pullRequestDiffPath(FIRST_PROJECT, pullRequest?.number ?? 0)}`)).json());
+      expect(diff.files.map((file) => file.path)).toEqual(pullRequest?.files.map((file) => file.path));
+      const changed = diff.files[0];
+      const added = (changed?.patch.split('\n') ?? []).filter((line) => line.startsWith('+') && !line.startsWith('+++')).map((line) => line.slice(1));
+      const served = await fetch(`${base}${repositoryFilePath(FIRST_PROJECT, diff.headSha, changed?.path ?? '')}`);
+      expect(served.status).toBe(200);
+      const text = await served.text();
+      expect(added.length).toBeGreaterThan(0);
+      for (const line of added) expect(text).toContain(line);
+      const body = await (await fetch(`${base}${pullRequest?.url ?? ''}`)).text();
+      expect(body).toContain(`/api/projects/${FIRST_PROJECT}/blob/`);
+      expect(body).not.toContain('github.com');
+      expect((await fetch(`${base}${pullRequestDiffPath(FIRST_PROJECT, 999)}`)).status).toBe(404);
+      expect((await fetch(`${base}${repositoryFilePath(FIRST_PROJECT, diff.headSha, 'no/such/file.md')}`)).status).toBe(404);
+      expect((await fetch(`${base}${repositoryFilePath(FIRST_PROJECT, 'not-a-commit', 'README.md')}`)).status).toBe(400);
       expect(projectIn(snapshot, SECOND_PROJECT).issues).toEqual([]);
       expect(snapshot.runs.length).toBeGreaterThanOrEqual(3);
       expect(new Set(snapshot.runs.map((run) => run.project))).toEqual(new Set([FIRST_PROJECT]));

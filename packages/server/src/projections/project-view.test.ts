@@ -196,8 +196,8 @@ describe('the view of one project', () => {
 
     it('reports the files recorded with the evidence commit', () => {
       expect(pullRequest?.files).toEqual([
-        { path: 'app/pages/mockup.vue', additions: 4, deletions: 1, patch: '' },
-        { path: 'app/e2e/link.spec.ts', additions: 12, deletions: 0, patch: '' },
+        { path: 'app/pages/mockup.vue', additions: 4, deletions: 1 },
+        { path: 'app/e2e/link.spec.ts', additions: 12, deletions: 0 },
       ]);
     });
 

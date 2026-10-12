@@ -1,4 +1,5 @@
 export const GH_EXECUTABLE = 'gh';
+export const GITHUB_WEB_ORIGIN = 'https://github.com';
 export const GH_COMMAND_TIMEOUT_MS = 60_000;
 export const GH_ENVIRONMENT_PASSTHROUGH: readonly string[] = [
   'PATH',

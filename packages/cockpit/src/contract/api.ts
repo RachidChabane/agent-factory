@@ -7,6 +7,9 @@ export const AFTER_QUERY_PARAMETER = 'after';
 export const EVIDENCE_SEGMENT = 'evidence';
 export const REQUESTS_SEGMENT = 'requests';
 export const FORGE_SEGMENT = 'forge';
+export const REPOSITORY_FILE_SEGMENT = 'blob';
+export const PULL_REQUESTS_SEGMENT = 'pull-requests';
+export const DIFF_SEGMENT = 'diff';
 
 export const STREAM_FACTORY_EVENT = 'factory';
 export const STREAM_RUN_LOG_EVENT = 'run-log';
@@ -37,6 +40,16 @@ export function evidencePath(project: string, issueNumber: number, path: string)
 /** An attachment of a request, served from the project's requests directory. */
 export function requestAttachmentPath(project: string, requestId: string, path: string): string {
   return `${API_PROJECTS_PATH}/${encodeURIComponent(project)}/${REQUESTS_SEGMENT}/${encodeURIComponent(requestId)}/${relativePath(path)}`;
+}
+
+/** A file as a commit of the project's repository holds it, read from the factory's clone. */
+export function repositoryFilePath(project: string, sha: string, path: string): string {
+  return `${API_PROJECTS_PATH}/${encodeURIComponent(project)}/${REPOSITORY_FILE_SEGMENT}/${encodeURIComponent(sha)}/${relativePath(path)}`;
+}
+
+/** The diff of a pull request of the factory, file by file, read when asked for. */
+export function pullRequestDiffPath(project: string, pullRequestNumber: number): string {
+  return `${API_PROJECTS_PATH}/${encodeURIComponent(project)}/${PULL_REQUESTS_SEGMENT}/${pullRequestNumber}/${DIFF_SEGMENT}`;
 }
 
 /** A file of a project's local forge (its issues and pull requests), which a browser cannot open from disk. */

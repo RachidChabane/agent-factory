@@ -7,6 +7,7 @@ import { SequenceCursor } from '../http/sequence-cursor.ts';
 import { SnapshotSource } from '../snapshot/snapshot-source.ts';
 import { createDaemons, type RunningDaemons } from './installation-daemon.ts';
 import type { InstallationRuntime } from './installation/installation-runtime.ts';
+import type { ProjectRuntime } from './project/project-runtime.ts';
 import { FACTORY_INSTALL_DIRECTORY } from './install-paths.ts';
 
 export const FACTORY_LOCK_FILE = 'factory.lock';
@@ -29,6 +30,10 @@ export interface RunningFactory {
   readonly finished: Promise<void>;
 }
 
+function projectNamed(runtime: InstallationRuntime, id: string): ProjectRuntime | undefined {
+  return runtime.projects.find((candidate) => candidate.id === id);
+}
+
 /** The cockpit's HTTP server over an installation; without daemons, commands that need a running factory are refused. */
 export function createHttpServer(runtime: InstallationRuntime, daemons: RunningDaemons | null, options: RuntimeOptions = {}): FactoryHttpServer {
   const source = new SnapshotSource(runtime);
@@ -42,6 +47,8 @@ export function createHttpServer(runtime: InstallationRuntime, daemons: RunningD
       snapshot: () => source.snapshot(),
       telemetry: () => source.telemetry(),
       command: (name, body, operator) => dispatchCommand(name, body, { runtime, daemons, operator }, cursor),
+      repositoryFile: async (id, sha, path) => (await projectNamed(runtime, id)?.repository.file(sha, path)) ?? null,
+      pullRequestDiff: async (id, pullRequestNumber) => (await projectNamed(runtime, id)?.repository.pullRequestDiff(pullRequestNumber)) ?? null,
     },
     {
       host: config.server.host,
@@ -49,7 +56,7 @@ export function createHttpServer(runtime: InstallationRuntime, daemons: RunningD
       operator: runtime.operator,
       remoteAccess: config.server.remoteAccess,
       projectDirectories: (id) => {
-        const project = runtime.projects.find((candidate) => candidate.id === id);
+        const project = projectNamed(runtime, id);
         if (project === undefined) return null;
         const { directories, forge } = project.config;
         return { evidence: directories.evidence, requests: directories.requests, forge: forge.kind === 'local' ? forge.directory : null };
