@@ -13,7 +13,6 @@ export interface EnvironmentDeployments {
 
 export type HealthSamplesByCheck = ReadonlyMap<string, readonly HealthSample[]>;
 
-const UNKNOWN_ACTOR = 'unknown';
 const OUTCOME_OF: Readonly<Record<DeploymentState, Deployment['outcome']>> = {
   success: 'success',
   inactive: 'success',
@@ -28,7 +27,7 @@ function deploymentView(record: DeploymentRecord, tags: ReadonlySet<string>): De
     ref: record.ref,
     sha: record.sha,
     deployedAt: iso(record.createdAt),
-    actor: record.creator ?? UNKNOWN_ACTOR,
+    actor: record.creator,
     outcome: OUTCOME_OF[record.state],
     workflowUrl: record.logUrl,
   };

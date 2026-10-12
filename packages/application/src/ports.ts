@@ -129,6 +129,8 @@ export interface CheckRunSummary {
   readonly name: string;
   readonly conclusion: CheckConclusion;
   readonly url: string;
+  /** How long the check ran, once the forge says when it started and when it ended; null otherwise. */
+  readonly durationMs: number | null;
 }
 
 export interface CommitSummary {
@@ -174,11 +176,16 @@ export interface TagRef {
   readonly sha: string;
 }
 
+export const FORGE_PULL_REQUEST_STATES = ['open', 'closed', 'merged'] as const;
+export type ForgePullRequestState = (typeof FORGE_PULL_REQUEST_STATES)[number];
+
 export interface PullRequestDetails {
   readonly number: number;
   readonly title: string;
   readonly body: string;
   readonly authorLogin: string | null;
+  /** Closed means closed without a merge. */
+  readonly state: ForgePullRequestState;
 }
 
 export const DEPLOYMENT_STATES = ['success', 'failure', 'in-progress', 'inactive'] as const;

@@ -65,7 +65,7 @@ export function projectView(project: ProjectConfig, records: readonly FactoryEve
     ),
     releases: projectReleases(index, journals, context),
     audits: projectAudits(index, releaseOfCommits(index), context),
-    skippedChanges: projectSkippedChanges(index),
+    skippedChanges: projectSkippedChanges(index, context),
     knowledge: readings.knowledge,
     tools: readings.tools,
     settings: projectSettingsView(project),

@@ -73,4 +73,18 @@ describe('cached readings', () => {
     expect((await reading.get(new Date('2026-10-10T08:00:05.000Z'))).value).toBe(2);
     expect((await reading.get(null)).value).toBe(2);
   });
+
+  it('reads again sooner while the last value says it is about to change', async () => {
+    const clock = new ManualClock(START);
+    const values = ['pending', 'pending', 'success'];
+    const reading = new CachedReading(() => Promise.resolve(values.shift() ?? 'success'), (last) => (last === 'pending' ? 10_000 : 60_000), clock);
+    expect((await reading.get()).value).toBe('pending');
+    clock.advance(10_000);
+    expect((await reading.get()).value).toBe('pending');
+    clock.advance(10_000);
+    expect((await reading.get()).value).toBe('success');
+    clock.advance(10_000);
+    expect((await reading.get()).value).toBe('success');
+    expect((await reading.get()).readAt).toEqual(new Date(START + 20_000));
+  });
 });

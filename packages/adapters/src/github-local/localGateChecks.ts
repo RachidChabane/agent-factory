@@ -17,6 +17,8 @@ export const RUNNING_GATE_CHECK = 'gate';
 export interface LocalCheckStep {
   readonly name: string;
   readonly passed: boolean;
+  /** How long the step ran; null when it could not start. */
+  readonly durationMs: number | null;
 }
 
 export interface LocalCheckRun {
@@ -34,7 +36,7 @@ const OutcomeSchema = z.object({
   sha: z.string().min(1),
   startedAt: z.iso.datetime({ offset: true }),
   finishedAt: z.iso.datetime({ offset: true }),
-  steps: z.array(z.object({ name: z.string().min(1), passed: z.boolean() })),
+  steps: z.array(z.object({ name: z.string().min(1), passed: z.boolean(), durationMs: z.number().nonnegative().nullable().default(null) })),
 });
 type Outcome = z.infer<typeof OutcomeSchema>;
 
@@ -61,9 +63,9 @@ export class LocalGateChecks {
   async of(sha: string): Promise<readonly CheckRunSummary[]> {
     const outcome = await this.readOutcome(sha);
     const url = pathToFileURL(this.logPath(sha)).href;
-    if (outcome !== null) return outcome.steps.map((step) => ({ name: step.name, conclusion: step.passed ? 'success' : 'failure', url }));
+    if (outcome !== null) return outcome.steps.map((step) => ({ name: step.name, conclusion: step.passed ? 'success' : 'failure', url, durationMs: step.durationMs }));
     this.start(sha);
-    return [{ name: RUNNING_GATE_CHECK, conclusion: 'pending', url }];
+    return [{ name: RUNNING_GATE_CHECK, conclusion: 'pending', url, durationMs: null }];
   }
 
   /** Settles once every gate started so far has finished. */
@@ -84,7 +86,7 @@ export class LocalGateChecks {
       result = await this.runner.run(sha, this.signal);
     } catch (error) {
       if (this.signal.aborted) return;
-      result = { steps: [{ name: RUNNING_GATE_CHECK, passed: false }], log: `the gate could not run: ${error instanceof Error ? error.message : String(error)}\n` };
+      result = { steps: [{ name: RUNNING_GATE_CHECK, passed: false, durationMs: null }], log: `the gate could not run: ${error instanceof Error ? error.message : String(error)}\n` };
     }
     if (this.signal.aborted) return;
     await mkdir(this.directory, { recursive: true });

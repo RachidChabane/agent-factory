@@ -40,6 +40,8 @@ export const CheckRunsPagesSchema = z.array(
         status: z.string(),
         conclusion: z.string().nullable(),
         html_url: z.string().nullable(),
+        started_at: z.string().nullable().optional(),
+        completed_at: z.string().nullable().optional(),
       }),
     ),
   }),
@@ -86,6 +88,8 @@ export const PullRequestDetailsSchema = z.object({
   title: z.string(),
   body: z.string().nullable(),
   user: z.object({ login: z.string() }).nullable(),
+  state: z.enum(['open', 'closed']),
+  merged_at: z.string().nullable().optional(),
 });
 
 export const OpenPullRequestListSchema = z.array(

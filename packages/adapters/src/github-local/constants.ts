@@ -13,6 +13,11 @@ export const SAFE_ENVIRONMENT_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 export const ISSUE_FILE_EXTENSION = '.md';
 export const PULL_REQUEST_FILE_EXTENSION = '.json';
 export const PULL_REQUEST_BODY_EXTENSION = '.md';
+
+/** The file of a local forge that shows a pull request, relative to the forge's directory. */
+export function localPullRequestPage(number: number): string {
+  return `${LOCAL_GITHUB_DIRECTORIES.pulls}/${number}${PULL_REQUEST_BODY_EXTENSION}`;
+}
 export const COMMENTS_FILE_EXTENSION = '.json';
 export const BARE_REPOSITORY_SUFFIX = '.git';
 

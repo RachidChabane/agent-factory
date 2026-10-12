@@ -99,7 +99,7 @@ export class FakeGitHubGateway implements GitHubGateway {
   }
 
   pullRequestDetails(number: number): Promise<PullRequestDetails> {
-    return Promise.resolve(this.pullRequests.get(number) ?? { number, title: `pull request ${number}`, body: '', authorLogin: 'alice' });
+    return Promise.resolve(this.pullRequests.get(number) ?? { number, title: `pull request ${number}`, body: '', authorLogin: 'alice', state: 'merged' });
   }
 
   createIssue(title: string, body: string, labels: readonly string[]): Promise<IssueRecord> {

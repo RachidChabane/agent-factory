@@ -3,6 +3,8 @@ import type { SkillEvalCase } from '@agent-factory/domain';
 
 export const ScoreCaseSchema = z.strictObject({
   id: z.string().min(1),
+  /** What the case checks, in words, when the evaluation names it. */
+  label: z.string().min(1).optional(),
   targeted: z.boolean(),
   scores: z.array(z.number().finite()).min(1),
 });

@@ -240,11 +240,12 @@ describe('GhCliGateway', () => {
         name: 'Analyze (actions)',
         conclusion: 'success',
         url: 'https://github.com/example-org/storefront/actions/runs/28133052741/job/82551344735',
+        durationMs: 59_000,
       });
       expect(summaries.slice(-3)).toEqual([
-        { name: 'legacy/ci', conclusion: 'failure', url: 'https://ci.example/1' },
-        { name: 'legacy/lint', conclusion: 'pending', url: '' },
-        { name: 'legacy/deploy', conclusion: 'success', url: 'https://ci.example/3' },
+        { name: 'legacy/ci', conclusion: 'failure', url: 'https://ci.example/1', durationMs: null },
+        { name: 'legacy/lint', conclusion: 'pending', url: '', durationMs: null },
+        { name: 'legacy/deploy', conclusion: 'success', url: 'https://ci.example/3', durationMs: null },
       ]);
     });
 
@@ -496,7 +497,7 @@ describe('GhCliGateway', () => {
     it('reads the title, body and author of a pull request', async () => {
       const { gateway } = await gatewayWith([{ contains: [`${REPO_PATH}/pulls/280`], stdout: await readFixture('pull-detail.json') }]);
       const pull = await gateway.pullRequestDetails(280);
-      expect(pull).toMatchObject({ number: 280, title: 'Stop pulling the private analytics package into the web image' });
+      expect(pull).toMatchObject({ number: 280, title: 'Stop pulling the private analytics package into the web image', state: 'merged' });
       expect(pull.body).toContain('403 Forbidden');
       expect(pull.authorLogin).toEqual(expect.any(String));
     });

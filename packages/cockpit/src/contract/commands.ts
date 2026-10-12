@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { AGENT_ROLES, EFFORT_LEVELS } from '@agent-factory/domain';
+import { AGENT_ROLES, EFFORT_LEVELS, PAUSE_ABOVE_PRESSURE_LEVELS } from '@agent-factory/domain';
 import { AmountSchema, CountSchema, IssueNumberSchema, IssueTypeIdSchema, PercentSchema, ProjectIdSchema } from './primitives.ts';
-import { MEMORY_PRESSURES } from './vocabulary.ts';
 
 const ProjectRefSchema = z.object({ project: ProjectIdSchema });
 const RequestRefSchema = ProjectRefSchema.extend({ requestId: z.string().min(1) });
@@ -78,7 +77,7 @@ export const COMMAND_BODY_SCHEMAS = {
   'settings.update-role': ScopeSchema.extend({ change: RoleChangeSchema }),
   'settings.update-resources': z.object({
     minimumFreeMemoryPercent: PercentSchema,
-    pauseAbovePressure: z.enum(MEMORY_PRESSURES),
+    pauseAbovePressure: z.enum(PAUSE_ABOVE_PRESSURE_LEVELS),
     maxConcurrentRuns: CountSchema,
   }),
   'settings.update-budget': z.object({

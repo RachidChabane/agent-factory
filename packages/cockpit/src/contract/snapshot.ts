@@ -10,6 +10,7 @@ import {
   BRANCH_TEST_RESULTS,
   EFFORT_LEVELS,
   ISSUE_STATES,
+  PAUSE_ABOVE_PRESSURE_LEVELS,
   PAUSE_CAUSES,
   PROMOTION_POLICIES,
   PROOF_STRATEGIES,
@@ -291,7 +292,8 @@ export type CheckRunLog = z.infer<typeof CheckRunLogSchema>;
 
 export const EvalCaseScoreSchema = z.object({
   caseId: z.string(),
-  label: z.string(),
+  /** What the case checks, when the project's evaluation names its cases. */
+  label: z.string().nullable(),
   targeted: z.boolean(),
   baseScore: z.number(),
   branchScore: z.number(),
@@ -318,8 +320,9 @@ export const EvidenceSchema = z.discriminatedUnion('kind', [
     caption: z.string(),
     beforeUrl: z.string(),
     afterUrl: z.string(),
-    width: CountSchema,
-    height: CountSchema,
+    /** The image's size in pixels as its file declares it; null when the file could not be read as an image. */
+    width: CountSchema.nullable(),
+    height: CountSchema.nullable(),
   }),
   z.object({
     kind: z.literal('recording'),
@@ -453,7 +456,8 @@ export const DeploymentSchema = z.object({
   ref: z.string(),
   sha: z.string(),
   deployedAt: IsoDateTimeSchema,
-  actor: z.string(),
+  /** Who started the deployment, when the forge says. */
+  actor: z.string().nullable(),
   outcome: z.enum(DEPLOYMENT_OUTCOMES),
   workflowUrl: z.string().nullable(),
 });
@@ -493,7 +497,8 @@ export type EnvironmentView = z.infer<typeof EnvironmentViewSchema>;
 export const ReleaseCommitSchema = z.object({
   sha: z.string(),
   message: z.string(),
-  author: z.string(),
+  /** The commit's author login, when the forge says. */
+  author: z.string().nullable(),
   pullRequestNumber: IssueNumberSchema.nullable(),
   issueNumber: IssueNumberSchema.nullable(),
   attribution: z.enum(COMMIT_ATTRIBUTIONS),
@@ -565,6 +570,8 @@ export const AuditViewSchema = z.object({
   commitMessage: z.string(),
   authorLogin: z.string().nullable(),
   pullRequestNumber: IssueNumberSchema.nullable(),
+  /** The forge's page of the change's pull request. */
+  pullRequestUrl: z.string().nullable(),
   branch: z.string().nullable(),
   state: z.enum(AUDIT_STATES),
   detectedAt: IsoDateTimeSchema,
@@ -590,6 +597,8 @@ export const SkippedChangeViewSchema = z.object({
   commitMessage: z.string(),
   authorLogin: z.string().nullable(),
   pullRequestNumber: IssueNumberSchema.nullable(),
+  /** The forge's page of the change's pull request. */
+  pullRequestUrl: z.string().nullable(),
   branch: z.string().nullable(),
   recordedAt: IsoDateTimeSchema,
 });
@@ -682,7 +691,7 @@ export const InstallationSettingsViewSchema = z.object({
   defaultRoles: z.array(RoleSettingSchema),
   resources: z.object({
     minimumFreeMemoryPercent: PercentSchema,
-    pauseAbovePressure: z.enum(MEMORY_PRESSURES),
+    pauseAbovePressure: z.enum(PAUSE_ABOVE_PRESSURE_LEVELS),
     maxConcurrentRuns: CountSchema,
   }),
   notifications: z.array(NotificationChannelViewSchema),
@@ -760,7 +769,7 @@ export type ResourceSample = z.infer<typeof ResourceSampleSchema>;
 export const ResourcesViewSchema = z.object({
   sample: readingOf(ResourceSampleSchema),
   minimumFreeMemoryPercent: PercentSchema,
-  pauseAbovePressure: z.enum(MEMORY_PRESSURES),
+  pauseAbovePressure: z.enum(PAUSE_ABOVE_PRESSURE_LEVELS),
   schedulingPaused: z.boolean(),
 });
 export type ResourcesView = z.infer<typeof ResourcesViewSchema>;

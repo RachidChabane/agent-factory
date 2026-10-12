@@ -56,11 +56,11 @@ class ProjectGateRunner implements LocalCheckRunner {
         const run = await shell.run(command.run, checkout.path, accessOf(command));
         const passed = run.started && run.exitCode === 0 && !run.timedOut;
         log += logOf(command, run.started ? run.output : run.reason, run.started ? run.exitCode : null);
-        if (!passed) return { steps: [...steps, { name: command.name, passed: false }], log };
+        if (!passed) return { steps: [...steps, { name: command.name, passed: false, durationMs: run.started ? run.durationMs : null }], log };
       }
       for (const command of [...project.gate.commandsBeforeAcceptance, ...project.gate.commandsAfterAcceptance]) {
         const run = await shell.run(command.run, checkout.path, accessOf(command));
-        steps.push({ name: command.name, passed: run.started && run.exitCode === 0 && !run.timedOut });
+        steps.push({ name: command.name, passed: run.started && run.exitCode === 0 && !run.timedOut, durationMs: run.started ? run.durationMs : null });
         log += logOf(command, run.started ? run.output : run.reason, run.started ? run.exitCode : null);
       }
       return { steps, log };

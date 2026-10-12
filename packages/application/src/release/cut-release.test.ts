@@ -26,7 +26,7 @@ async function setup(health = HEALTHY) {
   await watchReleases({ events, github }, 'main', MODEL);
   github.openPullRequests = [releasePullRequest('h1')];
   await watchReleases({ events, github }, 'main', MODEL);
-  github.checkRuns = [{ name: 'ci', conclusion: 'success', url: 'https://example.invalid/ci' }];
+  github.checkRuns = [{ name: 'ci', conclusion: 'success', url: 'https://example.invalid/ci', durationMs: null }];
   return { events, github, cut: new CutRelease({ events, github, health, rules: attributionRules(DEFAULT_PROJECT_CONVENTIONS) }) };
 }
 
@@ -53,7 +53,7 @@ describe('cutting a release on operator order', () => {
   it('records the moved head before evaluating, and refuses while checks run on it', async () => {
     const { events, github, cut } = await setup();
     github.openPullRequests = [releasePullRequest('h2')];
-    github.checkRuns = [{ name: 'ci', conclusion: 'pending', url: 'https://example.invalid/ci' }];
+    github.checkRuns = [{ name: 'ci', conclusion: 'pending', url: 'https://example.invalid/ci', durationMs: null }];
     await expect(cut.cut({ releaseId: 'pr-31', operator: 'alex' })).rejects.toThrow('checks still running: ci (pending)');
     expect(events.typesOf('release/pr-31').filter((type) => type === RELEASE_DETECTED_EVENT)).toHaveLength(2);
     expect(github.merges).toEqual([]);

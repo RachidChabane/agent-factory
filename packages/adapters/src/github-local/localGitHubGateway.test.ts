@@ -224,7 +224,7 @@ describe('LocalGitHubGateway', () => {
         LocalPullRequestRefusedError,
       );
       await github.updatePullRequestBody(2, 'Updated.');
-      expect(await github.pullRequestDetails(2)).toEqual({ number: 2, title: 'ci(infra): serve the domain', body: 'Updated.', authorLogin: TEST_IDENTITY.name });
+      expect(await github.pullRequestDetails(2)).toEqual({ number: 2, title: 'ci(infra): serve the domain', body: 'Updated.', authorLogin: TEST_IDENTITY.name, state: 'open' });
     });
 
     it('reports the live head of an open pull request', async () => {
@@ -414,13 +414,13 @@ describe('LocalGitHubGateway', () => {
       });
       const head = bareHead(TEST_BASE_BRANCH);
       const logUrl = pathToFileURL(join(directory, 'checks', `${head}.log`)).href;
-      expect(await github.checks(TEST_BASE_BRANCH)).toEqual([{ name: 'gate', conclusion: 'pending', url: logUrl }]);
-      expect(await github.checks(head)).toEqual([{ name: 'gate', conclusion: 'pending', url: logUrl }]);
-      finish({ steps: [{ name: 'lint', passed: true }, { name: 'unit', passed: false }], log: '$ npm test\n1 failing\n' });
+      expect(await github.checks(TEST_BASE_BRANCH)).toEqual([{ name: 'gate', conclusion: 'pending', url: logUrl, durationMs: null }]);
+      expect(await github.checks(head)).toEqual([{ name: 'gate', conclusion: 'pending', url: logUrl, durationMs: null }]);
+      finish({ steps: [{ name: 'lint', passed: true, durationMs: 1_200 }, { name: 'unit', passed: false, durationMs: 3_400 }], log: '$ npm test\n1 failing\n' });
       await checks.settled();
       expect(await github.checks(head)).toEqual([
-        { name: 'lint', conclusion: 'success', url: logUrl },
-        { name: 'unit', conclusion: 'failure', url: logUrl },
+        { name: 'lint', conclusion: 'success', url: logUrl, durationMs: 1_200 },
+        { name: 'unit', conclusion: 'failure', url: logUrl, durationMs: 3_400 },
       ]);
       expect(runs).toEqual([head]);
       expect(await readFile(join(directory, 'checks', `${head}.log`), 'utf8')).toBe('$ npm test\n1 failing\n');
@@ -431,7 +431,7 @@ describe('LocalGitHubGateway', () => {
       const head = bareHead(TEST_BASE_BRANCH);
       await github.checks(head);
       await checks.settled();
-      expect(await github.checks(head)).toEqual([{ name: 'gate', conclusion: 'failure', url: pathToFileURL(join(directory, 'checks', `${head}.log`)).href }]);
+      expect(await github.checks(head)).toEqual([{ name: 'gate', conclusion: 'failure', url: pathToFileURL(join(directory, 'checks', `${head}.log`)).href, durationMs: null }]);
       expect(await readFile(join(directory, 'checks', `${head}.log`), 'utf8')).toContain('the clean checkout could not be prepared');
     });
   });

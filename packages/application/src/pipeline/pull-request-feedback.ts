@@ -1,5 +1,5 @@
-import { decideNextAttempt } from '@agent-factory/domain';
-import type { EscalationProfile, IssueState, ReviewFinding } from '@agent-factory/domain';
+import { decideNextAttempt, FEEDBACK_STATES } from '@agent-factory/domain';
+import type { EscalationProfile, ReviewFinding } from '@agent-factory/domain';
 import type { Clock } from '../ports.ts';
 import { reviewFailureSummary } from './failure-summary.ts';
 import { PIPELINE_EVENTS, type ExternalFeedbackRecord } from './journal-events.ts';
@@ -9,7 +9,6 @@ import type { PipelineDependencies } from './pipeline-dependencies.ts';
 import { currentAttempt, loadJournal } from './pipeline-journal.ts';
 import { attemptHistory } from './retry.ts';
 
-export const FEEDBACK_STATES: readonly IssueState[] = ['pr-open', 'ci'];
 export const FEEDBACK_FINDING_CATEGORY = 'correctness';
 export const BLOCKING = 'blocking';
 

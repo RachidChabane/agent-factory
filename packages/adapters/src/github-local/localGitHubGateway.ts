@@ -271,7 +271,7 @@ export class LocalGitHubGateway implements GitHubGateway {
 
   async pullRequestDetails(number: number): Promise<PullRequestDetails> {
     const pullRequest = await this.requirePullRequest(number);
-    return { number, title: pullRequest.title, body: await this.files.readPullRequestBody(number), authorLogin: pullRequest.author };
+    return { number, title: pullRequest.title, body: await this.files.readPullRequestBody(number), authorLogin: pullRequest.author, state: pullRequest.state };
   }
 
   private refOf(pullRequest: PullRequestFile, headSha: string): PullRequestRef {

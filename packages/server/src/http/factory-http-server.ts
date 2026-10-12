@@ -17,7 +17,7 @@ import {
   type CockpitSnapshot,
   type TelemetrySample,
 } from '@agent-factory/cockpit';
-import type { EventStore, OperationLog, RunLogStore } from '@agent-factory/application';
+import { EVIDENCE_CACHE_ISSUE_PREFIX, type EventStore, type OperationLog, type RunLogStore } from '@agent-factory/application';
 import type { RemoteAccessConfig } from '../config/agent-factory-config.ts';
 import { EventStreamConnection, runLogJson, type EventStreamSettings } from './event-stream.ts';
 import { identify } from './identity.ts';
@@ -39,7 +39,6 @@ const API_PREFIX = '/api/';
 const PATH_SEPARATOR = '/';
 const NO_SEQUENCE = 0;
 const COCKPIT_NOT_BUILT = 'the cockpit is not built; run "pnpm --filter @agent-factory/cockpit build"';
-const ISSUE_EVIDENCE_PREFIX = 'issue-';
 const INTEGER = /^\d+$/;
 const POSITIVE_INTEGER = /^[1-9]\d*$/;
 export interface CommandOutcome {
@@ -262,7 +261,7 @@ export class FactoryHttpServer {
       return;
     }
     if (segment === EVIDENCE_SEGMENT && POSITIVE_INTEGER.test(owner)) {
-      await this.sendInside(response, join(directories.evidence, `${ISSUE_EVIDENCE_PREFIX}${owner}`), rest.join(PATH_SEPARATOR), path);
+      await this.sendInside(response, join(directories.evidence, `${EVIDENCE_CACHE_ISSUE_PREFIX}${owner}`), rest.join(PATH_SEPARATOR), path);
       return;
     }
     const requestRoot = segment === REQUESTS_SEGMENT ? resolveInside(directories.requests, owner) : null;

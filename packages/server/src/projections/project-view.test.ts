@@ -7,6 +7,7 @@ import { issueJournals } from './issue-views.ts';
 import { projectView, type ProjectReadingsView } from './project-view.ts';
 import { proofLogExcerpt } from './pull-request-views.ts';
 import { pendingQuestions, projectRuns, recordedRuns } from './run-views.ts';
+import { imageKey, type ProjectSnapshotContext } from './snapshot-context.ts';
 import { COST_SETTINGS, GENERATED_AT, PROJECT, projectContext, projectHistory, type ProjectHistory } from './testing/project-history.ts';
 
 const READINGS: ProjectReadingsView = { forgeUrl: 'https://github.com/acme/widgets', workflows: null, deployments: () => null, knowledge: [], tools: [] };
@@ -95,8 +96,8 @@ describe('the view of one project', () => {
     const history = projectHistory();
     const at = new Date('2026-10-09T11:59:00.000Z');
     const context = projectContext(history, {
-      pullRequestChecks: new Map([[100, { value: [{ name: 'ci', conclusion: 'success', url: 'https://github.com/acme/widgets/actions/runs/1' }, { name: 'pr-title', conclusion: 'failure', url: 'https://github.com/acme/widgets/actions/runs/2' }], readAt: at, error: null }]]),
-      baseChecks: { value: [{ name: 'pr-title', conclusion: 'failure', url: 'https://github.com/acme/widgets/actions/runs/0' }], readAt: at, error: null },
+      pullRequestChecks: new Map([[100, { value: [{ name: 'ci', conclusion: 'success', url: 'https://github.com/acme/widgets/actions/runs/1', durationMs: null }, { name: 'pr-title', conclusion: 'failure', url: 'https://github.com/acme/widgets/actions/runs/2', durationMs: null }], readAt: at, error: null }]]),
+      baseChecks: { value: [{ name: 'pr-title', conclusion: 'failure', url: 'https://github.com/acme/widgets/actions/runs/0', durationMs: null }], readAt: at, error: null },
     });
     const pullRequest = viewOf(history, context).view.pullRequests[0];
     expect(pullRequest?.checks.value?.map((check) => [check.name, check.conclusion, check.failsOnBase])).toEqual([
@@ -109,8 +110,33 @@ describe('the view of one project', () => {
   });
 
   it('titles a pull request as the forge records it', () => {
-    const titled = viewOf(projectHistory(), projectContext(projectHistory(), { pullRequestTitles: new Map([[100, 'feat(app): link mockups to their conversation page']]) }));
+    const titled = viewOf(projectHistory(), projectContext(projectHistory(), { pullRequestsOnForge: new Map([[100, { title: 'feat(app): link mockups to their conversation page', state: 'open' }]]) }));
     expect(titled.view.pullRequests[0]?.title).toBe('feat(app): link mockups to their conversation page');
+  });
+
+  it('shows a pull request the forge closed without a merge as closed, with nothing left to block', () => {
+    const closed = viewOf(projectHistory(), projectContext(projectHistory(), { pullRequestsOnForge: new Map([[100, { title: 'feat(app): link mockups', state: 'closed' }]]) }));
+    expect(closed.view.pullRequests[0]).toMatchObject({ state: 'closed', mergeable: false, mergeBlockers: [] });
+  });
+
+  it('shows a pull request the forge merged as merged, even before the factory records the merge', () => {
+    const merged = viewOf(projectHistory(), projectContext(projectHistory(), { pullRequestsOnForge: new Map([[100, { title: 'feat(app): link mockups', state: 'merged' }]]) }));
+    expect(merged.view.pullRequests[0]).toMatchObject({ state: 'merged', mergeable: false, mergeBlockers: [] });
+  });
+
+  it('sizes an evidence image as its file declares, and says nothing of a size it could not read', () => {
+    const imageOf = (sizes: ProjectSnapshotContext['imageSizes']) =>
+      viewOf(projectHistory(), projectContext(projectHistory(), { imageSizes: sizes })).view.pullRequests[0]?.evidence.find((evidence) => evidence.kind === 'image-compare');
+    expect(imageOf(new Map([[imageKey(42, 'after/app/test-results/link.png'), { width: 1280, height: 720 }]]))).toMatchObject({ width: 1280, height: 720 });
+    expect(imageOf(new Map())).toMatchObject({ width: null, height: null });
+  });
+
+  it('carries how long each check ran, as the forge reports it', () => {
+    const at = new Date('2026-10-09T11:59:00.000Z');
+    const context = projectContext(projectHistory(), {
+      pullRequestChecks: new Map([[100, { value: [{ name: 'ci', conclusion: 'success', url: 'https://github.com/acme/widgets/actions/runs/1', durationMs: 84_000 }], readAt: at, error: null }]]),
+    });
+    expect(viewOf(projectHistory(), context).view.pullRequests[0]?.checks.value?.[0]?.durationMs).toBe(84_000);
   });
 
   it('shows a release pull request as open until the operator cuts it, then as cut with its gate', () => {

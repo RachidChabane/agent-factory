@@ -277,8 +277,8 @@ describe('the factory HTTP server end to end, with two projects', () => {
     expect(events.filter((type) => type === 'settings.changed')).toHaveLength(4);
 
     const critical = await post('settings.update-resources', { minimumFreeMemoryPercent: 35, pauseAbovePressure: 'critical', maxConcurrentRuns: 1 });
-    expect(critical.status).toBe(409);
-    expect(CommandRejectedSchema.parse(await critical.json()).error).toContain('critical');
+    expect(critical.status).toBe(400);
+    expect(JSON.stringify(await critical.json())).toContain('pauseAbovePressure');
     const beyondCeiling = await post('settings.update-concurrency', { project: SECOND_PROJECT, issues: 9, ceiling: 3 });
     expect(beyondCeiling.status).toBe(409);
     expect(await readFile(rehearsal.config.configPath, 'utf8')).toBe(text);

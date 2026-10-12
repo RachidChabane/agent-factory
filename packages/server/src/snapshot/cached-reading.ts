@@ -9,6 +9,9 @@ export interface Observed<Value> {
 
 export const NEVER_READ: Observed<never> = { value: null, readAt: null, error: null };
 
+/** How long a reading stays fresh: a fixed interval, or one chosen from the last value read, null before any. */
+export type ReadInterval<Value> = number | ((last: Value | null) => number);
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -19,22 +22,23 @@ function message(error: unknown): string {
  */
 export class CachedReading<Value> {
   private readonly read: () => Promise<Value>;
-  private readonly intervalMs: number;
+  private readonly interval: ReadInterval<Value>;
   private readonly clock: Clock;
   private observed: Observed<Value> = NEVER_READ;
   private attemptedAt: number | null = null;
   private inFlight: Promise<Observed<Value>> | null = null;
 
-  constructor(read: () => Promise<Value>, intervalMs: number, clock: Clock) {
+  constructor(read: () => Promise<Value>, interval: ReadInterval<Value>, clock: Clock) {
     this.read = read;
-    this.intervalMs = intervalMs;
+    this.interval = interval;
     this.clock = clock;
   }
 
   /** The cached value, read again first when the interval has passed or when it was read before `changedAt`. */
   get(changedAt: Date | null = null): Promise<Observed<Value>> {
     const now = this.clock.now().getTime();
-    const fresh = this.attemptedAt !== null && now - this.attemptedAt < this.intervalMs;
+    const intervalMs = typeof this.interval === 'number' ? this.interval : this.interval(this.observed.value);
+    const fresh = this.attemptedAt !== null && now - this.attemptedAt < intervalMs;
     const outdated = changedAt !== null && (this.attemptedAt === null || this.attemptedAt < changedAt.getTime());
     if (fresh && !outdated) return Promise.resolve(this.observed);
     return this.refresh();
@@ -65,19 +69,19 @@ export class CachedReading<Value> {
 export class CachedReadings<Key, Value> {
   private readonly readings = new Map<Key, CachedReading<Value>>();
   private readonly read: (key: Key) => Promise<Value>;
-  private readonly intervalMs: number;
+  private readonly interval: ReadInterval<Value>;
   private readonly clock: Clock;
 
-  constructor(read: (key: Key) => Promise<Value>, intervalMs: number, clock: Clock) {
+  constructor(read: (key: Key) => Promise<Value>, interval: ReadInterval<Value>, clock: Clock) {
     this.read = read;
-    this.intervalMs = intervalMs;
+    this.interval = interval;
     this.clock = clock;
   }
 
   get(key: Key): Promise<Observed<Value>> {
     let reading = this.readings.get(key);
     if (reading === undefined) {
-      reading = new CachedReading(() => this.read(key), this.intervalMs, this.clock);
+      reading = new CachedReading(() => this.read(key), this.interval, this.clock);
       this.readings.set(key, reading);
     }
     return reading.get();

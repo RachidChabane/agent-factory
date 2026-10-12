@@ -13,7 +13,7 @@ async function scenarioWithOpenPullRequest(): Promise<{ scenario: PipelineScenar
 describe('MergeOnOrder', () => {
   it('removes the evidence in a final commit, pushes, then squash-merges that head', async () => {
     const { scenario, head } = await scenarioWithOpenPullRequest();
-    scenario.github.checkRuns = [{ name: 'ci', conclusion: 'success', url: 'https://ci.example/1' }];
+    scenario.github.checkRuns = [{ name: 'ci', conclusion: 'success', url: 'https://ci.example/1', durationMs: null }];
     const worktree = scenario.worktree();
 
     const outcome = await scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head });
@@ -40,9 +40,9 @@ describe('MergeOnOrder', () => {
 
   it('refuses while checks fail or still run', async () => {
     const { scenario, head } = await scenarioWithOpenPullRequest();
-    scenario.github.checkRuns = [{ name: 'ci', conclusion: 'failure', url: 'https://ci.example/1' }];
+    scenario.github.checkRuns = [{ name: 'ci', conclusion: 'failure', url: 'https://ci.example/1', durationMs: null }];
     await expect(scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head })).rejects.toThrow('checks failed: ci (failure)');
-    scenario.github.checkRuns = [{ name: 'ci', conclusion: 'pending', url: 'https://ci.example/1' }];
+    scenario.github.checkRuns = [{ name: 'ci', conclusion: 'pending', url: 'https://ci.example/1', durationMs: null }];
     await expect(scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head })).rejects.toThrow('checks still running');
     expect((await scenario.journal()).state).toBe('pr-open');
   });
@@ -50,22 +50,22 @@ describe('MergeOnOrder', () => {
   it('merges despite a check that fails the same way on the base branch, which the change did not cause', async () => {
     const { scenario, head } = await scenarioWithOpenPullRequest();
     scenario.github.checkRuns = [
-      { name: 'lint-pull-request-title', conclusion: 'failure', url: 'https://ci.example/2' },
-      { name: 'unit', conclusion: 'success', url: 'https://ci.example/3' },
+      { name: 'lint-pull-request-title', conclusion: 'failure', url: 'https://ci.example/2', durationMs: null },
+      { name: 'unit', conclusion: 'success', url: 'https://ci.example/3', durationMs: null },
     ];
-    scenario.github.baseCheckRuns = [{ name: 'lint-pull-request-title', conclusion: 'failure', url: 'https://ci.example/1' }];
+    scenario.github.baseCheckRuns = [{ name: 'lint-pull-request-title', conclusion: 'failure', url: 'https://ci.example/1', durationMs: null }];
     await scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head });
     expect(scenario.github.merges).toHaveLength(1);
   });
 
   it('tells which failing checks the change caused and which already failed on the base', () => {
     const checks = [
-      { name: 'lint', conclusion: 'failure' as const, url: '' },
-      { name: 'unit', conclusion: 'failure' as const, url: '' },
+      { name: 'lint', conclusion: 'failure' as const, url: '', durationMs: null },
+      { name: 'unit', conclusion: 'failure' as const, url: '', durationMs: null },
     ];
     const base = [
-      { name: 'lint', conclusion: 'failure' as const, url: '' },
-      { name: 'unit', conclusion: 'success' as const, url: '' },
+      { name: 'lint', conclusion: 'failure' as const, url: '', durationMs: null },
+      { name: 'unit', conclusion: 'success' as const, url: '', durationMs: null },
     ];
     expect(failingOnBase(checks, base)).toEqual(new Set(['lint']));
     expect(checksBlockingMerge(checks, base)).toBe('checks failed: unit (failure)');

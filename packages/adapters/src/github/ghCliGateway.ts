@@ -15,7 +15,7 @@ import type {
   WorkflowDispatch,
   WorkflowDispatchReceipt, WorkflowRunRecord } from '@agent-factory/application';
 import type { z } from 'zod';
-import { conclusionOfCheckRun, conclusionOfCommitStatus } from './checkConclusions.ts';
+import { checkRunDuration, conclusionOfCheckRun, conclusionOfCommitStatus, forgePullRequestState } from './checkConclusions.ts';
 import {
   ACCEPT_HEADER,
   DIFF_MEDIA_TYPE,
@@ -294,6 +294,7 @@ export class GhCliGateway implements GitHubGateway {
         name: run.name,
         conclusion: conclusionOfCheckRun(run.status, run.conclusion),
         url: run.html_url ?? '',
+        durationMs: checkRunDuration(run.started_at ?? null, run.completed_at ?? null),
       })),
     );
     const statuses = statusPages.flatMap((page) =>
@@ -301,6 +302,7 @@ export class GhCliGateway implements GitHubGateway {
         name: status.context,
         conclusion: conclusionOfCommitStatus(status.state),
         url: status.target_url ?? '',
+        durationMs: null,
       })),
     );
     return [...runs, ...statuses];
@@ -416,7 +418,7 @@ export class GhCliGateway implements GitHubGateway {
 
   async pullRequestDetails(number: number): Promise<PullRequestDetails> {
     const pull = await this.apiJson(`${this.repositoryPath}/pulls/${number}`, PullRequestDetailsSchema, `pull request #${number}`);
-    return { number: pull.number, title: pull.title, body: pull.body ?? '', authorLogin: pull.user?.login ?? null };
+    return { number: pull.number, title: pull.title, body: pull.body ?? '', authorLogin: pull.user?.login ?? null, state: forgePullRequestState(pull.state, pull.merged_at ?? null) };
   }
 
   private async summariseCommit(commit: z.infer<typeof CommitSchema>): Promise<CommitSummary> {

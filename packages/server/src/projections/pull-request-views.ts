@@ -1,4 +1,4 @@
-import type { ChangedFile, Evidence, ExternalFeedback, PullRequestView, ReviewRound } from '@agent-factory/cockpit';
+import type { ChangedFile, Evidence, ExternalFeedback, PullRequestState, PullRequestView, ReviewRound } from '@agent-factory/cockpit';
 import { acceptanceTestResults, issueSubject } from '@agent-factory/domain';
 import {
   DEFAULT_MINIMUM_TARGETED_DELTA,
@@ -22,7 +22,7 @@ import { firstOf, iso, lastOf, type EventIndex } from './event-index.ts';
 import { withoutLocalPaths } from './local-paths.ts';
 import { baseRunSummary, branchRunSummary } from './proof-summary.ts';
 import { NEVER_READ, observedView, type Observed } from '../snapshot/cached-reading.ts';
-import { logKey, type ProjectSnapshotContext } from './snapshot-context.ts';
+import { imageKey, logKey, type ForgePullRequest, type ProjectSnapshotContext } from './snapshot-context.ts';
 
 const FAILING_CONCLUSIONS: readonly CheckRunSummary['conclusion'][] = ['failure', 'cancelled'];
 const PENDING_CONCLUSION: CheckRunSummary['conclusion'] = 'pending';
@@ -78,7 +78,10 @@ function evidenceOf(journal: PipelineJournal, context: ProjectSnapshotContext, r
     const before = files.find((file) => file.sourcePath === sourcePath && file.phase === 'before');
     const after = files.find((file) => file.sourcePath === sourcePath && file.phase === 'after');
     if (before === undefined || after === undefined || !isImage(sourcePath)) return [];
-    return [{ kind: 'image-compare', id: sourcePath, title: sourcePath, caption: after.caption, beforeUrl: url(`${before.phase}/${sourcePath}`), afterUrl: url(`${after.phase}/${sourcePath}`), width: 0, height: 0 }];
+    const beforePath = `${before.phase}/${sourcePath}`;
+    const afterPath = `${after.phase}/${sourcePath}`;
+    const size = context.imageSizes.get(imageKey(issueNumber, afterPath)) ?? context.imageSizes.get(imageKey(issueNumber, beforePath)) ?? null;
+    return [{ kind: 'image-compare', id: sourcePath, title: sourcePath, caption: after.caption, beforeUrl: url(beforePath), afterUrl: url(afterPath), width: size?.width ?? null, height: size?.height ?? null }];
   });
   const evidence: Evidence[] = [...images];
   const proof = journal.beforeProof;
@@ -130,7 +133,7 @@ function evidenceOf(journal: PipelineJournal, context: ProjectSnapshotContext, r
       regressionTolerance: DEFAULT_REGRESSION_TOLERANCE,
       cases: branchReport.cases.map((entry) => ({
         caseId: entry.id,
-        label: entry.id,
+        label: entry.label ?? null,
         targeted: entry.targeted,
         baseScore: mean(baseReport.cases.find((candidate) => candidate.id === entry.id)?.scores ?? []),
         branchScore: mean(entry.scores),
@@ -174,6 +177,12 @@ function mergeBlockers(journal: PipelineJournal, checks: Observed<readonly Check
   return blockers;
 }
 
+/** Merged once the factory merged it or the forge says so; closed when the forge says it was closed without a merge. */
+function stateOf(journal: PipelineJournal, onForge: ForgePullRequest | undefined): PullRequestState {
+  if (journal.mergeSha !== null) return 'merged';
+  return onForge?.state ?? 'open';
+}
+
 export function projectPullRequests(
   journals: ReadonlyMap<number, PipelineJournal>,
   index: EventIndex,
@@ -191,26 +200,28 @@ export function projectPullRequests(
     const preExisting = failingOnBase(checks.value ?? [], context.baseChecks.value ?? []);
     const missing = journal.evidence?.bundle.missing.map((entry) => `${entry.sourcePath} (${entry.phase})`) ?? [];
     const evidenceComplete = journal.evidence !== null && missing.length === 0;
-    const blockers = journal.mergeSha === null ? mergeBlockers(journal, checks, preExisting, evidenceComplete) : ['already merged'];
+    const onForge = context.pullRequestsOnForge.get(pullRequest.number);
+    const state = stateOf(journal, onForge);
+    const blockers = state === 'open' ? mergeBlockers(journal, checks, preExisting, evidenceComplete) : [];
     views.push({
       number: pullRequest.number,
-      title: context.pullRequestTitles.get(pullRequest.number) ?? pullRequestTitle(spec, context.conventions, journal.evidence?.changes.map((change) => change.path)),
+      title: onForge?.title ?? pullRequestTitle(spec, context.conventions, journal.evidence?.changes.map((change) => change.path)),
       issueNumber: journal.issueNumber,
       type: spec.type,
       branch: journal.branch,
       url: context.links.forge(pullRequest.url),
       headSha: journal.evidenceRemoval?.headSha ?? journal.pushedHead ?? pullRequest.headSha,
-      state: journal.mergeSha === null ? 'open' : 'merged',
+      state,
       openedAt: iso(opened?.occurredAt ?? context.generatedAt),
       mergedAt: merged === null ? null : iso(merged.occurredAt),
-      checks: observedView(checks, (runs) => runs.map((check) => ({ name: check.name, conclusion: check.conclusion, url: context.links.forge(check.url), durationMs: null, failsOnBase: preExisting.has(check.name) }))),
+      checks: observedView(checks, (runs) => runs.map((check) => ({ name: check.name, conclusion: check.conclusion, url: context.links.forge(check.url), durationMs: check.durationMs, failsOnBase: preExisting.has(check.name) }))),
       evidenceComplete,
       missingEvidence: missing,
       evidence: evidenceOf(journal, context, records),
       reviewRounds: reviewRounds(journal, index),
       externalFeedback: feedbackOf(journal),
       files: changedFiles(journal),
-      mergeable: blockers.length === 0,
+      mergeable: state === 'open' && blockers.length === 0,
       mergeBlockers: blockers,
     });
   }

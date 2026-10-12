@@ -30,6 +30,7 @@ export function projectAudits(index: EventIndex, releaseOfCommit: ReadonlyMap<st
         commitMessage: audit.commitMessage,
         authorLogin: audit.authorLogin,
         pullRequestNumber: audit.pullRequestNumber,
+        pullRequestUrl: audit.pullRequestNumber === null ? null : context.links.pullRequest(audit.pullRequestNumber),
         branch: audit.pullRequestBranch,
         state: audit.state,
         detectedAt: iso(detected?.occurredAt ?? context.generatedAt),
@@ -56,7 +57,7 @@ export function projectAudits(index: EventIndex, releaseOfCommit: ReadonlyMap<st
     .sort((left, right) => right.detectedAt.localeCompare(left.detectedAt));
 }
 
-export function projectSkippedChanges(index: EventIndex): SkippedChangeView[] {
+export function projectSkippedChanges(index: EventIndex, context: ProjectSnapshotContext): SkippedChangeView[] {
   return foldSkippedChanges(auditRecords(index))
     .map((change) => ({
       commitSha: change.commitSha,
@@ -64,6 +65,7 @@ export function projectSkippedChanges(index: EventIndex): SkippedChangeView[] {
       commitMessage: change.commitMessage,
       authorLogin: change.authorLogin,
       pullRequestNumber: change.pullRequestNumber,
+      pullRequestUrl: change.pullRequestNumber === null ? null : context.links.pullRequest(change.pullRequestNumber),
       branch: change.pullRequestBranch,
       recordedAt: iso(change.recordedAt),
     }))

@@ -8,6 +8,8 @@ export const ISSUE_ESCALATION_STATE: IssueState = 'needs-human';
 export const ISSUE_ABANDONED_STATE: IssueState = 'abandoned';
 export const ISSUE_FINAL_STATES: readonly IssueState[] = [ISSUE_TERMINAL_STATE, ISSUE_ABANDONED_STATE];
 export const ISSUE_CHECK_REWRITE_STATE: IssueState = 'rewriting-check';
+/** The states in which an issue's pull request takes feedback from reviewers and from its checks. */
+export const FEEDBACK_STATES: readonly IssueState[] = ['pr-open', 'ci'];
 export const CHECK_REWRITABLE_STATES: readonly IssueState[] = [
   'checks-frozen',
   'implementing',

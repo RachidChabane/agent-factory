@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { KnowledgeDocument } from '@agent-factory/adapters';
+import { localPullRequestPage, type KnowledgeDocument } from '@agent-factory/adapters';
 import type { CockpitSnapshot, KnowledgeSourceView, ProjectView, TelemetrySample } from '@agent-factory/cockpit';
 import { evidencePath, forgeFilePath, requestAttachmentPath } from '@agent-factory/cockpit';
 import {
   acceptanceCommand,
+  EVIDENCE_CACHE_ISSUE_PREFIX,
   latestToolChecks,
   parseIssueSpec,
   parseProjectSubject,
@@ -32,11 +33,15 @@ import { issueJournals } from '../projections/issue-views.ts';
 import { withoutLocalPaths } from '../projections/local-paths.ts';
 import { proofLogExcerpt } from '../projections/pull-request-views.ts';
 import { projectRuns, recordedRuns, type RecordedRun } from '../projections/run-views.ts';
-import { logKey, type PendingIssue, type ProjectSnapshotContext, type RunLogSummary } from '../projections/snapshot-context.ts';
+import { imageKey, logKey, type ForgePullRequest, type PendingIssue, type ProjectSnapshotContext, type RunLogSummary } from '../projections/snapshot-context.ts';
 import { projectView, type ProjectViewProjection } from '../projections/project-view.ts';
 import { CachedReading, CachedReadings, NEVER_READ, observedView, type Observed } from './cached-reading.ts';
+import { ImageSizes } from './evidence-image-sizes.ts';
+import type { ImageSize } from './image-size.ts';
 
 export const FORGE_READ_INTERVAL_MS = 60_000;
+/** Checks still running are read again sooner: their conclusion is about to change. */
+export const PENDING_CHECKS_READ_INTERVAL_MS = 10_000;
 export const RESOURCES_READ_INTERVAL_MS = 10_000;
 export const KNOWLEDGE_READ_INTERVAL_MS = 5 * 60_000;
 /** A commit's files never change. */
@@ -56,6 +61,8 @@ const DAEMON_STARTED_EVENT = 'daemon.started';
 const DAEMON_STOPPED_EVENT = 'daemon.stopped';
 const FILE_URL_PREFIX = 'file://';
 const LOCAL_ISSUES_DIRECTORY = 'issues';
+const PENDING_CONCLUSION = 'pending';
+const OPEN_ON_FORGE = 'open';
 const MARKDOWN_EXTENSION = '.md';
 
 function productVersion(): string {
@@ -104,12 +111,16 @@ function splitByProject(records: readonly FactoryEventRecord[]): SplitRecords {
   return { installation, projects };
 }
 
+function checksReadInterval(last: readonly CheckRunSummary[] | null): number {
+  return last?.some((check) => check.conclusion === PENDING_CONCLUSION) === true ? PENDING_CHECKS_READ_INTERVAL_MS : FORGE_READ_INTERVAL_MS;
+}
+
 /** The readings of one project from its forge and its files, each with the time it was read. */
 class ProjectReadings {
   readonly pendingIssues: CachedReading<readonly PendingIssue[]>;
   readonly checks: CachedReadings<string, readonly CheckRunSummary[]>;
   readonly baseChecks: CachedReading<readonly CheckRunSummary[]>;
-  readonly titles: CachedReadings<number, string>;
+  readonly pullRequests: CachedReadings<number, ForgePullRequest>;
   readonly deployments: CachedReadings<string, EnvironmentDeployments>;
   readonly workflows: CachedReading<readonly WorkflowRunRecord[] | null>;
   readonly changedFiles: CachedReadings<string, readonly string[]>;
@@ -119,7 +130,7 @@ class ProjectReadings {
     const { clock } = runtime;
     const forge = project.forge;
     const { labels } = project.conventions;
-    this.pendingIssues = new CachedReading(
+    this.pendingIssues = new CachedReading<readonly PendingIssue[]>(
       async () => {
         const listed = [...(await forge.listIssues(labels.factory)), ...(await forge.listIssues(labels.validated))];
         return [...new Map(listed.map((issue) => [issue.number, issue])).values()].flatMap((issue): PendingIssue[] => {
@@ -133,10 +144,17 @@ class ProjectReadings {
       FORGE_READ_INTERVAL_MS,
       clock,
     );
-    this.checks = new CachedReadings((head) => forge.checks(head), FORGE_READ_INTERVAL_MS, clock);
+    this.checks = new CachedReadings((head) => forge.checks(head), checksReadInterval, clock);
     this.baseChecks = new CachedReading(() => forge.baseBranchChecks(), FORGE_READ_INTERVAL_MS, clock);
-    this.titles = new CachedReadings(async (number) => (await forge.pullRequestDetails(number)).title, FORGE_READ_INTERVAL_MS, clock);
-    this.deployments = new CachedReadings(
+    this.pullRequests = new CachedReadings(
+      async (number) => {
+        const details = await forge.pullRequestDetails(number);
+        return { title: details.title, state: details.state };
+      },
+      FORGE_READ_INTERVAL_MS,
+      clock,
+    );
+    this.deployments = new CachedReadings<string, EnvironmentDeployments>(
       async (target) => ({ records: await forge.deployments(target, DEPLOYMENT_HISTORY_LIMIT), tags: new Set((await forge.listTags()).map((tag) => tag.name)) }),
       FORGE_READ_INTERVAL_MS,
       clock,
@@ -160,6 +178,7 @@ export class SnapshotSource {
   private readonly version = productVersion();
   private readonly readings = new Map<string, ProjectReadings>();
   private readonly resources: CachedReading<ResourceSnapshot>;
+  private readonly imageSizes = new ImageSizes();
 
   constructor(runtime: InstallationRuntime) {
     this.runtime = runtime;
@@ -268,13 +287,13 @@ export class SnapshotSource {
     const journals = issueJournals(index);
     const pending = await readings.pendingIssues.get(records.findLast((record) => PENDING_ISSUE_EVENTS.includes(record.type))?.occurredAt ?? null);
     const checks = new Map<number, Observed<readonly CheckRunSummary[]>>();
-    const titles = new Map<number, string>();
+    const onForge = new Map<number, ForgePullRequest>();
     for (const journal of journals.values()) {
       const pullRequest = journal.pullRequest;
       if (pullRequest === null) continue;
-      const title = await readings.titles.get(pullRequest.number);
-      if (title.value !== null) titles.set(pullRequest.number, title.value);
-      if (journal.mergeSha !== null) continue;
+      const reading = await readings.pullRequests.get(pullRequest.number);
+      if (reading.value !== null) onForge.set(pullRequest.number, reading.value);
+      if (journal.mergeSha !== null || (reading.value !== null && reading.value.state !== OPEN_ON_FORGE)) continue;
       checks.set(pullRequest.number, await readings.checks.get(journal.evidenceRemoval?.headSha ?? journal.pushedHead ?? pullRequest.headSha));
     }
     const changedFiles = new Map<string, readonly string[]>();
@@ -291,11 +310,13 @@ export class SnapshotSource {
         forge: (url) => this.forgeLink(project, url),
         evidence: (number, path) => evidencePath(project.id, number, path),
         requestAttachment: (requestId, path) => requestAttachmentPath(project.id, requestId, path),
+        pullRequest: (number) => this.pullRequestUrl(project, number),
       },
       pendingIssues: pending.value ?? [],
       pullRequestChecks: checks,
       baseChecks: checks.size === 0 ? NEVER_READ : await readings.baseChecks.get(),
-      pullRequestTitles: titles,
+      pullRequestsOnForge: onForge,
+      imageSizes: await this.evidenceImageSizes(project, journals),
       logs: await this.logTails(project, journals),
       productionWorkflowUrl: productionWorkflowUrl(project.config),
       issueCosts: issueCosts(runs, project.id),
@@ -313,6 +334,24 @@ export class SnapshotSource {
       knowledge: await this.knowledgeViews(project, readings),
       tools: toolViews(projectTools(config), latestToolChecks(records), 'project'),
     });
+  }
+
+  /** The sizes of the evidence images of every issue with a pull request, by issue, phase and path. */
+  private async evidenceImageSizes(project: ProjectRuntime, journals: ReturnType<typeof issueJournals>): Promise<ReadonlyMap<string, ImageSize>> {
+    const sizes = new Map<string, ImageSize>();
+    for (const journal of journals.values()) {
+      for (const file of journal.evidence?.bundle.files ?? []) {
+        const relativePath = `${file.phase}/${file.sourcePath}`;
+        const size = await this.imageSizes.of(join(project.config.directories.evidence, `${EVIDENCE_CACHE_ISSUE_PREFIX}${journal.issueNumber}`, relativePath));
+        if (size !== null) sizes.set(imageKey(journal.issueNumber, relativePath), size);
+      }
+    }
+    return sizes;
+  }
+
+  private pullRequestUrl(project: ProjectRuntime, number: number): string {
+    const web = forgeUrl(project.config);
+    return web === null ? forgeFilePath(project.id, localPullRequestPage(number)) : `${web}/pull/${number}`;
   }
 
   private issueUrl(project: ProjectRuntime, number: number): string {

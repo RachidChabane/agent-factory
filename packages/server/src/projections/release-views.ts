@@ -16,7 +16,6 @@ import {
 import { firstOf, iso, lastOf, type EventIndex } from './event-index.ts';
 import type { ProjectSnapshotContext } from './snapshot-context.ts';
 
-const UNKNOWN_AUTHOR = 'unknown';
 const TAG_SOURCE = 'tag';
 
 function gateState(from: ReleaseState, evaluation: ReleaseEvaluatedPayload | null): ReleaseState {
@@ -86,7 +85,7 @@ export function projectReleases(index: EventIndex, journals: ReadonlyMap<number,
         return {
           sha: commit.sha,
           message: commit.message,
-          author: commit.author ?? UNKNOWN_AUTHOR,
+          author: commit.author,
           pullRequestNumber: commit.pullRequestNumber,
           issueNumber: journal?.issueNumber ?? null,
           attribution: commit.attribution,

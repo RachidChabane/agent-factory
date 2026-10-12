@@ -77,7 +77,7 @@ describe('auditMerge', () => {
   it('includes the pull request context when one exists', async () => {
     const pullRequestCommit = commit({ sha: 'p1', pullRequestNumber: 9, pullRequestBranch: 'feature/x', pullRequestLabels: [] });
     const { github, harness, dependencies } = await setup([runResult({ finalText: verdictAnswer('keep') })], [pullRequestCommit]);
-    github.pullRequests.set(9, { number: 9, title: 'Add widget', body: 'Because users asked.', authorLogin: 'bob' });
+    github.pullRequests.set(9, { number: 9, title: 'Add widget', body: 'Because users asked.', authorLogin: 'bob', state: 'merged' });
     await auditMerge(dependencies, 'p1');
     expect(harness.requests[0]?.prompt).toContain('#9 Add widget');
     expect(harness.requests[0]?.prompt).toContain('Because users asked.');
