@@ -123,6 +123,11 @@ export class FactoryDaemon {
     return this.concurrency;
   }
 
+  /** Applies a concurrency reloaded by the installation; running issues keep running. */
+  updateConcurrency(concurrency: number): void {
+    this.concurrency = concurrency;
+  }
+
   reloadConfiguration(): Promise<void> {
     const next = this.reloading.then(() => this.applyPendingSettings());
     this.reloading = next.catch(() => undefined);
