@@ -9,7 +9,12 @@ describe('identifying the operator', () => {
   it('lets the machine itself in on loopback and refuses other addresses without an identity', () => {
     expect(identify({}, '127.0.0.1', LOOPBACK_ONLY)).toEqual({ allowed: true, operator: null });
     expect(identify({}, '::1', LOOPBACK_ONLY)).toEqual({ allowed: true, operator: null });
-    expect(identify({}, '192.0.2.10', LOOPBACK_ONLY)).toMatchObject({ allowed: false });
+    expect(identify({}, '192.0.2.10', LOOPBACK_ONLY)).toEqual({ allowed: false, reason: 'requests from 192.0.2.10 are refused: remote access is off' });
+  });
+
+  it('ignores an identity header while remote access is off, since anyone can write one', () => {
+    expect(identify({ [IDENTITY_HEADER]: 'dana@example.com' }, '192.0.2.10', LOOPBACK_ONLY)).toMatchObject({ allowed: false });
+    expect(identify({ [IDENTITY_HEADER]: 'dana@example.com' }, '127.0.0.1', LOOPBACK_ONLY)).toEqual({ allowed: true, operator: null });
   });
 
   it('takes the operator from the tailnet identity header', () => {
