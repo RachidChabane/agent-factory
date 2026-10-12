@@ -21,6 +21,8 @@ import { descendantsOf, isAlive, killProcessTree } from '../testing/process-tabl
 import { createRehearsal, FIRST_PROJECT, TEST_WEBHOOK_VARIABLE, waitFor, type RehearsalEnvironment } from '../testing/rehearsal-environment.ts';
 
 const FAKE_CLAUDE = join(FACTORY_INSTALL_DIRECTORY, 'packages', 'adapters', 'src', 'claude', 'test-fixtures', 'fake-claude.ts');
+/** The fake agent does not end by itself when the factory is gone, so an agent the factory leaks behind is seen. */
+const UNWATCHED_FAKE_FLAG = '--fake-unwatched';
 const CLI = join(FACTORY_INSTALL_DIRECTORY, 'packages', 'server', 'src', 'cli', 'main.ts');
 /** How long each step may take: starting processes is slow on a loaded machine. */
 const TIMEOUT_MS = 120_000;
@@ -40,7 +42,7 @@ describe('factory start shutdown', () => {
   let cli: ChildProcess | null = null;
 
   beforeEach(async () => {
-    rehearsal = await createRehearsal({ claudeCommand: [process.execPath, FAKE_CLAUDE, '--fake-mode', 'hang'], minimumFreeMemoryPercent: 0 });
+    rehearsal = await createRehearsal({ claudeCommand: [process.execPath, FAKE_CLAUDE, '--fake-mode', 'hang', UNWATCHED_FAKE_FLAG], minimumFreeMemoryPercent: 0 });
   });
 
   afterEach(async () => {
