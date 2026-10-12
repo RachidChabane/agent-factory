@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Starts the factory and serves its cockpit; `script/start --demo` runs the demonstration on fictional projects.
+# The same as `script/factory start`, kept as the front door's verb.
+set -euo pipefail
+exec "$(dirname "$0")/factory" start "$@"
