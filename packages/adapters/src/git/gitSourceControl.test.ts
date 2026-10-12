@@ -102,6 +102,15 @@ describe('GitSourceControl', () => {
     expect(await sourceControl.changedFiles(worktree)).toEqual([]);
   });
 
+  it('lists only untracked, non-ignored files, never modified or committed ones', async () => {
+    await writeRepositoryFile(worktree.path, 'src/app.txt', 'changed\n');
+    await writeRepositoryFile(worktree.path, 'app/test/zz-probe.test.ts', 'probe\n');
+    await writeRepositoryFile(worktree.path, 'node_modules/dep/index.js', 'x\n');
+    expect(await sourceControl.untrackedFiles(worktree)).toEqual(['app/test/zz-probe.test.ts']);
+    await sourceControl.commitAll(worktree, 'feat: change');
+    expect(await sourceControl.untrackedFiles(worktree)).toEqual([]);
+  });
+
   it('produces a diff that covers modifications and untracked files', async () => {
     await writeRepositoryFile(worktree.path, 'src/app.txt', 'changed\n');
     await writeRepositoryFile(worktree.path, 'src/untracked.txt', 'brand new\n');

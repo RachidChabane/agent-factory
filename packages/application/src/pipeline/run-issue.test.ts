@@ -35,6 +35,7 @@ const HAPPY_PATH_STATES = [
   'pr-open',
 ];
 
+const SCRATCH_PATH = 'app/test/zz-probe.test.ts';
 const FILM_REPORT_PATH = '.evidence/42/films/checkout-flow/after-report.json';
 
 const BLOCKING_FINDING = {
@@ -383,6 +384,53 @@ describe('runIssue', () => {
     scenario.harness.script('acceptance-author', {
       effect: (request) => {
         scenario.authorChecks(request);
+        scenario.workspace.write(request.workingDirectory, PRODUCT_PATH, 'changed by the author');
+      },
+    });
+    const outcome = await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    expect(outcome).toMatchObject({ kind: 'needs-human', reason: `the acceptance-author changed files outside its checks: ${PRODUCT_PATH}` });
+  });
+
+  it('removes the scratch files the acceptance-author left behind, records them and carries on', async () => {
+    const scenario = new PipelineScenario();
+    scenario.harness.script('acceptance-author', {
+      effect: (request) => {
+        scenario.authorChecks(request);
+        scenario.workspace.write(request.workingDirectory, SCRATCH_PATH, 'probe');
+      },
+    });
+    const outcome = await scenario.pipeline().runIssue(ISSUE_NUMBER);
+
+    expect(outcome.kind).toBe('pr-open');
+    expect(scenario.workspace.tree(scenario.worktree().path).has(SCRATCH_PATH)).toBe(false);
+    expect(scenario.events.records.filter((event) => event.type === 'pipeline.author-scratch-files-removed')).toEqual([
+      expect.objectContaining({ payload: { paths: [SCRATCH_PATH] } }),
+    ]);
+  });
+
+  it('keeps a new file that the manifest lists as a check and records nothing', async () => {
+    const scenario = new PipelineScenario();
+    const second = 'app/e2e/second.spec.ts';
+    const manifest = { ...MANIFEST, checks: [MANIFEST.checks[0], { ...MANIFEST.checks[1], paths: [CHECK_PATH, second] }] };
+    scenario.harness.script('acceptance-author', {
+      effect: (request) => {
+        scenario.authorChecks(request, manifest);
+        scenario.workspace.write(request.workingDirectory, second, CHECK_CONTENT);
+      },
+    });
+    const outcome = await scenario.pipeline().runIssue(ISSUE_NUMBER);
+
+    expect(outcome.kind).toBe('pr-open');
+    expect(scenario.workspace.tree(scenario.worktree().path).has(second)).toBe(true);
+    expect(scenario.events.records.some((event) => event.type === 'pipeline.author-scratch-files-removed')).toBe(false);
+  });
+
+  it('still sends the issue to a human when the author modified product code besides leaving a scratch file', async () => {
+    const scenario = new PipelineScenario();
+    scenario.harness.script('acceptance-author', {
+      effect: (request) => {
+        scenario.authorChecks(request);
+        scenario.workspace.write(request.workingDirectory, SCRATCH_PATH, 'probe');
         scenario.workspace.write(request.workingDirectory, PRODUCT_PATH, 'changed by the author');
       },
     });

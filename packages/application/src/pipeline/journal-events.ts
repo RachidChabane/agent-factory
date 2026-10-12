@@ -23,6 +23,7 @@ export const PIPELINE_EVENTS = {
   agentRunFinished: 'pipeline.agent-run-finished',
   acceptanceAuthored: 'pipeline.acceptance-authored',
   beforeProofRecorded: 'pipeline.before-proof-recorded',
+  authorScratchFilesRemoved: 'pipeline.author-scratch-files-removed',
   checksFrozen: 'pipeline.checks-frozen',
   implementerAttemptFinished: 'pipeline.implementer-attempt-finished',
   gateCompleted: 'pipeline.gate-completed',
@@ -79,6 +80,10 @@ export const AuthoringRestartedSchema = z.object({
 
 export const WorkspacePreparedSchema = z.object({
   logName: z.string().min(1),
+});
+
+export const AuthorScratchFilesRemovedSchema = z.object({
+  paths: z.array(z.string().min(1)).min(1),
 });
 
 export const AgentRunStartedSchema = z.object({

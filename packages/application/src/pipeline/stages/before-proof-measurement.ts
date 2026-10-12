@@ -12,6 +12,7 @@ import type { Worktree } from '../../ports.ts';
 import type { BeforeProofRecord } from '../journal-events.ts';
 import { EscalationRequiredError } from '../pipeline-errors.ts';
 import { describeOutcome, EXIT_CODE_SUCCESS, tailLines, type ShellCommands } from '../shell-commands.ts';
+import { removeAuthorScratchFiles } from './author-scratch-files.ts';
 import type { StageContext } from './stage.ts';
 import { assertOnlyChecksChanged, issueTypeOfSpec } from './stage-support.ts';
 
@@ -28,6 +29,7 @@ export async function measureBeforeProof(context: StageContext, worktree: Worktr
   const { dependencies } = toolkit;
   await dependencies.files.remove(worktree.path, FACTORY_WORK_DIRECTORY);
   await toolkit.evidence.clearOutputs(worktree, manifest, issueTypeOfSpec(context, spec));
+  await removeAuthorScratchFiles(context, worktree, spec, manifest);
   await assertOnlyChecksChanged(context, worktree, manifest, 'the acceptance-author changed files outside its checks');
   const command = acceptanceCommand(manifest);
   if (command === null) {

@@ -168,6 +168,11 @@ export class InMemorySourceControl implements SourceControl {
     return Promise.resolve([...paths].filter((path) => tree.get(path) !== this.baseFiles.get(path)).sort());
   }
 
+  untrackedFiles(worktree: Worktree): Promise<readonly string[]> {
+    const committed = this.head(worktree).snapshot;
+    return Promise.resolve([...this.tracked(worktree).keys()].filter((path) => !committed.has(path)).sort());
+  }
+
   async diff(worktree: Worktree): Promise<string> {
     const tree = this.tracked(worktree);
     const changed = await this.changedFiles(worktree);
