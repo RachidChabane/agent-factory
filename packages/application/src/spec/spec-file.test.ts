@@ -25,7 +25,7 @@ describe('spec files', () => {
     const file = parseSpecFile(SPEC_FILE);
     expect(file.title).toBe('Serve shop.example.com from the storefront in production');
     expect(file.labels).toEqual(['type:infra-ci']);
-    expect(file.body.startsWith('## Need\nOn cutover day')).toBe(true);
+    expect(file.body.startsWith('## Need\nOn launch day')).toBe(true);
     expect(file.body.endsWith('passes on the branch.\n')).toBe(true);
     expect(specFileProblems(file)).toEqual([]);
   });

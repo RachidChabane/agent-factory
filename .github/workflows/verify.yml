@@ -45,6 +45,14 @@ jobs:
           set -f
           # shellcheck disable=SC2086 # ARGS is a list of arguments by contract; globbing is off.
           "script/$VERB" $ARGS
+      - name: Collect the files the script changed
+        if: always()
+        run: |
+          git ls-files --modified --others --exclude-standard -z | while IFS= read -r -d '' path; do
+            case "$path" in build/*) continue ;; esac
+            mkdir -p "build/verify-artifacts/changed/$(dirname "$path")"
+            cp "$path" "build/verify-artifacts/changed/$path"
+          done
       - name: Keep what the script produced for download
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
