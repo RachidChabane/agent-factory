@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { CONFIGURATION_RELOAD_FAILED_EVENT, CONFIGURATION_RELOADED_EVENT, SETTINGS_SUBJECT } from '@agent-factory/application';
+import { CONFIGURATION_RELOAD_FAILED_EVENT, CONFIGURATION_RELOADED_EVENT, DAEMON_SUBJECT, projectSubjectPrefix, SETTINGS_SUBJECT } from '@agent-factory/application';
 import { installationSettingsView } from '../projections/installation-views.ts';
 import { RehearsalAgents } from '../testing/rehearsal-agents.ts';
 import { createRehearsal, FIRST_PROJECT, waitFor, type RehearsalEnvironment } from '../testing/rehearsal-environment.ts';
@@ -28,7 +28,8 @@ describe('a hand edit of the configuration file', () => {
     });
     controller = new AbortController();
     running = createDaemons(installation).installation.run(controller.signal);
-    await waitFor(async () => ((await installation.events.read('daemon', 0)).length > 0 ? true : null), TIMEOUT_MS, 'the daemon to start');
+    // The loop reads the file for the first time at its first tick, once every project has started: an edit before that is no change.
+    await waitFor(async () => ((await installation.events.read(`${projectSubjectPrefix(FIRST_PROJECT)}${DAEMON_SUBJECT}`, 0)).length > 0 ? true : null), TIMEOUT_MS, 'the project to start');
   });
 
   afterEach(async () => {
