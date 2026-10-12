@@ -17,6 +17,7 @@ import { resolvePath, type AgentFactoryConfig, type ProjectConfig } from '../../
 import { FACTORY_INSTALL_DIRECTORY } from '../install-paths.ts';
 import type { ListeningPorts } from '../listening-ports.ts';
 import type { SourceEnvironment } from './project-settings.ts';
+import { referenceSnapshotDirectories } from './references.ts';
 
 /** The shell commands an agent of a project granted the container engine may start. */
 export const CONTAINER_ENGINE_COMMANDS: readonly string[] = ['docker *'];
@@ -115,6 +116,7 @@ export function commandSandbox(config: AgentFactoryConfig, project: ProjectConfi
     temporaryDirectories: userTemporaryDirectories(settings.platform),
     blockedPorts: () => settings.listening.ports(),
     engineSockets: projectEngineSockets(project, settings),
+    readOnlyDirectories: referenceSnapshotDirectories(project),
   });
 }
 

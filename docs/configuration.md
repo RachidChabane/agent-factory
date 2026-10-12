@@ -168,7 +168,7 @@ resolves to in `<name>@<ref>.commit` beside it. A snapshot is rebuilt only when 
 or the ref resolves to another commit, and the previous one stays until the new one is
 complete. When `source` does not hold the ref, `start` refuses to start and `validate` fails
 the project's `reference <name>` line, both naming `git -C <source> fetch --tags`. The
-agent commands that run an agent (`run-issue`, `resume`, `request`, `audit`, `pr-feedback`)
+commands that may run an agent (`run-issue`, `request challenge`, `audit`, `pr-feedback`)
 bring the snapshots up to date first, the same way.
 
 Every role of the project reads its snapshots, in Claude Code's own sandbox and in the

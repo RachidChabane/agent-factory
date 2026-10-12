@@ -5,6 +5,7 @@ import type { ProjectRuntime } from '../../composition/project/project-runtime.t
 import type { CliContext } from '../cli-context.ts';
 import { PROGRAM_NAME, PROJECT_OPTION } from '../command-line.ts';
 import { selectProject } from '../project-selection.ts';
+import { requireProjectReferences } from './project-references.ts';
 
 export interface ProjectSession {
   readonly installation: InstallationRuntime;
@@ -32,6 +33,12 @@ export async function withProjectSession<T>(context: CliContext, selected: Selec
   } finally {
     installation.close();
   }
+}
+
+/** A project session for a command that may run an agent: the snapshots of the project's references are brought up to date first, as at start. */
+export async function withAgentSession<T>(context: CliContext, selected: SelectedProject, work: (session: ProjectSession) => Promise<T>): Promise<T> {
+  await requireProjectReferences(context, [selected.project]);
+  return withProjectSession(context, selected, work);
 }
 
 /** Reads and writes the project's events without opening its forge or worktrees. */

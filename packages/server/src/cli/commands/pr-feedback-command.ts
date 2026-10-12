@@ -6,7 +6,7 @@ import type { CliContext } from '../cli-context.ts';
 import { EXIT_CODES } from '../output.ts';
 import { abortOnShutdown } from '../shutdown.ts';
 import { runningFactory, withFactoryLock } from './factory-running.ts';
-import { itemName, selectedProject, withProjectSession } from './project-session.ts';
+import { itemName, selectedProject, withAgentSession } from './project-session.ts';
 import { reportOutcome } from './run-issue-command.ts';
 
 const UTF8 = 'utf8';
@@ -15,7 +15,7 @@ const CLI_SOURCE = 'cli';
 export async function prFeedbackCommand(pullRequestNumber: number, path: string, author: string, requested: string | null, context: CliContext): Promise<number> {
   const selected = await selectedProject(context, requested);
   const body = (await readFile(resolve(context.workingDirectory, path), UTF8)).trim();
-  return withProjectSession(context, selected, async ({ installation, project }) => {
+  return withAgentSession(context, selected, async ({ installation, project }) => {
     const controller = new AbortController();
     const releaseSignals = abortOnShutdown(controller, context.output);
     try {

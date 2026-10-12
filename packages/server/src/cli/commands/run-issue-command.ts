@@ -5,7 +5,7 @@ import type { CliContext } from '../cli-context.ts';
 import { EXIT_CODES, type CliOutput } from '../output.ts';
 import { abortOnShutdown } from '../shutdown.ts';
 import { withFactoryLock } from './factory-running.ts';
-import { itemName, selectedProject, withProjectSession } from './project-session.ts';
+import { itemName, selectedProject, withAgentSession } from './project-session.ts';
 
 export function reportOutcome(project: ProjectConfig, outcome: RunIssueOutcome, output: CliOutput): number {
   const issue = itemName(project, outcome.issueNumber);
@@ -28,7 +28,7 @@ export function reportOutcome(project: ProjectConfig, outcome: RunIssueOutcome, 
 export async function runIssueCommand(issueNumber: number, requested: string | null, context: CliContext): Promise<number> {
   const selected = await selectedProject(context, requested);
   return withFactoryLock(selected.config, () =>
-    withProjectSession(context, selected, async ({ project }) => {
+    withAgentSession(context, selected, async ({ project }) => {
       const controller = new AbortController();
       const release = abortOnShutdown(controller, context.output);
       try {

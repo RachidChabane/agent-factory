@@ -5,17 +5,22 @@ import { factoryLockPath, startFactory, type RunningFactory } from '../../compos
 import type { CliContext } from '../cli-context.ts';
 import { EXIT_CODES } from '../output.ts';
 import { abortOnShutdown } from '../shutdown.ts';
+import { requireProjectReferences } from './project-references.ts';
 
 /** What runs beside the factory once it serves, such as the demonstration's own activity; it ends when the signal aborts. */
 export type CompanionTask = (runtime: InstallationRuntime, running: RunningFactory, signal: AbortSignal) => Promise<void>;
 
-/** Runs the factory on every project of the configuration and serves the cockpit until a shutdown signal. */
+/**
+ * Runs the factory on every project of the configuration and serves the cockpit until a shutdown signal. The snapshots of the
+ * projects' references are brought up to date first, and the factory does not start when one cannot be.
+ */
 export async function serveInstallation(config: AgentFactoryConfig, overrides: InstallationOverrides, context: CliContext, companion: CompanionTask | null = null): Promise<number> {
   const lock = new ProcessLock(factoryLockPath(config.directories.state));
   await lock.acquire();
   const controller = new AbortController();
   const releaseSignals = abortOnShutdown(controller, context.output);
   try {
+    await requireProjectReferences(context, config.projects);
     const runtime = await context.openInstallation(config, overrides);
     try {
       const running = await startFactory(runtime, controller.signal);

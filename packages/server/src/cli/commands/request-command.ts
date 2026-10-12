@@ -7,7 +7,7 @@ import { COMMAND_NAMES, REQUEST_SUBCOMMANDS } from '../command-line.ts';
 import { EXIT_CODES } from '../output.ts';
 import { abortOnShutdown } from '../shutdown.ts';
 import { runningFactory, withFactoryLock } from './factory-running.ts';
-import { nextCommand, selectedProject, withProjectEvents, withProjectSession, type SelectedProject } from './project-session.ts';
+import { nextCommand, selectedProject, withAgentSession, withProjectEvents, type SelectedProject } from './project-session.ts';
 
 const UTF8 = 'utf8';
 const CLI_CHANNEL = 'cli';
@@ -42,7 +42,7 @@ export async function requestAddCommand(path: string, imagesDirectory: string | 
 }
 
 async function challengeNow(requestId: string, selected: SelectedProject, context: CliContext): Promise<number> {
-  return withProjectSession(context, selected, async ({ installation, project }) => {
+  return withAgentSession(context, selected, async ({ installation, project }) => {
     const controller = new AbortController();
     const releaseSignals = abortOnShutdown(controller, context.output);
     try {

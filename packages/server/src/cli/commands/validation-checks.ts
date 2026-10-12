@@ -9,7 +9,7 @@ import {
   NonLocalRemoteError,
   RemoteLocalityGuard,
 } from '@agent-factory/adapters';
-import { PIPELINE_ROLES, requiredLabels, type CommandRunner, type ToolProber } from '@agent-factory/application';
+import { PIPELINE_ROLES, requiredLabels, type CommandRunner, type ReferenceSource, type ToolProber } from '@agent-factory/application';
 import { admitAgentRun, REQUIRED_TOOLS, type ToolProbeResult } from '@agent-factory/domain';
 import { z } from 'zod';
 import type { AgentFactoryConfig, NotificationChannelConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
@@ -17,6 +17,7 @@ import { ROLE_PROMPTS_DIRECTORY } from '../../composition/install-paths.ts';
 import type { SourceEnvironment } from '../../composition/installation/installation-context.ts';
 import { builtInTools, definedEnvironment, installationToolProber, projectToolProber, type ToolProberSettings } from '../../composition/installation/tools.ts';
 import { projectEngineSockets } from '../../composition/project/confinement.ts';
+import { openReferenceSnapshots } from '../../composition/project/references.ts';
 import { projectGitEnvironment, rehearsalRepositories } from '../../composition/project/forge.ts';
 import { projectConventions } from '../../composition/project/project-settings.ts';
 
@@ -227,6 +228,13 @@ async function knowledgeOutcome(project: ProjectConfig): Promise<CheckOutcome> {
   return missing.length === 0 ? { ok: true, detail: paths.join(', ') } : { ok: false, detail: `missing: ${missing.join(', ')}` };
 }
 
+/** Builds the snapshot of a reference, or finds it built, and says which commit the ref names; fails with the fetch that brings a missing ref in. */
+async function referenceOutcome(project: ProjectConfig, reference: ReferenceSource, settings: ValidationSettings): Promise<CheckOutcome> {
+  const snapshots = await openReferenceSnapshots(project, settings.environment, settings.runner);
+  const snapshot = await snapshots.materialise(reference);
+  return { ok: true, detail: `${snapshot.repository} at ${snapshot.ref} is commit ${snapshot.commit}, snapshot ${snapshot.change} at ${snapshot.path}` };
+}
+
 /** What confined code of the project may reach beyond its worktree, with the consequence of a container engine grant. */
 export function sandboxOutcome(project: ProjectConfig, engineSockets: readonly string[]): CheckOutcome {
   const { allowedDomains, docker } = project.sandbox;
@@ -263,6 +271,9 @@ export function projectChecks(config: AgentFactoryConfig, project: ProjectConfig
       : []),
     { name: 'prompts', severity: 'required', runsCommands: false, run: () => guarded(() => promptOverridesOutcome(project)) },
     { name: 'knowledge', severity: 'required', runsCommands: false, run: () => guarded(() => knowledgeOutcome(project)) },
+    ...project.references.map(
+      (reference): ValidationCheck => ({ name: `reference ${reference.name}`, severity: 'required', runsCommands: true, run: () => guarded(() => referenceOutcome(project, reference, settings)) }),
+    ),
     { name: 'sandbox', severity: 'optional', runsCommands: false, run: () => guarded(() => Promise.resolve(sandboxOutcome(project, projectEngineSockets(project, settings)()))) },
     ...project.tools.map((tool) => toolCheck(prober, tool.name, 'optional', `tool ${tool.name}`)),
   ];

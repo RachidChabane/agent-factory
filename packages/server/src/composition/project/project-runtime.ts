@@ -13,6 +13,7 @@ import {
   NodeWorkspaceFiles,
   SourcesKnowledgePack,
   SpawnServiceProcesses,
+  type ReferenceMounts,
 } from '@agent-factory/adapters';
 import {
   GovernedHarness,
@@ -32,6 +33,7 @@ import {
   type PipelineDependencies,
   type PipelineSettings,
   type ProjectConventions,
+  type ReferenceSnapshots,
   type SpecReader,
 } from '@agent-factory/application';
 import type { AgentFactoryConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
@@ -45,6 +47,7 @@ import { openForge, projectGitEnvironment } from './forge.ts';
 import { ProjectRepository } from './project-repository.ts';
 import { localGateChecks } from './local-checks.ts';
 import { pipelineSettings } from './project-settings.ts';
+import { openReferenceSnapshots, referenceMounts } from './references.ts';
 
 export const PROJECT_LINK_SEGMENT = 'projects';
 /** Where the services of a project's stacks write their output, under the project's logs. */
@@ -63,6 +66,8 @@ export interface ProjectRuntime {
   /** The commits of the project's repository, read from the factory's clone. */
   readonly repository: ProjectRepository;
   readonly knowledge: SourcesKnowledgePack;
+  /** The read-only snapshots of the repositories the project's specifications cite. */
+  readonly references: ReferenceSnapshots;
   readonly delivery: readonly DeliveryEnvironment[];
   readonly releaseHealth: readonly EnvironmentHealth[];
   readonly health: HealthMonitor;
@@ -80,7 +85,7 @@ function projectCockpitUrl(publicUrl: string, id: string): string {
   return `${publicUrl.replace(/\/+$/, '')}/${PROJECT_LINK_SEGMENT}/${encodeURIComponent(id)}`;
 }
 
-function baseHarness(installation: InstallationContext, project: ProjectConfig): AgentHarness {
+function baseHarness(installation: InstallationContext, project: ProjectConfig, references: ReferenceMounts): AgentHarness {
   if (installation.harnessFor !== null) return installation.harnessFor(project);
   const { config } = installation;
   return new ClaudeCodeHarness(
@@ -100,14 +105,15 @@ function baseHarness(installation: InstallationContext, project: ProjectConfig):
       shellCommands: agentShellCommands(project),
       sandboxAllowedDomains: project.sandbox.allowedDomains,
       engineSockets: projectEngineSockets(project, { platform: installation.platform, home: installation.userHome, environment: installation.environment }),
+      references,
       platform: installation.platform,
     }),
   );
 }
 
 /** Runs are recorded in the installation's log, stamped with the project, and share the installation's run slots. */
-export function projectHarness(installation: InstallationContext, project: ProjectConfig): AgentHarness {
-  const recorded = new RecordingHarness(baseHarness(installation, project), installation.events, installation.clock, installation.runLogs, project.id);
+export function projectHarness(installation: InstallationContext, project: ProjectConfig, references: ReferenceMounts): AgentHarness {
+  const recorded = new RecordingHarness(baseHarness(installation, project, references), installation.events, installation.clock, installation.runLogs, project.id);
   return new SlottedHarness(new GovernedHarness(recorded, installation.admission, installation.budget, installation.usage), installation.runSlots);
 }
 
@@ -132,6 +138,7 @@ export async function openProject(installation: InstallationContext, initial: Pr
   });
   const forge = await openForge(config, runner, environment, clock, gateChecks);
   const files = new NodeWorkspaceFiles();
+  const references = await openReferenceSnapshots(config, environment, runner);
   const specReader: SpecReader = { read: (issue) => parseIssueSpec(issue, settings.conventions) };
   const dependencies: PipelineDependencies = {
     github: forge,
@@ -145,7 +152,7 @@ export async function openProject(installation: InstallationContext, initial: Pr
       size: config.worktreePool.size,
     }),
     sourceControl: new GitSourceControl(runner, { environment: gitEnvironment, identity: config.commitIdentity, branchPrefix: config.conventions.branchPrefix }),
-    harness: projectHarness(installation, config),
+    harness: projectHarness(installation, config, referenceMounts(config, references)),
     roles: await rolePrompts(config),
     runner,
     sandbox: commandSandbox(installation.config, config, {
@@ -187,6 +194,7 @@ export async function openProject(installation: InstallationContext, initial: Pr
     }),
     repository: new ProjectRepository(new GitObjects(config.clonePath, gitEnvironment), events, clock),
     knowledge: new SourcesKnowledgePack(config.knowledge, config.clonePath, files),
+    references,
     delivery: deliveryEnvironments(config),
     releaseHealth: releaseGateHealth(config),
     health: new HealthMonitor({ events, clock }, { environments: monitoredEnvironments(config), intervalMs: config.delivery.healthIntervalMs }),

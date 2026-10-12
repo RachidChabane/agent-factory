@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { referenceSnapshotPath } from '@agent-factory/application';
 import { COCKPIT_DEV_SERVER_PORT } from '@agent-factory/cockpit';
 import { describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
@@ -11,6 +12,7 @@ import {
   agentDeniedReadPaths,
   agentShellCommands,
   commandSandbox,
+  commandWritableDirectories,
   CONTAINER_ENGINE_COMMANDS,
   credentialPaths,
   installationPrivatePaths,
@@ -18,9 +20,14 @@ import {
   projectEngineSockets,
   projectPrivatePaths,
 } from './confinement.ts';
+import { referenceSnapshotDirectories } from './references.ts';
 
 const USER_HOME = '/Users/operator';
 const HOME = `${USER_HOME}/.agent-factory`;
+const REFERENCES = [
+  { name: 'design-tokens', repository: 'example-org/design-tokens', ref: 'v1.0.0', source: '~/src/design-tokens' },
+  { name: 'icons', repository: 'example-org/icons', ref: 'v2', source: '~/src/icons' },
+];
 
 function project(id: string, forge: Record<string, unknown>, sandbox: Record<string, unknown> = {}): Record<string, unknown> {
   return { id, name: id, forge, commitIdentity: { name: 'Bot', email: 'bot@example.invalid' }, sandbox: { deniedReadPaths: ['~/.kube*'], ...sandbox } };
@@ -32,7 +39,7 @@ function configText(): string {
     claude: { writableDirectories: ['cache'], accounts: [{ name: 'primary', configDir: '~/.claude-primary' }] },
     defaults: { sandbox: { allowedDomains: ['registry.npmjs.org'], shellCommands: ['npm view *'] } },
     projects: [
-      project('storefront', { kind: 'github', repository: 'example-org/storefront' }),
+      { ...project('storefront', { kind: 'github', repository: 'example-org/storefront' }), references: REFERENCES },
       {
         ...project('ledger', { kind: 'local', repository: 'example-org/ledger' }, { docker: true, shellCommands: ['go vet *'], allowedDomains: ['proxy.golang.org'] }),
         setup: [{ name: 'install', run: 'go mod download', network: 'downloads the modules' }],
@@ -154,5 +161,77 @@ describe('the confinement of a project', () => {
     } finally {
       await rm(operator, { recursive: true, force: true });
     }
+  });
+
+  describe('the snapshots of its references', () => {
+    const snapshots = storefront.references.map((reference) => referenceSnapshotPath(storefront.directories.references, reference));
+
+    it("are named from the project's configuration alone, built or not", () => {
+      expect(snapshots).toEqual([`${storefront.directory}/references/design-tokens@v1.0.0`, `${storefront.directory}/references/icons@v2`]);
+      expect(referenceSnapshotDirectories(storefront)).toEqual(snapshots);
+      expect(referenceSnapshotDirectories(ledger)).toEqual([]);
+    });
+
+    it('are readable by the agent runs and the commands of their own project', () => {
+      const denied = [
+        ...agentDeniedReadPaths(config, storefront),
+        ...credentialPaths(storefront),
+        ...installationPrivatePaths(config),
+        ...projectPrivatePaths(storefront),
+        ...otherProjectsDirectories(config, storefront),
+      ];
+      for (const snapshot of snapshots) expect(denied.some((path) => encloses(path, `${snapshot}/icons/logo.svg`))).toBe(false);
+    });
+
+    it('are out of reach of every other project, agents and commands alike', () => {
+      for (const snapshot of snapshots) {
+        expect(agentDeniedReadPaths(config, ledger).some((path) => encloses(path, `${snapshot}/tokens.json`))).toBe(true);
+        expect(otherProjectsDirectories(config, ledger).some((path) => encloses(path, snapshot))).toBe(true);
+      }
+      const [, , profile] = commandSandbox(config, ledger, { platform: 'darwin', home: USER_HOME, environment: {}, listening: LISTENING }).confine(['true'], {
+        workingDirectory: `${ledger.worktreePool.directory}/slot-1`,
+        network: false,
+      });
+      expect(profile).toContain(`(subpath "${storefront.directory}")`);
+      for (const snapshot of snapshots) expect(profile).not.toContain(snapshot);
+    });
+
+    it('lie inside no directory a run or a command may write', () => {
+      const writable = [
+        storefront.worktreePool.directory,
+        storefront.directories.checkouts,
+        ...config.claude.writableDirectories,
+        ...commandWritableDirectories(config, storefront, 'darwin', USER_HOME),
+        ...commandWritableDirectories(config, storefront, 'linux', USER_HOME),
+      ];
+      for (const snapshot of snapshots) expect(writable.some((directory) => encloses(directory, snapshot))).toBe(false);
+    });
+
+    it('are read-only to the commands of their project on macOS: readable inside a denied directory, never writable inside a writable one', () => {
+      const profile = sandboxOf('darwin').confine(['/bin/sh', '-c', 'cp -R snapshot .'], { workingDirectory: SLOT, network: false })[2] ?? '';
+      const grants = snapshots.map((snapshot) => `(subpath "${snapshot}")`).join('\n  ');
+      expect(profile).toContain(`(allow file-read*\n  ${grants})`);
+      expect(profile).toContain(`(deny file-write*\n  ${grants})`);
+      expect(profile.lastIndexOf('(deny file-write*')).toBeGreaterThan(profile.indexOf('(allow file-write*'));
+    });
+
+    it('are bound read-only last for the commands of their project under bubblewrap', async () => {
+      const operator = await realpath(await mkdtemp(join(tmpdir(), 'factory-snapshot-confinement-')));
+      try {
+        const home = join(operator, '.agent-factory');
+        const local = parseAgentFactoryConfig(configText(), home, join(home, 'config.yaml'), operator);
+        const own = projectOf(local, 'storefront');
+        const slot = join(own.worktreePool.directory, 'slot-1');
+        await mkdir(slot, { recursive: true });
+        const [first] = referenceSnapshotDirectories(own);
+        const command = commandSandbox(local, own, { platform: 'linux', home: operator, environment: {}, listening: new ListeningPorts(factoryPorts(local.server.port)) })
+          .confine(['true'], { workingDirectory: slot, network: false })
+          .join(' ');
+        expect(command).toContain(`--ro-bind-try ${first} ${first}`);
+        expect(command.indexOf(`--ro-bind-try ${first}`)).toBeGreaterThan(command.indexOf(`--bind ${slot} ${slot}`));
+      } finally {
+        await rm(operator, { recursive: true, force: true });
+      }
+    });
   });
 });

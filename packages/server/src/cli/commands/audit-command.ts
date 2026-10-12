@@ -5,7 +5,7 @@ import { renderAudit, type AuditRunFigures } from '../audit-view.ts';
 import { EXIT_CODES } from '../output.ts';
 import { abortOnShutdown } from '../shutdown.ts';
 import { runningFactory, withFactoryLock } from './factory-running.ts';
-import { selectedProject, withProjectSession, type ProjectSession, type SelectedProject } from './project-session.ts';
+import { selectedProject, withAgentSession, withProjectSession, type ProjectSession, type SelectedProject } from './project-session.ts';
 
 const FIRST_SEQUENCE = 0;
 
@@ -42,7 +42,7 @@ async function auditEach(shas: readonly string[], { installation, project }: Pro
 
 async function auditNow(shas: readonly string[], selected: SelectedProject, context: CliContext): Promise<number> {
   return withFactoryLock(selected.config, () =>
-    withProjectSession(context, selected, async (session) => {
+    withAgentSession(context, selected, async (session) => {
       const controller = new AbortController();
       const releaseSignals = abortOnShutdown(controller, context.output);
       try {
