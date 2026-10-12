@@ -30,6 +30,7 @@ Every verb is a shebang script in `script/`, also reachable as `pnpm run <verb>`
 | `script/setup` | install the dependencies from the lockfile, build the cockpit, and activate the git hooks |
 | `script/lint` | ESLint, type-check every package, the schema and notices freshness, `claude plugin validate` of the plugin and its marketplace (skipped when `claude` is not installed), shellcheck, actionlint |
 | `script/test` | unit, property, contract and integration tests of every package |
+| `script/test-linux` | the tests and the example journey on Linux, in a container with bubblewrap, from a macOS workstation (needs Docker and the network; it tests the committed HEAD) |
 | `script/e2e` | both end-to-end suites below |
 | `script/e2e-example` | the fictional example project from spec to merge through the command line, with the fake `claude` |
 | `script/e2e-cockpit` | every cockpit command clicked in a real browser against a running factory, in demo and rehearsal modes |

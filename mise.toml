@@ -12,6 +12,10 @@ run = "script/lint"
 description = "Unit, property, contract and integration tests of every package"
 run = "script/test"
 
+[tasks."test-linux"]
+description = "The tests and the example journey on Linux, in a container with bubblewrap (needs Docker)"
+run = "script/test-linux"
+
 [tasks.e2e]
 description = "Both end-to-end suites"
 run = "script/e2e"

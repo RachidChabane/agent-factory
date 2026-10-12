@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Runs the tests of every package and the example journey on Linux, in a container, so that the bubblewrap
+# confinement the factory uses on Linux runs from a macOS workstation too (on Linux, run script/test directly).
+# The container clones the committed HEAD, so uncommitted changes are left out; it installs bubblewrap and the
+# dependencies from the lockfile, runs everything as an unprivileged user, and removes itself when it ends.
+# It needs Docker and the network.
+# Usage: script/test-linux [script/test arguments]
+set -euo pipefail
+cd "$(dirname "$0")/.."
+source script/lib/heavy.sh
+
+node_version="$(tr -d '[:space:]' < .node-version)"
+readonly IMAGE="node:${node_version}-bookworm"
+readonly CONTAINER_CPUS="${AGENT_FACTORY_LINUX_CPUS:-4}"
+readonly CONTAINER_MEMORY="${AGENT_FACTORY_LINUX_MEMORY:-6g}"
+
+# bubblewrap creates user, mount and PID namespaces and mounts a fresh /proc, which Docker's default seccomp
+# profile and masked /proc forbid: the container runs privileged, inside Docker Desktop's virtual machine.
+run_heavy docker run --rm --privileged \
+  --cpus "$CONTAINER_CPUS" --memory "$CONTAINER_MEMORY" \
+  --volume "$PWD:/source:ro" \
+  --env AGENT_FACTORY_SKIP_MEMORY_GUARD=1 \
+  "$IMAGE" /source/script/lib/linux-container.sh "$@"

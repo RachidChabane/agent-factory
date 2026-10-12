@@ -16,6 +16,7 @@
     "setup": "script/setup",
     "lint": "script/lint",
     "test": "script/test",
+    "test-linux": "script/test-linux",
     "e2e": "script/e2e",
     "e2e-example": "script/e2e-example",
     "e2e-cockpit": "script/e2e-cockpit",
