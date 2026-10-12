@@ -158,6 +158,7 @@ describe('SourcesKnowledgePack', () => {
       exists: () => Promise.resolve(true),
       copyFile: () => Promise.resolve(false),
       remove: () => Promise.resolve(),
+      makeDirectory: () => Promise.reject(new Error('read only')),
     };
     const text = await new SourcesKnowledgePack([{ kind: 'repository', path: 'docs/context.md' }], '/clones/acme', files).read();
     expect(asked).toEqual([['/clones/acme', 'docs/context.md']]);

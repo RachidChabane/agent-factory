@@ -85,4 +85,11 @@ export class NodeWorkspaceFiles implements WorkspaceFiles {
   async remove(root: string, relativePath: string): Promise<void> {
     await rm(resolveInside(root, relativePath), { recursive: true, force: true });
   }
+
+  async makeDirectory(root: string, relativePath: string): Promise<void> {
+    const target = resolveInside(root, relativePath);
+    await mkdir(target, { recursive: true });
+    const [realRoot, realTarget] = await Promise.all([realpath(root), realpath(target)]);
+    if (!isWithin(realRoot, realTarget)) throw new PathOutsideWorktreeError(relativePath);
+  }
 }

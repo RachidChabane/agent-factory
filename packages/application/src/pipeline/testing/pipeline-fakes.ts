@@ -47,6 +47,7 @@ type Tree = Map<string, string>;
 
 export class InMemoryWorkspace implements WorkspaceFiles {
   readonly trees = new Map<string, Tree>();
+  readonly directories = new Map<string, Set<string>>();
 
   tree(root: string): Tree {
     const existing = this.trees.get(root);
@@ -76,7 +77,8 @@ export class InMemoryWorkspace implements WorkspaceFiles {
   exists(root: string, relativePath: string): Promise<boolean> {
     const tree = this.tree(root);
     const prefix = `${relativePath}${PATH_SEPARATOR}`;
-    return Promise.resolve(tree.has(relativePath) || [...tree.keys()].some((path) => path.startsWith(prefix)));
+    const directory = this.directories.get(root)?.has(relativePath) ?? false;
+    return Promise.resolve(directory || tree.has(relativePath) || [...tree.keys()].some((path) => path.startsWith(prefix)));
   }
 
   copyFile(fromRoot: string, fromRelativePath: string, toRoot: string, toRelativePath: string): Promise<boolean> {
@@ -92,6 +94,17 @@ export class InMemoryWorkspace implements WorkspaceFiles {
     for (const path of [...tree.keys()]) {
       if (path === relativePath || path.startsWith(prefix)) tree.delete(path);
     }
+    const directories = this.directories.get(root);
+    for (const directory of [...(directories ?? [])]) {
+      if (directory === relativePath || directory.startsWith(prefix)) directories?.delete(directory);
+    }
+    return Promise.resolve();
+  }
+
+  makeDirectory(root: string, relativePath: string): Promise<void> {
+    const directories = this.directories.get(root) ?? new Set<string>();
+    directories.add(relativePath);
+    this.directories.set(root, directories);
     return Promise.resolve();
   }
 }

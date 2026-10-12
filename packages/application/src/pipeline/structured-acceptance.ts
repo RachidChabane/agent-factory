@@ -26,6 +26,7 @@ export class StructuredAcceptance {
     const plan = structuredAcceptanceCommand(manifest, runner, worktree.path);
     if (plan === null) return null;
     await this.files.remove(worktree.path, ACCEPTANCE_REPORT_DIRECTORY);
+    await this.files.makeDirectory(worktree.path, ACCEPTANCE_REPORT_DIRECTORY);
     try {
       const outcome = await this.shell.execute(plan.command, worktree.path, OFFLINE);
       const text = await this.files.readText(worktree.path, plan.reportPath);

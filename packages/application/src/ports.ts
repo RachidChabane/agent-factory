@@ -323,6 +323,8 @@ export interface WorkspaceFiles {
   exists(root: string, relativePath: string): Promise<boolean>;
   copyFile(fromRoot: string, fromRelativePath: string, toRoot: string, toRelativePath: string): Promise<boolean>;
   remove(root: string, relativePath: string): Promise<void>;
+  /** Creates the directory and its parents inside the root, for a tool that writes into it without creating it. */
+  makeDirectory(root: string, relativePath: string): Promise<void>;
 }
 
 export interface LogArchive {
