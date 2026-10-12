@@ -18,4 +18,5 @@ done
 if [ "${1:-}" = "--" ]; then
   shift
 fi
-run_heavy pnpm -r "${filters[@]}" --workspace-concurrency=1 --if-present run test "$@"
+# The ${array[@]+...} form keeps an empty array valid under `set -u` in bash 3.2.
+run_heavy pnpm -r ${filters[@]+"${filters[@]}"} --workspace-concurrency=1 --if-present run test "$@"
