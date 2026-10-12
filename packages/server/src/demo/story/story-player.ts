@@ -5,6 +5,7 @@ import {
   acceptProposedSpecs,
   AddRequest,
   createIssueFromPlan,
+  headVisibilityPolicy,
   loadJournal,
   loadRequest,
   MergeOnOrder,
@@ -143,7 +144,10 @@ export class StoryPlayer {
     await this.waitFor(`the checks of pull request #${pullRequest.number}`, signal, async () =>
       (await github.checks(pushedHead)).some((check) => check.conclusion === CHECK_PENDING) ? null : true,
     );
-    await new MergeOnOrder(this.project.dependencies).merge({ pullRequestNumber: pullRequest.number, expectedHeadSha: pushedHead });
+    await new MergeOnOrder(this.project.dependencies, headVisibilityPolicy(this.settings.sleeper, signal)).merge({
+      pullRequestNumber: pullRequest.number,
+      expectedHeadSha: pushedHead,
+    });
   }
 
   private async landOutsideChange(change: StoryOutsideChange): Promise<void> {

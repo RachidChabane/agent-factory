@@ -73,6 +73,32 @@ export class ResumeRefusedError extends Error {
   }
 }
 
+export class PullRequestHeadMovedError extends Error {
+  readonly expectedHeadSha: string;
+  readonly actualHeadSha: string;
+
+  constructor(pullRequestNumber: number, expectedHeadSha: string, actualHeadSha: string) {
+    super(`Pull request #${pullRequestNumber} head is ${actualHeadSha}, expected ${expectedHeadSha}`);
+    this.name = 'PullRequestHeadMovedError';
+    this.expectedHeadSha = expectedHeadSha;
+    this.actualHeadSha = actualHeadSha;
+  }
+}
+
+/** The forge still reports an older head than the one just pushed: a read that lags the push, which sending the order again settles. */
+export class PushedHeadNotVisibleError extends Error {
+  readonly pullRequestNumber: number;
+
+  constructor(pullRequestNumber: number, pushedHeadSha: string, reportedHeadSha: string | null, attempts: number) {
+    super(
+      `Pull request #${pullRequestNumber}: the forge still reports head ${reportedHeadSha ?? 'none'} after ${attempts} reads, ` +
+        `the push of ${pushedHeadSha} is not visible yet; send the merge order again`,
+    );
+    this.name = 'PushedHeadNotVisibleError';
+    this.pullRequestNumber = pullRequestNumber;
+  }
+}
+
 export class AbandonRefusedError extends Error {
   readonly issueNumber: number;
 

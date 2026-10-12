@@ -31,6 +31,7 @@ import type {
   RunningProcess,
   SandboxScope,
   ServiceProcesses,
+  Sleeper,
   SourceControl,
   WorkspaceFiles,
   Worktree,
@@ -686,3 +687,13 @@ export class ScriptedServiceProcesses implements ServiceProcesses {
   }
 }
 
+
+/** A sleeper that returns at once and remembers how long it was asked to wait. */
+export class RecordingSleeper implements Sleeper {
+  readonly naps: number[] = [];
+
+  sleep(milliseconds: number): Promise<void> {
+    this.naps.push(milliseconds);
+    return Promise.resolve();
+  }
+}
