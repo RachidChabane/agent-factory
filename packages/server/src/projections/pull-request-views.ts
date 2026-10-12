@@ -20,7 +20,8 @@ import {
 import { firstOf, iso, lastOf, type EventIndex } from './event-index.ts';
 import { withoutLocalPaths } from './local-paths.ts';
 import { baseRunSummary, branchRunSummary } from './proof-summary.ts';
-import { logKey, type SnapshotContext } from './snapshot-context.ts';
+import { NEVER_READ, observedView, type Observed } from '../snapshot/cached-reading.ts';
+import { logKey, type ProjectSnapshotContext } from './snapshot-context.ts';
 
 const FAILING_CONCLUSIONS: readonly CheckRunSummary['conclusion'][] = ['failure', 'cancelled'];
 const PENDING_CONCLUSION: CheckRunSummary['conclusion'] = 'pending';
@@ -43,7 +44,7 @@ export function proofLogExcerpt(text: string, command: string | null, maxCharact
   return excerpt.slice(-maxCharacters);
 }
 
-function logText(context: SnapshotContext, issueNumber: number, name: string | null): string {
+function logText(context: ProjectSnapshotContext, issueNumber: number, name: string | null): string {
   return name === null ? '' : stripAnsi(context.logs.get(logKey(issueNumber, name)) ?? '');
 }
 
@@ -66,7 +67,7 @@ function baseShaOf(journal: PipelineJournal, records: readonly FactoryEventRecor
   return WorktreeAcquiredSchema.safeParse(acquired?.payload).data?.baseSha ?? '';
 }
 
-function evidenceOf(journal: PipelineJournal, context: SnapshotContext, records: readonly FactoryEventRecord[]): Evidence[] {
+function evidenceOf(journal: PipelineJournal, context: ProjectSnapshotContext, records: readonly FactoryEventRecord[]): Evidence[] {
   const record = journal.evidence;
   if (record === null) return [];
   const issueNumber = journal.issueNumber;
@@ -160,11 +161,12 @@ function feedbackOf(journal: PipelineJournal): ExternalFeedback[] {
   }));
 }
 
-function mergeBlockers(journal: PipelineJournal, checks: readonly CheckRunSummary[], evidenceComplete: boolean): string[] {
+function mergeBlockers(journal: PipelineJournal, checks: Observed<readonly CheckRunSummary[]>, evidenceComplete: boolean): string[] {
   const blockers: string[] = [];
   if (journal.state === null || !MERGEABLE_STATES.includes(journal.state)) blockers.push(`the issue is ${journal.state ?? 'unknown'}`);
   if (!evidenceComplete) blockers.push('evidence is missing');
-  for (const check of checks) {
+  if (checks.value === null) blockers.push('the checks of the head commit were not read yet');
+  for (const check of checks.value ?? []) {
     if (FAILING_CONCLUSIONS.includes(check.conclusion)) blockers.push(`check ${check.name} failed`);
     if (check.conclusion === PENDING_CONCLUSION) blockers.push(`check ${check.name} is still running`);
   }
@@ -174,7 +176,7 @@ function mergeBlockers(journal: PipelineJournal, checks: readonly CheckRunSummar
 export function projectPullRequests(
   journals: ReadonlyMap<number, PipelineJournal>,
   index: EventIndex,
-  context: SnapshotContext,
+  context: ProjectSnapshotContext,
 ): PullRequestView[] {
   const views: PullRequestView[] = [];
   for (const journal of journals.values()) {
@@ -184,7 +186,7 @@ export function projectPullRequests(
     const records = index.subject(issueSubject(journal.issueNumber));
     const opened = firstOf(records, PIPELINE_EVENTS.pullRequestOpened);
     const merged = firstOf(records, PIPELINE_EVENTS.pullRequestMerged);
-    const checks = context.pullRequestChecks.get(pullRequest.number) ?? [];
+    const checks = context.pullRequestChecks.get(pullRequest.number) ?? NEVER_READ;
     const missing = journal.evidence?.bundle.missing.map((entry) => `${entry.sourcePath} (${entry.phase})`) ?? [];
     const evidenceComplete = journal.evidence !== null && missing.length === 0;
     const blockers = journal.mergeSha === null ? mergeBlockers(journal, checks, evidenceComplete) : ['already merged'];
@@ -194,12 +196,12 @@ export function projectPullRequests(
       issueNumber: journal.issueNumber,
       type: spec.type,
       branch: journal.branch,
-      url: pullRequest.url,
+      url: context.links.forge(pullRequest.url),
       headSha: journal.evidenceRemoval?.headSha ?? journal.pushedHead ?? pullRequest.headSha,
       state: journal.mergeSha === null ? 'open' : 'merged',
       openedAt: iso(opened?.occurredAt ?? context.generatedAt),
       mergedAt: merged === null ? null : iso(merged.occurredAt),
-      checks: checks.map((check) => ({ name: check.name, conclusion: check.conclusion, url: check.url, durationMs: null })),
+      checks: observedView(checks, (runs) => runs.map((check) => ({ name: check.name, conclusion: check.conclusion, url: check.url, durationMs: null }))),
       evidenceComplete,
       missingEvidence: missing,
       evidence: evidenceOf(journal, context, records),

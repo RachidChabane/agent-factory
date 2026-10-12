@@ -39,10 +39,15 @@ export const DEFAULT_ISSUE_CONCURRENCY = 1;
 export const DEFAULT_CONCURRENCY_CEILING = 3;
 export const DEFAULT_GATE_TIMEOUT_MINUTES = 30;
 export const DEFAULT_GATE_NICENESS = 10;
-export const DEFAULT_TAG_PATTERN = 'v*';
+/** Tags that look like a version, such as v1.4.0 or storefront-v1.4.0. */
+export const DEFAULT_TAG_PATTERN = '*.*.*';
+export const DEFAULT_HEALTH_INTERVAL_MINUTES = 5;
+/** Scale-to-zero environments answer once awake; a release gate waits this long for them. */
+export const DEFAULT_WAKE_UP_SECONDS = 90;
 export const DEFAULT_EVIDENCE_MAX_FILE_BYTES = 5_000_000;
 export const DEFAULT_EVIDENCE_MAX_TOTAL_BYTES = 40_000_000;
 export const FORGE_KINDS = ['github', 'local'] as const;
+export type ForgeKind = (typeof FORGE_KINDS)[number];
 export const DEPLOYMENT_SOURCE_KINDS = ['github', 'none'] as const;
 
 export const REPOSITORY_SLUG = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
@@ -112,13 +117,15 @@ const EnvironmentSchema = z.strictObject({
   promotion: z.enum(PROMOTION_POLICIES),
   deployments: DeploymentSourceSchema.prefault({ kind: 'none' }),
   health: z.array(HealthCheckSchema).default([]),
+  /** How long a release gate lets the environment wake up before its failing health checks count; 0 for an always-on environment. */
+  wakeUpSeconds: z.number().min(0).default(DEFAULT_WAKE_UP_SECONDS),
   redeploy: RedeploySchema.optional(),
   workflowUrl: z.url().optional(),
 });
 export type RawEnvironment = z.infer<typeof EnvironmentSchema>;
 
 const ReleaseModelSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('release-please') }),
+  z.strictObject({ kind: z.literal('release-please'), tagPattern: NonEmptyString.default(DEFAULT_TAG_PATTERN) }),
   z.strictObject({ kind: z.literal('tags'), tagPattern: NonEmptyString.default(DEFAULT_TAG_PATTERN) }),
   z.strictObject({ kind: z.literal('none') }),
 ]);
@@ -127,6 +134,8 @@ const DeliverySchema = z
   .strictObject({
     release: ReleaseModelSchema.prefault({ kind: 'none' }),
     environments: z.array(EnvironmentSchema).default([]),
+    /** How often the health checks of every environment are sampled. */
+    healthIntervalMinutes: PositiveMinutes.default(DEFAULT_HEALTH_INTERVAL_MINUTES),
   })
   .superRefine((delivery, context) => {
     for (const name of uniqueBy(delivery.environments, (environment) => environment.name)) {
@@ -158,8 +167,7 @@ const AuditIgnoreSchema = z
 
 const AuditsSchema = z
   .strictObject({
-    enabled: z.boolean().default(true),
-    /** Changes of other automations that are recorded but not audited. */
+    /** Other automations of the repository: their changes are recorded but not audited. */
     ignore: z.array(AuditIgnoreSchema).default([]),
   })
   .prefault({});

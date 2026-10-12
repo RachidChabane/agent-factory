@@ -1,0 +1,44 @@
+import type { AgentFactoryConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
+import type {
+  AgentHarness,
+  AgentRunAdmission,
+  BudgetGovernor,
+  Clock,
+  CommandRunner,
+  EventStore,
+  Notifier,
+  OperationLog,
+  ResourceGuard,
+  RunLogStore,
+  RunSlots,
+  UsageRefresher,
+} from '@agent-factory/application';
+import type { ListeningPorts } from '../listening-ports.ts';
+
+export type SourceEnvironment = Readonly<Record<string, string | undefined>>;
+
+/** What a project of the installation shares with the others. */
+export interface InstallationContext {
+  readonly config: AgentFactoryConfig;
+  readonly environment: SourceEnvironment;
+  readonly platform: string;
+  /** The operator's home directory. */
+  readonly userHome: string;
+  readonly clock: Clock;
+  readonly log: OperationLog;
+  readonly runner: CommandRunner;
+  /** The installation's log; every project writes its own events under its prefix. */
+  readonly events: EventStore;
+  readonly runLogs: RunLogStore;
+  readonly resources: ResourceGuard;
+  readonly admission: AgentRunAdmission;
+  readonly budget: BudgetGovernor;
+  /** Keeps each account's usage read; every agent run first makes sure it is fresh. */
+  readonly usage: UsageRefresher;
+  readonly runSlots: RunSlots;
+  readonly listeningPorts: ListeningPorts;
+  /** Delivers notices to the configured channels, without duplicates. */
+  readonly notifier: Notifier;
+  /** The agent that runs instead of the Claude CLI, in tests and in the demonstration. */
+  readonly harnessFor: ((project: ProjectConfig) => AgentHarness) | null;
+}

@@ -1,6 +1,7 @@
 import type { ServerResponse } from 'node:http';
-import type { EventStore, FactoryEventRecord, RunLogLine, RunLogStore } from '@agent-factory/application';
-import { STREAM_FACTORY_EVENT, STREAM_RUN_LOG_EVENT, STREAM_TELEMETRY_EVENT, type TelemetrySample } from '@agent-factory/cockpit';
+import { parseProjectSubject, type EventStore, type FactoryEventRecord, type RunLogLine, type RunLogStore } from '@agent-factory/application';
+import { STREAM_FACTORY_EVENT, STREAM_RUN_LOG_EVENT, STREAM_TELEMETRY_EVENT, type StreamEvent, type TelemetrySample } from '@agent-factory/cockpit';
+import { summarizeEvent } from '../projections/event-summary.ts';
 
 export const SSE_HEADERS = {
   'content-type': 'text/event-stream; charset=utf-8',
@@ -25,14 +26,17 @@ export interface EventStreamSources {
   telemetry(): Promise<TelemetrySample>;
 }
 
-export function factoryEventJson(record: FactoryEventRecord): string {
-  return JSON.stringify({
+/** An event of the installation's log as the cockpit receives it: its project, its own subject and a one-line summary. */
+export function streamEventOf(record: FactoryEventRecord): StreamEvent {
+  const { project, subject } = parseProjectSubject(record.subject);
+  return {
     sequence: record.sequence,
     occurredAt: record.occurredAt.toISOString(),
     type: record.type,
-    subject: record.subject,
-    payload: record.payload,
-  });
+    project,
+    subject,
+    summary: summarizeEvent({ type: record.type, subject, payload: record.payload }),
+  };
 }
 
 export function runLogJson(line: RunLogLine): string {
@@ -90,7 +94,7 @@ export class EventStreamConnection {
       const records = await this.sources.events.read(ALL_SUBJECTS, this.lastSent);
       for (const record of records) {
         if (record.sequence <= this.lastSent) continue;
-        this.send(STREAM_FACTORY_EVENT, factoryEventJson(record), record.sequence);
+        this.send(STREAM_FACTORY_EVENT, JSON.stringify(streamEventOf(record)), record.sequence);
         this.lastSent = record.sequence;
       }
     }).catch(() => undefined);

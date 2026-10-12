@@ -22,7 +22,7 @@ import {
   PositiveMinutes,
   PositiveSeconds,
   Ratio,
-  RoleSchema,
+  RoleOverrideSchema,
   SecretReferenceSchema,
   uniqueBy,
 } from './common.ts';
@@ -180,13 +180,14 @@ export const DEFAULT_ROLES = {
   auditor: { model: OPUS, effort: 'medium', maxBudgetUsd: 4, maxTurns: 80, timeoutMinutes: 25 },
 } as const;
 
+/** Each role of every project: any field left out keeps the built-in default above. */
 export const RolesSchema = z
   .strictObject({
-    'acceptance-author': RoleSchema.default(DEFAULT_ROLES['acceptance-author']),
-    implementer: RoleSchema.extend({ escalation: RoleSchema.shape.escalation.unwrap() }).default(DEFAULT_ROLES.implementer),
-    reviewer: RoleSchema.default(DEFAULT_ROLES.reviewer),
-    challenger: RoleSchema.default(DEFAULT_ROLES.challenger),
-    auditor: RoleSchema.default(DEFAULT_ROLES.auditor),
+    'acceptance-author': RoleOverrideSchema.prefault({}),
+    implementer: RoleOverrideSchema.prefault({}),
+    reviewer: RoleOverrideSchema.prefault({}),
+    challenger: RoleOverrideSchema.prefault({}),
+    auditor: RoleOverrideSchema.prefault({}),
   })
   .prefault({});
 export type RawRoles = z.infer<typeof RolesSchema>;

@@ -7,7 +7,7 @@ import {
   ISSUE_TRANSITIONED_EVENT,
   issueSubject,
 } from '@agent-factory/domain';
-import type { BaseExpectation, BeforeProofKind, IssueSpec, TestRunner } from '@agent-factory/domain';
+import type { BaseExpectation, BeforeProofKind, IssueSpec } from '@agent-factory/domain';
 import {
   checkPaths,
   ISSUE_PAUSED_EVENT,
@@ -24,23 +24,14 @@ import {
   type PipelineJournal,
 } from '@agent-factory/application';
 import { firstOf, iso, type EventIndex } from './event-index.ts';
-import type { SnapshotContext } from './snapshot-context.ts';
+import type { ProjectSnapshotContext } from './snapshot-context.ts';
 
-type CheckKind = AcceptanceCheck['kind'];
 type AttemptKind = Attempt['kind'];
 type AttemptOutcome = Attempt['outcome'];
 
-export const CHECK_KIND_BY_RUNNER: Readonly<Record<TestRunner, CheckKind>> = {
-  playwright: 'playwright',
-  eval: 'evaluation',
-  pytest: 'unit',
-  vitest: 'unit',
-  'node-test': 'unit',
-};
-const UNKNOWN_RUNNER_KIND: CheckKind = 'unit';
 const NO_BEFORE_PROOF: BeforeProofKind = 'none';
 
-function expectedProofKind(spec: IssueSpec, context: SnapshotContext): BeforeProofKind {
+function expectedProofKind(spec: IssueSpec, context: ProjectSnapshotContext): BeforeProofKind {
   const { typology } = context.conventions;
   return typology.has(spec.type) ? proofExpectation(typology.get(spec.type).proof).kind : NO_BEFORE_PROOF;
 }
@@ -101,23 +92,22 @@ function fileResult(journal: PipelineJournal, path: string, fallback: Acceptance
   return fallback;
 }
 
-function checksOf(journal: PipelineJournal, spec: IssueSpec, context: SnapshotContext): AcceptanceCheck[] {
+function checksOf(journal: PipelineJournal, spec: IssueSpec, context: ProjectSnapshotContext): AcceptanceCheck[] {
   const before = beforeResult(journal);
   const screenshot = journal.beforeProof?.evidence.find((entry) => entry.cachedPath !== null && isImage(entry.path));
   const withScreenshot = { ...before, screenshotUrl: screenshot === undefined ? null : context.links.evidence(spec.number, screenshot.cachedPath ?? screenshot.path) };
   const runner = journal.manifest?.runner ?? journal.beforeProof?.runner ?? null;
-  const kind = runner === null ? UNKNOWN_RUNNER_KIND : CHECK_KIND_BY_RUNNER[runner];
   if (journal.frozen !== null) {
     return journal.frozen.checks.map((check) => ({
       path: check.path,
-      kind,
+      runner,
       sha256: check.sha256,
       onBase: expectationOf(journal, check.path),
       before: fileResult(journal, check.path, withScreenshot),
     }));
   }
   if (journal.manifest !== null) {
-    return checkPaths(journal.manifest).map((path) => ({ path, kind, sha256: null, onBase: expectationOf(journal, path), before: fileResult(journal, path, withScreenshot) }));
+    return checkPaths(journal.manifest).map((path) => ({ path, runner, sha256: null, onBase: expectationOf(journal, path), before: fileResult(journal, path, withScreenshot) }));
   }
   return [];
 }
@@ -185,7 +175,7 @@ function issueView(
   spec: IssueSpec,
   journal: PipelineJournal | null,
   records: readonly FactoryEventRecord[],
-  context: SnapshotContext,
+  context: ProjectSnapshotContext,
   paused: ReadonlySet<number>,
   requestOfIssue: ReadonlyMap<number, string>,
 ): IssueView {
@@ -212,6 +202,7 @@ function issueView(
     escalation: journal === null ? null : escalationOf(journal, records),
     createdAt: iso(created),
     updatedAt: iso(updated),
+    costUsd: context.issueCosts.get(number) ?? 0,
     url: context.links.issue(number),
   };
 }
@@ -228,7 +219,7 @@ export function issueJournals(index: EventIndex): ReadonlyMap<number, PipelineJo
 export function projectIssues(
   index: EventIndex,
   journals: ReadonlyMap<number, PipelineJournal>,
-  context: SnapshotContext,
+  context: ProjectSnapshotContext,
   requestOfIssue: ReadonlyMap<number, string>,
 ): IssueView[] {
   const paused = pausedIssueNumbers(index);

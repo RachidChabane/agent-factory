@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# The agent-factory command once linked onto the PATH (npm link, pnpm link --global): it follows
+# its own link back to the checkout and runs the command line from there.
+set -euo pipefail
+self="$0"
+while [ -L "$self" ]; do
+  target="$(readlink "$self")"
+  case "$target" in
+    /*) self="$target" ;;
+    *) self="$(dirname "$self")/$target" ;;
+  esac
+done
+exec node "$(cd "$(dirname "$self")/.." && pwd)/packages/server/src/cli/main.ts" "$@"

@@ -14,7 +14,7 @@ import {
   type ReleaseEvaluatedPayload,
 } from '@agent-factory/application';
 import { firstOf, iso, lastOf, type EventIndex } from './event-index.ts';
-import type { SnapshotContext } from './snapshot-context.ts';
+import type { ProjectSnapshotContext } from './snapshot-context.ts';
 
 const UNKNOWN_AUTHOR = 'unknown';
 const TAG_SOURCE = 'tag';
@@ -48,7 +48,7 @@ export function releaseOfCommits(index: EventIndex): ReadonlyMap<string, string>
   return owners;
 }
 
-export function projectReleases(index: EventIndex, journals: ReadonlyMap<number, PipelineJournal>, context: SnapshotContext): ReleaseView[] {
+export function projectReleases(index: EventIndex, journals: ReadonlyMap<number, PipelineJournal>, context: ProjectSnapshotContext): ReleaseView[] {
   const issueOfPullRequest = new Map<number, PipelineJournal>();
   for (const journal of journals.values()) {
     if (journal.pullRequest !== null) issueOfPullRequest.set(journal.pullRequest.number, journal);
@@ -70,11 +70,16 @@ export function projectReleases(index: EventIndex, journals: ReadonlyMap<number,
     views.push({
       id: detection.releaseId,
       state: gateState(initial, evaluation),
-      branch: detection.ref,
-      createdAt: iso(firstDetection.occurredAt),
+      source: detection.source,
+      ref: detection.ref,
+      title: detection.title,
+      pullRequestNumber: detection.pullRequestNumber,
+      createdAt: detection.createdAt,
+      detectedAt: iso(firstDetection.occurredAt),
       cutAt: cutAt === null ? null : iso(cutAt),
       promotedAt: null,
       verifiedAt: null,
+      supersededBy: detection.supersededBy,
       commits: (evaluation?.commits ?? []).map((commit) => {
         const journal = commit.pullRequestNumber === null ? undefined : issueOfPullRequest.get(commit.pullRequestNumber);
         const evidenceComplete = journal?.evidence === null || journal === undefined ? null : journal.evidence.bundle.missing.length === 0;
@@ -85,6 +90,7 @@ export function projectReleases(index: EventIndex, journals: ReadonlyMap<number,
           pullRequestNumber: commit.pullRequestNumber,
           issueNumber: journal?.issueNumber ?? null,
           attribution: commit.attribution,
+          automation: commit.automation,
           auditId: audited.has(commit.sha) ? commit.sha : null,
           evidenceComplete,
         };
@@ -94,10 +100,10 @@ export function projectReleases(index: EventIndex, journals: ReadonlyMap<number,
         blockingReasons: evaluation?.blockingReasons ?? [],
         evaluatedAt: evaluatedRecord === null ? null : iso(evaluatedRecord.occurredAt),
       },
-      prepHealth: evaluation?.health ?? [],
+      health: evaluation?.health ?? [],
       productionWorkflowUrl: context.productionWorkflowUrl,
       report: evaluation?.report ?? '',
     });
   }
-  return views.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  return views.sort((left, right) => right.detectedAt.localeCompare(left.detectedAt));
 }

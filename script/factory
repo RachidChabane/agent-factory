@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# The agent-factory command line, run from this checkout: script/factory <command> [options].
+# "script/factory help" lists the commands.
+set -euo pipefail
+exec node "$(cd "$(dirname "$0")/.." && pwd)/packages/server/src/cli/main.ts" "$@"

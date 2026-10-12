@@ -1,0 +1,169 @@
+import { readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { createResourceGuard, FileRunLogStore, SpawnCommandRunner, type NotifyFetchFunction } from '@agent-factory/adapters';
+import {
+  AgentRunAdmission,
+  BudgetGovernor,
+  ChangeSettings,
+  OperatorNotifications,
+  RunSlots,
+  type AgentHarness,
+  type Clock,
+  type Notifier,
+  type OperationLog,
+  type ResourceGuard,
+  type SettingsDocument,
+  type ToolProber,
+  type UsageReportSource,
+} from '@agent-factory/application';
+import type { SettingsChange } from '@agent-factory/domain';
+import { parseAgentFactoryConfig, projectOf, UnknownProjectError, type AgentFactoryConfig, type ProjectConfig } from '../../config/agent-factory-config.ts';
+import { ConfigFile, configBackupsDirectory } from '../../config/config-file.ts';
+import { FileSettingsDocument } from '../../config/file-settings-document.ts';
+import { factoryPorts, ListeningPorts } from '../listening-ports.ts';
+import { StreamOperationLog } from '../operation-log.ts';
+import { openProject, type ProjectRuntime } from '../project/project-runtime.ts';
+import { SystemClock } from '../system.ts';
+import { openEventLog } from './event-log.ts';
+import type { InstallationContext, SourceEnvironment } from './installation-context.ts';
+import { LiveInstallation } from './live-installation.ts';
+import { installationNotifier } from './notifications.ts';
+import { definedEnvironment, installationToolProber, installationTools, projectToolProber, type ConfiguredTool } from './tools.ts';
+import { usageRefresher, usageReportSource } from './usage.ts';
+
+export const INSTALLATION_MODES = ['live', 'demo', 'rehearsal'] as const;
+export type InstallationMode = (typeof INSTALLATION_MODES)[number];
+const UTF8 = 'utf8';
+
+export interface InstallationOverrides {
+  /** Replaces the Claude CLI for agent runs. */
+  readonly harnessFor?: (project: ProjectConfig) => AgentHarness;
+  readonly resources?: ResourceGuard;
+  readonly usage?: UsageReportSource;
+  readonly fetch?: NotifyFetchFunction;
+  readonly log?: OperationLog;
+  readonly clock?: Clock;
+  readonly platform?: string;
+  readonly userHome?: string;
+  readonly mode?: InstallationMode;
+  /** Opens only these projects of the configuration; every project when absent. */
+  readonly projects?: readonly string[];
+}
+
+export interface InstallationRuntime extends InstallationContext {
+  readonly live: LiveInstallation;
+  readonly mode: InstallationMode;
+  /** Notices about the whole installation, such as its pauses, linking to the cockpit's home. */
+  readonly notifications: OperatorNotifications;
+  readonly tools: ToolProber;
+  readonly configuredTools: readonly ConfiguredTool[];
+  readonly settingsDocument: SettingsDocument;
+  readonly projects: readonly ProjectRuntime[];
+  project(id: string): ProjectRuntime;
+  projectTools(id: string): ToolProber;
+  /** Applies a settings change to the configuration file and records it; the running daemon picks it up. */
+  changeSettings(change: SettingsChange, operator: string): Promise<number>;
+  close(): void;
+}
+
+function processLog(clock: Clock): OperationLog {
+  return new StreamOperationLog((line) => process.stderr.write(`${line}\n`), clock);
+}
+
+function inferredMode(config: AgentFactoryConfig): InstallationMode {
+  return config.projects.every((project) => project.forge.kind === 'local') ? 'rehearsal' : 'live';
+}
+
+function selectedProjects(config: AgentFactoryConfig, ids: readonly string[] | undefined): readonly ProjectConfig[] {
+  return ids === undefined ? config.projects : ids.map((id) => projectOf(config, id));
+}
+
+function configurationLoader(config: AgentFactoryConfig, userHome: string): () => Promise<AgentFactoryConfig> {
+  return async () => parseAgentFactoryConfig(await readFile(config.configPath, UTF8), config.home, config.configPath, userHome);
+}
+
+/** Opens an installation and every project of its configuration. */
+export async function openInstallation(config: AgentFactoryConfig, environment: SourceEnvironment, overrides: InstallationOverrides = {}): Promise<InstallationRuntime> {
+  const clock = overrides.clock ?? new SystemClock();
+  const log = overrides.log ?? processLog(clock);
+  const platform = overrides.platform ?? process.platform;
+  const userHome = overrides.userHome ?? homedir();
+  const runner = new SpawnCommandRunner();
+  const eventLog = openEventLog(config.directories.state);
+  try {
+    const live = new LiveInstallation(config, configurationLoader(config, userHome));
+    const events = eventLog.events;
+    const resources = overrides.resources ?? createResourceGuard(platform, runner, definedEnvironment(environment));
+    const admission = new AgentRunAdmission(resources, config.resources);
+    const budget = new BudgetGovernor(events, clock, {
+      accounts: config.claude.accounts.map((account) => account.name),
+      thresholds: config.budget.thresholds,
+      dailyCap: config.budget.dailyCap,
+      perRunCapUsd: config.budget.perRunCapUsd,
+      staleAfterMs: config.claude.usage.staleAfterMs,
+    });
+    const runSlots = new RunSlots(config.resources.maxConcurrentRuns);
+    live.onChange((current) => {
+      admission.updatePolicy(current.resources);
+      runSlots.updateCapacity(current.resources.maxConcurrentRuns);
+      budget.updateLimits({ thresholds: current.budget.thresholds, dailyCap: current.budget.dailyCap, perRunCapUsd: current.budget.perRunCapUsd });
+    });
+    const usage = usageRefresher(config, budget, overrides.usage ?? usageReportSource(config, { clock, environment, workingDirectory: config.home }), events, clock, log);
+    const notifier: Notifier = installationNotifier(config, { platform, runner, environment, fetch: overrides.fetch ?? fetch, clock });
+    const listeningPorts = new ListeningPorts(factoryPorts(config.server.port));
+    const context: InstallationContext = {
+      get config(): AgentFactoryConfig {
+        return live.config;
+      },
+      environment,
+      platform,
+      userHome,
+      clock,
+      log,
+      runner,
+      events,
+      runLogs: new FileRunLogStore(config.directories.runLogs, clock),
+      resources,
+      admission,
+      budget,
+      usage,
+      runSlots,
+      listeningPorts,
+      notifier,
+      harnessFor: overrides.harnessFor ?? null,
+    };
+    const projects: ProjectRuntime[] = [];
+    for (const project of selectedProjects(config, overrides.projects)) projects.push(await openProject(context, project));
+    live.onChange((current) => {
+      for (const project of projects) project.reconfigure(current);
+    });
+    const toolSettings = { runner, environment, platform, workingDirectory: config.home };
+    const settingsDocument = new FileSettingsDocument(new ConfigFile(config.configPath, configBackupsDirectory(config.directories.state), clock), (text) =>
+      parseAgentFactoryConfig(text, config.home, config.configPath, userHome),
+    );
+    return {
+      ...context,
+      get config(): AgentFactoryConfig {
+        return live.config;
+      },
+      live,
+      mode: overrides.mode ?? inferredMode(config),
+      notifications: new OperatorNotifications(notifier, config.server.publicUrl, log),
+      tools: installationToolProber(config, toolSettings),
+      configuredTools: installationTools(config),
+      settingsDocument,
+      projects,
+      project: (id) => {
+        const found = projects.find((project) => project.id === id);
+        if (found === undefined) throw new UnknownProjectError(id, projects.map((project) => project.id));
+        return found;
+      },
+      projectTools: (id) => projectToolProber(projectOf(live.config, id), toolSettings),
+      changeSettings: (change, operator) => new ChangeSettings({ events, document: settingsDocument }).change(change, operator),
+      close: eventLog.close,
+    };
+  } catch (error) {
+    eventLog.close();
+    throw error;
+  }
+}

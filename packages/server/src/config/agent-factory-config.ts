@@ -20,7 +20,7 @@ import {
   type UsageThresholds,
 } from '@agent-factory/domain';
 import { NONE, type RawNamedCommand, type RawRole, type RawRoleOverride, type SecretReference } from './schema/common.ts';
-import type { RawNotificationChannel, RawRoles, RawToolCheck } from './schema/installation.ts';
+import { DEFAULT_ROLES, type RawNotificationChannel, type RawRoles, type RawToolCheck } from './schema/installation.ts';
 import type { RawEnvironment, RawIssueType, RawProject } from './schema/project.ts';
 import { AgentFactoryConfigSchema, type RawAgentFactoryConfig } from './schema/root.ts';
 
@@ -96,7 +96,7 @@ export type ForgeConfig =
   | { readonly kind: 'github' }
   | { readonly kind: 'local'; readonly directory: string; readonly bareRepositoryPath: string; readonly checks: LocalCheckMode };
 
-export type ReleaseModelConfig = { readonly kind: 'release-please' } | { readonly kind: 'tags'; readonly tagPattern: string } | { readonly kind: 'none' };
+export type ReleaseModelConfig = { readonly kind: 'release-please'; readonly tagPattern: string } | { readonly kind: 'tags'; readonly tagPattern: string } | { readonly kind: 'none' };
 
 export type DeploymentSourceConfig = { readonly kind: 'github'; readonly environment: string } | { readonly kind: 'none' };
 
@@ -106,6 +106,7 @@ export interface EnvironmentConfig {
   readonly promotion: PromotionPolicy;
   readonly deployments: DeploymentSourceConfig;
   readonly health: readonly { readonly name: string; readonly url: string }[];
+  readonly wakeUpMs: number;
   readonly redeploy: { readonly workflow: string; readonly inputs: Readonly<Record<string, string>> } | null;
   readonly workflowUrl: string | null;
 }
@@ -143,8 +144,8 @@ export interface ProjectConfig {
   readonly prompts: Readonly<Partial<Record<AgentRole, string>>>;
   readonly knowledge: readonly KnowledgeSourceConfig[];
   readonly evidence: { readonly maxFileBytes: number; readonly maxTotalBytes: number };
-  readonly delivery: { readonly release: ReleaseModelConfig; readonly environments: readonly EnvironmentConfig[] };
-  readonly audits: { readonly enabled: boolean; readonly ignore: readonly { readonly name: string; readonly branches: readonly string[]; readonly authors: readonly string[] }[] };
+  readonly delivery: { readonly release: ReleaseModelConfig; readonly environments: readonly EnvironmentConfig[]; readonly healthIntervalMs: number };
+  readonly audits: { readonly ignore: readonly { readonly name: string; readonly branches: readonly string[]; readonly authors: readonly string[] }[] };
   readonly tools: readonly ToolCheckConfig[];
   readonly directories: { readonly checkouts: string; readonly logs: string; readonly evidence: string; readonly requests: string; readonly knowledge: string };
 }
@@ -165,6 +166,8 @@ export interface AgentFactoryConfig {
   readonly daemon: { readonly pollIntervalMs: number; readonly mergeWatchIntervalMs: number; readonly issueRefreshMs: number };
   readonly notifications: { readonly dedupeWindowMs: number; readonly channels: readonly NotificationChannelConfig[] };
   readonly tools: readonly ToolCheckConfig[];
+  /** The roles of a project that overrides none: the built-in defaults under the installation's own. */
+  readonly defaultRoles: RoleSettingsMap;
   readonly directories: { readonly state: string; readonly runs: string; readonly logs: string; readonly runLogs: string; readonly cache: string };
   readonly projects: readonly ProjectConfig[];
 }
@@ -236,15 +239,19 @@ function mergedRole(base: RawRole, override: RawRoleOverride | undefined): RawRo
   return merged;
 }
 
+function layeredRole(role: keyof typeof DEFAULT_ROLES, defaults: RawRoles, overrides: RawProject['roles']): RawRole {
+  return mergedRole(mergedRole(DEFAULT_ROLES[role], defaults[role]), overrides[role]);
+}
+
+/** A role of a project: the built-in defaults, then the installation's defaults, then the project's overrides, field by field. */
 function resolveRoles(defaults: RawRoles, overrides: RawProject['roles']): RoleSettingsMap {
-  const implementer = mergedRole(defaults.implementer, overrides.implementer);
-  const escalation = implementer.escalation ?? defaults.implementer.escalation;
+  const implementer = layeredRole('implementer', defaults, overrides);
   return {
-    'acceptance-author': roleSettings(mergedRole(defaults['acceptance-author'], overrides['acceptance-author'])),
-    implementer: { ...roleSettings(implementer), escalation },
-    reviewer: roleSettings(mergedRole(defaults.reviewer, overrides.reviewer)),
-    challenger: roleSettings(mergedRole(defaults.challenger, overrides.challenger)),
-    auditor: roleSettings(mergedRole(defaults.auditor, overrides.auditor)),
+    'acceptance-author': roleSettings(layeredRole('acceptance-author', defaults, overrides)),
+    implementer: { ...roleSettings(implementer), escalation: implementer.escalation ?? DEFAULT_ROLES.implementer.escalation },
+    reviewer: roleSettings(layeredRole('reviewer', defaults, overrides)),
+    challenger: roleSettings(layeredRole('challenger', defaults, overrides)),
+    auditor: roleSettings(layeredRole('auditor', defaults, overrides)),
   };
 }
 
@@ -306,6 +313,7 @@ function environmentConfig(raw: RawEnvironment): EnvironmentConfig {
     promotion: raw.promotion,
     deployments: raw.deployments,
     health: raw.health,
+    wakeUpMs: seconds(raw.wakeUpSeconds),
     redeploy: raw.redeploy ?? null,
     workflowUrl: raw.workflowUrl ?? null,
   };
@@ -363,7 +371,7 @@ function resolveProject(raw: RawProject, config: RawAgentFactoryConfig, home: st
     prompts: Object.fromEntries(Object.entries(raw.prompts).map(([role, path]) => [role, at(path)])),
     knowledge: raw.knowledge.map((source) => ('path' in source ? { kind: 'path', path: at(source.path) } : { kind: 'repository', path: source.repository })),
     evidence: raw.evidence,
-    delivery: { release: raw.delivery.release, environments: raw.delivery.environments.map(environmentConfig) },
+    delivery: { release: raw.delivery.release, environments: raw.delivery.environments.map(environmentConfig), healthIntervalMs: minutes(raw.delivery.healthIntervalMinutes) },
     audits: raw.audits,
     tools: raw.tools.map(toolCheck),
     directories: {
@@ -386,7 +394,7 @@ export function resolveAgentFactoryConfig(raw: RawAgentFactoryConfig, home: stri
     server: {
       host: raw.server.host,
       port: raw.server.port,
-      publicUrl: raw.server.publicUrl ?? `${HTTP_SCHEME}${raw.server.host}:${raw.server.port}`,
+      publicUrl: raw.server.publicUrl ?? serverUrl(raw.server.host, raw.server.port),
       remoteAccess: raw.server.remoteAccess,
     },
     claude: {
@@ -409,6 +417,7 @@ export function resolveAgentFactoryConfig(raw: RawAgentFactoryConfig, home: stri
     },
     notifications: { dedupeWindowMs: minutes(raw.notifications.dedupeWindowMinutes), channels: raw.notifications.channels.map(notificationChannel) },
     tools: raw.tools.map(toolCheck),
+    defaultRoles: resolveRoles(raw.defaults.roles, {}),
     directories: {
       state: at(INSTALLATION_DIRECTORIES.state),
       runs: at(INSTALLATION_DIRECTORIES.runs),
@@ -418,6 +427,17 @@ export function resolveAgentFactoryConfig(raw: RawAgentFactoryConfig, home: stri
     },
     projects: raw.projects.map((project) => resolveProject(project, raw, home, userHome)),
   };
+}
+
+function serverUrl(host: string, port: number): string {
+  return `${HTTP_SCHEME}${host}:${port}`;
+}
+
+/** The configuration served on another port; a public URL derived from the port follows it, an explicit one stays. */
+export function withServerPort(config: AgentFactoryConfig, port: number): AgentFactoryConfig {
+  const { server } = config;
+  const derived = server.publicUrl === serverUrl(server.host, server.port);
+  return { ...config, server: { ...server, port, publicUrl: derived ? serverUrl(server.host, port) : server.publicUrl } };
 }
 
 export function projectOf(config: AgentFactoryConfig, id: string): ProjectConfig {
@@ -443,9 +463,13 @@ export function parseAgentFactoryConfig(text: string, home: string, configPath: 
   return resolveAgentFactoryConfig(parsed.data, home, configPath, userHome);
 }
 
-export async function loadAgentFactoryConfig(environment: Readonly<Record<string, string | undefined>>): Promise<AgentFactoryConfig> {
-  const home = factoryHome(environment);
-  const configPath = join(home, CONFIG_FILE_NAME);
+export function configPathOf(home: string): string {
+  return join(home, CONFIG_FILE_NAME);
+}
+
+export async function loadAgentFactoryConfig(environment: Readonly<Record<string, string | undefined>>, userHome: string = homedir()): Promise<AgentFactoryConfig> {
+  const home = factoryHome(environment, userHome);
+  const configPath = configPathOf(home);
   let text: string;
   try {
     text = await readFile(configPath, UTF8);
@@ -453,5 +477,5 @@ export async function loadAgentFactoryConfig(environment: Readonly<Record<string
     if (error instanceof Error && 'code' in error && error.code === MISSING_FILE_CODE) throw new ConfigMissingError(configPath);
     throw error;
   }
-  return parseAgentFactoryConfig(text, home, configPath);
+  return parseAgentFactoryConfig(text, home, configPath, userHome);
 }

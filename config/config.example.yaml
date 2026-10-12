@@ -1,126 +1,51 @@
-# Copy to ~/.agent-factory/config.yaml (or $FACTORY_HOME/config.yaml) and replace the placeholders.
-# Relative paths resolve against the factory home; "~/" resolves against your home directory.
+# yaml-language-server: $schema=../schema/config.schema.json
+#
+# Agent Factory configuration: ~/.agent-factory/config.yaml, or $AGENT_FACTORY_HOME/config.yaml.
+# Relative paths resolve against the factory home; "~/" against your home directory.
+# Secrets are never written here: { fromEnvironment: NAME } reads them from the environment.
+version: 1
 
-target:
-  owner: example-owner
-  name: example-repository
-  clonePath: ~/src/example-repository
-  baseBranch: main
-  # Setup and gate commands run under sandbox-exec: no network unless the command names why it needs it.
-  setupCommands:
-    - name: install
-      run: pnpm install --frozen-lockfile
-      network: downloads the locked dependencies from the package registry
-
-worktreePool:
-  directory: worktrees
-  size: 3
-
-concurrency:
-  issues: 1
-  ceiling: 3
-
-# No agent run starts below this free memory or with memory pressure above pauseAbovePressure (normal or warn).
-resources:
-  minimumFreeMemoryPercent: 40
-  pauseAbovePressure: normal
-
-roles:
-  acceptance-author:
-    model: sonnet
-    effort: medium
-    maxBudgetUsd: 3
-    maxTurns: 60
-    timeoutMinutes: 30
-  implementer:
-    model: sonnet
-    effort: high
-    maxBudgetUsd: 8
-    maxTurns: 120
-    timeoutMinutes: 60
-    escalation:
-      model: opus
-      effort: xhigh
-  reviewer:
-    model: sonnet
-    effort: high
-    maxBudgetUsd: 2
-    maxTurns: 40
-    timeoutMinutes: 20
-
-gate:
-  commandsBeforeAcceptance:
-    - name: lint
-      run: mise run lint
-  commandsAfterAcceptance: []
-  timeoutMinutes: 30
-  niceness: 10
-  environment:
-    passthrough: [PATH, HOME, LANG, TERM, TMPDIR, USER, MISE_DATA_DIR, MISE_CONFIG_DIR, MISE_CACHE_DIR, MISE_STATE_DIR]
-    set:
-      MISE_TRUSTED_CONFIG_PATHS: ~/.agent-factory/worktrees
-      UV_CACHE_DIR: ~/.agent-factory/cache/uv
-      MISE_TASK_RUN_AUTO_INSTALL: "false"
-
-# Commit type: a "kind:<type>" label on the issue wins; otherwise "types" below, otherwise
-# feat for feature, ui, api, data and prompt, fix for fix and security, build for dependencies,
-# docs for docs, chore for release, refactor for refactor, and for infra feat when the change
-# touches one of deploymentPaths, ci otherwise.
-conventionalCommits:
-  defaultScope: repo
-  scopes:
-    ui: app
-    api: api
-    prompt: agent
-    infra: ci
-    docs: docs
-    dependencies: deps
-  types: {}
-  deploymentPaths: [infrastructure/**, environments/**]
-
-# Agent runs and check commands never read the built-in credential stores (~/.ssh, ~/.config/gcloud,
-# ~/.config/gh, ~/.docker, ~/.aws, ~/.netrc, ~/.npmrc, ~/.claude*, ~/Library/Keychains, ...) nor the paths
-# listed here; a trailing * matches every entry starting with that path. Check commands write only their
-# worktree, the temporary directories, claude.writableDirectories and the directories listed here.
-sandbox:
-  deniedReadPaths: []
-  writableDirectories: [~/.local/state/mise, ~/Library/Caches/mise, ~/.npm, ~/Library/Caches/node-gyp]
-
-# Before a push or a pull request write, the diff and the pull request body are scanned for secret
-# patterns and for the exact values of credential-like environment variables and of these keychain items.
-secretScan:
-  keychainServices: [gh:github.com]
-
-directories:
-  state: state
-  runs: runs
-  logs: logs
-  evidence: evidence
-
-github:
-  mode: remote
-  localDirectory: github
-  localChecks: none
-  commitIdentity:
-    name: Example Factory
-    email: factory@example.invalid
+server:
+  host: 127.0.0.1
+  port: 7430
+  # The address notifications link to; null means http://<host>:<port>.
+  publicUrl: null
+  # none: loopback only. tailscale: serve the cockpit on the tailnet and require its identity header.
+  remoteAccess:
+    kind: none
 
 claude:
   command: [claude]
   niceness: 10
+  # Directories agent runs may write besides their worktree.
   writableDirectories: [cache]
-  # Each account is a Claude login: CLAUDE_CONFIG_DIR=<configDir> claude /login
+  # Each account is a Claude login: CLAUDE_CONFIG_DIR=<configDir> claude /login. No account: the default login.
   accounts:
     - name: primary
       configDir: ~/.claude-primary
-    - name: secondary
-      configDir: ~/.claude-secondary
+      billing: subscription
+  # Subscription usage comes from the CLI's own usage report, which costs no tokens.
+  usage:
+    refreshMinutes: 10
+    staleAfterMinutes: 30
 
 budget:
-  fiveHourPauseUtilization: 0.90
-  sevenDayPauseUtilization: 0.85
-  dailyCapUsd: 150
-  perRunCapUsd: 10
+  # No new agent run starts on an account once a limit reaches this share.
+  pauseAt:
+    session: 0.9
+    weeklyAll: 0.85
+    weeklyScoped: 0.85
+  # none, or US dollars of API-equivalent spend per UTC day.
+  dailyCapUsd: none
+  # none, or a ceiling on the budget of any single agent run.
+  perRunCapUsd: none
+
+resources:
+  minimumFreeMemoryPercent: 40
+  # normal or warn: the memory pressure above which no agent run starts.
+  pauseAbovePressure: normal
+  # Agent runs at once, across every project.
+  maxConcurrentRuns: 1
 
 daemon:
   pollIntervalSeconds: 30
@@ -128,20 +53,119 @@ daemon:
   issueRefreshSeconds: 120
 
 notifications:
-  googleChatWebhookUrl:
-    fromEnvironment: AGENT_FACTORY_GOOGLE_CHAT_WEBHOOK_URL
   dedupeWindowMinutes: 30
+  channels:
+    - kind: system
+    - kind: slack
+      webhookUrl: { fromEnvironment: AGENT_FACTORY_SLACK_WEBHOOK_URL }
 
-server:
-  host: 127.0.0.1
-  port: 7430
-  publicUrl: http://127.0.0.1:7430
+# Read-only checks of the command-line tools the projects rely on, shown in the cockpit and run by `validate`.
+tools:
+  - name: kubectl
+    description: Reads the clusters the environments run on
+    check: [kubectl, auth, whoami]
+    version: [kubectl, version, --client]
+    fix: kubectl config use-context <context>
+    timeoutSeconds: 20
 
-# The cockpit shows these environments from their GitHub deployments and redeploys dev and prep on the
-# operator's order through this workflow. Production is never deployed by the factory.
-delivery:
-  workflow: delivery.yml
-  environments:
-    dev: { name: example-dev, url: https://dev.example.invalid }
-    prep: { name: example-prep, url: https://prep.example.invalid }
-    prod: { name: example-prod, url: https://example.invalid }
+defaults:
+  roles:
+    acceptance-author: { model: opus, effort: medium, maxBudgetUsd: 8, maxTurns: 120, timeoutMinutes: 30 }
+    implementer:
+      model: sonnet
+      effort: medium
+      maxBudgetUsd: 10
+      maxTurns: 150
+      timeoutMinutes: 60
+      escalation: { model: opus, effort: high }
+    reviewer: { model: opus, effort: medium, maxBudgetUsd: 3, maxTurns: 60, timeoutMinutes: 20 }
+    challenger: { model: opus, effort: high, maxBudgetUsd: 8, maxTurns: 150, timeoutMinutes: 40 }
+    auditor: { model: opus, effort: medium, maxBudgetUsd: 4, maxTurns: 80, timeoutMinutes: 25 }
+
+projects:
+  - id: storefront
+    name: Storefront
+    forge:
+      kind: github
+      repository: example-org/storefront
+    baseBranch: main
+    clone: clone
+    commitIdentity: { name: Example Factory, email: factory@example.invalid }
+    worktrees: { size: 3 }
+    concurrency: { issues: 1, ceiling: 3 }
+    setup:
+      - name: install
+        run: npm ci
+        network: downloads the locked dependencies from the npm registry
+    gate:
+      beforeAcceptance:
+        - { name: lint, run: npm run lint }
+      afterAcceptance:
+        - { name: unit, run: npm test }
+      timeoutMinutes: 30
+    environment:
+      passthrough: [PATH, HOME, LANG, TERM, TMPDIR, USER]
+      set: { CI: "1" }
+    issueTypes:
+      - id: feature
+        proof: fails-on-base
+        checks: unit or integration tests in the repository's test layout
+        commit: { type: feat }
+      - id: ui
+        proof: fails-on-base
+        checks: a Playwright journey asserting what the criterion says is visible or possible, with the screenshots the expected proof names
+        commit: { type: feat, scope: web }
+        evidence: [acceptance-tests, screenshots]
+      - id: fix
+        proof: fails-on-base
+        checks: a test reproducing the bug
+        commit: { type: fix }
+      - id: security
+        proof: fails-on-base
+        checks: a test reproducing the attack
+        commit: { type: fix }
+        review: [security]
+      - id: docs
+        proof: none
+        commit: { type: docs }
+    roles:
+      implementer: { model: opus }
+    knowledge:
+      - path: docs/product
+    delivery:
+      release: { kind: tags, tagPattern: "v*" }
+      environments:
+        - name: staging
+          promotion: automatic
+          deployments: { kind: github, environment: storefront-staging }
+          health: [{ name: web, url: "https://staging.example.com/healthz" }]
+          redeploy:
+            workflow: deploy.yml
+            inputs: { environment: "{{target}}", version: "{{version}}" }
+        - name: production
+          promotion: manual
+          production: true
+          deployments: { kind: github, environment: storefront-production }
+          workflowUrl: https://github.com/example-org/storefront/actions/workflows/deploy.yml
+    audits:
+      ignore:
+        - name: Dependency updates
+          authors: ["dependabot[bot]"]
+
+  - id: ledger
+    name: Ledger
+    forge:
+      kind: local
+      repository: example-org/ledger
+      checks: none
+    commitIdentity: { name: Example Factory, email: factory@example.invalid }
+    gate:
+      afterAcceptance:
+        - { name: test, run: npm test }
+    issueTypes:
+      - id: feature
+        proof: fails-on-base
+        commit: { type: feat }
+      - id: fix
+        proof: fails-on-base
+        commit: { type: fix }

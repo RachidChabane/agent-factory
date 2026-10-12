@@ -1,13 +1,19 @@
 import { parseLabelList } from '@agent-factory/application';
+import { FORGE_KINDS, type ForgeKind } from '../config/schema/project.ts';
+
+export const PROGRAM_NAME = 'agent-factory';
 
 export const COMMAND_NAMES = {
+  init: 'init',
+  validate: 'validate',
+  schema: 'schema',
+  start: 'start',
+  status: 'status',
+  usage: 'usage',
   runIssue: 'run-issue',
   resume: 'resume',
   merge: 'merge',
-  status: 'status',
-  validate: 'validate',
   rehearsal: 'rehearsal',
-  start: 'start',
   request: 'request',
   issue: 'issue',
   pr: 'pr',
@@ -15,37 +21,31 @@ export const COMMAND_NAMES = {
   help: 'help',
 } as const;
 
-export const REQUEST_SUBCOMMANDS = {
-  add: 'add',
-  challenge: 'challenge',
-} as const;
+export const REQUEST_SUBCOMMANDS = { add: 'add', challenge: 'challenge' } as const;
+export const ISSUE_SUBCOMMANDS = { create: 'create', abandon: 'abandon' } as const;
+export const PR_SUBCOMMANDS = { feedback: 'feedback' } as const;
+export const REHEARSAL_SUBCOMMANDS = { init: 'init', reset: 'reset', addIssue: 'add-issue' } as const;
 
-export const ISSUE_SUBCOMMANDS = {
-  create: 'create',
-  abandon: 'abandon',
-} as const;
-
-export const PR_SUBCOMMANDS = {
-  feedback: 'feedback',
-} as const;
-
+export const PROJECT_OPTION = '--project';
 export const IMAGES_OPTION = '--images';
 export const REQUESTER_OPTION = '--requester';
 export const CONFIRM_FLAG = '--confirm';
 export const AUTHOR_OPTION = '--author';
-export const DEFAULT_REQUESTER = 'unknown';
-
-export const REHEARSAL_SUBCOMMANDS = {
-  init: 'init',
-  reset: 'reset',
-  addIssue: 'add-issue',
-} as const;
-
 export const EXPECTED_HEAD_OPTION = '--expected-head';
 export const LABELS_OPTION = '--labels';
 export const ANSWER_OPTION = '--answer';
 export const REASON_OPTION = '--reason';
 export const SKIP_GATE_PREFLIGHT_FLAG = '--skip-gate-preflight';
+export const OFFLINE_FLAG = '--offline';
+export const REFRESH_FLAG = '--refresh';
+export const DEMO_FLAG = '--demo';
+export const FORCE_FLAG = '--force';
+export const ID_OPTION = '--id';
+export const FORGE_OPTION = '--forge';
+export const NAME_OPTION = '--name';
+export const PORT_OPTION = '--port';
+const MAX_PORT = 65_535;
+export const DEFAULT_REQUESTER = 'unknown';
 const OPTION_VALUE_SEPARATOR = '=';
 const HELP_FLAGS: readonly string[] = ['-h', '--help'];
 const POSITIVE_INTEGER = /^[1-9]\d*$/;
@@ -53,39 +53,51 @@ const COMMIT_REFERENCE = /^[0-9a-f]{7,40}$/;
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/;
 
 export const USAGE = [
-  'Usage: factory <command>',
+  `Usage: ${PROGRAM_NAME} [${PROJECT_OPTION} <id>] <command>`,
   '',
-  'Commands:',
+  `Commands that act on one project take ${PROJECT_OPTION} <id>; it may be left out when the configuration has one project.`,
+  '',
+  'Set up',
+  '  init [<repository>] [--id <id>] [--name <name>] [--forge github|local] [--force]',
+  '                                               inspect a repository and add it as a project to the configuration',
+  '  validate [--offline] [--skip-gate-preflight] check the configuration; without --offline also every tool, forge and gate command',
+  '  schema                                       print the JSON Schema of the configuration file',
+  '',
+  'Run',
+  '  start [--demo] [--port <port>]               run the factory and serve the cockpit; --demo plays fictional projects with no account',
+  '  status [<issue>]                             the installation at a glance, or the state of one issue',
+  '  usage [--refresh]                            subscription usage by account and limit; --refresh reads it now',
   '  run-issue <issue>                            drive a validated issue to an open pull request, resuming where it stopped',
-  '  resume <issue> [--answer <text>]             operator order after an escalation: return the issue to the stage it left, re-reading a spec whose checks are not frozen yet;',
-  '                                               --answer carries the decision the implementer asked for',
-  '  merge <pull-request> --expected-head <sha>   operator order: remove the evidence and squash-merge the reviewed head (full sha)',
-  '  status <issue>                               show the state of an issue from the event log',
-  '  validate [--skip-gate-preflight]             check the configuration and every tool the factory depends on, then run each setup',
-  '                                               and gate command on a clean base workspace under the gate sandbox',
-  '  rehearsal init <source-clone>                github.mode local: mirror the source clone into a local bare remote and clone it at target.clonePath',
-  '  rehearsal reset <source-clone>               github.mode local: reset the base branch of the local remote and its clone to the source clone\'s, dropping merged rehearsal pull requests',
-  '  rehearsal add-issue <spec.md> [--labels a,b] github.mode local: create a local issue from a spec file (Title:, Labels:, then the four sections)',
-  '  start                                        run the factory: schedule validated issues, watch merges and releases, serve the cockpit',
-  '  request add <file> [--images <dir>] [--requester <name>]  store a product request with its images',
+  '  resume <issue> [--answer <text>]             after an escalation, return the issue to the stage it left; --answer carries the decision asked for',
+  '  merge <pull-request> --expected-head <sha>   remove the evidence and squash-merge the reviewed head (full sha)',
+  '',
+  'Work items',
+  '  request add <file> [--images <dir>] [--requester <name>]   store a product request with its images',
   '  request challenge <id>                       challenge a stored request and draft its specs, report and reply',
   '  issue create <spec.md> [--confirm]           create an issue from a spec file; on GitHub it needs --confirm',
-  '  issue abandon <issue> --reason <text>        operator order after an escalation: stop the factory work on the issue and free its worktree;',
-  '                                               the issue and its branch stay as they are on the tracker',
-  '  audit <commit> [<commit>...]                 record an on-demand audit for each commit of the base branch and run the auditor on them one at a time',
-  '  pr feedback <pull-request> <file> --author <name>  record review feedback as blocking findings and start a new cycle',
+  '  issue abandon <issue> --reason <text>        stop the factory work on an escalated issue and free its worktree',
+  '  pr feedback <pull-request> <file> --author <name>   record review feedback and start a new cycle',
+  '  audit <commit> [<commit>...]                 audit commits of the base branch, one at a time',
+  '',
+  'Rehearsal (projects on a local forge)',
+  '  rehearsal init <source-clone>                mirror a source clone into the local forge and clone it for the project',
+  '  rehearsal reset <source-clone>               reset the local forge and its clone to the source clone',
+  '  rehearsal add-issue <spec.md> [--labels a,b] create a local issue from a spec file',
 ].join('\n');
 
 export type CliCommand =
+  | { readonly kind: 'init'; readonly repository: string | null; readonly id: string | null; readonly name: string | null; readonly forge: ForgeKind | null; readonly force: boolean }
+  | { readonly kind: 'validate'; readonly offline: boolean; readonly gatePreflight: boolean }
+  | { readonly kind: 'schema' }
+  | { readonly kind: 'start'; readonly demo: boolean; readonly port: number | null }
+  | { readonly kind: 'status'; readonly issueNumber: number | null }
+  | { readonly kind: 'usage'; readonly refresh: boolean }
   | { readonly kind: 'run-issue'; readonly issueNumber: number }
   | { readonly kind: 'resume'; readonly issueNumber: number; readonly answer: string | null }
   | { readonly kind: 'merge'; readonly pullRequestNumber: number; readonly expectedHeadSha: string }
-  | { readonly kind: 'status'; readonly issueNumber: number }
-  | { readonly kind: 'validate'; readonly gatePreflight: boolean }
   | { readonly kind: 'rehearsal-init'; readonly sourceClonePath: string }
   | { readonly kind: 'rehearsal-reset'; readonly sourceClonePath: string }
   | { readonly kind: 'rehearsal-add-issue'; readonly specPath: string; readonly labels: readonly string[] }
-  | { readonly kind: 'start' }
   | { readonly kind: 'request-add'; readonly path: string; readonly imagesDirectory: string | null; readonly requester: string }
   | { readonly kind: 'request-challenge'; readonly requestId: string }
   | { readonly kind: 'issue-create'; readonly specPath: string; readonly confirmed: boolean }
@@ -94,50 +106,26 @@ export type CliCommand =
   | { readonly kind: 'audit'; readonly commits: readonly string[] }
   | { readonly kind: 'help' };
 
-function parseValidate(rest: readonly string[]): ParsedCommandLine {
-  const unexpected = rest.filter((argument) => argument !== SKIP_GATE_PREFLIGHT_FLAG);
-  if (unexpected.length > 0) return { ok: false, error: `unexpected arguments: ${unexpected.join(' ')}` };
-  return { ok: true, command: { kind: 'validate', gatePreflight: !rest.includes(SKIP_GATE_PREFLIGHT_FLAG) } };
+/** A command, with the project it names when the operator named one. */
+export interface CommandLine {
+  readonly project: string | null;
+  readonly command: CliCommand;
 }
 
-export type ParsedCommandLine = { readonly ok: true; readonly command: CliCommand } | { readonly ok: false; readonly error: string };
+export type ParsedCommandLine = { readonly ok: true; readonly line: CommandLine } | { readonly ok: false; readonly error: string };
+type ParsedCommand = { readonly ok: true; readonly command: CliCommand } | { readonly ok: false; readonly error: string };
 
-function failure(error: string): ParsedCommandLine {
+function failure(error: string): { readonly ok: false; readonly error: string } {
   return { ok: false, error };
+}
+
+function done(command: CliCommand): ParsedCommand {
+  return { ok: true, command };
 }
 
 function positiveInteger(value: string | undefined, what: string): number | string {
   if (value === undefined) return `missing ${what}`;
   return POSITIVE_INTEGER.test(value) ? Number(value) : `${what} must be a positive integer, got "${value}"`;
-}
-
-function single(rest: readonly string[], what: string, build: (value: number) => CliCommand): ParsedCommandLine {
-  if (rest.length > 1) return failure(`unexpected arguments: ${rest.slice(1).join(' ')}`);
-  const value = positiveInteger(rest[0], what);
-  return typeof value === 'string' ? failure(value) : { ok: true, command: build(value) };
-}
-
-type SplitArguments =
-  | { readonly ok: true; readonly positional: readonly string[]; readonly value: string | undefined }
-  | { readonly ok: false; readonly error: string };
-
-function splitOption(rest: readonly string[], option: string): SplitArguments {
-  let value: string | undefined;
-  const positional: string[] = [];
-  for (let index = 0; index < rest.length; index += 1) {
-    const argument = rest[index] ?? '';
-    if (argument === option) {
-      value = rest[index + 1];
-      index += 1;
-    } else if (argument.startsWith(`${option}${OPTION_VALUE_SEPARATOR}`)) {
-      value = argument.slice(option.length + OPTION_VALUE_SEPARATOR.length);
-    } else if (argument.startsWith('-')) {
-      return { ok: false, error: `unknown option ${argument}` };
-    } else {
-      positional.push(argument);
-    }
-  }
-  return { ok: true, positional, value };
 }
 
 interface ParsedOptions {
@@ -179,163 +167,185 @@ function exactly(positional: readonly string[], names: readonly string[]): strin
   return null;
 }
 
-function parseRequest(rest: readonly string[]): ParsedCommandLine {
-  const [subcommand, ...subcommandArguments] = rest;
+function withOptions(rest: readonly string[], valueOptions: readonly string[], flagOptions: readonly string[], build: (options: ParsedOptions) => ParsedCommand): ParsedCommand {
+  const parsed = parseOptions(rest, valueOptions, flagOptions);
+  return parsed.ok ? build(parsed.options) : failure(parsed.error);
+}
+
+function single(rest: readonly string[], what: string, build: (value: number) => CliCommand): ParsedCommand {
+  return withOptions(rest, [], [], ({ positional }) => {
+    const problem = exactly(positional, [what]);
+    if (problem !== null) return failure(problem);
+    const value = positiveInteger(positional[0], what);
+    return typeof value === 'string' ? failure(value) : done(build(value));
+  });
+}
+
+function isForgeKind(value: string): value is ForgeKind {
+  return FORGE_KINDS.some((forge) => forge === value);
+}
+
+function parseInit(rest: readonly string[]): ParsedCommand {
+  return withOptions(rest, [ID_OPTION, NAME_OPTION, FORGE_OPTION], [FORCE_FLAG], ({ positional, values, flags }) => {
+    if (positional.length > 1) return failure(`unexpected arguments: ${positional.slice(1).join(' ')}`);
+    const forge = values.get(FORGE_OPTION) ?? null;
+    if (forge !== null && !isForgeKind(forge)) return failure(`${FORGE_OPTION} must be one of ${FORGE_KINDS.join(', ')}, got "${forge}"`);
+    return done({ kind: 'init', repository: positional[0] ?? null, id: values.get(ID_OPTION) ?? null, name: values.get(NAME_OPTION) ?? null, forge, force: flags.has(FORCE_FLAG) });
+  });
+}
+
+function parseStart(rest: readonly string[]): ParsedCommand {
+  return withOptions(rest, [PORT_OPTION], [DEMO_FLAG], ({ positional, values, flags }) => {
+    if (positional.length > 0) return failure(`unexpected arguments: ${positional.join(' ')}`);
+    const requested = values.get(PORT_OPTION);
+    if (requested === undefined) return done({ kind: 'start', demo: flags.has(DEMO_FLAG), port: null });
+    const port = positiveInteger(requested, 'port');
+    if (typeof port === 'string' || port > MAX_PORT) return failure(`${PORT_OPTION} must be a port number from 1 to ${MAX_PORT}, got "${requested}"`);
+    return done({ kind: 'start', demo: flags.has(DEMO_FLAG), port });
+  });
+}
+
+function parseStatus(rest: readonly string[]): ParsedCommand {
+  return withOptions(rest, [], [], ({ positional }) => {
+    if (positional.length > 1) return failure(`unexpected arguments: ${positional.slice(1).join(' ')}`);
+    if (positional[0] === undefined) return done({ kind: 'status', issueNumber: null });
+    const value = positiveInteger(positional[0], 'issue number');
+    return typeof value === 'string' ? failure(value) : done({ kind: 'status', issueNumber: value });
+  });
+}
+
+function parseRequest(rest: readonly string[]): ParsedCommand {
+  const [subcommand, ...arguments_] = rest;
   switch (subcommand) {
-    case REQUEST_SUBCOMMANDS.add: {
-      const parsed = parseOptions(subcommandArguments, [IMAGES_OPTION, REQUESTER_OPTION], []);
-      if (!parsed.ok) return failure(parsed.error);
-      const problem = exactly(parsed.options.positional, ['request file']);
-      if (problem !== null) return failure(problem);
-      return {
-        ok: true,
-        command: {
-          kind: 'request-add',
-          path: parsed.options.positional[0] ?? '',
-          imagesDirectory: parsed.options.values.get(IMAGES_OPTION) ?? null,
-          requester: parsed.options.values.get(REQUESTER_OPTION) ?? DEFAULT_REQUESTER,
-        },
-      };
-    }
-    case REQUEST_SUBCOMMANDS.challenge: {
-      const problem = exactly(subcommandArguments, ['request id']);
-      if (problem !== null) return failure(problem);
-      return { ok: true, command: { kind: 'request-challenge', requestId: subcommandArguments[0] ?? '' } };
-    }
+    case REQUEST_SUBCOMMANDS.add:
+      return withOptions(arguments_, [IMAGES_OPTION, REQUESTER_OPTION], [], ({ positional, values }) => {
+        const problem = exactly(positional, ['request file']);
+        if (problem !== null) return failure(problem);
+        return done({ kind: 'request-add', path: positional[0] ?? '', imagesDirectory: values.get(IMAGES_OPTION) ?? null, requester: values.get(REQUESTER_OPTION) ?? DEFAULT_REQUESTER });
+      });
+    case REQUEST_SUBCOMMANDS.challenge:
+      return withOptions(arguments_, [], [], ({ positional }) => {
+        const problem = exactly(positional, ['request id']);
+        return problem === null ? done({ kind: 'request-challenge', requestId: positional[0] ?? '' }) : failure(problem);
+      });
     default:
       return failure(subcommand === undefined ? 'missing request subcommand' : `unknown request subcommand "${subcommand}"`);
   }
 }
 
-function parseIssueCreate(rest: readonly string[]): ParsedCommandLine {
-  const parsed = parseOptions(rest, [], [CONFIRM_FLAG]);
-  if (!parsed.ok) return failure(parsed.error);
-  const problem = exactly(parsed.options.positional, ['spec file']);
-  if (problem !== null) return failure(problem);
-  return { ok: true, command: { kind: 'issue-create', specPath: parsed.options.positional[0] ?? '', confirmed: parsed.options.flags.has(CONFIRM_FLAG) } };
-}
-
-function parseIssueAbandon(rest: readonly string[]): ParsedCommandLine {
-  const parsed = parseOptions(rest, [REASON_OPTION], []);
-  if (!parsed.ok) return failure(parsed.error);
-  const problem = exactly(parsed.options.positional, ['issue number']);
-  if (problem !== null) return failure(problem);
-  const issueNumber = positiveInteger(parsed.options.positional[0], 'issue number');
-  if (typeof issueNumber === 'string') return failure(issueNumber);
-  const reason = parsed.options.values.get(REASON_OPTION)?.trim() ?? '';
-  if (reason === '') return failure(`missing ${REASON_OPTION} <text>`);
-  return { ok: true, command: { kind: 'issue-abandon', issueNumber, reason } };
-}
-
-function parseIssue(rest: readonly string[]): ParsedCommandLine {
-  const [subcommand, ...subcommandArguments] = rest;
+function parseIssue(rest: readonly string[]): ParsedCommand {
+  const [subcommand, ...arguments_] = rest;
   switch (subcommand) {
     case ISSUE_SUBCOMMANDS.create:
-      return parseIssueCreate(subcommandArguments);
+      return withOptions(arguments_, [], [CONFIRM_FLAG], ({ positional, flags }) => {
+        const problem = exactly(positional, ['spec file']);
+        return problem === null ? done({ kind: 'issue-create', specPath: positional[0] ?? '', confirmed: flags.has(CONFIRM_FLAG) }) : failure(problem);
+      });
     case ISSUE_SUBCOMMANDS.abandon:
-      return parseIssueAbandon(subcommandArguments);
+      return withOptions(arguments_, [REASON_OPTION], [], ({ positional, values }) => {
+        const problem = exactly(positional, ['issue number']);
+        if (problem !== null) return failure(problem);
+        const issueNumber = positiveInteger(positional[0], 'issue number');
+        if (typeof issueNumber === 'string') return failure(issueNumber);
+        const reason = values.get(REASON_OPTION)?.trim() ?? '';
+        return reason === '' ? failure(`missing ${REASON_OPTION} <text>`) : done({ kind: 'issue-abandon', issueNumber, reason });
+      });
     default:
       return failure(subcommand === undefined ? 'missing issue subcommand' : `unknown issue subcommand "${subcommand}"`);
   }
 }
 
-function parsePullRequest(rest: readonly string[]): ParsedCommandLine {
-  const [subcommand, ...subcommandArguments] = rest;
-  if (subcommand !== PR_SUBCOMMANDS.feedback) {
-    return failure(subcommand === undefined ? 'missing pr subcommand' : `unknown pr subcommand "${subcommand}"`);
-  }
-  const parsed = parseOptions(subcommandArguments, [AUTHOR_OPTION], []);
-  if (!parsed.ok) return failure(parsed.error);
-  const problem = exactly(parsed.options.positional, ['pull request number', 'feedback file']);
-  if (problem !== null) return failure(problem);
-  const pullRequestNumber = positiveInteger(parsed.options.positional[0], 'pull request number');
-  if (typeof pullRequestNumber === 'string') return failure(pullRequestNumber);
-  const author = parsed.options.values.get(AUTHOR_OPTION);
-  if (author === undefined) return failure(`missing ${AUTHOR_OPTION} <name>`);
-  return { ok: true, command: { kind: 'pr-feedback', pullRequestNumber, path: parsed.options.positional[1] ?? '', author } };
+function parsePullRequest(rest: readonly string[]): ParsedCommand {
+  const [subcommand, ...arguments_] = rest;
+  if (subcommand !== PR_SUBCOMMANDS.feedback) return failure(subcommand === undefined ? 'missing pr subcommand' : `unknown pr subcommand "${subcommand}"`);
+  return withOptions(arguments_, [AUTHOR_OPTION], [], ({ positional, values }) => {
+    const problem = exactly(positional, ['pull request number', 'feedback file']);
+    if (problem !== null) return failure(problem);
+    const pullRequestNumber = positiveInteger(positional[0], 'pull request number');
+    if (typeof pullRequestNumber === 'string') return failure(pullRequestNumber);
+    const author = values.get(AUTHOR_OPTION);
+    return author === undefined ? failure(`missing ${AUTHOR_OPTION} <name>`) : done({ kind: 'pr-feedback', pullRequestNumber, path: positional[1] ?? '', author });
+  });
 }
 
-function sourceCloneCommand(rest: readonly string[], build: (sourceClonePath: string) => CliCommand): ParsedCommandLine {
-  const [sourceClonePath, ...extra] = rest;
-  if (sourceClonePath === undefined) return failure('missing source clone path');
-  if (extra.length > 0) return failure(`unexpected arguments: ${extra.join(' ')}`);
-  return { ok: true, command: build(sourceClonePath) };
-}
-
-function parseRehearsal(rest: readonly string[]): ParsedCommandLine {
-  const [subcommand, ...subcommandArguments] = rest;
+function parseRehearsal(rest: readonly string[]): ParsedCommand {
+  const [subcommand, ...arguments_] = rest;
   switch (subcommand) {
     case REHEARSAL_SUBCOMMANDS.init:
-      return sourceCloneCommand(subcommandArguments, (sourceClonePath) => ({ kind: 'rehearsal-init', sourceClonePath }));
     case REHEARSAL_SUBCOMMANDS.reset:
-      return sourceCloneCommand(subcommandArguments, (sourceClonePath) => ({ kind: 'rehearsal-reset', sourceClonePath }));
-    case REHEARSAL_SUBCOMMANDS.addIssue: {
-      const split = splitOption(subcommandArguments, LABELS_OPTION);
-      if (!split.ok) return failure(split.error);
-      const [specPath, ...extra] = split.positional;
-      if (specPath === undefined) return failure('missing spec file');
-      if (extra.length > 0) return failure(`unexpected arguments: ${extra.join(' ')}`);
-      return { ok: true, command: { kind: 'rehearsal-add-issue', specPath, labels: parseLabelList(split.value ?? '') } };
-    }
+      return withOptions(arguments_, [], [], ({ positional }) => {
+        const problem = exactly(positional, ['source clone path']);
+        if (problem !== null) return failure(problem);
+        const sourceClonePath = positional[0] ?? '';
+        return done(subcommand === REHEARSAL_SUBCOMMANDS.init ? { kind: 'rehearsal-init', sourceClonePath } : { kind: 'rehearsal-reset', sourceClonePath });
+      });
+    case REHEARSAL_SUBCOMMANDS.addIssue:
+      return withOptions(arguments_, [LABELS_OPTION], [], ({ positional, values }) => {
+        const problem = exactly(positional, ['spec file']);
+        return problem === null ? done({ kind: 'rehearsal-add-issue', specPath: positional[0] ?? '', labels: parseLabelList(values.get(LABELS_OPTION) ?? '') }) : failure(problem);
+      });
     default:
       return failure(subcommand === undefined ? 'missing rehearsal subcommand' : `unknown rehearsal subcommand "${subcommand}"`);
   }
 }
 
-function parseResume(rest: readonly string[]): ParsedCommandLine {
-  if (rest.at(-1) === ANSWER_OPTION) return failure(`missing text after ${ANSWER_OPTION}`);
-  const split = splitOption(rest, ANSWER_OPTION);
-  if (!split.ok) return failure(split.error);
-  const { positional, value: answer } = split;
-  if (positional.length > 1) return failure(`unexpected arguments: ${positional.slice(1).join(' ')}`);
-  const issueNumber = positiveInteger(positional[0], 'issue number');
-  if (typeof issueNumber === 'string') return failure(issueNumber);
-  if (answer !== undefined && answer.trim() === '') return failure(`${ANSWER_OPTION} needs the text of the answer`);
-  return { ok: true, command: { kind: 'resume', issueNumber, answer: answer ?? null } };
+function parseResume(rest: readonly string[]): ParsedCommand {
+  return withOptions(rest, [ANSWER_OPTION], [], ({ positional, values }) => {
+    const problem = exactly(positional, ['issue number']);
+    if (problem !== null) return failure(problem);
+    const issueNumber = positiveInteger(positional[0], 'issue number');
+    if (typeof issueNumber === 'string') return failure(issueNumber);
+    const answer = values.get(ANSWER_OPTION);
+    if (answer !== undefined && answer.trim() === '') return failure(`${ANSWER_OPTION} needs the text of the answer`);
+    return done({ kind: 'resume', issueNumber, answer: answer ?? null });
+  });
 }
 
-function parseMerge(rest: readonly string[]): ParsedCommandLine {
-  const split = splitOption(rest, EXPECTED_HEAD_OPTION);
-  if (!split.ok) return failure(split.error);
-  const { positional, value: expectedHeadSha } = split;
-  if (positional.length > 1) return failure(`unexpected arguments: ${positional.slice(1).join(' ')}`);
-  const pullRequestNumber = positiveInteger(positional[0], 'pull request number');
-  if (typeof pullRequestNumber === 'string') return failure(pullRequestNumber);
-  if (expectedHeadSha === undefined) return failure(`missing ${EXPECTED_HEAD_OPTION} <sha>`);
-  if (!FULL_COMMIT_SHA.test(expectedHeadSha)) {
-    return failure(`${EXPECTED_HEAD_OPTION} must be the full 40-character commit sha, got "${expectedHeadSha}"`);
-  }
-  return { ok: true, command: { kind: 'merge', pullRequestNumber, expectedHeadSha } };
+function parseMerge(rest: readonly string[]): ParsedCommand {
+  return withOptions(rest, [EXPECTED_HEAD_OPTION], [], ({ positional, values }) => {
+    const problem = exactly(positional, ['pull request number']);
+    if (problem !== null) return failure(problem);
+    const pullRequestNumber = positiveInteger(positional[0], 'pull request number');
+    if (typeof pullRequestNumber === 'string') return failure(pullRequestNumber);
+    const expectedHeadSha = values.get(EXPECTED_HEAD_OPTION);
+    if (expectedHeadSha === undefined) return failure(`missing ${EXPECTED_HEAD_OPTION} <sha>`);
+    if (!FULL_COMMIT_SHA.test(expectedHeadSha)) return failure(`${EXPECTED_HEAD_OPTION} must be the full 40-character commit sha, got "${expectedHeadSha}"`);
+    return done({ kind: 'merge', pullRequestNumber, expectedHeadSha });
+  });
 }
 
-function parseAudit(rest: readonly string[]): ParsedCommandLine {
-  const parsed = parseOptions(rest, [], []);
-  if (!parsed.ok) return failure(parsed.error);
-  const commits = parsed.options.positional;
-  const invalid = commits.find((commit) => !COMMIT_REFERENCE.test(commit));
-  if (commits.length === 0) return failure('missing commit');
-  if (invalid !== undefined) return failure(`commit must be a hexadecimal sha of 7 to 40 characters, got "${invalid}"`);
-  return { ok: true, command: { kind: 'audit', commits } };
+function parseAudit(rest: readonly string[]): ParsedCommand {
+  return withOptions(rest, [], [], ({ positional }) => {
+    if (positional.length === 0) return failure('missing commit');
+    const invalid = positional.find((commit) => !COMMIT_REFERENCE.test(commit));
+    return invalid === undefined ? done({ kind: 'audit', commits: positional }) : failure(`commit must be a hexadecimal sha of 7 to 40 characters, got "${invalid}"`);
+  });
 }
 
-export function parseCommandLine(argv: readonly string[]): ParsedCommandLine {
-  const [name, ...rest] = argv;
-  if (name === undefined || name === COMMAND_NAMES.help || HELP_FLAGS.includes(name)) return { ok: true, command: { kind: 'help' } };
+function parseCommand(name: string, rest: readonly string[]): ParsedCommand {
   switch (name) {
+    case COMMAND_NAMES.init:
+      return parseInit(rest);
+    case COMMAND_NAMES.validate:
+      return withOptions(rest, [], [OFFLINE_FLAG, SKIP_GATE_PREFLIGHT_FLAG], ({ positional, flags }) =>
+        positional.length > 0 ? failure(`unexpected arguments: ${positional.join(' ')}`) : done({ kind: 'validate', offline: flags.has(OFFLINE_FLAG), gatePreflight: !flags.has(SKIP_GATE_PREFLIGHT_FLAG) }),
+      );
+    case COMMAND_NAMES.schema:
+      return rest.length === 0 ? done({ kind: 'schema' }) : failure(`unexpected arguments: ${rest.join(' ')}`);
+    case COMMAND_NAMES.start:
+      return parseStart(rest);
+    case COMMAND_NAMES.status:
+      return parseStatus(rest);
+    case COMMAND_NAMES.usage:
+      return withOptions(rest, [], [REFRESH_FLAG], ({ positional, flags }) => (positional.length > 0 ? failure(`unexpected arguments: ${positional.join(' ')}`) : done({ kind: 'usage', refresh: flags.has(REFRESH_FLAG) })));
     case COMMAND_NAMES.runIssue:
       return single(rest, 'issue number', (issueNumber) => ({ kind: 'run-issue', issueNumber }));
     case COMMAND_NAMES.resume:
       return parseResume(rest);
-    case COMMAND_NAMES.status:
-      return single(rest, 'issue number', (issueNumber) => ({ kind: 'status', issueNumber }));
     case COMMAND_NAMES.merge:
       return parseMerge(rest);
     case COMMAND_NAMES.rehearsal:
       return parseRehearsal(rest);
-    case COMMAND_NAMES.validate:
-      return parseValidate(rest);
-    case COMMAND_NAMES.start:
-      return rest.length === 0 ? { ok: true, command: { kind: 'start' } } : failure(`unexpected arguments: ${rest.join(' ')}`);
     case COMMAND_NAMES.request:
       return parseRequest(rest);
     case COMMAND_NAMES.issue:
@@ -347,4 +357,25 @@ export function parseCommandLine(argv: readonly string[]): ParsedCommandLine {
     default:
       return failure(`unknown command "${name}"`);
   }
+}
+
+/** Takes `--project <id>` from anywhere on the line, then parses the command. */
+export function parseCommandLine(argv: readonly string[]): ParsedCommandLine {
+  const rest: string[] = [];
+  let project: string | null = null;
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index] ?? '';
+    if (argument === PROJECT_OPTION || argument.startsWith(`${PROJECT_OPTION}${OPTION_VALUE_SEPARATOR}`)) {
+      const value = argument === PROJECT_OPTION ? argv[index + 1] : argument.slice(PROJECT_OPTION.length + OPTION_VALUE_SEPARATOR.length);
+      if (value === undefined || value === '') return failure(`missing value for ${PROJECT_OPTION}`);
+      project = value;
+      if (argument === PROJECT_OPTION) index += 1;
+    } else {
+      rest.push(argument);
+    }
+  }
+  const [name, ...arguments_] = rest;
+  if (name === undefined || name === COMMAND_NAMES.help || HELP_FLAGS.includes(name)) return { ok: true, line: { project, command: { kind: 'help' } } };
+  const parsed = parseCommand(name, arguments_);
+  return parsed.ok ? { ok: true, line: { project, command: parsed.command } } : parsed;
 }

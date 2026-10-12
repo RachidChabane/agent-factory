@@ -1,31 +1,24 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createIssueFromPlan, planIssueCreation, specOriginOf, type SpecOrigin } from '@agent-factory/application';
-import { conventionsFromConfig } from '../../config/conventions-from-config.ts';
-import type { FactoryConfig } from '../../config/factory-config.ts';
+import { createIssueFromPlan, planIssueCreation, specOriginOf } from '@agent-factory/application';
+import { projectConventions } from '../../composition/project/project-settings.ts';
 import type { CliContext } from '../cli-context.ts';
 import { EXIT_CODES } from '../output.ts';
+import { forgeName } from './forge-names.ts';
+import { itemName, selectedProject, withProjectEvents, withProjectSession } from './project-session.ts';
 
 const UTF8 = 'utf8';
-const REMOTE_MODE = 'remote';
 const LABEL_SEPARATOR = ', ';
 
-async function originOf(context: CliContext, config: FactoryConfig, specPath: string): Promise<SpecOrigin | null> {
-  const eventLog = context.openEventLog(config);
-  try {
-    return await specOriginOf(eventLog.events, config.directories.requests, resolve(specPath));
-  } finally {
-    eventLog.close();
-  }
-}
-
-export async function issueCreateCommand(specPath: string, confirmed: boolean, context: CliContext): Promise<number> {
-  const config = await context.loadConfig();
-  const text = await readFile(specPath, UTF8);
-  const plan = planIssueCreation(text, await originOf(context, config, specPath), conventionsFromConfig(config));
-  const target = `${config.target.owner}/${config.target.name}`;
-  if (config.github.mode === REMOTE_MODE && !confirmed) {
-    context.output.line(`This creates an issue on GitHub in ${target}:`);
+export async function issueCreateCommand(specPath: string, confirmed: boolean, requested: string | null, context: CliContext): Promise<number> {
+  const selected = await selectedProject(context, requested);
+  const { project } = selected;
+  const path = resolve(context.workingDirectory, specPath);
+  const text = await readFile(path, UTF8);
+  const origin = await withProjectEvents(context, selected, (events) => specOriginOf(events, project.directories.requests, path));
+  const plan = planIssueCreation(text, origin, projectConventions(project));
+  if (project.forge.kind === 'github' && !confirmed) {
+    context.output.line(`This creates an issue on ${forgeName(project)}:`);
     context.output.line(`Title: ${plan.title}`);
     context.output.line(`Labels: ${plan.labels.join(LABEL_SEPARATOR)}`);
     context.output.line('');
@@ -34,13 +27,11 @@ export async function issueCreateCommand(specPath: string, confirmed: boolean, c
     context.output.error('Nothing was created. Re-run with --confirm to create it.');
     return EXIT_CODES.confirmationRequired;
   }
-  const factory = await context.openFactory(config);
-  try {
-    const issue = await createIssueFromPlan(factory.dependencies, plan);
+  return withProjectSession(context, selected, async (session) => {
+    const issue = await createIssueFromPlan(session.project.dependencies, plan);
     const from = plan.origin === null ? '' : ` from ${plan.origin.requestId} ${plan.origin.specId}`;
-    context.output.line(`Issue #${issue.number} created in ${target}${from} [${issue.labels.join(LABEL_SEPARATOR)}]; add spec:validated once you have reviewed it`);
+    const validated = project.conventions.labels.validated;
+    context.output.line(`${itemName(project, issue.number)} created on ${forgeName(project)}${from} [${issue.labels.join(LABEL_SEPARATOR)}]; add ${validated} once you have reviewed it`);
     return EXIT_CODES.ok;
-  } finally {
-    factory.close();
-  }
+  });
 }

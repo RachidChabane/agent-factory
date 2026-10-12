@@ -1,7 +1,13 @@
 import type { IssueStatus } from '@agent-factory/application';
+import type { CostsView } from '@agent-factory/cockpit';
 
 const NONE = 'none';
 const COST_DECIMALS = 2;
+const COST_BASIS_NOTES: Readonly<Record<CostsView['basis'], string>> = {
+  'subscription-equivalent': 'what the same usage would cost on the API; the subscription pays for it',
+  metered: 'charged to the API key',
+  mixed: 'API prices; part of the usage is paid by a subscription',
+};
 
 function gateLine(status: IssueStatus): string {
   const gate = status.lastGate;
@@ -17,10 +23,10 @@ function reviewLine(status: IssueStatus): string {
   return `attempt ${review.attempt + 1}: ${review.findings.length} finding(s), ${blocking} blocking`;
 }
 
-export function renderIssueStatus(status: IssueStatus): readonly string[] {
+export function renderIssueStatus(project: string, status: IssueStatus, costBasis: CostsView['basis']): readonly string[] {
   const { attempts } = status;
   return [
-    `Issue #${status.issueNumber}${status.title === null ? '' : `: ${status.title}`}`,
+    `${project}#${status.issueNumber}${status.title === null ? '' : `: ${status.title}`}`,
     `State: ${status.state ?? 'unknown'}`,
     ...(status.escalationReason === null ? [] : [`Needs human: ${status.escalationReason}`]),
     `Branch: ${status.branch ?? NONE}`,
@@ -32,6 +38,6 @@ export function renderIssueStatus(status: IssueStatus): readonly string[] {
     `Last review: ${reviewLine(status)}`,
     `Pull request: ${status.pullRequest === null ? NONE : `#${status.pullRequest.number} ${status.pullRequest.url}`}`,
     ...(status.mergeSha === null ? [] : [`Merged as: ${status.mergeSha}`]),
-    `Agent cost: $${status.costUsd.toFixed(COST_DECIMALS)}`,
+    `Agent cost: $${status.costUsd.toFixed(COST_DECIMALS)} (${COST_BASIS_NOTES[costBasis]})`,
   ];
 }

@@ -13,7 +13,7 @@ import {
 } from '@agent-factory/application';
 import { ISSUE_ESCALATION_STATE, issueSubject } from '@agent-factory/domain';
 import { lastOf, type EventIndex } from './event-index.ts';
-import type { SnapshotContext } from './snapshot-context.ts';
+import type { RunLogSummary } from './snapshot-context.ts';
 
 export interface RecordedRun {
   readonly started: RunStartedPayload;
@@ -63,16 +63,18 @@ export function pendingQuestions(index: EventIndex, journals: ReadonlyMap<number
   return questions;
 }
 
-function runView(run: RecordedRun, context: SnapshotContext, questions: ReadonlyMap<string, PendingQuestion>): RunView {
+function runView(run: RecordedRun, runLogs: ReadonlyMap<string, RunLogSummary>, questions: ReadonlyMap<string, PendingQuestion>): RunView {
   const { started, finished } = run;
-  const log = context.runLogs.get(started.id);
+  const log = runLogs.get(started.id);
   const question = questions.get(started.id) ?? null;
   const status = finished === null ? started.status : finished.status === WAITING && question === null ? ANSWERED : finished.status;
   return {
     id: started.id,
+    project: started.project,
     role: started.role,
     model: started.model,
     effort: started.effort,
+    account: finished?.account ?? started.account,
     status,
     outcome: finished?.outcome ?? null,
     subject: started.subject,
@@ -94,8 +96,8 @@ function runView(run: RecordedRun, context: SnapshotContext, questions: Readonly
   };
 }
 
-export function projectRuns(runs: readonly RecordedRun[], context: SnapshotContext, questions: ReadonlyMap<string, PendingQuestion>): RunView[] {
+export function projectRuns(runs: readonly RecordedRun[], runLogs: ReadonlyMap<string, RunLogSummary>, questions: ReadonlyMap<string, PendingQuestion>): RunView[] {
   return runs
-    .map((run) => runView(run, context, questions))
+    .map((run) => runView(run, runLogs, questions))
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || left.id.localeCompare(right.id));
 }

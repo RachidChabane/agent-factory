@@ -7,5 +7,6 @@ export default defineConfig({
   test: {
     testTimeout: INTEGRATION_TEST_TIMEOUT_MS,
     hookTimeout: INTEGRATION_TEST_TIMEOUT_MS,
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

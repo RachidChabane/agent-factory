@@ -9,6 +9,7 @@ const CONCLUDED: AuditRecord = {
   commitMessage: 'fix: remove the gate',
   authorLogin: 'dev',
   pullRequestNumber: null,
+  pullRequestBranch: null,
   state: 'challenge',
   conclusion: {
     runId: 'run-1',

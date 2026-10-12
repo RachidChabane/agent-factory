@@ -1,18 +1,66 @@
 import type { CliContext } from './cli-context.ts';
-import { parseCommandLine, USAGE } from './command-line.ts';
+import { parseCommandLine, USAGE, type CommandLine } from './command-line.ts';
 import { auditCommand } from './commands/audit-command.ts';
-import { mergeCommand } from './commands/merge-command.ts';
-import { rehearsalAddIssueCommand, rehearsalInitCommand, rehearsalResetCommand } from './commands/rehearsal-command.ts';
-import { resumeCommand } from './commands/resume-command.ts';
-import { runIssueCommand } from './commands/run-issue-command.ts';
-import { statusCommand } from './commands/status-command.ts';
-import { validateCommand } from './commands/validate-command.ts';
-import { EXIT_CODES } from './output.ts';
+import { initCommand } from './commands/init-command.ts';
 import { issueAbandonCommand } from './commands/issue-abandon-command.ts';
 import { issueCreateCommand } from './commands/issue-create-command.ts';
+import { mergeCommand } from './commands/merge-command.ts';
 import { prFeedbackCommand } from './commands/pr-feedback-command.ts';
+import { rehearsalAddIssueCommand, rehearsalInitCommand, rehearsalResetCommand } from './commands/rehearsal-command.ts';
 import { requestAddCommand, requestChallengeCommand } from './commands/request-command.ts';
+import { resumeCommand } from './commands/resume-command.ts';
+import { runIssueCommand } from './commands/run-issue-command.ts';
+import { schemaCommand } from './commands/schema-command.ts';
 import { startCommand } from './commands/start-command.ts';
+import { statusCommand } from './commands/status-command.ts';
+import { usageCommand } from './commands/usage-command.ts';
+import { validateCommand } from './commands/validate-command.ts';
+import { startDemoCommand } from '../demo/demo-command.ts';
+import { EXIT_CODES } from './output.ts';
+
+async function dispatch({ project, command }: CommandLine, context: CliContext): Promise<number> {
+  switch (command.kind) {
+    case 'help':
+      context.output.line(USAGE);
+      return EXIT_CODES.ok;
+    case 'init':
+      return initCommand(command, context);
+    case 'validate':
+      return validateCommand(context, { offline: command.offline, gatePreflight: command.gatePreflight });
+    case 'schema':
+      return schemaCommand(context);
+    case 'start':
+      return command.demo ? startDemoCommand(context, command.port) : startCommand(context, command.port);
+    case 'status':
+      return statusCommand(command.issueNumber, project, context);
+    case 'usage':
+      return usageCommand(command.refresh, context);
+    case 'run-issue':
+      return runIssueCommand(command.issueNumber, project, context);
+    case 'resume':
+      return resumeCommand(command.issueNumber, command.answer, project, context);
+    case 'merge':
+      return mergeCommand(command.pullRequestNumber, command.expectedHeadSha, project, context);
+    case 'rehearsal-init':
+      return rehearsalInitCommand(command.sourceClonePath, project, context);
+    case 'rehearsal-reset':
+      return rehearsalResetCommand(command.sourceClonePath, project, context);
+    case 'rehearsal-add-issue':
+      return rehearsalAddIssueCommand(command.specPath, command.labels, project, context);
+    case 'request-add':
+      return requestAddCommand(command.path, command.imagesDirectory, command.requester, project, context);
+    case 'request-challenge':
+      return requestChallengeCommand(command.requestId, project, context);
+    case 'issue-create':
+      return issueCreateCommand(command.specPath, command.confirmed, project, context);
+    case 'issue-abandon':
+      return issueAbandonCommand(command.issueNumber, command.reason, project, context);
+    case 'pr-feedback':
+      return prFeedbackCommand(command.pullRequestNumber, command.path, command.author, project, context);
+    case 'audit':
+      return auditCommand(command.commits, project, context);
+  }
+}
 
 export async function runCli(argv: readonly string[], context: CliContext): Promise<number> {
   const parsed = parseCommandLine(argv);
@@ -20,43 +68,8 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
     context.output.error(`${parsed.error}\n\n${USAGE}`);
     return EXIT_CODES.usage;
   }
-  const { command } = parsed;
   try {
-    switch (command.kind) {
-      case 'help':
-        context.output.line(USAGE);
-        return EXIT_CODES.ok;
-      case 'run-issue':
-        return await runIssueCommand(command.issueNumber, context);
-      case 'resume':
-        return await resumeCommand(command.issueNumber, command.answer, context);
-      case 'merge':
-        return await mergeCommand(command.pullRequestNumber, command.expectedHeadSha, context);
-      case 'status':
-        return await statusCommand(command.issueNumber, context);
-      case 'validate':
-        return await validateCommand(context, { gatePreflight: command.gatePreflight });
-      case 'rehearsal-init':
-        return await rehearsalInitCommand(command.sourceClonePath, context);
-      case 'rehearsal-reset':
-        return await rehearsalResetCommand(command.sourceClonePath, context);
-      case 'rehearsal-add-issue':
-        return await rehearsalAddIssueCommand(command.specPath, command.labels, context);
-      case 'start':
-        return await startCommand(context);
-      case 'request-add':
-        return await requestAddCommand(command.path, command.imagesDirectory, command.requester, context);
-      case 'request-challenge':
-        return await requestChallengeCommand(command.requestId, context);
-      case 'issue-create':
-        return await issueCreateCommand(command.specPath, command.confirmed, context);
-      case 'issue-abandon':
-        return await issueAbandonCommand(command.issueNumber, command.reason, context);
-      case 'audit':
-        return await auditCommand(command.commits, context);
-      case 'pr-feedback':
-        return await prFeedbackCommand(command.pullRequestNumber, command.path, command.author, context);
-    }
+    return await dispatch(parsed.line, context);
   } catch (error) {
     context.output.error(error instanceof Error ? error.message : String(error));
     return EXIT_CODES.failure;

@@ -1,15 +1,18 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { AddRequest, requestChallenge, requestTitleOf } from '@agent-factory/application';
-import { requestChallenger } from '../../composition/use-cases.ts';
+import { requestChallenger } from '../../composition/project/project-use-cases.ts';
 import type { CliContext } from '../cli-context.ts';
+import { COMMAND_NAMES, REQUEST_SUBCOMMANDS } from '../command-line.ts';
 import { EXIT_CODES } from '../output.ts';
-import type { FactoryConfig } from '../../config/factory-config.ts';
 import { abortOnShutdown } from '../shutdown.ts';
 import { runningFactory, withFactoryLock } from './factory-running.ts';
+import { nextCommand, selectedProject, withProjectEvents, withProjectSession, type SelectedProject } from './project-session.ts';
 
 const UTF8 = 'utf8';
 const CLI_CHANNEL = 'cli';
+const REPORT_FILE = 'report.md';
+const REPLY_FILE = 'reply.md';
 
 async function imageNames(directory: string): Promise<readonly string[]> {
   return (await readdir(directory, { withFileTypes: true }))
@@ -18,57 +21,52 @@ async function imageNames(directory: string): Promise<readonly string[]> {
     .sort();
 }
 
-export async function requestAddCommand(path: string, imagesDirectory: string | null, requester: string, context: CliContext): Promise<number> {
-  const config = await context.loadConfig();
-  const body = await readFile(path, UTF8);
-  const images = imagesDirectory === null ? [] : (await imageNames(resolve(imagesDirectory))).map((name) => ({ name, sourceDirectory: resolve(imagesDirectory) }));
-  const eventLog = context.openEventLog(config);
-  try {
-    const added = await new AddRequest(
-      { events: eventLog.events, files: context.files, clock: context.clock },
-      { requestsDirectory: config.directories.requests },
-    ).add({ title: requestTitleOf(body), requester, channel: CLI_CHANNEL, body, images });
-    context.output.line(`Request ${added.id} stored with ${added.attachments.length} image(s) in ${config.directories.requests}/${added.id}`);
-    context.output.line(`Challenge it with "factory request challenge ${added.id}"`);
-    return EXIT_CODES.ok;
-  } finally {
-    eventLog.close();
-  }
+export async function requestAddCommand(path: string, imagesDirectory: string | null, requester: string, requested: string | null, context: CliContext): Promise<number> {
+  const selected = await selectedProject(context, requested);
+  const { project } = selected;
+  const body = await readFile(resolve(context.workingDirectory, path), UTF8);
+  const sourceDirectory = imagesDirectory === null ? null : resolve(context.workingDirectory, imagesDirectory);
+  const images = sourceDirectory === null ? [] : (await imageNames(sourceDirectory)).map((name) => ({ name, sourceDirectory }));
+  const added = await withProjectEvents(context, selected, (events) =>
+    new AddRequest({ events, files: context.files, clock: context.clock }, { requestsDirectory: project.directories.requests }).add({
+      title: requestTitleOf(body),
+      requester,
+      channel: CLI_CHANNEL,
+      body,
+      images,
+    }),
+  );
+  context.output.line(`Request ${added.id} of ${project.id} stored with ${added.attachments.length} image(s) in ${join(project.directories.requests, added.id)}`);
+  context.output.line(`Challenge it with "${nextCommand(selected, COMMAND_NAMES.request, REQUEST_SUBCOMMANDS.challenge, added.id)}"`);
+  return EXIT_CODES.ok;
 }
 
-export async function requestChallengeCommand(requestId: string, context: CliContext): Promise<number> {
-  const config = await context.loadConfig();
-  const running = await runningFactory(config);
-  if (running !== null) {
-    const eventLog = context.openEventLog(config);
+async function challengeNow(requestId: string, selected: SelectedProject, context: CliContext): Promise<number> {
+  return withProjectSession(context, selected, async ({ installation, project }) => {
+    const controller = new AbortController();
+    const releaseSignals = abortOnShutdown(controller, context.output);
     try {
-      await requestChallenge(eventLog.events, requestId, CLI_CHANNEL);
-      context.output.line(`Request ${requestId} queued; the factory running as process ${running} challenges it`);
+      const outcome = await requestChallenger(project, installation).challenge(requestId, controller.signal);
+      if (outcome.status === 'failed') {
+        context.output.error(`The challenge of ${requestId} failed: ${outcome.reason}`);
+        return EXIT_CODES.failure;
+      }
+      const directory = join(project.config.directories.requests, requestId);
+      context.output.line(`Request ${requestId} challenged: ${outcome.items.length} item(s), report ${join(directory, REPORT_FILE)}, reply ${join(directory, REPLY_FILE)}`);
+      for (const path of outcome.specPaths) context.output.line(`Proposed spec: ${join(directory, path)}`);
+      for (const report of outcome.problems) context.output.error(`${report.specId}: ${report.problems.join('; ')}`);
       return EXIT_CODES.ok;
     } finally {
-      eventLog.close();
+      releaseSignals();
     }
-  }
-  return withFactoryLock(config, () => challengeNow(requestId, config, context));
+  });
 }
 
-async function challengeNow(requestId: string, config: FactoryConfig, context: CliContext): Promise<number> {
-  const factory = await context.openFactory(config);
-  const controller = new AbortController();
-  const releaseSignals = abortOnShutdown(controller, context.output);
-  try {
-    const outcome = await requestChallenger(factory).challenge(requestId, controller.signal);
-    if (outcome.status === 'failed') {
-      context.output.error(`The challenge of ${requestId} failed: ${outcome.reason}`);
-      return EXIT_CODES.failure;
-    }
-    const directory = `${config.directories.requests}/${requestId}`;
-    context.output.line(`Request ${requestId} challenged: ${outcome.items.length} item(s), report ${directory}/report.md, reply ${directory}/reply.md`);
-    for (const path of outcome.specPaths) context.output.line(`Proposed spec: ${directory}/${path}`);
-    for (const report of outcome.problems) context.output.error(`${report.specId}: ${report.problems.join('; ')}`);
-    return EXIT_CODES.ok;
-  } finally {
-    releaseSignals();
-    factory.close();
-  }
+export async function requestChallengeCommand(requestId: string, requested: string | null, context: CliContext): Promise<number> {
+  const selected = await selectedProject(context, requested);
+  const running = await runningFactory(selected.config);
+  if (running === null) return withFactoryLock(selected.config, () => challengeNow(requestId, selected, context));
+  await withProjectEvents(context, selected, (events) => requestChallenge(events, requestId, CLI_CHANNEL));
+  context.output.line(`Request ${requestId} queued; the factory running as process ${running} challenges it`);
+  return EXIT_CODES.ok;
 }

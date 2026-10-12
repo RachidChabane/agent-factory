@@ -5,6 +5,9 @@
   "description": "An agentic software factory: drives Claude Code from a validated issue spec to a proof-carrying pull request, with a live cockpit.",
   "license": "AGPL-3.0-only",
   "type": "module",
+  "bin": {
+    "agent-factory": "bin/agent-factory"
+  },
   "packageManager": "pnpm@10.32.1",
   "engines": {
     "node": ">=24.11.0"
@@ -13,7 +16,8 @@
     "setup": "script/setup",
     "lint": "script/lint",
     "test": "script/test",
-    "scan": "script/scan"
+    "scan": "script/scan",
+    "factory": "script/factory"
   },
   "devDependencies": {
     "@types/node": "24.5.2",

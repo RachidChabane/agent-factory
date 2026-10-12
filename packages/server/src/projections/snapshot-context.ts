@@ -1,12 +1,6 @@
-import type { ConfiguredTool, RoleSetting, SubscriptionWindowView, ToolConnection } from '@agent-factory/cockpit';
 import type { CheckRunSummary, ProjectConventions } from '@agent-factory/application';
-import type { DeploymentEnvironment, IssueSpec, PauseAbovePressureLevel, ResourceSnapshot, TokenUsage } from '@agent-factory/domain';
-import type { EnvironmentDeployments } from './environment-views.ts';
-
-export interface ResourceReading {
-  readonly snapshot: ResourceSnapshot | null;
-  readonly sampledAt: Date;
-}
+import type { IssueSpec, TokenUsage } from '@agent-factory/domain';
+import type { Observed } from '../snapshot/cached-reading.ts';
 
 export interface RunLogSummary {
   readonly logLength: number;
@@ -15,8 +9,11 @@ export interface RunLogSummary {
   readonly progress: { readonly usage: TokenUsage; readonly turns: number } | null;
 }
 
+/** Where the cockpit finds a project's issues, evidence files and request attachments. */
 export interface SnapshotLinks {
   issue(issueNumber: number): string;
+  /** The address the cockpit can open for a URL the forge gave, such as a local forge's file. */
+  forge(url: string): string;
   evidence(issueNumber: number, relativePath: string): string;
   requestAttachment(requestId: string, relativePath: string): string;
 }
@@ -25,31 +22,20 @@ export function logKey(issueNumber: number, name: string): string {
   return `${issueNumber}/${name}`;
 }
 
-export interface SnapshotContext {
+/** What the projections of one project read besides its events. */
+export interface ProjectSnapshotContext {
   readonly generatedAt: Date;
-  readonly repository: string;
-  readonly defaultBranch: string;
-  readonly operator: string;
-  readonly links: SnapshotLinks;
+  readonly project: string;
   readonly conventions: ProjectConventions;
-  readonly roles: readonly RoleSetting[];
-  readonly models: readonly string[];
-  readonly concurrency: { readonly ceiling: number; readonly maximum: number };
-  readonly freeMemoryThresholdPercent: number;
-  readonly pauseAbovePressure: PauseAbovePressureLevel;
-  readonly resources: ResourceReading;
-  readonly subscription: readonly SubscriptionWindowView[];
-  readonly pauseAtUtilization: number;
-  readonly dailyCapUsd: number;
-  readonly perRunCapUsd: number | null;
-  readonly productionWorkflowUrl: string;
+  readonly links: SnapshotLinks;
+  /** Validated issues the factory has not started yet, as last read from the forge. */
   readonly pendingIssues: readonly IssueSpec[];
-  readonly runLogs: ReadonlyMap<string, RunLogSummary>;
-  readonly pullRequestChecks: ReadonlyMap<number, readonly CheckRunSummary[]>;
+  readonly pullRequestChecks: ReadonlyMap<number, Observed<readonly CheckRunSummary[]>>;
   readonly pullRequestTitles: ReadonlyMap<number, string>;
   readonly logs: ReadonlyMap<string, string>;
-  readonly knowledgeSources: readonly string[];
-  readonly configuredTools: readonly ConfiguredTool[];
-  readonly tools: readonly ToolConnection[];
-  readonly deployments: ReadonlyMap<DeploymentEnvironment, EnvironmentDeployments>;
+  readonly productionWorkflowUrl: string | null;
+  /** What the agent runs of each issue cost, summed. */
+  readonly issueCosts: ReadonlyMap<number, number>;
+  /** The files each audited change touched, for the changes read from the forge so far. */
+  readonly changedFiles: ReadonlyMap<string, readonly string[]>;
 }

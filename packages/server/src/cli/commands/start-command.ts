@@ -1,28 +1,42 @@
 import { ProcessLock } from '@agent-factory/adapters';
-import { factoryLockPath, startFactoryRuntime } from '../../composition/factory-runtime.ts';
+import { withServerPort, type AgentFactoryConfig } from '../../config/agent-factory-config.ts';
+import type { InstallationOverrides, InstallationRuntime } from '../../composition/installation/installation-runtime.ts';
+import { factoryLockPath, startFactory, type RunningFactory } from '../../composition/runtime.ts';
 import type { CliContext } from '../cli-context.ts';
-import { abortOnShutdown } from '../shutdown.ts';
 import { EXIT_CODES } from '../output.ts';
+import { abortOnShutdown } from '../shutdown.ts';
 
-export async function startCommand(context: CliContext): Promise<number> {
-  const config = await context.loadConfig();
-  const lock = new ProcessLock(factoryLockPath(config));
+/** What runs beside the factory once it serves, such as the demonstration's own activity; it ends when the signal aborts. */
+export type CompanionTask = (runtime: InstallationRuntime, running: RunningFactory, signal: AbortSignal) => Promise<void>;
+
+/** Runs the factory on every project of the configuration and serves the cockpit until a shutdown signal. */
+export async function serveInstallation(config: AgentFactoryConfig, overrides: InstallationOverrides, context: CliContext, companion: CompanionTask | null = null): Promise<number> {
+  const lock = new ProcessLock(factoryLockPath(config.directories.state));
   await lock.acquire();
   const controller = new AbortController();
   const releaseSignals = abortOnShutdown(controller, context.output);
   try {
-    const factory = await context.openFactory(config);
+    const runtime = await context.openInstallation(config, overrides);
     try {
-      const runtime = await startFactoryRuntime(factory, controller.signal);
-      context.output.line(`Factory started; cockpit at http://${runtime.address.address}:${runtime.address.port} (${config.server.publicUrl})`);
-      await runtime.finished;
+      const running = await startFactory(runtime, controller.signal);
+      const projects = runtime.projects.map((project) => project.id).join(', ');
+      context.output.line(`Factory started on ${projects}; cockpit at http://${running.address.address}:${running.address.port} (${config.server.publicUrl})`);
+      const companionDone = companion === null ? Promise.resolve() : companion(runtime, running, controller.signal);
+      await running.finished;
+      await companionDone;
       context.output.line('Factory stopped');
       return EXIT_CODES.ok;
     } finally {
-      factory.close();
+      runtime.close();
     }
   } finally {
     releaseSignals();
     await lock.release();
   }
+}
+
+/** Starts the factory of the operator's configuration; a port given on the command line replaces the configured one. */
+export async function startCommand(context: CliContext, port: number | null): Promise<number> {
+  const config = await context.loadConfig();
+  return serveInstallation(port === null ? config : withServerPort(config, port), {}, context);
 }

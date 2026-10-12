@@ -8,18 +8,19 @@ import {
   COMMAND_TOKEN_HEADER,
   COMMAND_TOKEN_META_NAME,
   CommandRejectedSchema,
-  FactoryEventRecordSchema,
-  RunFinishedPayloadSchema,
   RunLogLineSchema,
   RunLogPageSchema,
-  RunStartedPayloadSchema,
+  StreamEventSchema,
   TelemetrySampleSchema,
+  type CockpitSnapshot,
+  type ProjectView,
 } from '@agent-factory/cockpit';
-import { openFactory, type FactoryContainer } from '../composition/factory-container.ts';
-import { createHttpServer, startFactoryRuntime, type FactoryRuntime } from '../composition/factory-runtime.ts';
+import { RUN_SUBJECT_PREFIX } from '@agent-factory/application';
+import { openInstallation, type InstallationRuntime } from '../composition/installation/installation-runtime.ts';
 import { SILENT_LOG } from '../composition/operation-log.ts';
+import { createHttpServer, startFactory, type RunningFactory } from '../composition/runtime.ts';
 import { DECISION_QUESTION, RehearsalAgents } from '../testing/rehearsal-agents.ts';
-import { createRehearsal, waitFor, type RehearsalEnvironment } from '../testing/rehearsal-environment.ts';
+import { createRehearsal, FIRST_PROJECT, SECOND_PROJECT, waitFor, type RehearsalEnvironment } from '../testing/rehearsal-environment.ts';
 
 const TIMEOUT_MS = 60_000;
 const FAST_STREAM = { heartbeatMs: 200, pollMs: 100, telemetryMs: 150 };
@@ -91,80 +92,110 @@ function typed(data: unknown, type: string): boolean {
   return typeof data === 'object' && data !== null && 'type' in data && data.type === type;
 }
 
-describe('factory HTTP server end to end', () => {
+function projectIn(snapshot: CockpitSnapshot, id: string): ProjectView {
+  const project = snapshot.projects.find((candidate) => candidate.id === id);
+  if (project === undefined) throw new Error(`the snapshot has no project ${id}`);
+  return project;
+}
+
+/** Delivery of the first project: a development environment the factory may redeploy, a pre-production one with a health check that cannot answer, and production. */
+const DELIVERY = {
+  delivery: {
+    release: { kind: 'release-please' },
+    environments: [
+      {
+        name: 'dev',
+        promotion: 'automatic',
+        deployments: { kind: 'github', environment: 'widgets-dev' },
+        redeploy: { workflow: 'cloud-delivery.yml', inputs: { environment_name: '{{target}}', build: 'skip', deploy: 'true' } },
+      },
+      { name: 'prep', promotion: 'batch', deployments: { kind: 'github', environment: 'widgets-prep' }, health: [{ name: 'ui', url: 'http://127.0.0.1:9/healthz' }], wakeUpSeconds: 0 },
+      { name: 'prod', promotion: 'manual', production: true, deployments: { kind: 'github', environment: 'widgets-prod' } },
+    ],
+  },
+};
+
+describe('the factory HTTP server end to end, with two projects', () => {
   let rehearsal: RehearsalEnvironment;
-  let factory: FactoryContainer;
-  let runtime: FactoryRuntime;
+  let installation: InstallationRuntime;
+  let running: RunningFactory;
   let controller: AbortController;
   let base: string;
   let commandHeaders: Record<string, string>;
   let agents: RehearsalAgents;
 
+  const state = async (): Promise<CockpitSnapshot> => CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
+  const post = (name: string, body: unknown) => fetch(`${base}/api/commands/${name}`, { method: 'POST', headers: commandHeaders, body: JSON.stringify(body) });
+
   beforeEach(async () => {
-    rehearsal = await createRehearsal();
+    rehearsal = await createRehearsal({ projects: [FIRST_PROJECT, SECOND_PROJECT], projectSettings: { [FIRST_PROJECT]: DELIVERY } });
     agents = new RehearsalAgents();
-    factory = await openFactory(rehearsal.config, rehearsal.environment, {
-      harness: agents,
+    installation = await openInstallation(rehearsal.config, rehearsal.environment, {
+      harnessFor: () => agents,
       resources: NORMAL_RESOURCES,
+      usage: { read: (account) => Promise.resolve({ account, source: 'usage-report', readAt: new Date(), limits: [{ kind: 'weekly_all', scope: null, utilization: 0.2, resetsAt: null }] }) },
       fetch: () => Promise.resolve({ status: 200 }),
       log: SILENT_LOG,
+      userHome: rehearsal.root,
     });
     const cockpitDirectory = join(rehearsal.root, 'cockpit-dist');
     await mkdir(join(cockpitDirectory, 'assets'), { recursive: true });
     await writeFile(join(cockpitDirectory, 'index.html'), COCKPIT_PAGE);
     await writeFile(join(cockpitDirectory, 'assets', 'app.js'), 'console.log(1);');
     controller = new AbortController();
-    runtime = await startFactoryRuntime(factory, controller.signal, { stream: FAST_STREAM, cockpitDirectory });
-    base = `http://127.0.0.1:${runtime.address.port}`;
-    commandHeaders = { [COMMAND_TOKEN_HEADER]: TOKEN_META.exec(await (await fetch(`${base}/`)).text())?.[1] ?? '' };
+    running = await startFactory(installation, controller.signal, { stream: FAST_STREAM, cockpitDirectory });
+    base = `http://127.0.0.1:${running.address.port}`;
+    commandHeaders = { [COMMAND_TOKEN_HEADER]: TOKEN_META.exec(await (await fetch(`${base}/`)).text())?.[1] ?? '', 'content-type': 'application/json' };
   });
 
   afterEach(async () => {
     controller.abort();
-    await runtime.finished;
-    factory.close();
+    await running.finished;
+    installation.close();
     await rehearsal.cleanup();
   });
 
   it(
-    'serves a snapshot the cockpit accepts and streams the factory live',
+    'serves a snapshot the cockpit accepts, streams the factory live and keeps each project to its own work',
     async () => {
-      const initial = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
+      const initial = await state();
+      expect(initial.projects.map((project) => [project.id, project.forge.kind])).toEqual([
+        [FIRST_PROJECT, 'local'],
+        [SECOND_PROJECT, 'local'],
+      ]);
       const stream = new FrameReader();
       await stream.open(`${base}/api/events?after=${initial.sequence}`);
-
-      const issue = await rehearsal.addDocIssue('Document the cockpit');
+      const issue = await rehearsal.project(FIRST_PROJECT).addDocIssue('Document the cockpit');
       const opened = await waitFor(
-        async () => stream.find('factory', (data) => typed(data, 'issue.transitioned') && JSON.stringify(data).includes('"to":"pr-open"')),
+        async () => stream.find('factory', (data) => typed(data, 'issue.transitioned') && StreamEventSchema.parse(data).summary.endsWith('pr-open')),
         TIMEOUT_MS,
         'the pull request to open',
       );
-      expect(FactoryEventRecordSchema.parse(opened).subject).toBe(`issue/${issue}`);
-      const started = FactoryEventRecordSchema.parse(stream.find('factory', (data) => typed(data, 'run.started')));
-      const run = RunStartedPayloadSchema.parse(started.payload);
-      expect(run).toMatchObject({ role: 'acceptance-author', subject: { kind: 'issue', id: String(issue) }, status: 'running' });
-      expect(RunFinishedPayloadSchema.parse(FactoryEventRecordSchema.parse(stream.find('factory', (data) => typed(data, 'run.finished'))).payload).status).toBe(
-        'succeeded',
-      );
+      expect(StreamEventSchema.parse(opened)).toMatchObject({ project: FIRST_PROJECT, subject: `issue/${issue}` });
+      expect(StreamEventSchema.parse(stream.find('factory', (data) => typed(data, 'run.started')))).toMatchObject({ project: null, summary: expect.stringContaining('acceptance-author run started') });
       expect(RunLogLineSchema.parse(stream.find('run-log', () => true))).toMatchObject({ index: 0 });
       await waitFor(async () => stream.find('telemetry', () => true), TIMEOUT_MS, 'a telemetry sample');
-      expect(TelemetrySampleSchema.parse(stream.find('telemetry', () => true)).resources.pressure).toBe('normal');
+      expect(TelemetrySampleSchema.parse(stream.find('telemetry', () => true)).resources.sample.value?.pressure).toBe('normal');
 
-      const page = RunLogPageSchema.parse(await (await fetch(`${base}/api/runs/${run.id}/log?after=0`)).json());
-      expect(page.lines.map((line) => line.index)).toEqual(page.lines.map((_line, position) => position + 1));
-
-      const snapshot = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
-      expect(snapshot.issues.find((entry) => entry.number === issue)?.state).toBe('pr-open');
-      expect(snapshot.pullRequests).toHaveLength(1);
+      const snapshot = await state();
+      const widgets = projectIn(snapshot, FIRST_PROJECT);
+      expect(widgets.issues.find((entry) => entry.number === issue)?.state).toBe('pr-open');
+      expect(widgets.pullRequests).toHaveLength(1);
+      expect(projectIn(snapshot, SECOND_PROJECT).issues).toEqual([]);
       expect(snapshot.runs.length).toBeGreaterThanOrEqual(3);
+      expect(new Set(snapshot.runs.map((run) => run.project))).toEqual(new Set([FIRST_PROJECT]));
+      const run = snapshot.runs.at(-1);
+      const page = RunLogPageSchema.parse(await (await fetch(`${base}/api/runs/${run?.id ?? ''}/log?after=0`)).json());
+      expect(page.lines.map((line) => line.index)).toEqual(page.lines.map((_line, position) => position + 1));
+      expect(snapshot.usage.accounts[0]).toMatchObject({ name: 'default', source: 'agent-stream', limits: expect.arrayContaining([expect.objectContaining({ kind: 'weekly_all', utilization: 0.2 })]) });
 
-      const paused = await fetch(`${base}/api/commands/scheduler.pause`, { method: 'POST', body: '{}', headers: { ...commandHeaders, 'content-type': 'application/json' } });
-      const accepted = CommandAcceptedSchema.parse(await paused.json());
-      await waitFor(async () => stream.find('factory', (data) => typed(data, 'scheduler.paused')), TIMEOUT_MS, 'the pause event');
-      expect(CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json())).toMatchObject({
-        sequence: accepted.sequence,
-        factory: { schedulerPaused: true },
-      });
+      const paused = CommandAcceptedSchema.parse(await (await post('scheduler.pause', { project: SECOND_PROJECT })).json());
+      expect(paused.effect).toBe(`No new work starts for ${SECOND_PROJECT}; running issues finish their current step`);
+      const after = await state();
+      expect(after.sequence).toBeGreaterThanOrEqual(paused.sequence ?? 0);
+      expect(projectIn(after, SECOND_PROJECT).pauses.map((pause) => pause.cause)).toEqual(['operator']);
+      expect(projectIn(after, FIRST_PROJECT).pauses).toEqual([]);
+      expect(after.installation.pauses).toEqual([]);
       stream.close();
     },
     TIMEOUT_MS * 2,
@@ -174,31 +205,22 @@ describe('factory HTTP server end to end', () => {
     'shows an implementer question as waiting on the operator and resumes the issue with the answer',
     async () => {
       agents.decisionsToAsk = 1;
-      const issue = await rehearsal.addDocIssue('Document the release owners');
-      const waiting = await waitFor(async () => {
-        const snapshot = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
-        return snapshot.runs.find((run) => run.pendingQuestion !== null) ?? null;
-      }, TIMEOUT_MS, 'the waiting run');
-      expect(waiting).toMatchObject({ role: 'implementer', status: 'waiting', outcome: 'decision-requested' });
+      const issue = await rehearsal.project(SECOND_PROJECT).addDocIssue('Document the release owners');
+      const waiting = await waitFor(async () => (await state()).runs.find((candidate) => candidate.pendingQuestion !== null) ?? null, TIMEOUT_MS, 'the waiting run');
+      expect(waiting).toMatchObject({ role: 'implementer', status: 'waiting', outcome: 'decision-requested', project: SECOND_PROJECT });
       expect(waiting.pendingQuestion?.text).toBe(DECISION_QUESTION);
-      const snapshot = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
-      expect(snapshot.issues.find((entry) => entry.number === issue)).toMatchObject({ state: 'needs-human', resumeTarget: 'implementing' });
+      expect(projectIn(await state(), SECOND_PROJECT).issues.find((entry) => entry.number === issue)).toMatchObject({ state: 'needs-human', resumeTarget: 'implementing' });
 
-      const answered = await fetch(`${base}/api/commands/run.answer`, {
-        method: 'POST',
-        headers: commandHeaders,
-        body: JSON.stringify({ runId: waiting.id, questionId: waiting.pendingQuestion?.id ?? '', answer: 'By team.' }),
-      });
+      const answered = await post('run.answer', { runId: waiting.id, questionId: waiting.pendingQuestion?.id ?? '', answer: 'By team.' });
       expect(answered.status).toBe(200);
       CommandAcceptedSchema.parse(await answered.json());
-      await waitFor(async () => {
-        const state = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
-        return state.issues.find((entry) => entry.number === issue)?.state === 'pr-open' ? true : null;
-      }, TIMEOUT_MS, 'the answered issue to open its pull request');
-      const after = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
-      expect(after.runs.find((run) => run.id === waiting.id)).toMatchObject({ status: 'succeeded', pendingQuestion: null });
-      const resumed = agents.requests.filter((request) => request.role === 'implementer').at(-1);
-      expect(resumed?.prompt).toContain('By team.');
+      await waitFor(
+        async () => (projectIn(await state(), SECOND_PROJECT).issues.find((entry) => entry.number === issue)?.state === 'pr-open' ? true : null),
+        TIMEOUT_MS,
+        'the answered issue to open its pull request',
+      );
+      expect((await state()).runs.find((candidate) => candidate.id === waiting.id)).toMatchObject({ status: 'succeeded', pendingQuestion: null });
+      expect(agents.requests.filter((request) => request.role === 'implementer').at(-1)?.prompt).toContain('By team.');
     },
     TIMEOUT_MS * 2,
   );
@@ -207,110 +229,106 @@ describe('factory HTTP server end to end', () => {
     'abandons an escalated issue from the cockpit and never starts it again',
     async () => {
       agents.decisionsToAsk = 1;
-      const issue = await rehearsal.addDocIssue('Document the on-call rota');
-      await waitFor(async () => {
-        const snapshot = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
-        return snapshot.issues.find((entry) => entry.number === issue)?.state === 'needs-human' ? true : null;
-      }, TIMEOUT_MS, 'the issue to wait on the operator');
-
-      const post = (body: unknown) => fetch(`${base}/api/commands/issue.abandon`, { method: 'POST', headers: commandHeaders, body: JSON.stringify(body) });
-      expect((await post({ issueNumber: issue, reason: '  ' })).status).toBe(400);
-      const abandoned = await post({ issueNumber: issue, reason: 'the rota moves to the wiki' });
+      const issue = await rehearsal.project(FIRST_PROJECT).addDocIssue('Document the on-call rota');
+      await waitFor(
+        async () => (projectIn(await state(), FIRST_PROJECT).issues.find((entry) => entry.number === issue)?.state === 'needs-human' ? true : null),
+        TIMEOUT_MS,
+        'the issue to wait on the operator',
+      );
+      expect((await post('issue.abandon', { project: FIRST_PROJECT, issueNumber: issue, reason: '  ' })).status).toBe(400);
+      const abandoned = await post('issue.abandon', { project: FIRST_PROJECT, issueNumber: issue, reason: 'the rota moves to the wiki' });
       expect(abandoned.status).toBe(200);
-      CommandAcceptedSchema.parse(await abandoned.json());
-      const again = await post({ issueNumber: issue, reason: 'twice' });
+      expect(CommandAcceptedSchema.parse(await abandoned.json()).effect).toContain(`Issue #${issue} abandoned`);
+      const again = await post('issue.abandon', { project: FIRST_PROJECT, issueNumber: issue, reason: 'twice' });
       expect(again.status).toBe(409);
       expect(await again.json()).toMatchObject({ error: `Issue #${issue} cannot be abandoned: it is abandoned, not needs-human` });
-
-      const rewrite = await fetch(`${base}/api/commands/issue.rewrite-check`, {
-        method: 'POST',
-        headers: commandHeaders,
-        body: JSON.stringify({ issueNumber: issue, path: 'docs/rota.md', instruction: 'Assert the rota names a backup.' }),
-      });
+      const rewrite = await post('issue.rewrite-check', { project: FIRST_PROJECT, issueNumber: issue, path: 'docs/rota.md', instruction: 'Assert the rota names a backup.' });
       expect(rewrite.status).toBe(409);
       expect(CommandRejectedSchema.parse(await rewrite.json()).error).toContain('it is abandoned');
 
       const requestsBefore = agents.requests.length;
       await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
-      const snapshot = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
-      expect(snapshot.issues.find((entry) => entry.number === issue)).toMatchObject({ state: 'abandoned' });
+      expect(projectIn(await state(), FIRST_PROJECT).issues.find((entry) => entry.number === issue)).toMatchObject({ state: 'abandoned' });
       expect(agents.requests.length).toBe(requestsBefore);
     },
     TIMEOUT_MS * 2,
   );
 
-  it('applies settings edits live without a restart, keeps a backup of each previous file and refuses values outside the bounds', async () => {
-    const post = (name: string, body: unknown) => fetch(`${base}/api/commands/${name}`, { method: 'POST', headers: commandHeaders, body: JSON.stringify(body) });
-    expect((await post('settings.update-role', { role: 'reviewer', model: 'sonnet', effort: 'medium', maxBudgetUsd: 2, maxTurns: 30 })).status).toBe(200);
-    expect((await post('settings.update-limits', { concurrencyCeiling: 2, freeMemoryThresholdPercent: 35, pauseAbovePressure: 'warn' })).status).toBe(200);
-    expect((await post('costs.update-caps', { dailyUsd: 20, perRunUsd: 3, pauseAtUtilization: 0.6 })).status).toBe(200);
+  it('applies settings edits live, keeps a backup of each previous file and refuses values outside the bounds', async () => {
+    const reviewer = { role: 'reviewer', model: 'sonnet', effort: 'medium', maxBudgetUsd: 2, maxTurns: 30 };
+    expect((await post('settings.update-role', { project: FIRST_PROJECT, change: reviewer })).status).toBe(200);
+    expect((await post('settings.update-resources', { minimumFreeMemoryPercent: 35, pauseAbovePressure: 'warn', maxConcurrentRuns: 2 })).status).toBe(200);
+    expect((await post('settings.update-budget', { dailyCapUsd: 20, perRunCapUsd: 3 })).status).toBe(200);
+    expect((await post('settings.update-concurrency', { project: SECOND_PROJECT, issues: 2, ceiling: 3 })).status).toBe(200);
 
-    const snapshot = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
-    expect(snapshot.settings.roles.find((role) => role.role === 'reviewer')).toMatchObject({ model: 'sonnet', effort: 'medium', maxBudgetUsd: 2, maxTurns: 30 });
-    expect(snapshot.settings.concurrency).toMatchObject({ ceiling: 2, maximum: 3 });
-    expect(snapshot.settings.resourceGuard).toEqual({ freeMemoryThresholdPercent: 35, pauseAbovePressure: 'warn' });
-    expect(snapshot.costs.caps).toEqual({ dailyUsd: 20, perRunUsd: 3, pauseAtUtilization: 0.6 });
-    expect(runtime.daemon.concurrentIssues).toBe(2);
-    expect(factory.admission.currentPolicy).toEqual({ minimumFreeMemoryPercent: 35, pauseAbovePressure: 'warn' });
-    expect(factory.budget.perRunCapUsd).toBe(3);
-    expect(factory.settings.roles.reviewer).toMatchObject({ model: 'sonnet', maxTurns: 30 });
+    const snapshot = await state();
+    expect(projectIn(snapshot, FIRST_PROJECT).settings.roles.find((role) => role.role === 'reviewer')).toMatchObject({ model: 'sonnet', effort: 'medium', maxBudgetUsd: 2, maxTurns: 30 });
+    expect(projectIn(snapshot, SECOND_PROJECT).settings.roles.find((role) => role.role === 'reviewer')).toMatchObject({ model: 'haiku' });
+    expect(projectIn(snapshot, SECOND_PROJECT).settings.concurrency).toMatchObject({ issues: 2, ceiling: 3 });
+    expect(snapshot.resources).toMatchObject({ minimumFreeMemoryPercent: 35, pauseAbovePressure: 'warn' });
+    expect(snapshot.costs).toMatchObject({ dailyCap: { kind: 'usd', amount: 20 }, perRunCapUsd: 3 });
+    expect(snapshot.installation.runSlots.limit).toBe(2);
+    expect(installation.project(FIRST_PROJECT).config.roles.reviewer).toMatchObject({ model: 'sonnet', maxTurns: 30 });
+    expect(installation.budget.runBudgetUsd(10)).toBe(3);
 
     const text = await readFile(rehearsal.config.configPath, 'utf8');
-    expect(text).toContain('reviewer: { model: sonnet, effort: medium, maxBudgetUsd: 2, maxTurns: 30, timeoutMinutes: 5 }');
-    expect(await readdir(join(rehearsal.config.directories.state, 'config-backups'))).toHaveLength(3);
-    const events = (await factory.dependencies.events.read('settings', 0)).map((record) => record.type);
-    expect(events.filter((type) => type === 'settings.changed')).toHaveLength(3);
-    expect(events).toContain('settings.configuration-reloaded');
+    expect(await readdir(join(rehearsal.config.directories.state, 'config-backups'))).toHaveLength(4);
+    const events = (await installation.events.read('settings', 0)).map((record) => record.type);
+    expect(events.filter((type) => type === 'settings.changed')).toHaveLength(4);
 
-    const critical = await post('settings.update-limits', { concurrencyCeiling: 1, freeMemoryThresholdPercent: 35, pauseAbovePressure: 'critical' });
+    const critical = await post('settings.update-resources', { minimumFreeMemoryPercent: 35, pauseAbovePressure: 'critical', maxConcurrentRuns: 1 });
     expect(critical.status).toBe(409);
-    expect(CommandRejectedSchema.parse(await critical.json()).error).toContain('not critical');
-    const beyondCeiling = await post('settings.update-limits', { concurrencyCeiling: 9, freeMemoryThresholdPercent: 35, pauseAbovePressure: 'normal' });
+    expect(CommandRejectedSchema.parse(await critical.json()).error).toContain('critical');
+    const beyondCeiling = await post('settings.update-concurrency', { project: SECOND_PROJECT, issues: 9, ceiling: 3 });
     expect(beyondCeiling.status).toBe(409);
-    expect(CommandRejectedSchema.parse(await beyondCeiling.json()).error).toContain('concurrency.ceiling');
     expect(await readFile(rehearsal.config.configPath, 'utf8')).toBe(text);
   });
 
-  it('tests a tool connection on order and shows the result in the settings', async () => {
-    const tested = await fetch(`${base}/api/commands/settings.test-tool`, { method: 'POST', headers: commandHeaders, body: JSON.stringify({ tool: 'sandbox' }) });
-    expect(tested.status).toBe(200);
-    const snapshot = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
-    expect(snapshot.settings.tools).toEqual([expect.objectContaining({ tool: 'sandbox', status: 'connected', fixCommand: null })]);
+  it('checks a tool on order and shows the result with the time it was read', async () => {
+    const checked = await post('tools.check', { project: null, tool: 'sandbox' });
+    expect(checked.status).toBe(200);
+    expect(CommandAcceptedSchema.parse(await checked.json()).effect).toMatch(/^sandbox: connected/);
+    const tool = (await state()).tools.find((entry) => entry.name === 'sandbox');
+    expect(tool).toMatchObject({ scope: 'installation', builtIn: true, status: 'connected', fixCommand: null });
+    expect(tool?.checkedAt).not.toBeNull();
   });
 
-  it('redeploys DEV or PREP at the deployed version as a simulated dispatch, and never production', async () => {
-    const deployments = join(rehearsal.config.github.local.directory, 'deployments');
-    await mkdir(deployments, { recursive: true });
-    const sha = rehearsal.pushDirectCommit('NOTES.md', 'notes\n', 'docs: add notes');
+  it('redeploys a development environment at the deployed version as a simulated dispatch, and never production', async () => {
+    const widgets = rehearsal.project(FIRST_PROJECT);
+    const forge = widgets.config.forge.kind === 'local' ? widgets.config.forge.directory : '';
+    await mkdir(join(forge, 'deployments'), { recursive: true });
+    const sha = widgets.pushDirectCommit('NOTES.md', 'notes\n', 'docs: add notes');
     await writeFile(
-      join(deployments, 'widgets-dev.json'),
+      join(forge, 'deployments', 'widgets-dev.json'),
       JSON.stringify([{ id: 'd1', ref: 'main', sha, createdAt: '2026-10-10T07:00:00.000Z', creator: 'deployer', state: 'success', logUrl: null, environmentUrl: null }]),
     );
-    const post = (body: unknown) => fetch(`${base}/api/commands/deployment.redeploy`, { method: 'POST', headers: commandHeaders, body: JSON.stringify(body) });
-    const snapshot = CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json());
-    const dev = snapshot.environments.find((environment) => environment.name === 'dev');
-    expect(dev?.current?.version).toBe(sha.slice(0, 7));
-    expect(snapshot.environments.map((environment) => environment.name)).toEqual(['dev', 'prep', 'prod']);
+    const environments = projectIn(await state(), FIRST_PROJECT).environments;
+    expect(environments.map((environment) => [environment.name, environment.production, environment.redeployable])).toEqual([
+      ['dev', false, true],
+      ['prep', false, false],
+      ['prod', true, false],
+    ]);
+    expect(environments[0]?.deployments?.value?.current?.version).toBe(sha.slice(0, 7));
 
-    expect((await post({ environment: 'prod', confirmVersion: sha.slice(0, 7) })).status).toBe(400);
-    const unconfirmed = await post({ environment: 'dev', confirmVersion: 'abcdef0' });
-    expect(unconfirmed.status).toBe(409);
-    const redeployed = await post({ environment: 'dev', confirmVersion: sha.slice(0, 7) });
+    expect((await post('deployment.redeploy', { project: FIRST_PROJECT, environment: 'prod', confirmVersion: sha.slice(0, 7) })).status).toBe(409);
+    expect((await post('deployment.redeploy', { project: FIRST_PROJECT, environment: 'dev', confirmVersion: 'abcdef0' })).status).toBe(409);
+    const redeployed = await post('deployment.redeploy', { project: FIRST_PROJECT, environment: 'dev', confirmVersion: sha.slice(0, 7) });
     expect(redeployed.status).toBe(200);
-    const dispatch = JSON.parse(await readFile(join(rehearsal.config.github.local.directory, 'workflow-dispatches', '1.json'), 'utf8'));
-    expect(dispatch).toMatchObject({ workflow: 'cloud-delivery.yml', ref: 'main', inputs: { environment_name: 'widgets-dev', build: 'skip', deploy: 'true' } });
-    const recorded = await factory.dependencies.events.read('deployment/', 0);
+    expect(CommandAcceptedSchema.parse(await redeployed.json()).effect).toContain('(simulated by the local forge)');
+    const dispatch: unknown = JSON.parse(await readFile(join(forge, 'workflow-dispatches', '1.json'), 'utf8'));
+    expect(dispatch).toMatchObject({ workflow: 'cloud-delivery.yml', inputs: { environment_name: 'widgets-dev', build: 'skip', deploy: 'true' } });
+    const recorded = await installation.project(FIRST_PROJECT).dependencies.events.read('deployment/', 0);
     expect(recorded.map((record) => [record.type, record.subject])).toEqual([['deployment.redeploy-dispatched', 'deployment/dev']]);
-    expect(recorded[0]?.payload).toMatchObject({ simulated: true, version: sha.slice(0, 7) });
   });
 
   it('refuses to cut a release whose gate is not promotable and names the blocking reasons', async () => {
-    const pulls = join(rehearsal.config.github.local.directory, 'pulls');
-    await mkdir(pulls, { recursive: true });
-    const head = rehearsal.pushDirectCommit('CHANGELOG.md', '# 1.3.0\n', 'chore(main): release 1.3.0');
-    execFileSync('git', ['push', '--quiet', 'origin', 'HEAD:refs/heads/release-please--branches--main'], { cwd: rehearsal.config.target.clonePath, stdio: 'ignore' });
+    const widgets = rehearsal.project(FIRST_PROJECT);
+    const forge = widgets.config.forge.kind === 'local' ? widgets.config.forge.directory : '';
+    await mkdir(join(forge, 'pulls'), { recursive: true });
+    const head = widgets.pushDirectCommit('CHANGELOG.md', '# 1.3.0\n', 'chore(main): release 1.3.0');
+    execFileSync('git', ['push', '--quiet', 'origin', 'HEAD:refs/heads/release-please--branches--main'], { cwd: widgets.config.clonePath, stdio: 'ignore' });
     await writeFile(
-      join(pulls, '7.json'),
+      join(forge, 'pulls', '7.json'),
       JSON.stringify({
         number: 7,
         title: 'chore(main): release 1.3.0',
@@ -325,7 +343,8 @@ describe('factory HTTP server end to end', () => {
         mergedAt: null,
       }),
     );
-    await factory.dependencies.events.append('release.detected', 'release/pr-7', {
+    const events = installation.project(FIRST_PROJECT).dependencies.events;
+    await events.append('release.detected', 'release/pr-7', {
       releaseId: 'pr-7',
       source: 'pull-request',
       ref: 'main',
@@ -333,56 +352,59 @@ describe('factory HTTP server end to end', () => {
       headSha: head,
       pullRequestNumber: 7,
       title: 'chore(main): release 1.3.0',
+      createdAt: '2026-10-10T07:00:00.000Z',
+      supersededBy: null,
     });
-    const refused = await fetch(`${base}/api/commands/release.cut`, { method: 'POST', headers: commandHeaders, body: JSON.stringify({ releaseId: 'pr-7' }) });
+    const refused = await post('release.cut', { project: FIRST_PROJECT, releaseId: 'pr-7' });
     expect(refused.status).toBe(409);
-    expect(CommandRejectedSchema.parse(await refused.json()).error).toContain('no PREP health check has been recorded');
-    expect((await factory.dependencies.events.read('release/pr-7', 0)).map((record) => record.type)).toContain('release.evaluated');
+    expect(CommandRejectedSchema.parse(await refused.json()).error).toContain('prep');
+    expect((await events.read('release/pr-7', 0)).map((record) => record.type)).toContain('release.evaluated');
+    expect(projectIn(await state(), FIRST_PROJECT).releases.find((release) => release.id === 'pr-7')).toMatchObject({ state: 'open', gate: { promotable: false }, createdAt: '2026-10-10T07:00:00.000Z' });
   });
 
-  it('answers unknown, refused and malformed commands, and guards files', async () => {
-    const post = (name: string, body: string) => fetch(`${base}/api/commands/${name}`, { method: 'POST', headers: commandHeaders, body });
-    const unknown = await post('nope', '{}');
+  it('answers unknown, refused and malformed commands, and serves only the files of a known project', async () => {
+    const raw = (name: string, body: string) => fetch(`${base}/api/commands/${name}`, { method: 'POST', headers: commandHeaders, body });
+    const unknown = await raw('nope', '{}');
     expect(unknown.status).toBe(404);
-    const cut = await post('release.cut', '{"releaseId":"pr-404"}');
+    const cut = await raw('release.cut', JSON.stringify({ project: FIRST_PROJECT, releaseId: 'pr-404' }));
     expect(cut.status).toBe(409);
     expect(await cut.json()).toEqual({ error: 'release pr-404 was never detected', command: 'release.cut' });
-    const malformed = await post('pr.merge', '{"number": "one"}');
+    const malformed = await raw('pr.merge', JSON.stringify({ project: FIRST_PROJECT, number: 'one' }));
     expect(malformed.status).toBe(400);
     expect(CommandRejectedSchema.parse(await malformed.json()).error).toContain('invalid body');
-    const refused = await post('request.challenge', '{"requestId":"req-9"}');
-    expect(refused.status).toBe(409);
+    const elsewhere = await raw('scheduler.pause', JSON.stringify({ project: 'nope' }));
+    expect(elsewhere.status).toBe(409);
+    expect(CommandRejectedSchema.parse(await elsewhere.json()).error).toContain('no project "nope"');
 
     expect(await (await fetch(`${base}/`)).text()).toBe(COCKPIT_PAGE.replace('</head>', `<meta name="${COMMAND_TOKEN_META_NAME}" content="${commandHeaders[COMMAND_TOKEN_HEADER]}"></head>`));
-    expect(TOKEN_META.test(await (await fetch(`${base}/issues/42`)).text())).toBe(true);
+    expect(TOKEN_META.test(await (await fetch(`${base}/projects/widgets/issues`)).text())).toBe(true);
     expect((await fetch(`${base}/assets/app.js`)).headers.get('content-type')).toContain('text/javascript');
-    expect((await fetch(`${base}/api/evidence/1/..%2F..%2Fconfig.yaml`)).status).toBe(404);
+    expect((await fetch(`${base}/api/projects/${FIRST_PROJECT}/evidence/1/..%2F..%2Fconfig.yaml`)).status).toBe(404);
+    expect((await fetch(`${base}/api/projects/nope/evidence/1/report.md`)).status).toBe(404);
     expect((await fetch(`${base}/api/events?after=x`)).status).toBe(400);
+    expect((await installation.events.read(RUN_SUBJECT_PREFIX, 0)).length).toBe(0);
   });
 
   it('refuses a command that lacks the per-process token, and never serves the token outside the cockpit page', async () => {
-    const body = JSON.stringify({});
-    const without = await fetch(`${base}/api/commands/scheduler.pause`, { method: 'POST', body });
-    expect(without.status).toBe(403);
+    const body = JSON.stringify({ project: null });
+    expect((await fetch(`${base}/api/commands/scheduler.pause`, { method: 'POST', body })).status).toBe(403);
     const wrong = await fetch(`${base}/api/commands/scheduler.pause`, { method: 'POST', body, headers: { [COMMAND_TOKEN_HEADER]: 'f'.repeat(64) } });
     expect(wrong.status).toBe(403);
     expect(CommandRejectedSchema.parse(await wrong.json()).error).toContain(COMMAND_TOKEN_HEADER);
-    expect(CockpitSnapshotSchema.parse(await (await fetch(`${base}/api/state`)).json()).factory.schedulerPaused).toBe(false);
+    expect((await state()).installation.pauses).toEqual([]);
     const token = commandHeaders[COMMAND_TOKEN_HEADER] ?? '';
     for (const path of ['/api/state', '/assets/app.js']) expect(await (await fetch(`${base}${path}`)).text()).not.toContain(token);
   });
 
-  it('refuses requests without a Tailscale identity once a tailnet is configured', async () => {
-    const guarded = createHttpServer(
-      { ...factory, config: { ...factory.config, server: { ...factory.config.server, tailnet: true } } },
-      null,
-      { cockpitDirectory: join(rehearsal.root, 'cockpit-dist') },
-    );
+  it('refuses requests without an allowed Tailscale identity once remote access goes through the tailnet', async () => {
+    const tailnet = { ...installation.config.server, remoteAccess: { kind: 'tailscale' as const, allowedLogins: ['alex@example.com'] } };
+    const guarded = createHttpServer({ ...installation, config: { ...installation.config, server: tailnet } }, null, { cockpitDirectory: join(rehearsal.root, 'cockpit-dist') });
     const address = await guarded.start();
     try {
       const url = `http://127.0.0.1:${address.port}/api/state`;
       expect((await fetch(url)).status).toBe(403);
-      expect((await fetch(url, { headers: { 'Tailscale-User-Login': 'operator@example.test' } })).status).toBe(200);
+      expect((await fetch(url, { headers: { 'Tailscale-User-Login': 'riley@example.com' } })).status).toBe(403);
+      expect((await fetch(url, { headers: { 'Tailscale-User-Login': 'alex@example.com' } })).status).toBe(200);
     } finally {
       await guarded.stop();
     }

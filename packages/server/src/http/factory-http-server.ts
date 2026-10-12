@@ -6,8 +6,11 @@ import {
   AFTER_QUERY_PARAMETER,
   API_COMMANDS_PATH,
   API_EVENTS_PATH,
-  API_EVIDENCE_PATH,
+  API_PROJECTS_PATH,
   API_RUNS_PATH,
+  EVIDENCE_SEGMENT,
+  FORGE_SEGMENT,
+  REQUESTS_SEGMENT,
   COMMAND_TOKEN_HEADER,
   COMMAND_TOKEN_META_NAME,
   API_STATE_PATH,
@@ -15,12 +18,12 @@ import {
   type TelemetrySample,
 } from '@agent-factory/cockpit';
 import type { EventStore, OperationLog, RunLogStore } from '@agent-factory/application';
+import type { RemoteAccessConfig } from '../config/agent-factory-config.ts';
 import { EventStreamConnection, runLogJson, type EventStreamSettings } from './event-stream.ts';
 import { identify } from './identity.ts';
 import { CommandToken } from './command-token.ts';
 import { isFile, resolveInside, sendFile } from './static-files.ts';
 
-export const API_REQUESTS_PATH = '/api/requests';
 export const INDEX_FILE = 'index.html';
 export const MAX_COMMAND_BODY_BYTES = 32 * 1024 * 1024;
 export const DEFAULT_STREAM_SETTINGS: EventStreamSettings = { heartbeatMs: 15_000, pollMs: 1_000, telemetryMs: 10_000 };
@@ -55,12 +58,19 @@ export interface HttpServerDependencies {
   command(name: string, body: unknown, operator: string): Promise<CommandOutcome>;
 }
 
+/** Where a project keeps the files the cockpit links to. */
+export interface ProjectFileDirectories {
+  readonly evidence: string;
+  readonly requests: string;
+  /** The directory of a local forge; null for a remote forge. */
+  readonly forge: string | null;
+}
+
 export interface HttpServerSettings {
   readonly host: string;
   readonly port: number;
-  readonly tailnet: boolean;
-  readonly evidenceDirectory: string;
-  readonly requestsDirectory: string;
+  readonly remoteAccess: RemoteAccessConfig;
+  readonly projectDirectories: (project: string) => ProjectFileDirectories | null;
   readonly cockpitDirectory: string;
   readonly stream: EventStreamSettings;
 }
@@ -142,7 +152,7 @@ export class FactoryHttpServer {
   }
 
   private async handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
-    const decision = identify(request.headers, request.socket.remoteAddress, this.settings.tailnet);
+    const decision = identify(request.headers, request.socket.remoteAddress, this.settings.remoteAccess);
     if (!decision.allowed) {
       sendJson(response, HTTP.forbidden, { error: decision.reason });
       return;
@@ -174,12 +184,8 @@ export class FactoryHttpServer {
       await this.runLog(response, url, path);
       return;
     }
-    if (path.startsWith(`${API_EVIDENCE_PATH}${PATH_SEPARATOR}`)) {
-      await this.evidence(response, path);
-      return;
-    }
-    if (path.startsWith(`${API_REQUESTS_PATH}${PATH_SEPARATOR}`)) {
-      await this.requestFile(response, path);
+    if (path.startsWith(`${API_PROJECTS_PATH}${PATH_SEPARATOR}`)) {
+      await this.projectFile(response, path);
       return;
     }
     if (path.startsWith(API_PREFIX)) {
@@ -239,23 +245,32 @@ export class FactoryHttpServer {
     }
   }
 
-  private async evidence(response: ServerResponse, path: string): Promise<void> {
-    const [issue, ...rest] = path.slice(API_EVIDENCE_PATH.length + 1).split(PATH_SEPARATOR);
-    if (issue === undefined || !POSITIVE_INTEGER.test(issue) || rest.length === 0) {
-      sendJson(response, HTTP.notFound, { error: `no evidence at ${path}` });
+  /** Serves `/api/projects/<project>/evidence/<issue>/<path>` and `/api/projects/<project>/requests/<request>/<path>`. */
+  private async projectFile(response: ServerResponse, path: string): Promise<void> {
+    const [project, segment, owner, ...rest] = path.slice(API_PROJECTS_PATH.length + 1).split(PATH_SEPARATOR).map(decodeURIComponent);
+    const directories = project === undefined ? null : this.settings.projectDirectories(project);
+    if (directories === null || owner === undefined) {
+      sendJson(response, HTTP.notFound, { error: `no file at ${path}` });
       return;
     }
-    await this.sendInside(response, join(this.settings.evidenceDirectory, `${ISSUE_EVIDENCE_PREFIX}${issue}`), rest.join(PATH_SEPARATOR), path);
-  }
-
-  private async requestFile(response: ServerResponse, path: string): Promise<void> {
-    const [requestId, ...rest] = path.slice(API_REQUESTS_PATH.length + 1).split(PATH_SEPARATOR);
-    const root = requestId === undefined ? null : resolveInside(this.settings.requestsDirectory, requestId);
-    if (root === null || rest.length === 0) {
-      sendJson(response, HTTP.notFound, { error: `no request file at ${path}` });
+    if (segment === FORGE_SEGMENT && directories.forge !== null) {
+      await this.sendInside(response, directories.forge, [owner, ...rest].join(PATH_SEPARATOR), path);
       return;
     }
-    await this.sendInside(response, root, rest.join(PATH_SEPARATOR), path);
+    if (rest.length === 0) {
+      sendJson(response, HTTP.notFound, { error: `no file at ${path}` });
+      return;
+    }
+    if (segment === EVIDENCE_SEGMENT && POSITIVE_INTEGER.test(owner)) {
+      await this.sendInside(response, join(directories.evidence, `${ISSUE_EVIDENCE_PREFIX}${owner}`), rest.join(PATH_SEPARATOR), path);
+      return;
+    }
+    const requestRoot = segment === REQUESTS_SEGMENT ? resolveInside(directories.requests, owner) : null;
+    if (requestRoot === null) {
+      sendJson(response, HTTP.notFound, { error: `no file at ${path}` });
+      return;
+    }
+    await this.sendInside(response, requestRoot, rest.join(PATH_SEPARATOR), path);
   }
 
   private async sendInside(response: ServerResponse, root: string, relativePath: string, path: string): Promise<void> {
