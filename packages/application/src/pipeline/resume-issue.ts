@@ -10,11 +10,12 @@ import { PIPELINE_EVENTS } from './journal-events.ts';
 import { IssueJournalWriter } from './journal-writer.ts';
 import type { PipelineDependencies } from './pipeline-dependencies.ts';
 import { ResumeRefusedError, SpecNotValidatedError } from './pipeline-errors.ts';
-import { decisionsOfEpoch, loadJournal, pendingFeedback, type PipelineJournal } from './pipeline-journal.ts';
+import { currentAttempt, decisionAfter, decisionsOfEpoch, gateRecord, loadJournal, pendingFeedback, type PipelineJournal } from './pipeline-journal.ts';
 
 export const STATES_BEFORE_FROZEN_CHECKS: readonly IssueState[] = ['spec-draft', 'spec-validated', 'blocked', 'authoring-checks'];
 export const AUTHORING_STATE: IssueState = 'authoring-checks';
 const RESUME_REASON = 'the operator resumed the issue';
+const REVIEW_AGAIN_REASON = 'the operator ordered a new review of the same implementation';
 const RESTART_REASON = 'the operator resumed the issue before its checks were frozen';
 
 const SPENT_RETRY_BUDGET = 'the implementer retry budget is spent, so the issue would escalate again; the change needs a human';
@@ -22,10 +23,23 @@ const FROZEN_CHECKS_VIOLATED = 'a frozen acceptance check was modified or delete
 const NO_ESCALATION_PROFILE = 'external feedback waits for a fresh session but no escalation profile was given';
 const ANSWER_REQUIRED = 'the implementer asked for a decision, so the resume needs the operator\'s answer';
 const NOTHING_TO_ANSWER = 'it does not wait on a decision, so there is nothing to answer';
+const REVIEW_AGAIN_FROM_REVIEW = 'the escalation did not come from the review stage, so there is no review to run again';
+const REVIEW_AGAIN_FROM_REVIEW_FAILURE = 'the escalation was not caused by a blocking review';
+const REVIEW_AGAIN_GATE_NOT_PASSED = 'the gate of the latest attempt did not pass, so there is no implementation to review';
 
 function repeatedEscalation(journal: PipelineJournal): string | null {
   if (decisionsOfEpoch(journal).some((record) => record.decision.action === 'needs-human')) return SPENT_RETRY_BUDGET;
   if (journal.gates.some((record) => record.attempt >= journal.attemptEpoch && record.violations.length > 0)) return FROZEN_CHECKS_VIOLATED;
+  return null;
+}
+
+/** Why the review of the current attempt cannot be run again, or null: it must have ended the issue on a passing gate. */
+function reviewAgainRefusal(journal: PipelineJournal, attempt: number): string | null {
+  if (journal.stateBeforeEscalation !== 'reviewing') return REVIEW_AGAIN_FROM_REVIEW;
+  const decision = decisionAfter(journal, attempt);
+  if (decision === null || decision.decision.action !== 'needs-human' || decision.failure.source !== 'review') return REVIEW_AGAIN_FROM_REVIEW_FAILURE;
+  const gate = gateRecord(journal, attempt);
+  if (gate === null || !gate.result.passed || gate.violations.length > 0) return REVIEW_AGAIN_GATE_NOT_PASSED;
   return null;
 }
 
@@ -38,6 +52,11 @@ export interface ResumeOutcome {
   readonly checksReauthored: boolean;
   readonly feedbackCycleGranted: boolean;
   readonly decisionAnswered: boolean;
+}
+
+export interface ReviewAgainOutcome {
+  readonly issueNumber: number;
+  readonly attempt: number;
 }
 
 export interface ResumeIssueSettings {
@@ -55,6 +74,26 @@ export class ResumeIssue {
     this.dependencies = dependencies;
     this.conventions = settings.conventions;
     this.escalation = settings.escalation;
+  }
+
+  /**
+   * Orders a new review of the implementation an escalated issue already has, in a fresh context and on the same
+   * head. The reviews of the attempt recorded so far stop counting and no implementer attempt is spent; a review
+   * that blocks again escalates the issue again, without a new retry decision.
+   */
+  async reviewAgain(issueNumber: number, operator: string): Promise<ReviewAgainOutcome> {
+    const { events, states } = this.dependencies;
+    const journal = await loadJournal(events, issueNumber);
+    if (journal.state !== ISSUE_ESCALATION_STATE) {
+      throw new ResumeRefusedError(issueNumber, `it is ${journal.state ?? 'unknown to the factory'}, not ${ISSUE_ESCALATION_STATE}`);
+    }
+    const attempt = currentAttempt(journal);
+    const refusal = reviewAgainRefusal(journal, attempt);
+    if (refusal !== null) throw new ResumeRefusedError(issueNumber, refusal);
+    const writer = new IssueJournalWriter(events, states, issueNumber);
+    await writer.record(PIPELINE_EVENTS.reviewReordered, { attempt, operator });
+    await writer.transition('reviewing', REVIEW_AGAIN_REASON);
+    return { issueNumber, attempt };
   }
 
   async resume(issueNumber: number, answer: string | null = null): Promise<ResumeOutcome> {

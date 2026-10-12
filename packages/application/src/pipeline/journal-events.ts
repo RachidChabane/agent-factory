@@ -28,6 +28,7 @@ export const PIPELINE_EVENTS = {
   implementerAttemptFinished: 'pipeline.implementer-attempt-finished',
   gateCompleted: 'pipeline.gate-completed',
   reviewCompleted: 'pipeline.review-completed',
+  reviewReordered: 'pipeline.review-reordered',
   retryDecided: 'pipeline.retry-decided',
   implementationCommitted: 'pipeline.implementation-committed',
   evidenceCommitted: 'pipeline.evidence-committed',
@@ -249,6 +250,12 @@ export const ReviewCompletedSchema = z.object({
   findings: z.array(ReviewFindingSchema),
 });
 
+/** The operator ordered the review of an attempt again: the reviews recorded before the order no longer count. */
+export const ReviewReorderedSchema = z.object({
+  attempt: z.number().int().nonnegative(),
+  operator: z.string().min(1),
+});
+
 export const FAILURE_SOURCES = ['agent', 'gate', 'review'] as const;
 export type FailureSource = (typeof FAILURE_SOURCES)[number];
 
@@ -399,6 +406,7 @@ export type ImplementerAttemptRecord = z.infer<typeof ImplementerAttemptFinished
 export type GateRecord = z.infer<typeof GateCompletedSchema>;
 export type FrozenCheckViolation = z.infer<typeof FrozenCheckViolationSchema>;
 export type ReviewRecord = z.infer<typeof ReviewCompletedSchema>;
+export type ReviewReorderRecord = z.infer<typeof ReviewReorderedSchema>;
 export type RetryRecord = z.infer<typeof RetryDecidedSchema>;
 export type DecisionAnswerRecord = z.infer<typeof DecisionAnsweredSchema>;
 export type BeforeProofCorrectionRecord = z.infer<typeof BeforeProofCorrectionRequestedSchema>;
