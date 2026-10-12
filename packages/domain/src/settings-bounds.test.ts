@@ -1,32 +1,33 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
-  dailyCapOf,
+  MAX_CONCURRENT_RUNS,
   MAX_DAILY_CAP_USD,
   MAX_FREE_MEMORY_THRESHOLD_PERCENT,
-  MAX_PAUSE_UTILIZATION,
   MAX_ROLE_TURNS,
   MAX_RUN_BUDGET_USD,
   MIN_FREE_MEMORY_THRESHOLD_PERCENT,
-  MIN_PAUSE_UTILIZATION,
-  NO_DAILY_CAP_USD,
   settingsChangeProblems,
-  type CapsSettingsChange,
-  type LimitsSettingsChange,
+  type BudgetSettingsChange,
+  type ConcurrencySettingsChange,
+  type ResourcesSettingsChange,
   type RoleSettingsChange,
 } from './settings-bounds.ts';
 
-const ROLE: RoleSettingsChange = { kind: 'role', role: 'implementer', model: 'sonnet', effort: 'medium', maxBudgetUsd: 10, maxTurns: 150 };
-const LIMITS: LimitsSettingsChange = { kind: 'limits', concurrentIssues: 1, minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' };
-const CAPS: CapsSettingsChange = { kind: 'caps', dailyCapUsd: 50, perRunCapUsd: 10, pauseAtUtilization: 0.85 };
+const ROLE: RoleSettingsChange = { kind: 'role', project: null, role: 'implementer', model: 'sonnet', effort: 'medium', maxBudgetUsd: 10, maxTurns: 150 };
+const RESOURCES: ResourcesSettingsChange = { kind: 'resources', minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal', maxConcurrentRuns: 2 };
+const BUDGET: BudgetSettingsChange = { kind: 'budget', dailyCap: { kind: 'usd', amount: 50 }, perRunCapUsd: 10 };
+const CONCURRENCY: ConcurrencySettingsChange = { kind: 'concurrency', project: 'storefront', issues: 1, ceiling: 3 };
 
 describe('settings bounds', () => {
   it('accepts the values a configured factory runs with', () => {
     expect(settingsChangeProblems(ROLE)).toEqual([]);
-    expect(settingsChangeProblems({ ...ROLE, model: 'claude-opus-4-1[1m]' })).toEqual([]);
-    expect(settingsChangeProblems(LIMITS)).toEqual([]);
-    expect(settingsChangeProblems({ ...LIMITS, pauseAbovePressure: 'warn' })).toEqual([]);
-    expect(settingsChangeProblems(CAPS)).toEqual([]);
+    expect(settingsChangeProblems({ ...ROLE, project: 'storefront', model: 'claude-opus-4-1[1m]' })).toEqual([]);
+    expect(settingsChangeProblems(RESOURCES)).toEqual([]);
+    expect(settingsChangeProblems({ ...RESOURCES, pauseAbovePressure: 'warn' })).toEqual([]);
+    expect(settingsChangeProblems(BUDGET)).toEqual([]);
+    expect(settingsChangeProblems({ ...BUDGET, dailyCap: { kind: 'none' }, perRunCapUsd: null })).toEqual([]);
+    expect(settingsChangeProblems(CONCURRENCY)).toEqual([]);
   });
 
   it('refuses a role whose model, budget or turns leave the bounds', () => {
@@ -38,40 +39,30 @@ describe('settings bounds', () => {
   });
 
   it('never lets scheduling run on through critical memory pressure', () => {
-    expect(settingsChangeProblems({ ...LIMITS, pauseAbovePressure: 'critical' })).toEqual([
-      'scheduling must pause above normal or warn memory pressure, not critical',
+    expect(settingsChangeProblems({ ...RESOURCES, pauseAbovePressure: 'critical' })).toHaveLength(1);
+  });
+
+  it('keeps the free-memory threshold and the concurrent runs within bounds', () => {
+    fc.assert(
+      fc.property(fc.double({ noNaN: true, min: -1_000, max: 1_000 }), (percent) => {
+        const accepted = settingsChangeProblems({ ...RESOURCES, minimumFreeMemoryPercent: percent }).length === 0;
+        return accepted === (percent >= MIN_FREE_MEMORY_THRESHOLD_PERCENT && percent <= MAX_FREE_MEMORY_THRESHOLD_PERCENT);
+      }),
+    );
+    expect(settingsChangeProblems({ ...RESOURCES, maxConcurrentRuns: 0 })).toHaveLength(1);
+    expect(settingsChangeProblems({ ...RESOURCES, maxConcurrentRuns: MAX_CONCURRENT_RUNS + 1 })).toHaveLength(1);
+  });
+
+  it('refuses a daily cap of zero: no cap is said with none', () => {
+    expect(settingsChangeProblems({ ...BUDGET, dailyCap: { kind: 'usd', amount: 0 } })).toEqual([
+      `a daily cap must be above 0 and at most ${MAX_DAILY_CAP_USD} USD, or none, got 0`,
     ]);
+    expect(settingsChangeProblems({ ...BUDGET, dailyCap: { kind: 'usd', amount: MAX_DAILY_CAP_USD + 1 } })).toHaveLength(1);
+    expect(settingsChangeProblems({ ...BUDGET, perRunCapUsd: 0 })).toHaveLength(1);
   });
 
-  it('accepts a free-memory threshold exactly inside its bounds', () => {
-    fc.assert(
-      fc.property(fc.double({ min: -50, max: 150, noNaN: true }), (threshold) =>
-        (settingsChangeProblems({ ...LIMITS, minimumFreeMemoryPercent: threshold }).length === 0) ===
-        (threshold >= MIN_FREE_MEMORY_THRESHOLD_PERCENT && threshold <= MAX_FREE_MEMORY_THRESHOLD_PERCENT),
-      ),
-    );
-  });
-
-  it('accepts caps exactly inside their bounds', () => {
-    fc.assert(
-      fc.property(
-        fc.double({ min: -10, max: MAX_DAILY_CAP_USD * 2, noNaN: true }),
-        fc.double({ min: -10, max: MAX_RUN_BUDGET_USD * 2, noNaN: true }),
-        fc.double({ min: -1, max: 2, noNaN: true }),
-        (dailyCapUsd, perRunCapUsd, pauseAtUtilization) =>
-          (settingsChangeProblems({ kind: 'caps', dailyCapUsd, perRunCapUsd, pauseAtUtilization }).length === 0) ===
-          (dailyCapUsd >= NO_DAILY_CAP_USD &&
-            dailyCapUsd <= MAX_DAILY_CAP_USD &&
-            perRunCapUsd > 0 &&
-            perRunCapUsd <= MAX_RUN_BUDGET_USD &&
-            pauseAtUtilization >= MIN_PAUSE_UTILIZATION &&
-            pauseAtUtilization <= MAX_PAUSE_UTILIZATION),
-      ),
-    );
-  });
-
-  it('reads a zero daily cap as no cap', () => {
-    expect(dailyCapOf(NO_DAILY_CAP_USD)).toBeNull();
-    expect(dailyCapOf(25)).toBe(25);
+  it('keeps the concurrency ceiling at or above the concurrent issues', () => {
+    expect(settingsChangeProblems({ ...CONCURRENCY, issues: 0 })).toHaveLength(1);
+    expect(settingsChangeProblems({ ...CONCURRENCY, issues: 3, ceiling: 2 })).toHaveLength(1);
   });
 });
