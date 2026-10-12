@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Takes the fictional storefront example from a spec to a merged pull request through the factory's
+# own command line: a temporary factory home, a local forge, the fake Claude playing the scripted
+# agents. It needs no model, no account and no secret, and removes the home and stops every process
+# it started, whatever the outcome.
+# Prints one line per step and a summary; exits 0 when every step passed, 1 with what was expected
+# and what was found when one did not.
+# Usage: script/e2e-example
+set -euo pipefail
+cd "$(dirname "$0")/.."
+source script/lib/heavy.sh
+
+run_heavy node packages/server/src/e2e/example-run.ts
