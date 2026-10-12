@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Everything CI runs, in the same order: lint and type-check, tests, scans.
+# Everything CI runs, in the same order: lint and type-check, tests, scans, both end-to-end suites, and the
+# check that the screenshots match the cockpit and the demonstration.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 script/lint
 script/test
 script/scan
+script/e2e
+script/screenshots --check

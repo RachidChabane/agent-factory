@@ -1,0 +1,32 @@
+name: Release
+
+# Publishes the GitHub Release of a version tag pushed by script/release, with its changelog section as notes.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions: {}
+
+jobs:
+  release:
+    name: GitHub Release
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","mac-mini"]') || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Read the notes from the changelog
+        env:
+          TAG: ${{ github.ref_name }}
+        run: node tools/release/src/release.ts notes "$TAG" > "$RUNNER_TEMP/notes.md"
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag

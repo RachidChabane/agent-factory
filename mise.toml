@@ -1,0 +1,61 @@
+# Shortcuts to the front-door scripts in script/, which also run as `pnpm run <verb>` or directly.
+
+[tasks.setup]
+description = "Install the dependencies from the lockfile, build the cockpit and activate the git hooks"
+run = "script/setup"
+
+[tasks.lint]
+description = "ESLint, type-check every package, the schema and notices freshness, shellcheck, actionlint"
+run = "script/lint"
+
+[tasks.test]
+description = "Unit, property, contract and integration tests of every package"
+run = "script/test"
+
+[tasks.e2e]
+description = "Both end-to-end suites"
+run = "script/e2e"
+
+[tasks."e2e-example"]
+description = "The fictional example project from spec to merge through the command line"
+run = "script/e2e-example"
+
+[tasks."e2e-cockpit"]
+description = "Every cockpit command clicked in a real browser, in demo and rehearsal modes"
+run = "script/e2e-cockpit"
+
+[tasks.scan]
+description = "Denylist scan of the tree and the history, then gitleaks"
+run = "script/scan"
+
+[tasks.screenshots]
+description = "Regenerate the README screenshots from the demonstration (--check verifies them)"
+run = "script/screenshots"
+
+[tasks.schema]
+description = "Regenerate the configuration JSON Schema (--check verifies it)"
+run = "script/schema"
+
+[tasks."third-party-notices"]
+description = "Regenerate THIRD_PARTY_NOTICES.md (--check verifies it)"
+run = "script/third-party-notices"
+
+[tasks.lockfile]
+description = "Rewrite pnpm-lock.yaml without installing anything"
+run = "script/lockfile"
+
+[tasks.ci]
+description = "Everything CI runs, in the same order"
+run = "script/ci"
+
+[tasks.factory]
+description = "The product's command line"
+run = "script/factory"
+
+[tasks.start]
+description = "Start the factory and its cockpit (--demo for the demonstration)"
+run = "script/start"
+
+[tasks.release]
+description = "Write the changelog section, set the version, commit and tag a release from main"
+run = "script/release"

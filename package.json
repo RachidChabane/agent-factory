@@ -16,10 +16,21 @@
     "setup": "script/setup",
     "lint": "script/lint",
     "test": "script/test",
+    "e2e": "script/e2e",
+    "e2e-example": "script/e2e-example",
+    "e2e-cockpit": "script/e2e-cockpit",
     "scan": "script/scan",
-    "factory": "script/factory"
+    "screenshots": "script/screenshots",
+    "schema": "script/schema",
+    "third-party-notices": "script/third-party-notices",
+    "lockfile": "script/lockfile",
+    "ci": "script/ci",
+    "factory": "script/factory",
+    "start": "script/start",
+    "release": "script/release"
   },
   "devDependencies": {
+    "@playwright/test": "1.61.0",
     "@types/node": "24.5.2",
     "eslint": "9.36.0",
     "eslint-plugin-react-hooks": "7.1.1",

@@ -1,0 +1,11 @@
+{
+  "name": "@agent-factory/release",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Writes the changelog section of a release from the Conventional Commits since the previous tag, and reads it back as release notes.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

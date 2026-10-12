@@ -1,0 +1,11 @@
+{
+  "name": "@agent-factory/notices",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Writes THIRD_PARTY_NOTICES.md from the licences of the production dependencies, and checks it is current.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

@@ -6,9 +6,17 @@ source script/lib/heavy.sh
 
 run_heavy pnpm exec eslint .
 run_heavy pnpm -r --workspace-concurrency=1 --if-present run typecheck
+run_heavy pnpm exec tsc --noEmit -p e2e/tsconfig.json
 script/schema --check
 
-shell_files=(script/setup script/lint script/test script/scan script/ci script/lockfile script/schema script/install-tool script/lib/*.sh .githooks/*)
+script/third-party-notices --check
+
+shell_files=(bin/agent-factory script/lib/*.sh .githooks/*)
+for file in script/*; do
+  if [ -f "$file" ]; then
+    shell_files+=("$file")
+  fi
+done
 if command -v shellcheck > /dev/null 2>&1; then
   shellcheck -x "${shell_files[@]}"
 else

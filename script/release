@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Cuts a release from main: writes the changelog section from the Conventional Commits since the previous tag, sets
+# the version of package.json, commits both and creates the annotated tag v<version> with the section as its message.
+# Pushing the tag (git push origin main --follow-tags) makes the release workflow publish the GitHub Release.
+# Usage: script/release <version>
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+readonly MAIN_BRANCH=main
+readonly VERSION="${1:?usage: script/release <version>}"
+readonly TAG="v${VERSION#v}"
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "release: the working tree has changes; commit or remove them first" >&2
+  exit 1
+fi
+if [ "$(git rev-parse --abbrev-ref HEAD)" != "$MAIN_BRANCH" ]; then
+  echo "release: releases are cut from $MAIN_BRANCH" >&2
+  exit 1
+fi
+if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
+  echo "release: $TAG already exists" >&2
+  exit 1
+fi
+
+node tools/release/src/release.ts prepare "$TAG" > /dev/null
+git add CHANGELOG.md package.json
+git commit --quiet --message "chore(release): $TAG"
+git tag --annotate "$TAG" --message "$TAG" --message "$(node tools/release/src/release.ts notes "$TAG")"
+echo "release: $TAG is committed and tagged; publish it with: git push origin $MAIN_BRANCH --follow-tags"

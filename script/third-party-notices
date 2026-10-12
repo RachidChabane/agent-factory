@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Writes THIRD_PARTY_NOTICES.md from the licences of the production dependencies; with --check, fails when the
+# committed file does not match them instead of writing it.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+exec node tools/notices/src/main.ts "$@"
