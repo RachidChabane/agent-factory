@@ -24,3 +24,11 @@ export class EmptyCommandError extends Error {
     this.name = 'EmptyCommandError';
   }
 }
+
+const MISSING_FILE_CODE = 'ENOENT';
+
+export function isMissingExecutable(error: unknown): boolean {
+  if (!(error instanceof CommandSpawnError)) return false;
+  const cause: unknown = error.cause;
+  return cause instanceof Error && 'code' in cause && cause.code === MISSING_FILE_CODE;
+}

@@ -3,7 +3,6 @@ import { useMemo } from 'react';
 import { useNow } from '../../app/context.tsx';
 import { useCommand, useSnapshot } from '../../app/hooks.ts';
 import type { RoleSetting, ToolName } from '../../contract/index.ts';
-import { TOOL_NAMES } from '../../contract/index.ts';
 import { Card, Section } from '../../ui/components/Card.tsx';
 import { Skeleton } from '../../ui/components/Skeleton.tsx';
 import { Page, PageHeader } from '../../ui/layout/Page.tsx';
@@ -23,8 +22,8 @@ export function SettingsView() {
   const now = useNow();
   const command = useCommand();
   const settings = snapshot?.settings ?? null;
-  const tools = useMemo(() => (settings === null ? [] : sortTools(settings.tools)), [settings]);
-  const unchecked = useMemo(() => (settings === null ? [] : uncheckedTools(settings.tools)), [settings]);
+  const tools = useMemo(() => (settings === null ? [] : sortTools(settings.tools, settings.configuredTools)), [settings]);
+  const unchecked = useMemo(() => (settings === null ? [] : uncheckedTools(settings.tools, settings.configuredTools)), [settings]);
 
   const saveRole = (role: RoleSetting) => {
     void command.run('settings.update-role', role, ROLE_SUCCESS);
@@ -69,7 +68,7 @@ export function SettingsView() {
               onSave={saveLimits}
             />
           </Section>
-          <Section title="Connexions des outils" id="settings-tools" description={`${connectedCount(settings.tools)} sur ${TOOL_NAMES.length} connectés`}>
+          <Section title="Connexions des outils" id="settings-tools" description={`${connectedCount(settings.tools)} sur ${settings.configuredTools.length} connectés`}>
             <Card padded={false}>
               <ToolList tools={tools} unchecked={unchecked} now={now} testing={command.pending === 'settings.test-tool'} onTest={testTool} />
             </Card>

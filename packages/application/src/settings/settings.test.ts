@@ -43,18 +43,18 @@ describe('tool checks', () => {
   it('records each probe and keeps the latest result per tool', async () => {
     const events = new InMemoryEventStore();
     const results: Record<string, ToolProbeResult> = {
-      tuc: { tool: 'gcloud', status: 'unauthenticated', version: null, detail: 'no auth credentials found', fixCommand: 'tuc login' },
+      cloud: { tool: 'cloud', status: 'unauthenticated', version: null, detail: 'no auth credentials found', fixCommand: 'cloud auth login' },
     };
     const prober: ToolProber = {
       probe: (tool: ToolName) => Promise.resolve(results[tool] ?? { tool, status: 'connected', version: '1.0.0', detail: 'ok', fixCommand: null }),
     };
-    await checkTool(events, prober, 'gcloud', 'alex');
-    results['gcloud'] = { tool: 'gcloud', status: 'connected', version: '2.4.0', detail: 'logged in', fixCommand: null };
-    await checkTool(events, prober, 'gcloud', 'alex');
+    await checkTool(events, prober, 'cloud', 'alex');
+    results['cloud'] = { tool: 'cloud', status: 'connected', version: '2.4.0', detail: 'logged in', fixCommand: null };
+    await checkTool(events, prober, 'cloud', 'alex');
     await checkTool(events, prober, 'gh', 'alex');
     expect(events.typesOf(SETTINGS_SUBJECT)).toEqual([TOOL_CHECKED_EVENT, TOOL_CHECKED_EVENT, TOOL_CHECKED_EVENT]);
     const latest = latestToolChecks(events.records);
-    expect([...latest.keys()]).toEqual(['gcloud', 'gh']);
-    expect(latest.get('gcloud')).toMatchObject({ status: 'connected', version: '2.4.0', operator: 'alex' });
+    expect([...latest.keys()]).toEqual(['cloud', 'gh']);
+    expect(latest.get('cloud')).toMatchObject({ status: 'connected', version: '2.4.0', operator: 'alex' });
   });
 });

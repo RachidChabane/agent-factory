@@ -1,16 +1,9 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { KnowledgePack } from '@agent-factory/application';
+import { isMissingPath, listMarkdownFileNames, markdownSection, SECTION_SEPARATOR } from './markdown-documents.ts';
 
-const KNOWLEDGE_FILE_EXTENSION = '.md';
-const FILE_HEADING_PREFIX = '## ';
-const SECTION_SEPARATOR = '\n\n';
 const UTF8 = 'utf8';
-const MISSING_DIRECTORY_CODES: readonly string[] = ['ENOENT', 'ENOTDIR'];
-
-function isMissingDirectory(error: unknown): boolean {
-  return error instanceof Error && 'code' in error && typeof error.code === 'string' && MISSING_DIRECTORY_CODES.includes(error.code);
-}
 
 export class FileKnowledgePack implements KnowledgePack {
   private readonly directory: string;
@@ -27,19 +20,14 @@ export class FileKnowledgePack implements KnowledgePack {
 
   private async markdownFileNames(): Promise<readonly string[]> {
     try {
-      const entries = await readdir(this.directory, { withFileTypes: true });
-      return entries
-        .filter((entry) => entry.isFile() && entry.name.endsWith(KNOWLEDGE_FILE_EXTENSION))
-        .map((entry) => entry.name)
-        .sort();
+      return await listMarkdownFileNames(this.directory);
     } catch (error) {
-      if (isMissingDirectory(error)) return [];
+      if (isMissingPath(error)) return [];
       throw error;
     }
   }
 
   private async section(name: string): Promise<string> {
-    const content = await readFile(join(this.directory, name), UTF8);
-    return `${FILE_HEADING_PREFIX}${name}${SECTION_SEPARATOR}${content.trim()}`;
+    return markdownSection(name, await readFile(join(this.directory, name), UTF8));
   }
 }

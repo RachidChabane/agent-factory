@@ -1,7 +1,7 @@
 import type { EffortLevel } from '@agent-factory/domain';
 import { EFFORT_LEVELS } from '@agent-factory/domain';
-import type { MemoryPressure, RoleSetting, ToolConnection, ToolName } from '../../contract/index.ts';
-import { MEMORY_PRESSURES, TOOL_NAMES } from '../../contract/index.ts';
+import type { ConfiguredTool, MemoryPressure, RoleSetting, ToolConnection, ToolName } from '../../contract/index.ts';
+import { MEMORY_PRESSURES } from '../../contract/index.ts';
 import { MEMORY_PRESSURE_LABELS } from '../../i18n/labels.ts';
 
 export const BUDGET_STEP = 0.1;
@@ -95,8 +95,9 @@ export function limitsErrors(draft: LimitsDraft, maximum: number): LimitsErrors 
   };
 }
 
-export function sortTools(tools: readonly ToolConnection[]): ToolConnection[] {
-  const order = (tool: ToolConnection) => TOOL_NAMES.indexOf(tool.tool);
+export function sortTools(tools: readonly ToolConnection[], configured: readonly ConfiguredTool[]): ToolConnection[] {
+  const names = configured.map((tool) => tool.name);
+  const order = (tool: ToolConnection) => names.indexOf(tool.tool);
   const rank = (tool: ToolConnection) => (tool.status === 'connected' ? 1 : 0);
   return [...tools].sort((left, right) => rank(left) - rank(right) || order(left) - order(right));
 }
@@ -105,7 +106,7 @@ export function connectedCount(tools: readonly ToolConnection[]): number {
   return tools.filter((tool) => tool.status === 'connected').length;
 }
 
-export function uncheckedTools(tools: readonly ToolConnection[]): readonly ToolName[] {
+export function uncheckedTools(tools: readonly ToolConnection[], configured: readonly ConfiguredTool[]): readonly ToolName[] {
   const checked = new Set(tools.map((tool) => tool.tool));
-  return TOOL_NAMES.filter((tool) => !checked.has(tool));
+  return configured.map((tool) => tool.name).filter((name) => !checked.has(name));
 }

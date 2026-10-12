@@ -5,7 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BUILT_IN_CREDENTIAL_PATHS } from './credential-paths.ts';
 import { RelativePathPatternError, concretePaths, parsePathPattern } from './path-patterns.ts';
 import { SANDBOX_EXEC, SeatbeltCommandSandbox } from './seatbelt-command-sandbox.ts';
-import { UnsafeSandboxPathError, UnsafeSandboxPortError, renderSeatbeltProfile, type SeatbeltPolicy } from './seatbelt-profile.ts';
+import { UnsafeSandboxPortError, renderSeatbeltProfile, type SeatbeltPolicy } from './seatbelt-profile.ts';
+import { UnsafeSandboxPathError } from './unsafe-sandbox-path.ts';
 
 const HOME = '/Users/operator';
 

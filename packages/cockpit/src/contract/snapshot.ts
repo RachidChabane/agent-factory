@@ -53,7 +53,6 @@ import {
   RUN_SUBJECT_KINDS,
   SOURCE_KINDS,
   SUBAGENT_STATUSES,
-  TOOL_NAMES,
   TOOL_STATUSES,
   WORKFLOW_STATUSES,
   WORKFLOW_TRIGGERS,
@@ -638,8 +637,12 @@ export const RoleSettingSchema = z.object({
 });
 export type RoleSetting = z.infer<typeof RoleSettingSchema>;
 
+/** A tool the installation or the project checks: the built-in ones and those the configuration declares. */
+export const ConfiguredToolSchema = z.object({ name: z.string().min(1), description: z.string().nullable() });
+export type ConfiguredTool = z.infer<typeof ConfiguredToolSchema>;
+
 export const ToolConnectionSchema = z.object({
-  tool: z.enum(TOOL_NAMES),
+  tool: z.string().min(1),
   status: z.enum(TOOL_STATUSES),
   version: z.string().nullable(),
   detail: z.string(),
@@ -653,6 +656,9 @@ export const SettingsViewSchema = z.object({
   roles: z.array(RoleSettingSchema),
   concurrency: z.object({ ceiling: CountSchema, maximum: CountSchema, active: CountSchema }),
   resourceGuard: z.object({ freeMemoryThresholdPercent: PercentSchema, pauseAbovePressure: z.enum(MEMORY_PRESSURES) }),
+  /** Every tool to check, in the configured order, whether or not it was checked yet. */
+  configuredTools: z.array(ConfiguredToolSchema),
+  /** The latest check of each tool that was checked at least once. */
   tools: z.array(ToolConnectionSchema),
 });
 export type SettingsView = z.infer<typeof SettingsViewSchema>;

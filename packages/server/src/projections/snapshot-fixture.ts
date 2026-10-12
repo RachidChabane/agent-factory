@@ -1,5 +1,5 @@
 import { DEFAULT_PROJECT_CONVENTIONS, type FactoryEventRecord, type ProjectConventions } from '@agent-factory/application';
-import { IssueTypology, type IssueSpec } from '@agent-factory/domain';
+import { BUILT_IN_TOOLS, IssueTypology, type IssueSpec } from '@agent-factory/domain';
 import type { SnapshotContext } from './snapshot-context.ts';
 
 const START_MS = Date.parse('2026-10-09T08:00:00.000Z');
@@ -388,6 +388,7 @@ export function fixtureContext(): SnapshotContext {
     pullRequestTitles: new Map(),
     logs: new Map([['42/before-proof.log', '2 failed: header has no conversation link'], ['42/gate-attempt-1.log', GATE_LOG]]),
     knowledgeSources: ['product-map.md'],
+    configuredTools: BUILT_IN_TOOLS.map((name) => ({ name, description: null })),
     tools: [],
     deployments: new Map(),
   };

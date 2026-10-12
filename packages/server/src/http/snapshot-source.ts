@@ -13,7 +13,7 @@ import {
   type RunLogLine,
 } from '@agent-factory/application';
 import type { EnvironmentDeployments } from '../projections/environment-views.ts';
-import { AGENT_ROLES, DEPLOYMENT_ENVIRONMENTS, type DeploymentEnvironment, type IssueSpec, type ResourceSnapshot } from '@agent-factory/domain';
+import { AGENT_ROLES, BUILT_IN_TOOLS, DEPLOYMENT_ENVIRONMENTS, type DeploymentEnvironment, type IssueSpec, type ResourceSnapshot } from '@agent-factory/domain';
 import type { FactoryContainer } from '../composition/factory-container.ts';
 import { recordedRuns } from '../projections/run-views.ts';
 import { indexEvents } from '../projections/event-index.ts';
@@ -145,6 +145,7 @@ export class SnapshotSource {
       pullRequestTitles: await this.pullRequestTitles(journals),
       logs: await this.logTails(journals),
       knowledgeSources: await this.knowledgeSources(),
+      configuredTools: BUILT_IN_TOOLS.map((name) => ({ name, description: null })),
       tools: toolConnections(records),
       deployments: await this.environmentDeployments(),
     };

@@ -1,36 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { CommandResult, CommandRunner } from '@agent-factory/application';
-import { TOOL_NAMES } from '@agent-factory/domain';
+import { BUILT_IN_TOOLS } from '@agent-factory/domain';
 import { PINNED_CLAUDE_VERSION } from '../claude/claude-invocation.ts';
-import { CommandSpawnError } from '../process/errors.ts';
 import { SpawnCommandRunner } from '../process/spawnCommandRunner.ts';
-import { CliToolProber, FIGMA_KEYCHAIN_SERVICE, type ToolProbeSettings } from './tool-probes.ts';
-
-type Answer = Partial<CommandResult> | Error;
-
-class AnsweringRunner implements CommandRunner {
-  readonly asked: { readonly command: string; readonly timeoutMs: number; readonly env: Readonly<Record<string, string>> }[] = [];
-  private readonly answers = new Map<string, Answer>();
-
-  answer(command: string, answer: Answer): this {
-    this.answers.set(command, answer);
-    return this;
-  }
-
-  run(command: readonly string[], _cwd: string, timeoutMs: number, env: Readonly<Record<string, string>>): Promise<CommandResult> {
-    const key = command.join(' ');
-    this.asked.push({ command: key, timeoutMs, env });
-    const answer = this.answers.get(key);
-    if (answer === undefined) return Promise.reject(new CommandSpawnError(command, Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' })));
-    if (answer instanceof Error) return Promise.reject(answer);
-    return Promise.resolve({ exitCode: 0, stdout: '', stderr: '', durationMs: 5, timedOut: false, ...answer });
-  }
-}
+import { CliToolProber, NO_PROBE_WITHOUT_CONFIGURATION, type ToolProbeSettings } from './tool-probes.ts';
+import { AnsweringRunner } from './testSupport.ts';
 
 const SANDBOX_PROBE: readonly string[] = ['/usr/bin/sandbox-exec', '-p', '(version 1)', '/usr/bin/true'];
 
 const SETTINGS: ToolProbeSettings = {
-  environment: { PATH: '/usr/bin', VAULT_ADDR: 'https://vault.example.invalid' },
+  environment: { PATH: '/usr/bin', LANG: 'C.UTF-8' },
   ghEnvironment: { PATH: '/usr/bin', GH_PROMPT_DISABLED: '1' },
   claudeCommand: ['claude'],
   sandboxProbe: SANDBOX_PROBE,
@@ -43,8 +21,8 @@ function probe(runner: AnsweringRunner) {
   return new CliToolProber(runner, SETTINGS);
 }
 
-describe('tool probes', () => {
-  it('reports a logged-in tool as connected with its version and no fix', async () => {
+describe('built-in tool probes', () => {
+  it('reports a logged-in gh as connected with its version and no fix', async () => {
     const runner = new AnsweringRunner()
       .answer('gh auth status', { stdout: 'github.com\n  ✓ Logged in to github.com account operator (keyring)\n' })
       .answer('gh --version', { stdout: 'gh version 2.93.0 (2026-05-27)\n' });
@@ -58,75 +36,89 @@ describe('tool probes', () => {
     expect(runner.asked[0]?.env).toBe(SETTINGS.ghEnvironment);
   });
 
-  it('reports a missing login with the command that fixes it', async () => {
+  it('reports a missing gh login with the command that fixes it', async () => {
     const runner = new AnsweringRunner()
-      .answer('tuc whoami', { exitCode: 1, stderr: 'ERROR no auth credentials found\n' })
-      .answer('tuc version', { stdout: '\ntuc 3.46.0\n' });
-    expect(await probe(runner).probe('tuc')).toEqual({
-      tool: 'tuc',
+      .answer('gh auth status', { exitCode: 1, stderr: 'You are not logged into any GitHub hosts. To log in, run: gh auth login\n' })
+      .answer('gh --version', { stdout: 'gh version 2.93.0 (2026-05-27)\n' });
+    expect(await probe(runner).probe('gh')).toEqual({
+      tool: 'gh',
       status: 'unauthenticated',
-      version: '3.46.0',
-      detail: 'ERROR no auth credentials found',
-      fixCommand: 'tuc login',
+      version: '2.93.0',
+      detail: 'You are not logged into any GitHub hosts. To log in, run: gh auth login',
+      fixCommand: 'gh auth login',
     });
   });
 
-  it('reads a probe that hangs on a browser login as a login needed, within its time bound', async () => {
-    const runner = new AnsweringRunner().answer('pup auth status --no-agent', { exitCode: 143, timedOut: true }).answer('pup --version', { stdout: 'pup 1.6.6' });
-    const result = await probe(runner).probe('pup');
-    expect(result).toMatchObject({ status: 'unauthenticated', fixCommand: 'pup auth login', version: '1.6.6' });
+  it('reads a gh that hangs on a browser login as a login needed, within its time bound', async () => {
+    const runner = new AnsweringRunner().answer('gh auth status', { exitCode: 143, timedOut: true }).answer('gh --version', { stdout: 'gh version 2.93.0' });
+    const result = await probe(runner).probe('gh');
+    expect(result).toMatchObject({ status: 'unauthenticated', fixCommand: 'gh auth login', version: '2.93.0' });
     expect(result.detail).toContain('did not answer within 20 s');
+    expect(result.detail).toContain('probably waiting for a login');
     expect(runner.asked.every((entry) => entry.timeoutMs === SETTINGS.timeoutMs)).toBe(true);
   });
 
-  it('reports a tool that is not installed as missing', async () => {
-    expect(await probe(new AnsweringRunner()).probe('avn')).toMatchObject({ status: 'missing', version: null, fixCommand: null });
-    expect(await probe(new AnsweringRunner()).probe('gcloud')).toMatchObject({ status: 'missing', fixCommand: 'brew install --cask google-cloud-sdk' });
+  it('reports a gh that is not installed as missing, with the way to install it', async () => {
+    expect(await probe(new AnsweringRunner()).probe('gh')).toMatchObject({ status: 'missing', version: null, fixCommand: 'brew install gh' });
   });
 
-  it('reads the structured answers of gcloud, gws, vault and avn', async () => {
-    const runner = new AnsweringRunner()
-      .answer('gcloud auth list --format=json', { stdout: JSON.stringify([{ account: 'a@example.com', status: '' }, { account: 'b@example.com', status: 'ACTIVE' }]) })
-      .answer('gws auth status', { stdout: 'Using keyring backend: keyring\n{"token_valid": false, "has_refresh_token": false}' })
-      .answer('vault token lookup -format=json', { stdout: JSON.stringify({ data: { id: 'hvs.secret-value', display_name: 'oidc-operator', ttl: 3600 } }) })
-      .answer('avn user info --json', { exitCode: 1, stderr: 'ERROR command failed: Expired db token, status 401' });
-    const prober = probe(runner);
-    expect(await prober.probe('gcloud')).toMatchObject({ status: 'connected', detail: 'b@example.com' });
-    expect(await prober.probe('gws')).toMatchObject({ status: 'unauthenticated', fixCommand: 'gws auth login' });
-    const vault = await prober.probe('vault');
-    expect(vault).toMatchObject({ status: 'connected', detail: 'oidc-operator, 3600 s left' });
-    expect(JSON.stringify(vault)).not.toContain('hvs.secret-value');
-    expect(await prober.probe('avn')).toMatchObject({ status: 'unauthenticated', fixCommand: 'avn user login <email>' });
+  it('reports git as connected with its version', async () => {
+    const runner = new AnsweringRunner().answer('git --version', { stdout: 'git version 2.50.1\n' });
+    expect(await probe(runner).probe('git')).toEqual({ tool: 'git', status: 'connected', version: '2.50.1', detail: 'git version 2.50.1', fixCommand: null });
+    expect(runner.asked.every((entry) => entry.env === SETTINGS.environment)).toBe(true);
   });
 
-  it('checks the figma token in the keychain without reading its value', async () => {
-    const runner = new AnsweringRunner().answer(`/usr/bin/security find-generic-password -s ${FIGMA_KEYCHAIN_SERVICE}`, { exitCode: 44 });
-    expect(await probe(runner).probe('figma')).toMatchObject({ status: 'unauthenticated' });
-    expect(runner.asked.map((entry) => entry.command).join(' ')).not.toMatch(/ -w\b| -g\b/);
+  it('reports git as missing when it is not on the PATH, and as an error when it fails', async () => {
+    expect(await probe(new AnsweringRunner()).probe('git')).toMatchObject({ status: 'missing', version: null, fixCommand: null });
+    const broken = new AnsweringRunner().answer('git --version', { exitCode: 134, stderr: 'dyld: Library not loaded: libpcre2.dylib\n' });
+    expect(await probe(broken).probe('git')).toMatchObject({ status: 'error', fixCommand: null, detail: 'dyld: Library not loaded: libpcre2.dylib' });
   });
 
-  it('flags a claude that is not the pinned version and runs the sandbox probe profile', async () => {
-    const runner = new AnsweringRunner()
-      .answer('claude --version', { stdout: '9.9.9 (Claude Code)' })
-      .answer(SANDBOX_PROBE.join(' '), { exitCode: 0 });
-    expect(await probe(runner).probe('claude')).toMatchObject({ status: 'error', fixCommand: `claude install ${PINNED_CLAUDE_VERSION}` });
-    expect(await probe(runner).probe('sandbox')).toMatchObject({ status: 'connected', fixCommand: null });
+  it('flags a claude that is not the pinned version, and accepts the pinned one', async () => {
+    const other = new AnsweringRunner().answer('claude --version', { stdout: '9.9.9 (Claude Code)' });
+    expect(await probe(other).probe('claude')).toMatchObject({ status: 'error', fixCommand: `claude install ${PINNED_CLAUDE_VERSION}` });
+    const pinned = new AnsweringRunner().answer('claude --version', { stdout: `${PINNED_CLAUDE_VERSION} (Claude Code)` });
+    expect(await probe(pinned).probe('claude')).toMatchObject({ status: 'connected', fixCommand: null });
   });
 
-  it('reports the sandbox probe as unavailable without a configuration', async () => {
-    expect(await new CliToolProber(new AnsweringRunner(), { ...SETTINGS, sandboxProbe: null }).probe('sandbox')).toMatchObject({
+  it('runs the probe command of the command sandbox and describes it without naming a platform tool', async () => {
+    const runner = new AnsweringRunner().answer(SANDBOX_PROBE.join(' '), { exitCode: 0 });
+    const result = await probe(runner).probe('sandbox');
+    expect(result).toMatchObject({ status: 'connected', fixCommand: null });
+    expect(runner.asked[0]?.env).toBe(SETTINGS.sandboxEnvironment);
+    expect(result.detail).not.toContain('sandbox-exec');
+  });
+
+  it('reports a sandbox that refuses its probe as an error carrying the refusal', async () => {
+    const runner = new AnsweringRunner().answer(SANDBOX_PROBE.join(' '), { exitCode: 1, stderr: 'bwrap: Creating new namespace failed: Operation not permitted\n' });
+    expect(await probe(runner).probe('sandbox')).toMatchObject({
       status: 'error',
-      detail: 'skipped: the configuration did not load',
+      detail: 'the command sandbox refused to run the probe: bwrap: Creating new namespace failed: Operation not permitted',
     });
   });
 
-  it('answers for every tool the cockpit lists', async () => {
-    const results = await Promise.all(TOOL_NAMES.map((tool) => probe(new AnsweringRunner()).probe(tool)));
-    expect(results.map((result) => result.tool)).toEqual([...TOOL_NAMES]);
+  it('reports the sandbox probe as unavailable without a configuration', async () => {
+    const runner = new AnsweringRunner();
+    expect(await new CliToolProber(runner, { ...SETTINGS, sandboxProbe: null }).probe('sandbox')).toMatchObject({
+      status: 'error',
+      detail: NO_PROBE_WITHOUT_CONFIGURATION,
+    });
+    expect(runner.asked).toEqual([]);
+  });
+
+  it('answers an error, without running anything, for a tool it has no built-in probe for', async () => {
+    const runner = new AnsweringRunner();
+    expect(await probe(runner).probe('pup')).toEqual({ tool: 'pup', status: 'error', version: null, detail: 'pup is not a built-in tool', fixCommand: null });
+    expect(runner.asked).toEqual([]);
+  });
+
+  it('answers for every built-in tool', async () => {
+    const results = await Promise.all(BUILT_IN_TOOLS.map((tool) => probe(new AnsweringRunner()).probe(tool)));
+    expect(results.map((result) => result.tool)).toEqual([...BUILT_IN_TOOLS]);
   });
 });
 
-describe('tool probes against real processes', () => {
+describe('built-in tool probes against real processes', () => {
   it('stops a probe that never answers at its time bound and reports the login it waits for', async () => {
     const prober = new CliToolProber(new SpawnCommandRunner({ killGraceMs: 100 }), {
       ...SETTINGS,
@@ -143,6 +135,6 @@ describe('tool probes against real processes', () => {
 
   it('reports an executable absent from the PATH as missing', async () => {
     const prober = new CliToolProber(new SpawnCommandRunner(), { ...SETTINGS, environment: { PATH: '/nonexistent' }, workingDirectory: '/' });
-    expect(await prober.probe('tuc')).toMatchObject({ status: 'missing' });
+    expect(await prober.probe('git')).toMatchObject({ status: 'missing' });
   });
 });

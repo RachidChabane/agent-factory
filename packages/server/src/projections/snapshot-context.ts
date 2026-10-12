@@ -1,4 +1,4 @@
-import type { RoleSetting, SubscriptionWindowView, ToolConnection } from '@agent-factory/cockpit';
+import type { ConfiguredTool, RoleSetting, SubscriptionWindowView, ToolConnection } from '@agent-factory/cockpit';
 import type { CheckRunSummary, ProjectConventions } from '@agent-factory/application';
 import type { DeploymentEnvironment, IssueSpec, PauseAbovePressureLevel, ResourceSnapshot, TokenUsage } from '@agent-factory/domain';
 import type { EnvironmentDeployments } from './environment-views.ts';
@@ -49,6 +49,7 @@ export interface SnapshotContext {
   readonly pullRequestTitles: ReadonlyMap<number, string>;
   readonly logs: ReadonlyMap<string, string>;
   readonly knowledgeSources: readonly string[];
+  readonly configuredTools: readonly ConfiguredTool[];
   readonly tools: readonly ToolConnection[];
   readonly deployments: ReadonlyMap<DeploymentEnvironment, EnvironmentDeployments>;
 }

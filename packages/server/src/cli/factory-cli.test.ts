@@ -100,20 +100,7 @@ function healthyRunner(home: string): TableRunner {
     .answer('memory_pressure -Q', 'System-wide memory free percentage: 61%')
     .answer('sysctl -n kern.memorystatus_vm_pressure_level', '1')
     .answer('/usr/bin/sandbox-exec -p', '')
-    .answer('gh --version', 'gh version 2.93.0 (2026-05-27)')
-    .answer('pup auth status --no-agent', 'authenticated')
-    .answer('pup --version', 'pup 1.6.6')
-    .answer('tuc whoami', 'operator@example.com')
-    .answer('tuc version', 'tuc 3.46.0')
-    .answer('gcloud auth list --format=json', JSON.stringify([{ account: 'operator@example.com', status: 'ACTIVE' }]))
-    .answer('gcloud --version', 'Google Cloud SDK 574.0.0')
-    .answer('vault token lookup -format=json', JSON.stringify({ data: { display_name: 'oidc-operator', ttl: 3600 } }))
-    .answer('vault version', 'Vault v1.20.4')
-    .answer('avn user info --json', JSON.stringify([{ user: 'operator@example.com' }]))
-    .answer('avn --version', 'aiven-client 4.15.0')
-    .answer('gws auth status', '{"token_valid": true}')
-    .answer('gws --version', 'gws 0.22.5')
-    .answer('/usr/bin/security find-generic-password -s figma-pat', 'keychain: "login.keychain-db"');
+    .answer('gh --version', 'gh version 2.93.0 (2026-05-27)');
 }
 
 describe('factory CLI', () => {
@@ -194,20 +181,7 @@ describe('factory CLI', () => {
       'ok   notifications',
       'ok   resources',
       'ok   command sandbox',
-      'ok   pup',
-      'ok   tuc',
-      'ok   gcloud',
-      'ok   vault',
-      'ok   avn',
-      'ok   gws',
-      'ok   figma',
     ]);
-  });
-
-  it('warns about an optional tool that needs a login without failing validation', async () => {
-    const runner = healthyRunner(home).answer('tuc whoami', 'ERROR no auth credentials found', 1);
-    expect(await runCli(['validate'], context({ runner }))).toBe(0);
-    expect(captured.lines).toContain('warn tuc: unauthenticated (3.46.0): ERROR no auth credentials found; fix: tuc login');
   });
 
   it('runs each setup and gate command on a clean base workspace and fails on an undeclared network need', async () => {

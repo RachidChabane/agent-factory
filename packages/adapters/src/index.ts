@@ -48,14 +48,21 @@ export {
 } from './health/httpHealthProbe.ts';
 export { NodeWorkspaceFiles } from './fs/nodeWorkspaceFiles.ts';
 export { FileLogArchive, UnsafeLogNameError, ISSUE_LOG_DIRECTORY_PREFIX } from './fs/fileLogArchive.ts';
+export { MacosResourceGuard, parseFreeMemoryPercent, parsePressureLevel, MEMORY_PRESSURE_COMMAND, PRESSURE_LEVEL_COMMAND } from './resources/macosResourceGuard.ts';
+export { ResourceProbeError } from './resources/errors.ts';
 export {
-  MacosResourceGuard,
-  ResourceProbeError,
-  parseFreeMemoryPercent,
-  parsePressureLevel,
-  MEMORY_PRESSURE_COMMAND,
-  PRESSURE_LEVEL_COMMAND,
-} from './resources/macosResourceGuard.ts';
+  LinuxResourceGuard,
+  parseAvailableMemoryPercent,
+  parseMemoryPressure,
+  pressureLevelOf,
+  CRITICAL_STALL_PERCENT,
+  MEMINFO_PATH,
+  MEMORY_PRESSURE_PATH,
+  PRESSURE_WITHOUT_PSI,
+  WARN_STALL_PERCENT,
+} from './resources/linuxResourceGuard.ts';
+export { NodeProcFileReader, type ProcFileReader } from './resources/procFileReader.ts';
+export { createResourceGuard } from './resources/resourceGuardFactory.ts';
 export {
   FileRolePromptCatalog,
   RolePromptMissingError,
@@ -63,6 +70,7 @@ export {
   placeholdersOf,
   ROLE_TEMPLATE_EXTENSION,
 } from './roles/fileRolePromptCatalog.ts';
+export { LayeredRolePromptCatalog, RolePromptOverrideMissingError, type RolePromptOverrides } from './roles/layeredRolePromptCatalog.ts';
 export {
   isLocalRemoteUrl,
   localOnlyGitEnvironment,
@@ -84,27 +92,47 @@ export {
   RehearsalSetupError,
   UnknownCommitError,
 } from './github-local/errors.ts';
-export { GoogleChatNotifier, buildGoogleChatMessage, type GoogleChatNotifierSettings, type NotifyFetchFunction } from './notify/googleChatNotifier.ts';
+export { GoogleChatNotifier, buildGoogleChatMessage, type GoogleChatNotifierSettings } from './notify/googleChatNotifier.ts';
+export { type NotifyFetchFunction } from './notify/webhookDelivery.ts';
+export { SlackNotifier, buildSlackMessage, escapeSlackText, SLACK_SECTION_TEXT_LIMIT, type SlackMessage, type SlackNotifierSettings } from './notify/slackNotifier.ts';
+export { WebhookNotifier, buildWebhookPayload, type WebhookNotifierSettings, type WebhookPayload } from './notify/webhookNotifier.ts';
+export {
+  SystemNotifier,
+  appleScriptNotification,
+  escapeAppleScriptString,
+  escapeNotificationMarkup,
+  NOTIFY_SEND_EXECUTABLE,
+  OSASCRIPT_EXECUTABLE,
+  type SystemNotifierSettings,
+} from './notify/systemNotifier.ts';
+export { CompositeNotifier, type NotificationChannel } from './notify/compositeNotifier.ts';
 export { NoopNotifier } from './notify/noopNotifier.ts';
-export { NotificationDeliveryError } from './notify/errors.ts';
+export { NotificationChannelsFailedError, NotificationDeliveryError, type ChannelFailure } from './notify/errors.ts';
 export { FileRunLogStore, RunLogEventSchema, UnsafeRunIdError, RUN_LOG_EXTENSION } from './runs/fileRunLogStore.ts';
 export { ProcessLock, LockHeldError, lockHolder, isProcessAlive } from './fs/processLock.ts';
 export { GitBaseCheckouts, UnsafeCheckoutNameError, type GitBaseCheckoutsSettings } from './git/gitBaseCheckouts.ts';
 export { FileKnowledgePack } from './knowledge/fileKnowledgePack.ts';
-export { BUILT_IN_CREDENTIAL_PATHS, KEYCHAIN_EXECUTABLE, KEYCHAIN_SERVICES } from './sandbox/credential-paths.ts';
+export { SourcesKnowledgePack, SOURCE_UNAVAILABLE_REASONS, type KnowledgeSource } from './knowledge/sourcesKnowledgePack.ts';
+export { BUILT_IN_CREDENTIAL_PATHS, KEYCHAIN_EXECUTABLE, KEYCHAIN_SERVICES, LINUX_PRIVATE_RUNTIME_PATHS } from './sandbox/credential-paths.ts';
 export { concretePaths, parsePathPattern, RelativePathPatternError, type PathPattern } from './sandbox/path-patterns.ts';
-export { renderSeatbeltProfile, UnsafeSandboxPathError, type SeatbeltPolicy } from './sandbox/seatbelt-profile.ts';
-export {
-  SANDBOX_EXEC,
-  SeatbeltCommandSandbox,
-  canonicalDirectory,
-  userTemporaryDirectories,
-  type SeatbeltSandboxSettings,
-} from './sandbox/seatbelt-command-sandbox.ts';
+export { UnsafeSandboxPathError } from './sandbox/unsafe-sandbox-path.ts';
+export { renderSeatbeltProfile, type SeatbeltPolicy } from './sandbox/seatbelt-profile.ts';
+export { SANDBOX_EXEC, SeatbeltCommandSandbox, type SeatbeltSandboxSettings } from './sandbox/seatbelt-command-sandbox.ts';
+export { canonicalDirectory } from './sandbox/canonical-directory.ts';
+export { userTemporaryDirectories } from './sandbox/temporary-directories.ts';
+export type { BlockedPorts, CommandSandboxSettings } from './sandbox/command-sandbox-settings.ts';
+export { BUBBLEWRAP_EXECUTABLE, renderBubblewrapArguments, type BubblewrapPolicy } from './sandbox/bubblewrap-arguments.ts';
+export { BubblewrapCommandSandbox } from './sandbox/bubblewrap-command-sandbox.ts';
+export { createCommandSandbox } from './sandbox/command-sandbox-factory.ts';
+export { defaultWritableCacheDirectories } from './sandbox/writable-cache-directories.ts';
+export { SUPPORTED_PLATFORMS, UnsupportedPlatformError, isSupportedPlatform, type SupportedPlatform } from './platform/supported-platform.ts';
 export {
   DEFAULT_KEYCHAIN_SERVICES,
   OperatorSecretInventory,
   environmentSecrets,
   type OperatorSecretInventorySettings,
 } from './secrets/operator-secret-inventory.ts';
-export { CliToolProber, DEFAULT_TOOL_PROBE_TIMEOUT_MS, FIGMA_KEYCHAIN_SERVICE, type ToolProbeSettings } from './tools/tool-probes.ts';
+export { CliToolProber, DEFAULT_TOOL_PROBE_TIMEOUT_MS, type ToolProbeSettings } from './tools/tool-probes.ts';
+export { DeclarativeToolProber, type DeclaredTool, type DeclarativeToolProbeSettings } from './tools/declarative-tool-prober.ts';
+export { InvalidToolDeclarationError } from './tools/errors.ts';
+export { RoutingToolProber } from './tools/routing-tool-prober.ts';

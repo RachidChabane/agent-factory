@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { AGENT_ROLES, EFFORT_LEVELS } from '@agent-factory/domain';
 import { AmountSchema, CountSchema, IssueNumberSchema, IssueTypeIdSchema, PercentSchema } from './primitives.ts';
 import { CostCapsSchema } from './snapshot.ts';
-import { MEMORY_PRESSURES, TOOL_NAMES } from './vocabulary.ts';
+import { MEMORY_PRESSURES } from './vocabulary.ts';
 
 const RequestRefSchema = z.object({ requestId: z.string().min(1) });
 const IssueRefSchema = z.object({ issueNumber: IssueNumberSchema });
@@ -66,7 +66,7 @@ export const COMMAND_BODY_SCHEMAS = {
     freeMemoryThresholdPercent: PercentSchema,
     pauseAbovePressure: z.enum(MEMORY_PRESSURES),
   }),
-  'settings.test-tool': z.object({ tool: z.enum(TOOL_NAMES) }),
+  'settings.test-tool': z.object({ tool: z.string().min(1) }),
   'costs.update-caps': CostCapsSchema,
   'scheduler.pause': z.object({}),
   'scheduler.resume': z.object({}),

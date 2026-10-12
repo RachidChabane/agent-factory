@@ -78,7 +78,7 @@ export type AlertState = (typeof ALERT_STATES)[number];
 export const MEMORY_PRESSURES = ['normal', 'warn', 'critical'] as const;
 export type MemoryPressure = (typeof MEMORY_PRESSURES)[number];
 
-export { TOOL_NAMES, TOOL_STATUSES } from '@agent-factory/domain';
+export { TOOL_STATUSES } from '@agent-factory/domain';
 export type { ToolName, ToolStatus } from '@agent-factory/domain';
 
 export const DECISION_STATUSES = ['accepted', 'proposed', 'superseded'] as const;

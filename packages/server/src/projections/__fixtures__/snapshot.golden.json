@@ -936,6 +936,24 @@
       "freeMemoryThresholdPercent": 40,
       "pauseAbovePressure": "normal"
     },
+    "configuredTools": [
+      {
+        "name": "git",
+        "description": null
+      },
+      {
+        "name": "gh",
+        "description": null
+      },
+      {
+        "name": "claude",
+        "description": null
+      },
+      {
+        "name": "sandbox",
+        "description": null
+      }
+    ],
     "tools": []
   },
   "resources": {

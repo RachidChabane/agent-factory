@@ -87,22 +87,22 @@ describe('SettingsView', () => {
 
   it('summarises the connections and lists the broken tools first with their fix command', async () => {
     renderWithCockpit(<SettingsView />);
-    expect(await screen.findByText('6 sur 10 connectés')).toBeInTheDocument();
+    expect(await screen.findByText('5 sur 9 connectés')).toBeInTheDocument();
     const rows = screen.getAllByRole('listitem').filter((item) => item.classList.contains('settings-tool'));
-    expect(rows).toHaveLength(10);
+    expect(rows).toHaveLength(9);
     expect(rows.at(-1)?.getAttribute('aria-label')).toBe('sandbox');
-    expect(rows.slice(0, 3).map((row) => row.getAttribute('aria-label'))).toEqual(['tuc', 'vault', 'avn']);
-    expect(within(screen.getByRole('listitem', { name: 'tuc' })).getByText('tuc login')).toBeInTheDocument();
-    expect(within(screen.getByRole('listitem', { name: 'avn' })).getByText('pipx install aiven-client')).toBeInTheDocument();
+    expect(rows.slice(0, 3).map((row) => row.getAttribute('aria-label'))).toEqual(['deployctl', 'secrets', 'metrics']);
+    expect(within(screen.getByRole('listitem', { name: 'deployctl' })).getByText('deployctl login')).toBeInTheDocument();
+    expect(within(screen.getByRole('listitem', { name: 'metrics' })).getByText('pipx install metrics-cli')).toBeInTheDocument();
     expect(screen.getAllByText('Pour corriger :')).toHaveLength(3);
   });
 
-  it('lists every tool as not checked, each with its test, before any test ran', async () => {
+  it('lists every configured tool as not checked, each with its test, before any test ran', async () => {
     const user = userEvent.setup();
     const snapshot = fixtureSnapshot();
     const { transport } = renderWithCockpit(<SettingsView />, { snapshot: { ...snapshot, settings: { ...snapshot.settings, tools: [] } } });
-    expect(await screen.findByText('0 sur 10 connectés')).toBeInTheDocument();
-    expect(screen.getAllByText('Non vérifié', { selector: '.settings-tool__status' })).toHaveLength(10);
+    expect(await screen.findByText('0 sur 9 connectés')).toBeInTheDocument();
+    expect(screen.getAllByText('Non vérifié', { selector: '.settings-tool__status' })).toHaveLength(9);
     await user.click(screen.getByRole('button', { name: 'Tester sandbox' }));
     await screen.findByText('Test de connexion lancé');
     expect(transport.commands).toEqual([{ name: 'settings.test-tool', body: { tool: 'sandbox' } }]);
@@ -111,8 +111,8 @@ describe('SettingsView', () => {
   it('runs a connection test for one tool', async () => {
     const user = userEvent.setup();
     const { transport } = renderWithCockpit(<SettingsView />);
-    await user.click(await screen.findByRole('button', { name: 'Tester vault' }));
+    await user.click(await screen.findByRole('button', { name: 'Tester secrets' }));
     await screen.findByText('Test de connexion lancé');
-    expect(transport.commands).toEqual([{ name: 'settings.test-tool', body: { tool: 'vault' } }]);
+    expect(transport.commands).toEqual([{ name: 'settings.test-tool', body: { tool: 'secrets' } }]);
   });
 });

@@ -23,7 +23,8 @@ import { TEST_BASE_BRANCH, TEST_GIT_ENVIRONMENT, TEST_IDENTITY, TEST_REPOSITORY_
 import { SpawnCommandRunner } from '../process/spawnCommandRunner.ts';
 import { BUILT_IN_CREDENTIAL_PATHS } from './credential-paths.ts';
 import { concretePaths, parsePathPattern, type PathPattern } from './path-patterns.ts';
-import { SeatbeltCommandSandbox, userTemporaryDirectories } from './seatbelt-command-sandbox.ts';
+import { SeatbeltCommandSandbox } from './seatbelt-command-sandbox.ts';
+import { userTemporaryDirectories } from './temporary-directories.ts';
 
 const REAL_SANDBOX_ENABLED = process.env['AGENT_FACTORY_REAL_SANDBOX'] === '1';
 const FACTORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));

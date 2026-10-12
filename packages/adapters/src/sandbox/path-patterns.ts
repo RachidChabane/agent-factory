@@ -44,9 +44,12 @@ function prefixMatches(pattern: PathPattern): readonly string[] {
   }
 }
 
+export function expandedPaths(patterns: readonly PathPattern[]): readonly string[] {
+  return patterns.flatMap((pattern) => (pattern.prefix ? prefixMatches(pattern) : [pattern.path]));
+}
+
 export function concretePaths(patterns: readonly PathPattern[]): readonly string[] {
-  const paths = patterns.flatMap((pattern) => (pattern.prefix ? prefixMatches(pattern) : [pattern.path]));
-  const withTargets = paths.flatMap((path) => {
+  const withTargets = expandedPaths(patterns).flatMap((path) => {
     const target = canonical(path);
     return target === null || target === path ? [path] : [path, target];
   });

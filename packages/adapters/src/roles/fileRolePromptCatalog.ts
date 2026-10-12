@@ -39,6 +39,12 @@ export function placeholdersOf(template: string): readonly string[] {
   return [...new Set([...template.matchAll(PLACEHOLDER)].map((match) => match[1] ?? ''))];
 }
 
+export function renderRoleTemplate(role: AgentRole, template: string, values: Record<string, string>): string {
+  const unknown = placeholdersOf(template).filter((name) => !Object.hasOwn(values, name));
+  if (unknown.length > 0) throw new UnknownPlaceholderError(role, unknown);
+  return template.replace(PLACEHOLDER, (_match, name: string) => values[name] ?? '');
+}
+
 export class FileRolePromptCatalog implements RolePromptCatalog {
   private readonly directory: string;
   private readonly templates: ReadonlyMap<AgentRole, string>;
@@ -60,8 +66,6 @@ export class FileRolePromptCatalog implements RolePromptCatalog {
   render(role: AgentRole, values: Record<string, string>): string {
     const template = this.templates.get(role);
     if (template === undefined) throw new RolePromptMissingError(role, this.directory);
-    const unknown = placeholdersOf(template).filter((name) => !Object.hasOwn(values, name));
-    if (unknown.length > 0) throw new UnknownPlaceholderError(role, unknown);
-    return template.replace(PLACEHOLDER, (_match, name: string) => values[name] ?? '');
+    return renderRoleTemplate(role, template, values);
   }
 }

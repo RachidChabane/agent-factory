@@ -1,4 +1,5 @@
 import type { PathPattern } from './path-patterns.ts';
+import { assertSafeSandboxPath } from './unsafe-sandbox-path.ts';
 
 export interface SeatbeltPolicy {
   readonly deniedReads: readonly PathPattern[];
@@ -8,13 +9,6 @@ export interface SeatbeltPolicy {
   readonly deniedServices: readonly string[];
   readonly blockedPorts: readonly number[];
   readonly network: boolean;
-}
-
-export class UnsafeSandboxPathError extends Error {
-  constructor(path: string) {
-    super(`${JSON.stringify(path)} cannot be written into a sandbox profile`);
-    this.name = 'UnsafeSandboxPathError';
-  }
 }
 
 export class UnsafeSandboxPortError extends Error {
@@ -30,19 +24,16 @@ export const LAUNCHD_SOCKET_DIRECTORIES = ['/private/var/run/com.apple.launchd.'
 
 const WRITABLE_DEVICES: readonly string[] = ['/dev/null', '/dev/zero', '/dev/tty', '/dev/dtracehelper', '/dev/ptmx', '/dev/random', '/dev/urandom'];
 const WRITABLE_DEVICE_PATTERNS: readonly string[] = ['^/dev/fd/', '^/dev/ttys[0-9]+$', '^/dev/pty'];
-const UNSAFE_CHARACTERS = /["\n\r\\]/;
 const REGEX_METACHARACTERS = /[.*+?^${}()|[\]\\/]/g;
 const NEWLINE = '\n';
 const INDENT = '\n  ';
 
 function quoted(path: string): string {
-  if (UNSAFE_CHARACTERS.test(path)) throw new UnsafeSandboxPathError(path);
-  return `"${path}"`;
+  return `"${assertSafeSandboxPath(path)}"`;
 }
 
 function prefixRegex(path: string): string {
-  if (UNSAFE_CHARACTERS.test(path)) throw new UnsafeSandboxPathError(path);
-  return `#"^${path.replace(REGEX_METACHARACTERS, '\\$&')}"`;
+  return `#"^${assertSafeSandboxPath(path).replace(REGEX_METACHARACTERS, '\\$&')}"`;
 }
 
 function pathFilter(pattern: PathPattern): string {

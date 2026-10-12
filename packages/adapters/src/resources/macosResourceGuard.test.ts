@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import type { CommandResult, CommandRunner } from '@agent-factory/application';
-import { MacosResourceGuard, parseFreeMemoryPercent, parsePressureLevel, ResourceProbeError } from './macosResourceGuard.ts';
+import { ResourceProbeError } from './errors.ts';
+import { MacosResourceGuard, parseFreeMemoryPercent, parsePressureLevel } from './macosResourceGuard.ts';
 
 const FIXTURE = new URL('./fixtures/memory-pressure-darwin.txt', import.meta.url);
 

@@ -1,6 +1,7 @@
 import type { CommandRunner, ResourceGuard } from '@agent-factory/application';
 import { MAX_PERCENT } from '@agent-factory/domain';
 import type { MemoryPressureLevel, ResourceSnapshot } from '@agent-factory/domain';
+import { ResourceProbeError } from './errors.ts';
 
 export const MEMORY_PRESSURE_COMMAND: readonly string[] = ['memory_pressure', '-Q'];
 export const PRESSURE_LEVEL_COMMAND: readonly string[] = ['sysctl', '-n', 'kern.memorystatus_vm_pressure_level'];
@@ -14,13 +15,6 @@ export const PRESSURE_LEVEL_BY_KERNEL_VALUE: Readonly<Record<string, MemoryPress
   '2': 'warn',
   '4': 'critical',
 };
-
-export class ResourceProbeError extends Error {
-  constructor(what: string, detail: string) {
-    super(`Could not read ${what}: ${detail}`);
-    this.name = 'ResourceProbeError';
-  }
-}
 
 export function parseFreeMemoryPercent(output: string): number {
   const match = FREE_PERCENTAGE_LINE.exec(output);

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AGENT_ROLES, EFFORT_LEVELS, MEMORY_PRESSURE_LEVELS, TOOL_NAMES, TOOL_STATUSES } from '@agent-factory/domain';
+import { AGENT_ROLES, EFFORT_LEVELS, MEMORY_PRESSURE_LEVELS, TOOL_STATUSES } from '@agent-factory/domain';
 
 export const SETTINGS_SUBJECT = 'settings';
 export const SETTINGS_CHANGED_EVENT = 'settings.changed';
@@ -44,7 +44,7 @@ export const ConfigurationReloadedPayloadSchema = z.object({
 export type ConfigurationReloadedPayload = z.infer<typeof ConfigurationReloadedPayloadSchema>;
 
 export const ToolCheckedPayloadSchema = z.object({
-  tool: z.enum(TOOL_NAMES),
+  tool: z.string().min(1),
   status: z.enum(TOOL_STATUSES),
   version: z.string().nullable(),
   detail: z.string(),

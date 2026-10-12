@@ -59,6 +59,7 @@ export function projectSnapshot(records: readonly FactoryEventRecord[], context:
       roles: [...context.roles],
       concurrency: { ceiling: context.concurrency.ceiling, maximum: context.concurrency.maximum, active },
       resourceGuard: { freeMemoryThresholdPercent: context.freeMemoryThresholdPercent, pauseAbovePressure: context.pauseAbovePressure },
+      configuredTools: [...context.configuredTools],
       tools: [...context.tools],
     },
     resources: {

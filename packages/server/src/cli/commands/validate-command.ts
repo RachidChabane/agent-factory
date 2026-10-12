@@ -10,7 +10,7 @@ import {
 } from '@agent-factory/adapters';
 import { PIPELINE_ROLES, requiredLabels, type PreflightStepReport } from '@agent-factory/application';
 import type { CommandRunner } from '@agent-factory/application';
-import { admitAgentRun, TOOL_NAMES, REQUIRED_TOOLS, type ToolName, type ToolProbeResult } from '@agent-factory/domain';
+import { admitAgentRun, REQUIRED_TOOLS, type ToolName, type ToolProbeResult } from '@agent-factory/domain';
 import { z } from 'zod';
 import type { FactoryConfig } from '../../config/factory-config.ts';
 import { checkCommandEnvironment } from '../../config/pipeline-settings-from-config.ts';
@@ -208,7 +208,6 @@ export function environmentChecks(context: CliContext, configError: () => string
       },
     },
     toolCheck(context, 'sandbox', COMMAND_SANDBOX_CHECK),
-    ...TOOL_NAMES.filter((tool) => !REQUIRED_TOOLS.includes(tool)).map((tool) => toolCheck(context, tool)),
   ];
 }
 

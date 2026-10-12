@@ -52,6 +52,30 @@ export const BUILT_IN_CREDENTIAL_PATHS: readonly string[] = [
   '~/Library/Application Support/BraveSoftware',
   '~/Library/Application Support/Claude',
   '~/Library/Application Support/1Password',
+  '~/.local/share/keyrings',
+  '~/.local/share/kwalletd',
+  '~/.config/google-chrome',
+  '~/.config/chromium',
+  '~/.config/BraveSoftware',
+  '~/.config/microsoft-edge',
+  '~/.mozilla',
+  '~/.config/Claude',
+  '~/.config/1Password',
+];
+
+export const LINUX_PRIVATE_RUNTIME_PATHS: readonly string[] = [
+  '/run/user',
+  '/run/dbus',
+  '/run/docker.sock',
+  '/run/docker',
+  '/run/containerd',
+  '/run/podman',
+  '/run/snapd.socket',
+  '/run/snapd-snap.socket',
+  '/tmp/.X11-unix',
+  '/tmp/ssh-*',
+  '/tmp/keyring-*',
+  '/tmp/dbus-*',
 ];
 
 export const KEYCHAIN_EXECUTABLE = '/usr/bin/security';
