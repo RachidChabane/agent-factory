@@ -29,7 +29,7 @@ export function AwaitingSection({ items }: { readonly items: readonly AttentionI
                     </span>
                     <span className="changes-awaiting__kind">{t(`attention.${item.kind}`)}</span>
                   </span>
-                  <Time iso={item.at} className="num subtle" />
+                  <Time iso={item.at} className="changes-awaiting__time num subtle" />
                 </Link>
               </li>
             ))}

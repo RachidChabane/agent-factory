@@ -52,6 +52,10 @@
   font-size: var(--text-12);
   color: var(--text-muted);
 }
+.changes-awaiting__time {
+  flex: none;
+  white-space: nowrap;
+}
 .changes-lanes {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
