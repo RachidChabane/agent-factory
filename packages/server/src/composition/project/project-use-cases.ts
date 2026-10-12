@@ -160,5 +160,6 @@ export function projectScheduler(project: ProjectRuntime, daemon: FactoryDaemon)
     tick: (signal) => daemon.tick(signal),
     stop: () => daemon.stop(),
     updateConcurrency: (concurrency) => daemon.updateConcurrency(concurrency),
+    isIdle: () => daemon.isIdle(),
   };
 }

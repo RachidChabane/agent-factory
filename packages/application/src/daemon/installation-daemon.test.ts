@@ -5,7 +5,9 @@ import { RecordingHarness } from '../runs/recording-harness.ts';
 import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT, runSubject } from '../runs/run-events.ts';
 import { agentRunRequest, InMemoryRunLogStore, SteppingClock } from '../runs/test-support.ts';
 import { CONFIGURATION_EDITED_EVENT, CONFIGURATION_RELOAD_FAILED_EVENT, CONFIGURATION_RELOADED_EVENT, SETTINGS_CHANGED_EVENT, SETTINGS_SUBJECT } from '../settings/settings-events.ts';
-import { InstallationDaemon, type InstallationReload, type InstallationTask, type ProjectScheduler } from './installation-daemon.ts';
+import { DAEMON_STARTED_EVENT, DAEMON_STOPPED_EVENT, DAEMON_SUBJECT, SCHEDULER_RESUMED_EVENT } from './daemon-events.ts';
+import { InstallationDaemon, requestDrain, type InstallationReload, type InstallationTask, type ProjectScheduler } from './installation-daemon.ts';
+import { activePauses } from './pause-state.ts';
 import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 
 const START = new Date('2026-03-02T09:00:00.000Z');
@@ -15,6 +17,7 @@ class RecordingProject implements ProjectScheduler {
   readonly calls: string[] = [];
   concurrency = 1;
   failTick = false;
+  busy = false;
 
   constructor(projectId: string) {
     this.projectId = projectId;
@@ -37,6 +40,10 @@ class RecordingProject implements ProjectScheduler {
 
   updateConcurrency(concurrency: number): void {
     this.concurrency = concurrency;
+  }
+
+  isIdle(): boolean {
+    return !this.busy;
   }
 }
 
@@ -201,6 +208,33 @@ describe('InstallationDaemon', () => {
     await daemon.tick(new AbortController().signal);
     expect(docs.calls).toEqual(['tick']);
     expect(warnings).toEqual(['ticking project shop failed: forge unreachable']);
+  });
+
+  it('stops on its own once a drain is asked for and every project is idle, then starts again unpaused', async () => {
+    const { events, shop, docs, daemon } = setup();
+    shop.busy = true;
+    const controller = new AbortController();
+    const running = daemon.run(controller.signal);
+    while (!events.typesOf(DAEMON_SUBJECT).includes(DAEMON_STARTED_EVENT)) await new Promise((resolve) => setTimeout(resolve, 1));
+    await requestDrain(events, 'alex');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(events.typesOf(DAEMON_SUBJECT)).not.toContain(DAEMON_STOPPED_EVENT);
+    shop.busy = false;
+    await running;
+    expect(controller.signal.aborted).toBe(false);
+    expect(shop.calls.at(-1)).toBe('stop');
+    expect(docs.calls.at(-1)).toBe('stop');
+    expect(events.typesOf(DAEMON_SUBJECT).slice(-2)).toEqual([SCHEDULER_RESUMED_EVENT, DAEMON_STOPPED_EVENT]);
+    expect(await activePauses(events)).toEqual(new Map());
+  });
+
+  it('lifts a drain a previous process was asked for and never finished', async () => {
+    const { events, daemon } = setup();
+    await requestDrain(events, 'alex');
+    const controller = new AbortController();
+    controller.abort();
+    await daemon.run(controller.signal);
+    expect((await activePauses(events)).has('drain')).toBe(false);
   });
 
   it('finds a project by its id', () => {

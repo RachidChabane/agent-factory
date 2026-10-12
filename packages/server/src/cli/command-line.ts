@@ -10,6 +10,7 @@ export const COMMAND_NAMES = {
   start: 'start',
   status: 'status',
   usage: 'usage',
+  stop: 'stop',
   runIssue: 'run-issue',
   resume: 'resume',
   merge: 'merge',
@@ -39,6 +40,7 @@ export const SKIP_GATE_PREFLIGHT_FLAG = '--skip-gate-preflight';
 export const OFFLINE_FLAG = '--offline';
 export const REFRESH_FLAG = '--refresh';
 export const DEMO_FLAG = '--demo';
+export const NOW_FLAG = '--now';
 export const FORCE_FLAG = '--force';
 export const ID_OPTION = '--id';
 export const FORGE_OPTION = '--forge';
@@ -67,6 +69,7 @@ export const USAGE = [
   '  start [--demo] [--port <port>]               run the factory and serve the cockpit; --demo plays fictional projects with no account',
   '  status [<issue>]                             the installation at a glance, or the state of one issue',
   '  usage [--refresh]                            subscription usage by account and limit; --refresh reads it now',
+  '  stop [--now]                                 stop the running factory once its running work finishes; --now stops its agents too',
   '  run-issue <issue>                            drive a validated issue to an open pull request, resuming where it stopped',
   '  resume <issue> [--answer <text>]             after an escalation, return the issue to the stage it left; --answer carries the decision asked for',
   '  merge <pull-request> --expected-head <sha>   remove the evidence and squash-merge the reviewed head (full sha)',
@@ -92,6 +95,7 @@ export type CliCommand =
   | { readonly kind: 'start'; readonly demo: boolean; readonly port: number | null }
   | { readonly kind: 'status'; readonly issueNumber: number | null }
   | { readonly kind: 'usage'; readonly refresh: boolean }
+  | { readonly kind: 'stop'; readonly now: boolean }
   | { readonly kind: 'run-issue'; readonly issueNumber: number }
   | { readonly kind: 'resume'; readonly issueNumber: number; readonly answer: string | null }
   | { readonly kind: 'merge'; readonly pullRequestNumber: number; readonly expectedHeadSha: string }
@@ -336,6 +340,8 @@ function parseCommand(name: string, rest: readonly string[]): ParsedCommand {
       return parseStart(rest);
     case COMMAND_NAMES.status:
       return parseStatus(rest);
+    case COMMAND_NAMES.stop:
+      return withOptions(rest, [], [NOW_FLAG], ({ positional, flags }) => (positional.length > 0 ? failure(`unexpected arguments: ${positional.join(' ')}`) : done({ kind: 'stop', now: flags.has(NOW_FLAG) })));
     case COMMAND_NAMES.usage:
       return withOptions(rest, [], [REFRESH_FLAG], ({ positional, flags }) => (positional.length > 0 ? failure(`unexpected arguments: ${positional.join(' ')}`) : done({ kind: 'usage', refresh: flags.has(REFRESH_FLAG) })));
     case COMMAND_NAMES.runIssue:

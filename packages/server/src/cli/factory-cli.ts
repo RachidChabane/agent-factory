@@ -13,10 +13,16 @@ import { runIssueCommand } from './commands/run-issue-command.ts';
 import { schemaCommand } from './commands/schema-command.ts';
 import { startCommand } from './commands/start-command.ts';
 import { statusCommand } from './commands/status-command.ts';
+import { stopCommand } from './commands/stop-command.ts';
 import { usageCommand } from './commands/usage-command.ts';
 import { validateCommand } from './commands/validate-command.ts';
-import { startDemoCommand } from '../demo/demo-command.ts';
 import { EXIT_CODES } from './output.ts';
+
+/** The demonstration and its fictional projects load only when asked for. */
+async function startDemo(context: CliContext, port: number | null): Promise<number> {
+  const { startDemoCommand } = await import('../demo/demo-command.ts');
+  return startDemoCommand(context, port);
+}
 
 async function dispatch({ project, command }: CommandLine, context: CliContext): Promise<number> {
   switch (command.kind) {
@@ -30,11 +36,13 @@ async function dispatch({ project, command }: CommandLine, context: CliContext):
     case 'schema':
       return schemaCommand(context);
     case 'start':
-      return command.demo ? startDemoCommand(context, command.port) : startCommand(context, command.port);
+      return command.demo ? startDemo(context, command.port) : startCommand(context, command.port);
     case 'status':
       return statusCommand(command.issueNumber, project, context);
     case 'usage':
       return usageCommand(command.refresh, context);
+    case 'stop':
+      return stopCommand(command.now, context);
     case 'run-issue':
       return runIssueCommand(command.issueNumber, project, context);
     case 'resume':

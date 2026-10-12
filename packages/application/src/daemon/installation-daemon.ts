@@ -9,11 +9,14 @@ import {
   ConfigurationReloadFailedPayloadSchema,
   SETTINGS_SUBJECT,
 } from '../settings/settings-events.ts';
+import { activePauses, pauseScheduling, resumeScheduling } from './pause-state.ts';
 import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 
 const FIRST_SEQUENCE = 0;
 const NO_PAUSES: PauseSet = new Map();
 const STOP_REASON = 'the installation stopped';
+const DRAINED_REASON = 'the installation stopped once its running work finished, as the operator asked';
+const DRAIN_CAUSE = 'drain';
 
 /** What an installation needs from the daemon of one project. */
 export interface ProjectScheduler {
@@ -22,6 +25,8 @@ export interface ProjectScheduler {
   tick(signal: AbortSignal): Promise<void>;
   stop(): Promise<void>;
   updateConcurrency(concurrency: number): void;
+  /** Whether no issue, challenge or audit of the project is running. */
+  isIdle(): boolean;
 }
 
 export interface InstallationReload {
@@ -59,11 +64,7 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/**
- * Drives every project of an installation from one loop: closes runs a previous stop left
- * open, starts each project, then at each tick runs the installation's own tasks, applies
- * settings changes, decides the machine pauses once and lets every project schedule its work.
- */
+
 /** The last change a reload applied or refused; a newer change triggers the next reload. */
 function handledThrough(settings: readonly FactoryEventRecord[]): number {
   let handled = -1;
@@ -74,6 +75,11 @@ function handledThrough(settings: readonly FactoryEventRecord[]): number {
   return handled;
 }
 
+/**
+ * Drives every project of an installation from one loop: closes runs a previous stop left
+ * open, starts each project, then at each tick runs the installation's own tasks, applies
+ * settings changes, decides the machine pauses once and lets every project schedule its work.
+ */
 export class InstallationDaemon {
   private readonly dependencies: InstallationDaemonDependencies;
   private readonly settings: InstallationDaemonSettings;
@@ -99,24 +105,30 @@ export class InstallationDaemon {
     const { events, clock, log, projects, sleeper } = this.dependencies;
     const closed = await closeOrphanRuns(events, clock);
     if (closed.length > 0) log.info(`closed ${closed.length} agent run(s) left open by an earlier stop`);
+    if ((await activePauses(events)).has(DRAIN_CAUSE)) await resumeScheduling(events, DRAIN_CAUSE);
     await events.append(DAEMON_STARTED_EVENT, DAEMON_SUBJECT, { projects: projects.map((project) => project.projectId) });
     for (const project of projects) await project.start();
+    let drained = false;
     try {
-      while (!signal.aborted) {
+      while (!signal.aborted && !drained) {
         await this.tick(signal);
-        await sleeper.sleep(this.settings.pollIntervalMs, signal);
+        drained = this.pausesNow.has(DRAIN_CAUSE) && projects.every((project) => project.isIdle()) && this.inFlight.size === 0;
+        if (!drained) await sleeper.sleep(this.settings.pollIntervalMs, signal);
       }
     } finally {
       await Promise.allSettled([...projects.map((project) => project.stop()), ...this.inFlight.values()]);
-      await events.append(DAEMON_STOPPED_EVENT, DAEMON_SUBJECT, { reason: STOP_REASON });
+      if (drained) await resumeScheduling(events, DRAIN_CAUSE);
+      await events.append(DAEMON_STOPPED_EVENT, DAEMON_SUBJECT, { reason: drained ? DRAINED_REASON : STOP_REASON });
     }
   }
 
   async tick(signal: AbortSignal): Promise<void> {
     const { pauses, projects } = this.dependencies;
-    this.startTasks(signal);
+    if (!this.pausesNow.has(DRAIN_CAUSE)) this.startTasks(signal);
     await this.guard('reloading the configuration', () => this.applyPendingSettings());
-    this.pausesNow = (await this.guard('deciding the machine pauses', () => pauses.refresh())) ?? this.pausesNow;
+    const refreshed = (await this.guard('deciding the machine pauses', () => pauses.refresh())) ?? this.pausesNow;
+    const drain = (await activePauses(this.dependencies.events)).get(DRAIN_CAUSE);
+    this.pausesNow = drain === undefined ? refreshed : new Map([...refreshed, [DRAIN_CAUSE, drain]]);
     await Promise.all(projects.map((project) => this.guard(`ticking project ${project.projectId}`, () => project.tick(signal))));
   }
 
@@ -168,4 +180,9 @@ export class InstallationDaemon {
       return null;
     }
   }
+}
+
+/** Asks the running installation to take no new work and to stop once its running work finishes, for a restart. */
+export async function requestDrain(events: EventStore, operator: string): Promise<number> {
+  return pauseScheduling(events, DRAIN_CAUSE, `${operator} asked the factory to stop once its running work finishes`, null);
 }

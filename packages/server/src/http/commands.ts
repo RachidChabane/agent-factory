@@ -17,6 +17,7 @@ import {
   publishAuditIssue,
   PullRequestFeedback,
   requestChallenge,
+  requestDrain,
   requestOnDemandAudit,
   resolveAudit,
   resumeScheduling,
@@ -289,6 +290,12 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
     const scope = scopeEvents(context, body.project);
     await pauseScheduling(scope.events, OPERATOR_CAUSE, `paused by ${context.operator}`, null);
     return `No new work starts for ${scope.label}; running issues finish their current step`;
+  }),
+  'factory.drain': command(COMMAND_BODY_SCHEMAS['factory.drain'], async (_body, context) => {
+    const daemons = requireDaemons(context);
+    await requestDrain(context.runtime.events, context.operator);
+    const running = context.runtime.projects.reduce((count, project) => count + (daemons.project(project.id)?.runningIssues().length ?? 0), 0);
+    return running === 0 ? 'No new work starts; the factory stops at its next tick' : `No new work starts; the factory stops once its ${running} running issue(s) finish`;
   }),
   'scheduler.resume': command(COMMAND_BODY_SCHEMAS['scheduler.resume'], async (body, context) => {
     const scope = scopeEvents(context, body.project);

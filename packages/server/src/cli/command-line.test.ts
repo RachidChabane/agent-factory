@@ -80,6 +80,9 @@ describe('parseCommandLine', () => {
     expect(parseCommandLine(['schema', 'out.json'])).toEqual({ ok: false, error: 'unexpected arguments: out.json' });
     expect(parseCommandLine(['usage'])).toEqual(ok({ kind: 'usage', refresh: false }));
     expect(parseCommandLine(['usage', '--refresh'])).toEqual(ok({ kind: 'usage', refresh: true }));
+    expect(parseCommandLine(['stop'])).toEqual(ok({ kind: 'stop', now: false }));
+    expect(parseCommandLine(['stop', '--now'])).toEqual(ok({ kind: 'stop', now: true }));
+    expect(parseCommandLine(['stop', 'later'])).toEqual({ ok: false, error: 'unexpected arguments: later' });
     expect(parseCommandLine(['start', '--demo', '--port', '7440'])).toEqual(ok({ kind: 'start', demo: true, port: 7440 }));
     expect(parseCommandLine(['start', '--port=70000'])).toEqual({ ok: false, error: '--port must be a port number from 1 to 65535, got "70000"' });
     expect(parseCommandLine(['start', '--port', 'http'])).toEqual({ ok: false, error: '--port must be a port number from 1 to 65535, got "http"' });

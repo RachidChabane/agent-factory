@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventSourcedIssueStateStore } from '@agent-factory/adapters';
-import { ProjectEventStore } from '@agent-factory/application';
+import { activePauses, ProjectEventStore } from '@agent-factory/application';
 import { issueSubject } from '@agent-factory/domain';
 import { ConfigMissingError, type AgentFactoryConfig } from '../config/agent-factory-config.ts';
 import { openEventLog } from '../composition/installation/event-log.ts';
@@ -207,6 +207,21 @@ describe('the agent-factory command line', () => {
     await writeFile(join(config.directories.state, 'factory.lock'), `${process.ppid}\n`);
     expect(await runCli(['run-issue', '7'], context())).toBe(1);
     expect(captured.errors[0]).toBe(`Factory process ${process.ppid} is running and holds ${config.directories.state}/factory.lock; wait for it to finish or stop it first`);
+  });
+
+  it('asks the running factory to stop once its running work finishes, and says when none runs', async () => {
+    expect(await runCli(['stop'], context())).toBe(1);
+    expect(captured.errors.at(-1)).toBe(`No factory runs on the installation at ${home}`);
+    await mkdir(config.directories.state, { recursive: true });
+    await writeFile(join(config.directories.state, 'factory.lock'), `${process.ppid}\n`);
+    expect(await runCli(['stop'], context({ environment: { AGENT_FACTORY_HOME: home, USER: 'alex' } }))).toBe(0);
+    expect(captured.lines.at(-1)).toBe(`The factory (process ${process.ppid}) takes no new work and stops once its running work finishes`);
+    const eventLog = openEventLog(config.directories.state);
+    try {
+      expect((await activePauses(eventLog.events)).get('drain')?.reason).toBe('alex asked the factory to stop once its running work finishes');
+    } finally {
+      eventLog.close();
+    }
   });
 
   it('prints the JSON Schema of the configuration', async () => {

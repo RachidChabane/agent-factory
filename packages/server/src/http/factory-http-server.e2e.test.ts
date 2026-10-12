@@ -385,6 +385,16 @@ describe('the factory HTTP server end to end, with two projects', () => {
     expect((await installation.events.read(RUN_SUBJECT_PREFIX, 0)).length).toBe(0);
   });
 
+  it('drains on order: no new work starts, and the factory stops once its running work finishes', async () => {
+    const drained = await post('factory.drain', {});
+    expect(drained.status).toBe(200);
+    expect(CommandAcceptedSchema.parse(await drained.json()).effect).toBe('No new work starts; the factory stops at its next tick');
+    await running.finished;
+    const records = await installation.events.read('daemon', 0);
+    expect(records.at(-1)).toMatchObject({ type: 'daemon.stopped', payload: { reason: 'the installation stopped once its running work finished, as the operator asked' } });
+    expect(controller.signal.aborted).toBe(false);
+  });
+
   it('refuses a command that lacks the per-process token, and never serves the token outside the cockpit page', async () => {
     const body = JSON.stringify({ project: null });
     expect((await fetch(`${base}/api/commands/scheduler.pause`, { method: 'POST', body })).status).toBe(403);

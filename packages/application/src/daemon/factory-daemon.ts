@@ -155,6 +155,11 @@ export class FactoryDaemon {
     this.dependencies.log.info(`configuration reloaded through settings change ${changedThrough}`);
   }
 
+  /** Whether nothing of the project runs: no issue, and no challenge or audit in the background. */
+  isIdle(): boolean {
+    return this.running.size === 0 && this.backgroundTask === null;
+  }
+
   runningIssues(): readonly number[] {
     return [...this.running.keys()].sort((a, b) => a - b);
   }

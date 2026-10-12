@@ -13,12 +13,14 @@ const PAUSE_TITLES: Readonly<Record<PauseCause, string>> = {
   resources: 'Factory paused: machine resources are short',
   budget: 'Factory paused: subscription budget spent',
   operator: 'Factory paused by the operator',
+  drain: 'Factory draining: no new work starts, and it stops once the running work finishes',
 };
 
 const RESUME_TITLES: Readonly<Record<PauseCause, string>> = {
   resources: 'Factory resumed: machine resources recovered',
   budget: 'Factory resumed: subscription budget available',
   operator: 'Factory resumed by the operator',
+  drain: 'Factory stopped after finishing its running work',
 };
 
 export const NOTICES = {

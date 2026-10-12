@@ -68,6 +68,8 @@ export const COMMAND_BODY_SCHEMAS = {
   'audit.publish-issue': AuditRefSchema,
   'audit.resolve': AuditRefSchema.extend({ note: z.string().min(1) }),
   'scheduler.pause': ScopeSchema,
+  /** No new work starts, and the factory process stops once its running work finishes, ready for a restart. */
+  'factory.drain': z.object({}),
   'scheduler.resume': ScopeSchema,
   'usage.refresh': z.object({}),
   'tools.check': ScopeSchema.extend({ tool: z.string().min(1) }),
