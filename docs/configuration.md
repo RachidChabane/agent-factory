@@ -44,8 +44,10 @@ applies at the next tick, and the cockpit lists what waits for a restart.
 | `daemon.pollIntervalSeconds` | `30` | how often the daemon looks for work |
 | `daemon.mergeWatchIntervalMinutes` | `10` | how often merged and outside changes are read from the forges |
 | `daemon.issueRefreshSeconds` | `120` | how often the forges' issues are read |
+| `daemon.checksSettleSeconds` | `120` | how long a forge may take to register the checks of a head before an empty list counts as passed; a pull request is announced as ready only once its required checks passed |
 | `notifications.channels` | `[]` | `system`, `slack` (`webhookUrl`), `google-chat` (`webhookUrl`), `webhook` (`url`, `headers`); secrets as `{ fromEnvironment: NAME }` |
 | `notifications.dedupeWindowMinutes` | `30` | identical notices within this window are sent once |
+| `notifications.media` | none | the command that makes a pull request's films and images reachable from its notices; see [Media in notices](#media-in-notices) |
 | `tools` | `[]` | the tools of the whole installation; see [Tools](#tools) |
 | `defaults.roles` | see [Roles](#roles) | the roles of every project that does not set its own |
 | `defaults.sandbox` | see [Sandbox](#sandbox) | the sandbox settings under every project's own |
@@ -82,6 +84,7 @@ applies at the next tick, and the cockpit lists what waits for a restart.
 | `references` | `[]` | other repositories the specifications cite, read as snapshots: `{ name, repository, ref, source }`; see [References](#references) |
 | `evidence.maxFileBytes` / `maxTotalBytes` | 5 MB / 40 MB | limits of the evidence committed to a pull request |
 | `evidence.films` | none | the command that films a pull request; see [Films](#films) |
+| `autonomy` | nothing delegated | what the orchestrator may do for the operator; see [Autonomy](#autonomy) |
 | `delivery` | none | see [Delivery](#delivery) |
 | `audits.ignore` | `[]` | other automations of the repository: `{ name, branches?: [globs], authors?: [globs] }`; their changes are recorded, not audited |
 | `tools` | `[]` | the tools of this project; see [Tools](#tools) |
@@ -148,6 +151,54 @@ operator orders any other with `agent-factory film <issue> --scenario <name>` or
 pull request page. A scenario name is letters, digits, dots, dashes and underscores, at
 most 45 characters. Films wait in one queue for the whole installation, one at a time,
 while nothing else runs: see [ADR 0030](adr/0030-films.md).
+
+### Autonomy
+
+`autonomy` names the gestures of the operator that the orchestrator may make on its own judgement
+([ADR 0033](adr/0033-autonomy-policy.md)). A gesture made with `--as <actor> --reason "<why>"` is checked against it
+before anything else, and refused with the missing rule when the project does not delegate it. Without `autonomy`,
+nothing is delegated, and a gesture without `--as` is always the operator's own.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `actor` | `orchestrator` | who acts for the operator: lowercase letters, digits and dashes, never `operator`; `--as` has to name it |
+| `validateSpecs` | `false` | `issue create --start` and `issue validate` |
+| `answerDecisions` | `false` | `resume <issue> --answer` |
+| `resume` | `false` | `resume <issue>` |
+| `merge` | `[]` | rules `{ types, requires }`: `types` lists issue type ids of the project; `requires` lists conditions |
+
+The only condition is `films-recorded`: every film the spec declares is recorded for the pull request as it is now, and
+none of its films failed or is queued or recording. A spec that declares no film has nothing to record, so the
+condition holds. A merge by the orchestrator keeps every guard of a merge: the head the reviewer saw, the checks, and the
+films in progress.
+
+Each gesture the orchestrator makes is an event with its actor, the gesture, its target, its reason and the rule that
+allowed it; the operator is notified of it, the cockpit lists it under **Delegated decisions** of the project, and the
+issue and pull request pages mark it. The policy keeps the orchestrator's gestures within what you delegated and makes
+each one visible. It is not a security boundary: the orchestrator runs with your account. `agent-factory validate` states
+in one sentence, per project, what is delegated to whom.
+
+### Media in notices
+
+When a pull request is ready to merge, the factory tells you once per head ([ADR 0034](adr/0034-notification-media.md)):
+its required checks passed (the rule that gates its merge), and none of its films is queued or recording. A failed film
+holds the notice until a later film of that scenario succeeds. The notice links the pull request in the cockpit and on
+the forge. With `notifications.media`, it also lists a link for the film of each scenario before and after, its final
+screenshot, and each image of the pull request's evidence, labelled by scenario, phase and file name.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `upload` | required | the argument template of the upload command; it holds `{file}`, the path of one file |
+| `timeoutSeconds` | `120` | the bound of one upload; the command's process group is stopped when it expires, and with the factory |
+
+The last non-empty line the command prints is the link; it has to be an `http:`, `https:` or `file:` address, otherwise
+the upload counts as failed. The command runs **outside the sandbox**, with your environment and logins, under `nice`,
+in the factory home: declare only a command you trust like your own scripts. `agent-factory validate` says so on the
+`notifications` line. A file is uploaded once per content: links are kept by the SHA-256 of the file in
+`<home>/state/media-links.json`. A file whose upload fails leaves its link out of the notice, the operation log says why,
+and the notice still goes out. Chat channels list the links (the first twenty; the cockpit has the rest), the generic
+webhook posts them in a `links` array of `{ label, url }`, and a desktop notification carries none. The pull request page
+of the cockpit shows when the notice was sent, its links, or why it is held.
 
 ### Issue types
 

@@ -80,6 +80,8 @@ export interface RehearsalProject {
   readonly forge: LocalGitHubGateway;
   /** A validated documentation issue; `films` are the scenarios its spec declares. */
   addDocIssue(title: string, films?: readonly string[]): Promise<number>;
+  /** A documentation issue whose spec the operator has not validated yet. */
+  addDraftDocIssue(title: string): Promise<number>;
   /** Pushes a commit straight to the base branch of the project's local forge, as someone outside the factory would. */
   pushDirectCommit(path: string, content: string, message: string): string;
 }
@@ -155,6 +157,11 @@ async function rehearsalProject(config: AgentFactoryConfig, id: string, source: 
       const spec = docIssue(title);
       const labels = [conventions.typology.get(spec.type).label, conventions.labels.validated, ...films.map(filmLabel)];
       const issue = await forge.createIssue(title, renderSpecBody({ ...spec, films }, conventions), labels);
+      return issue.number;
+    },
+    addDraftDocIssue: async (title) => {
+      const spec = docIssue(title);
+      const issue = await forge.createIssue(title, renderSpecBody(spec, conventions), [conventions.typology.get(spec.type).label]);
       return issue.number;
     },
     pushDirectCommit: (path, content, message) => {

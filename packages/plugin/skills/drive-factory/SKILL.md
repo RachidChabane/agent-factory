@@ -23,6 +23,7 @@ description: Find the agent-factory verb, option and cockpit address for what yo
 | Work | `agent-factory request add <file> [--images <dir>] [--requester <name>]` | stores a product request |
 | | `agent-factory request challenge <id>` | challenges a request and drafts its specs; queued for the running factory |
 | | `agent-factory issue create <spec.md> [--blocked-by <n>[,<n>]] [--confirm] [--start]` | creates an issue from a spec file; `--start` validates it |
+| | `agent-factory issue validate <issue>` | validates the spec of a drafted issue, so the factory takes it |
 | | `agent-factory issue abandon <issue> --reason <text>` | frees the worktree of an escalated issue; refused while the factory runs |
 | | `agent-factory resume <issue> [--answer <text>]` | returns an escalated issue to the stage it left, with the answer to its question |
 | | `agent-factory merge <pull-request> --expected-head <sha>` | squash-merges the reviewed head |
@@ -31,7 +32,7 @@ description: Find the agent-factory verb, option and cockpit address for what yo
 | | `agent-factory film <issue> --scenario <name>` | orders a film of the open pull request of an issue (`declare-films`) |
 | Set up | `agent-factory init [<repository>]`, `agent-factory schema`, `agent-factory rehearsal init <source-clone>`, `agent-factory rehearsal reset <source-clone>`, `agent-factory rehearsal add-issue <spec.md>` | the configuration and the rehearsal on a local forge; the operator's |
 
-A gesture the operator delegated (`issue create --start`, `resume`, `merge`) takes `--as orchestrator --reason "<why>"` after its other options when you take it on your own judgement. A gesture the operator orders is made without `--as`.
+A gesture the operator delegated (`issue create --start`, `issue validate`, `resume`, `resume --answer`, `merge`) takes `--as orchestrator --reason "<why>"` after its other options when you take it on your own judgement; both options go together. The factory checks the project's autonomy policy before it does anything else and refuses what the policy does not delegate, naming the missing rule (exit 1). It records each gesture it accepts with your reason, and tells the operator. A gesture the operator orders is made without `--as`.
 
 Exit codes: 0 done, 1 failed or refused, 2 wrong command line, 3 the issue needs a person, 4 the issue waits on others, 5 the command needs `--confirm`.
 

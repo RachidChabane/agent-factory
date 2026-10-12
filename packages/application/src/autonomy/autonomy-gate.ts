@@ -53,6 +53,13 @@ export function filmFactsOf(journal: PipelineJournal): FilmFacts {
 
 const NO_SPEC = 'the issue of the pull request has no recorded spec, so its type is unknown';
 
+/** Whether the policy lets the delegate make the gesture: the allowing rule, or a refusal naming what the policy lacks. */
+export function authoriseGesture(settings: AutonomyGateSettings, delegation: Delegation, request: GestureRequest): Authorisation {
+  const decision = decideGesture(settings.policy, delegation.actor, request);
+  if (!decision.allowed) throw new GestureRefusedError(delegation.actor, request.gesture, settings.project, decision.missing);
+  return { gesture: request.gesture, rule: decision.rule };
+}
+
 /**
  * Lets the delegate make a gesture of the operator's only when the project's policy delegates it, and
  * records each one it made. The check comes first: a refusal leaves everything as it was.
@@ -68,7 +75,7 @@ export class AutonomyGate {
 
   /** The gestures that need no fact beyond the policy. */
   authorise(delegation: Delegation, gesture: Exclude<DelegableGesture, 'merge'>): Authorisation {
-    return this.decide(delegation, { gesture });
+    return authoriseGesture(this.settings, delegation, { gesture });
   }
 
   /** The merge of a pull request, judged on its issue type and its films as the journal holds them now. */
@@ -77,7 +84,7 @@ export class AutonomyGate {
     const journal = await loadJournal(this.events, issueNumber);
     const issueType = journal.spec?.type;
     if (issueType === undefined) throw new GestureRefusedError(delegation.actor, 'merge', this.settings.project, NO_SPEC);
-    return this.decide(delegation, { gesture: 'merge', facts: { issueType, films: filmFactsOf(journal) } });
+    return authoriseGesture(this.settings, delegation, { gesture: 'merge', facts: { issueType, films: filmFactsOf(journal) } });
   }
 
   /** Records a gesture the delegate made, once it succeeded. */
@@ -92,11 +99,5 @@ export class AutonomyGate {
     };
     await this.events.append(GESTURE_MADE_EVENT, issueSubject(target.issueNumber), payload);
     return payload;
-  }
-
-  private decide(delegation: Delegation, request: GestureRequest): Authorisation {
-    const decision = decideGesture(this.settings.policy, delegation.actor, request);
-    if (!decision.allowed) throw new GestureRefusedError(delegation.actor, request.gesture, this.settings.project, decision.missing);
-    return { gesture: request.gesture, rule: decision.rule };
   }
 }
