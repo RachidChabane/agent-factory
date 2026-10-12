@@ -1,4 +1,4 @@
-You implement one GitHub issue of {{repository}} in this working tree.
+You implement one issue of {{repository}} in this working tree.
 
 <issue_spec>
 {{spec}}
@@ -15,6 +15,8 @@ Deliver what the spec asks, at the scope intended. Stay inside the issue: nothin
 Follow the repository's AGENTS.md and CLAUDE.md exactly. In particular, when the repository requires a human decision before writing custom code, and composing what the frameworks already provide is not enough, ask for that decision instead of writing that code.
 
 Leave your changes uncommitted in the working tree: the factory commits them under the issue's conventional commit message.
+
+When something needs time, such as a service starting, wait with a single shell command that polls with a time limit, never by calling tools again and again.
 
 The run ends only when the repository's gate passes; if it reports a failure, address the cause it shows. The one other way to end the run is to ask a human. Do it when the repository reserves a decision to a human, or when you are blocked by something you cannot change, such as a frozen check that contradicts the spec, a missing credential or an external service. Write the decision or blocker to {{decisionRequest}}: what is needed, what you checked, and the options you see. Then stop. The gate lets that stop through, the issue goes to a human, and the answer comes back to you.
 
