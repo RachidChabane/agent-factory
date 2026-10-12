@@ -22,6 +22,19 @@ export interface ConfiguredTool {
   readonly description: string | null;
   readonly builtIn: boolean;
   readonly installHint: string | null;
+  readonly loginCommand: string | null;
+  readonly keepAlive: { readonly command: string; readonly everyMs: number } | null;
+}
+
+function configuredTool(tool: ToolCheckConfig): ConfiguredTool {
+  return {
+    name: tool.name,
+    description: tool.description,
+    builtIn: false,
+    installHint: tool.install,
+    loginCommand: tool.login?.command ?? null,
+    keepAlive: tool.keepAlive === null ? null : { command: tool.keepAlive.command, everyMs: tool.keepAlive.everyMs },
+  };
 }
 
 export function definedEnvironment(environment: SourceEnvironment): Record<string, string> {
@@ -49,13 +62,13 @@ export function builtInTools(config: AgentFactoryConfig): readonly BuiltInTool[]
 
 export function installationTools(config: AgentFactoryConfig): readonly ConfiguredTool[] {
   return [
-    ...builtInTools(config).map((name) => ({ name, description: null, builtIn: true, installHint: null })),
-    ...config.tools.map((tool) => ({ name: tool.name, description: tool.description, builtIn: false, installHint: tool.install })),
+    ...builtInTools(config).map((name) => ({ name, description: null, builtIn: true, installHint: null, loginCommand: null, keepAlive: null })),
+    ...config.tools.map(configuredTool),
   ];
 }
 
 export function projectTools(project: ProjectConfig): readonly ConfiguredTool[] {
-  return project.tools.map((tool) => ({ name: tool.name, description: tool.description, builtIn: false, installHint: tool.install }));
+  return project.tools.map(configuredTool);
 }
 
 /** The command that proves the command sandbox works on this machine: an empty command, confined. */

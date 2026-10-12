@@ -39,6 +39,9 @@ export const DEFAULT_MERGE_WATCH_INTERVAL_MINUTES = 10;
 export const DEFAULT_ISSUE_REFRESH_SECONDS = 120;
 export const DEFAULT_NOTIFICATION_DEDUPE_MINUTES = 30;
 export const DEFAULT_TOOL_TIMEOUT_SECONDS = 20;
+/** A browser login waits for the operator's single sign-on. */
+export const DEFAULT_TOOL_LOGIN_TIMEOUT_SECONDS = 300;
+export const DEFAULT_KEEP_ALIVE_TIMEOUT_SECONDS = 120;
 export const DEFAULT_ENVIRONMENT_PASSTHROUGH: readonly string[] = ['PATH', 'HOME', 'LANG', 'TERM', 'TMPDIR', 'USER'];
 
 export const REMOTE_ACCESS_KINDS = ['none', 'tailscale'] as const;
@@ -147,6 +150,17 @@ export const ToolCheckSchema = z.strictObject({
   fix: NonEmptyString.optional(),
   install: NonEmptyString.optional(),
   timeoutSeconds: PositiveSeconds.default(DEFAULT_TOOL_TIMEOUT_SECONDS),
+  /** A login that needs no terminal, such as a single sign-on in the browser, which the cockpit and `tool-login` start. */
+  login: NonEmptyString.optional(),
+  loginTimeoutSeconds: PositiveSeconds.default(DEFAULT_TOOL_LOGIN_TIMEOUT_SECONDS),
+  /** A command the factory runs on a schedule, while it runs, to keep the tool's session alive. */
+  keepAlive: z
+    .strictObject({
+      command: NonEmptyString,
+      everyMinutes: PositiveMinutes,
+      timeoutSeconds: PositiveSeconds.default(DEFAULT_KEEP_ALIVE_TIMEOUT_SECONDS),
+    })
+    .optional(),
 });
 export type RawToolCheck = z.infer<typeof ToolCheckSchema>;
 

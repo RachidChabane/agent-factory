@@ -80,6 +80,8 @@ export interface ToolCheckConfig {
   readonly fix: string | null;
   readonly install: string | null;
   readonly timeoutMs: number;
+  readonly login: { readonly command: string; readonly timeoutMs: number } | null;
+  readonly keepAlive: { readonly command: string; readonly everyMs: number; readonly timeoutMs: number } | null;
 }
 
 export type HeaderValue = { readonly kind: 'literal'; readonly value: string } | { readonly kind: 'environment'; readonly variable: string };
@@ -271,6 +273,8 @@ function toolCheck(raw: RawToolCheck): ToolCheckConfig {
     fix: raw.fix ?? null,
     install: raw.install ?? null,
     timeoutMs: seconds(raw.timeoutSeconds),
+    login: raw.login === undefined ? null : { command: raw.login, timeoutMs: seconds(raw.loginTimeoutSeconds) },
+    keepAlive: raw.keepAlive === undefined ? null : { command: raw.keepAlive.command, everyMs: minutes(raw.keepAlive.everyMinutes), timeoutMs: seconds(raw.keepAlive.timeoutSeconds) },
   };
 }
 

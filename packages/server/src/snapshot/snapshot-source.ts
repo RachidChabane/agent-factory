@@ -8,6 +8,7 @@ import {
   acceptanceCommand,
   EVIDENCE_CACHE_ISSUE_PREFIX,
   latestToolChecks,
+  latestToolSessions,
   parseIssueSpec,
   parseProjectSubject,
   PENDING_ISSUE_EVENTS,
@@ -221,7 +222,7 @@ export class SnapshotSource {
         perRunCapUsd: config.budget.perRunCapUsd,
       }),
       resources: await this.resourcesView(pauses.some((pause) => pause.cause === RESOURCES_CAUSE)),
-      tools: toolViews(runtime.configuredTools, latestToolChecks(split.installation), 'installation'),
+      tools: toolViews(runtime.configuredTools, latestToolChecks(split.installation), latestToolSessions(split.installation), 'installation'),
       settings: installationSettingsView(config, runtime.environment, split.installation),
     };
   }
@@ -332,7 +333,7 @@ export class SnapshotSource {
       workflows: await this.workflowsView(readings),
       deployments: (target) => deployments.get(target) ?? null,
       knowledge: await this.knowledgeViews(project, readings),
-      tools: toolViews(projectTools(config), latestToolChecks(records), 'project'),
+      tools: toolViews(projectTools(config), latestToolChecks(records), latestToolSessions(records), 'project'),
     });
   }
 

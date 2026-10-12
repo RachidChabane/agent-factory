@@ -116,6 +116,16 @@ const DELIVERY = {
       { name: 'prod', promotion: 'manual', production: true, deployments: { kind: 'github', environment: 'widgets-prod' } },
     ],
   },
+  tools: [
+    {
+      name: 'catalog',
+      description: 'Reads the product catalogue service',
+      check: ['/bin/sh', '-c', 'test -f "$AGENT_FACTORY_HOME/catalog-session"'],
+      fix: 'catalog login',
+      login: 'touch "$AGENT_FACTORY_HOME/catalog-session"',
+      keepAlive: { command: 'touch "$AGENT_FACTORY_HOME/catalog-kept"', everyMinutes: 30 },
+    },
+  ],
 };
 
 describe('the factory HTTP server end to end, with two projects', () => {
@@ -310,6 +320,28 @@ describe('the factory HTTP server end to end, with two projects', () => {
     const tool = (await state()).tools.find((entry) => entry.name === 'sandbox');
     expect(tool).toMatchObject({ scope: 'installation', builtIn: true, status: 'connected', fixCommand: null });
     expect(tool?.checkedAt).not.toBeNull();
+  });
+
+  it("starts a tool's declared login on order, checks it again, and keeps its session alive on schedule", async () => {
+    const before = await post('tools.check', { project: FIRST_PROJECT, tool: 'catalog' });
+    expect(CommandAcceptedSchema.parse(await before.json()).effect).toMatch(/^catalog: unauthenticated/);
+    const login = await post('tools.login', { project: FIRST_PROJECT, tool: 'catalog' });
+    expect(login.status).toBe(200);
+    expect(CommandAcceptedSchema.parse(await login.json()).effect).toMatch(/^catalog: login succeeded \(exit code 0 after \d+ s\); the tool is now connected$/);
+    const kept = await waitFor(
+      async () => projectIn(await state(), FIRST_PROJECT).tools.find((entry) => entry.name === 'catalog' && entry.keepAlive?.last !== null),
+      TIMEOUT_MS,
+      'the first keep-alive of the catalogue session',
+    );
+    expect(kept).toMatchObject({
+      status: 'connected',
+      loginCommand: 'touch "$AGENT_FACTORY_HOME/catalog-session"',
+      lastLogin: { outcome: 'succeeded' },
+      keepAlive: { command: 'touch "$AGENT_FACTORY_HOME/catalog-kept"', everyMinutes: 30, last: { outcome: 'succeeded' } },
+    });
+    const without = await post('tools.login', { project: null, tool: 'git' });
+    expect(without.status).toBe(409);
+    expect(CommandRejectedSchema.parse(await without.json()).error).toContain('declares no login');
   });
 
   it('redeploys a development environment at the deployed version as a simulated dispatch, and never production', async () => {

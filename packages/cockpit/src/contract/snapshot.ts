@@ -20,6 +20,7 @@ import {
   REVIEW_CATEGORIES,
   REVIEW_SEVERITIES,
   TEST_RUNNERS,
+  TOOL_SESSION_OUTCOMES,
   TOOL_STATUSES,
   USAGE_FRESHNESS,
   USAGE_LIMIT_KINDS,
@@ -637,6 +638,15 @@ export type KnowledgeSourceView = z.infer<typeof KnowledgeSourceViewSchema>;
 // ---------------------------------------------------------------- tools
 
 /** A tool the installation or a project checks, listed whether or not it was checked yet. */
+/** One run of a tool's login or keep-alive: how it ended, never what it printed. */
+export const ToolSessionViewSchema = z.object({
+  at: IsoDateTimeSchema,
+  outcome: z.enum(TOOL_SESSION_OUTCOMES),
+  detail: z.string(),
+  operator: z.string(),
+});
+export type ToolSessionView = z.infer<typeof ToolSessionViewSchema>;
+
 export const ToolViewSchema = z.object({
   name: z.string().min(1),
   scope: z.enum(TOOL_SCOPES),
@@ -649,6 +659,11 @@ export const ToolViewSchema = z.object({
   fixCommand: z.string().nullable(),
   installHint: z.string().nullable(),
   checkedAt: IsoDateTimeSchema.nullable(),
+  /** The login `tools.login` starts, as the configuration declares it; null when the tool declares none. */
+  loginCommand: z.string().nullable(),
+  lastLogin: ToolSessionViewSchema.nullable(),
+  /** The command the factory runs on a schedule to keep the tool's session alive, and its last run. */
+  keepAlive: z.object({ command: z.string(), everyMinutes: z.number().positive(), last: ToolSessionViewSchema.nullable() }).nullable(),
 });
 export type ToolView = z.infer<typeof ToolViewSchema>;
 

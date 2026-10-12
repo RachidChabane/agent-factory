@@ -73,6 +73,8 @@ export const COMMAND_BODY_SCHEMAS = {
   'scheduler.resume': ScopeSchema,
   'usage.refresh': z.object({}),
   'tools.check': ScopeSchema.extend({ tool: z.string().min(1) }),
+  /** Starts the login the tool declares, on the factory's machine, then checks the tool again. */
+  'tools.login': ScopeSchema.extend({ tool: z.string().min(1) }),
   'health.check': ProjectRefSchema.extend({ environment: z.string().min(1) }),
   'settings.update-role': ScopeSchema.extend({ change: RoleChangeSchema }),
   'settings.update-resources': z.object({

@@ -9,6 +9,7 @@ import { ConfigMissingError, type AgentFactoryConfig } from '../config/agent-fac
 import { openEventLog } from '../composition/installation/event-log.ts';
 import { defaultCliContext, type CliContext } from './cli-context.ts';
 import { runCli } from './factory-cli.ts';
+import { openInstallation } from '../composition/installation/installation-runtime.ts';
 import { capturedOutput, cliContext, configText, healthyRunner, parseConfig, SPEC_FILE, type CapturedOutput } from './testing/cli-harness.ts';
 
 describe('the agent-factory command line', () => {
@@ -231,6 +232,43 @@ describe('the agent-factory command line', () => {
     const schema = JSON.parse(captured.lines.join('\n')) as { readonly $id: string; readonly title: string };
     expect(schema.title).toBe('Agent Factory configuration');
     expect(schema.$id).toMatch(/schema\/config\.schema\.json$/);
+  });
+  describe('connected tools', () => {
+    const TOOLS = [
+      '    conventions: { defaultScope: repo }',
+      '    tools:',
+      '      - name: catalog',
+      '        check: [/bin/sh, -c, test -f "$AGENT_FACTORY_HOME/catalog-session"]',
+      '        fix: catalog login',
+      '        login: touch "$AGENT_FACTORY_HOME/catalog-session"',
+    ].join('\n');
+
+    beforeEach(() => {
+      config = parseConfig(configText().replace('    conventions: { defaultScope: repo }', TOOLS), home);
+    });
+
+    function withInstallation(): CliContext {
+      const silent = { info: () => undefined, warn: () => undefined };
+      return context({ openInstallation: (loaded, extra = {}) => openInstallation(loaded, { AGENT_FACTORY_HOME: home }, { userHome: home, log: silent, ...extra }) });
+    }
+
+    it('checks a tool a project declares without being told which project, and says how to fix it', async () => {
+      expect(await runCli(['tool', 'check', 'catalog'], withInstallation())).toBe(1);
+      expect(captured.lines.at(-1)).toMatch(/^catalog: unauthenticated: .*; to fix: catalog login$/);
+    });
+
+    it('starts the login the tool declares, without a terminal, then checks the tool again', async () => {
+      expect(await runCli(['tool', 'login', 'catalog'], withInstallation())).toBe(0);
+      expect(captured.lines.slice(-2)).toEqual([expect.stringMatching(/^catalog: login succeeded \(exit code 0 after \d+ s\)$/), expect.stringMatching(/^catalog: connected/)]);
+      expect(await runCli(['tool', 'check', 'catalog'], withInstallation())).toBe(0);
+    });
+
+    it('refuses a tool nobody declares, and a login a tool does not declare', async () => {
+      expect(await runCli(['tool', 'login', 'nope'], context())).toBe(1);
+      expect(captured.errors.at(-1)).toBe('no tool named nope is declared by the installation or any project');
+      expect(await runCli(['tool', 'login', 'git'], withInstallation())).toBe(1);
+      expect(captured.errors.at(-1)).toContain('git declares no login the factory can start');
+    });
   });
 });
 

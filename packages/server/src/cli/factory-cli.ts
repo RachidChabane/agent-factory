@@ -14,6 +14,7 @@ import { schemaCommand } from './commands/schema-command.ts';
 import { startCommand } from './commands/start-command.ts';
 import { statusCommand } from './commands/status-command.ts';
 import { stopCommand } from './commands/stop-command.ts';
+import { toolCommand } from './commands/tool-command.ts';
 import { usageCommand } from './commands/usage-command.ts';
 import { validateCommand } from './commands/validate-command.ts';
 import { EXIT_CODES } from './output.ts';
@@ -67,6 +68,10 @@ async function dispatch({ project, command }: CommandLine, context: CliContext):
       return prFeedbackCommand(command.pullRequestNumber, command.path, command.author, project, context);
     case 'audit':
       return auditCommand(command.commits, project, context);
+    case 'tool-check':
+      return toolCommand('check', command.tool, project, context);
+    case 'tool-login':
+      return toolCommand('login', command.tool, project, context);
   }
 }
 

@@ -4,6 +4,7 @@ import type {
   PauseView,
   ProjectSettingsView,
   RoleSetting,
+  ToolSessionView,
   ToolView,
   UsageAccountView,
   UsageView,
@@ -29,6 +30,8 @@ import {
   type CheckedTool,
   type FactoryEventRecord,
   type NamedCommand,
+  type RecordedToolSession,
+  type ToolSessionHistory,
 } from '@agent-factory/application';
 import { AGENT_ROLES, type PauseCause } from '@agent-factory/domain';
 import type { AgentFactoryConfig, ProjectConfig, RoleSettings, RoleSettingsMap } from '../config/agent-factory-config.ts';
@@ -113,9 +116,19 @@ export function usageView(config: AgentFactoryConfig, usage: readonly AccountUsa
 }
 
 /** Every configured tool, with its latest check when it has one. */
-export function toolViews(configured: readonly ConfiguredTool[], checks: ReadonlyMap<string, CheckedTool>, scope: ToolView['scope']): ToolView[] {
+function sessionView(session: RecordedToolSession | null): ToolSessionView | null {
+  return session === null ? null : { at: iso(session.at), outcome: session.outcome, detail: session.detail, operator: session.operator };
+}
+
+export function toolViews(
+  configured: readonly ConfiguredTool[],
+  checks: ReadonlyMap<string, CheckedTool>,
+  sessions: ReadonlyMap<string, ToolSessionHistory>,
+  scope: ToolView['scope'],
+): ToolView[] {
   return configured.map((tool) => {
     const check = checks.get(tool.name) ?? null;
+    const history = sessions.get(tool.name) ?? null;
     return {
       name: tool.name,
       scope,
@@ -127,6 +140,12 @@ export function toolViews(configured: readonly ConfiguredTool[], checks: Readonl
       fixCommand: check?.fixCommand ?? null,
       installHint: tool.installHint,
       checkedAt: check === null ? null : iso(check.checkedAt),
+      loginCommand: tool.loginCommand,
+      lastLogin: sessionView(history?.lastLogin ?? null),
+      keepAlive:
+        tool.keepAlive === null
+          ? null
+          : { command: tool.keepAlive.command, everyMinutes: tool.keepAlive.everyMs / MILLISECONDS_PER_MINUTE, last: sessionView(history?.lastKeepAlive ?? null) },
     };
   });
 }

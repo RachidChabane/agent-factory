@@ -19,6 +19,7 @@ export const COMMAND_NAMES = {
   issue: 'issue',
   pr: 'pr',
   audit: 'audit',
+  tool: 'tool',
   help: 'help',
 } as const;
 
@@ -26,6 +27,7 @@ export const REQUEST_SUBCOMMANDS = { add: 'add', challenge: 'challenge' } as con
 export const ISSUE_SUBCOMMANDS = { create: 'create', abandon: 'abandon' } as const;
 export const PR_SUBCOMMANDS = { feedback: 'feedback' } as const;
 export const REHEARSAL_SUBCOMMANDS = { init: 'init', reset: 'reset', addIssue: 'add-issue' } as const;
+export const TOOL_SUBCOMMANDS = { check: 'check', login: 'login' } as const;
 
 export const PROJECT_OPTION = '--project';
 export const IMAGES_OPTION = '--images';
@@ -70,6 +72,8 @@ export const USAGE = [
   '  start [--demo] [--port <port>]               run the factory and serve the cockpit; --demo plays fictional projects with no account',
   '  status [<issue>]                             the installation at a glance, or the state of one issue',
   '  usage [--refresh]                            subscription usage by account and limit; --refresh reads it now',
+  '  tool check <name>                            check a connected tool now, as validate does',
+  '  tool login <name>                            start the login the tool declares (no terminal needed), then check it',
   '  stop [--now]                                 stop the running factory once its running work finishes; --now stops its agents too',
   '  run-issue <issue>                            drive a validated issue to an open pull request, resuming where it stopped',
   '  resume <issue> [--answer <text>]             after an escalation, return the issue to the stage it left; --answer carries the decision asked for',
@@ -109,6 +113,8 @@ export type CliCommand =
   | { readonly kind: 'issue-abandon'; readonly issueNumber: number; readonly reason: string }
   | { readonly kind: 'pr-feedback'; readonly pullRequestNumber: number; readonly path: string; readonly author: string }
   | { readonly kind: 'audit'; readonly commits: readonly string[] }
+  | { readonly kind: 'tool-check'; readonly tool: string }
+  | { readonly kind: 'tool-login'; readonly tool: string }
   | { readonly kind: 'help' };
 
 /** A command, with the project it names when the operator named one. */
@@ -327,6 +333,19 @@ function parseAudit(rest: readonly string[]): ParsedCommand {
   });
 }
 
+function parseTool(rest: readonly string[]): ParsedCommand {
+  const [subcommand, ...arguments_] = rest;
+  if (subcommand !== TOOL_SUBCOMMANDS.check && subcommand !== TOOL_SUBCOMMANDS.login) {
+    return failure(subcommand === undefined ? 'missing tool subcommand' : `unknown tool subcommand "${subcommand}"`);
+  }
+  return withOptions(arguments_, [], [], ({ positional }) => {
+    const problem = exactly(positional, ['tool name']);
+    if (problem !== null) return failure(problem);
+    const tool = positional[0] ?? '';
+    return done(subcommand === TOOL_SUBCOMMANDS.check ? { kind: 'tool-check', tool } : { kind: 'tool-login', tool });
+  });
+}
+
 function parseCommand(name: string, rest: readonly string[]): ParsedCommand {
   switch (name) {
     case COMMAND_NAMES.init:
@@ -361,6 +380,8 @@ function parseCommand(name: string, rest: readonly string[]): ParsedCommand {
       return parsePullRequest(rest);
     case COMMAND_NAMES.audit:
       return parseAudit(rest);
+    case COMMAND_NAMES.tool:
+      return parseTool(rest);
     default:
       return failure(`unknown command "${name}"`);
   }

@@ -67,6 +67,14 @@ tools:
     version: [kubectl, version, --client]
     fix: kubectl config use-context <context>
     timeoutSeconds: 20
+  - name: vault
+    description: Reads the secrets the deployments use
+    check: [vault, token, lookup, -format=json]
+    fix: vault login -method=oidc
+    # Started by the cockpit's Log in button and by `agent-factory tool login vault`: it must need no terminal.
+    login: vault login -method=oidc -no-print
+    # Run on a schedule while the factory runs; each run is recorded and the tool checked again.
+    keepAlive: { command: vault token renew -increment=2h, everyMinutes: 45 }
 
 defaults:
   roles:

@@ -29,6 +29,7 @@ import type { InstallationContext, SourceEnvironment } from './installation-cont
 import { LiveInstallation } from './live-installation.ts';
 import { installationNotifier } from './notifications.ts';
 import { definedEnvironment, installationToolProber, installationTools, projectToolProber, type ConfiguredTool } from './tools.ts';
+import { ConfiguredToolSessions } from './tool-sessions.ts';
 import { usageRefresher, usageReportSource } from './usage.ts';
 
 export const INSTALLATION_MODES = ['live', 'demo', 'rehearsal'] as const;
@@ -67,6 +68,10 @@ export interface InstallationRuntime extends InstallationContext {
   readonly projects: readonly ProjectRuntime[];
   project(id: string): ProjectRuntime;
   projectTools(id: string): ToolProber;
+  /** The logins and keep-alives the installation's own tools declare. */
+  readonly toolSessions: ConfiguredToolSessions;
+  /** The logins and keep-alives a project's tools declare. */
+  projectToolSessions(id: string): ConfiguredToolSessions;
   /** Applies a settings change to the configuration file and records it; the running daemon picks it up. */
   changeSettings(change: SettingsChange, operator: string): Promise<number>;
   close(): void;
@@ -168,6 +173,8 @@ export async function openInstallation(config: AgentFactoryConfig, environment: 
         return found;
       },
       projectTools: (id) => projectToolProber(projectOf(live.config, id), toolSettings),
+      toolSessions: new ConfiguredToolSessions(config.tools, runner, { environment, home: userHome }),
+      projectToolSessions: (id) => new ConfiguredToolSessions(projectOf(live.config, id).tools, runner, { environment, home: userHome }),
       changeSettings: (change, operator) => new ChangeSettings({ events, document: settingsDocument }).change(change, operator),
       close: () => {
         lifetime.abort();

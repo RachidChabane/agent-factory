@@ -458,6 +458,38 @@
             "default": 20,
             "type": "number",
             "exclusiveMinimum": 0
+          },
+          "login": {
+            "type": "string",
+            "minLength": 1
+          },
+          "loginTimeoutSeconds": {
+            "default": 300,
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "keepAlive": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "everyMinutes": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "timeoutSeconds": {
+                "default": 120,
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "command",
+              "everyMinutes"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1763,6 +1795,38 @@
                   "default": 20,
                   "type": "number",
                   "exclusiveMinimum": 0
+                },
+                "login": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "loginTimeoutSeconds": {
+                  "default": 300,
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "keepAlive": {
+                  "type": "object",
+                  "properties": {
+                    "command": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "everyMinutes": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "timeoutSeconds": {
+                      "default": 120,
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "command",
+                    "everyMinutes"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [

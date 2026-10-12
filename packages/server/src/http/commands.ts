@@ -11,6 +11,7 @@ import {
   declineRequest,
   detectedRelease,
   loadJournal,
+  logInTool,
   MergeOnOrder,
   OrderCheckRewrite,
   pauseScheduling,
@@ -317,6 +318,15 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
         ? await checkTool(runtime.events, runtime.tools, body.tool, operator)
         : await checkTool(projectOf(context, body.project).dependencies.events, runtime.projectTools(body.project), body.tool, operator);
     return `${result.tool}: ${result.status}${result.version === null ? '' : ` (${result.version})`}`;
+  }),
+  'tools.login': command(COMMAND_BODY_SCHEMAS['tools.login'], async (body, context) => {
+    const { runtime, operator } = context;
+    const dependencies =
+      body.project === null
+        ? { events: runtime.events, sessions: runtime.toolSessions, prober: runtime.tools }
+        : { events: projectOf(context, body.project).dependencies.events, sessions: runtime.projectToolSessions(body.project), prober: runtime.projectTools(body.project) };
+    const { login, check } = await logInTool(dependencies, body.tool, operator, new AbortController().signal);
+    return `${body.tool}: login ${login.outcome} (${login.detail}); the tool is now ${check.status}`;
   }),
   'health.check': command(COMMAND_BODY_SCHEMAS['health.check'], async (body, context) => {
     const samples = await projectOf(context, body.project).health.sampleEnvironment(body.environment);
