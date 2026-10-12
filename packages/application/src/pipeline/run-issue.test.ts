@@ -35,6 +35,8 @@ const HAPPY_PATH_STATES = [
   'pr-open',
 ];
 
+const FILM_REPORT_PATH = '.evidence/42/films/checkout-flow/after-report.json';
+
 const BLOCKING_FINDING = {
   severity: 'blocking',
   category: 'criteria-coverage',
@@ -104,6 +106,22 @@ describe('runIssue', () => {
     expect(reviewer?.prompt).toContain(`+${CHECK_CONTENT.split('\n')[0] ?? ''}`);
     const runIds = scenario.harness.requests.map((request) => request.runId);
     expect(new Set(runIds).size).toBe(runIds.length);
+  });
+
+  it('keeps the factory evidence out of the diff the reviewer reads', async () => {
+    const scenario = new PipelineScenario();
+    scenario.harness.script('implementer', {
+      effect: (request) => {
+        scenario.implement(request);
+        scenario.workspace.write(request.workingDirectory, FILM_REPORT_PATH, '{"film":"previous head"}');
+      },
+    });
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+    const [reviewer] = scenario.harness.requestsOf('reviewer');
+
+    expect(reviewer?.prompt).toContain(`diff --git a/${PRODUCT_PATH}`);
+    expect(reviewer?.prompt).not.toContain('.evidence/');
+    expect(reviewer?.prompt).not.toContain('previous head');
   });
 
   it('runs check commands without credentials in the configured environment', async () => {

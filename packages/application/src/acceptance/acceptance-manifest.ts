@@ -6,10 +6,11 @@ import { shellCommandLine } from './shell-quote.ts';
 export const FACTORY_WORK_DIRECTORY = '.factory';
 export const ACCEPTANCE_MANIFEST_PATH = `${FACTORY_WORK_DIRECTORY}/acceptance.json`;
 export const EVIDENCE_DIRECTORY = '.evidence';
+export const EVIDENCE_PREFIX = `${EVIDENCE_DIRECTORY}/`;
 
 const PATH_SEPARATOR = '/';
 const FORBIDDEN_SEGMENTS: readonly string[] = ['', '.', '..'];
-const RESERVED_PREFIXES: readonly string[] = [`${FACTORY_WORK_DIRECTORY}/`, `${EVIDENCE_DIRECTORY}/`, '.git/'];
+const RESERVED_PREFIXES: readonly string[] = [`${FACTORY_WORK_DIRECTORY}/`, EVIDENCE_PREFIX, '.git/'];
 const HOME_PREFIX = '~';
 const BACKSLASH = '\\';
 
