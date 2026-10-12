@@ -165,3 +165,6 @@ export { CommandFilmRecorder, type CommandFilmRecorderSettings } from './film/co
 export { FfmpegTranscoder, transcodeCommand, EVEN_DIMENSIONS_FILTER, H264_ARGUMENTS } from './film/ffmpegTranscoder.ts';
 export { parseReport, ReportUnreadableError, FILM_STATUSES, type ParsedReport } from './film/filmReportParsing.ts';
 export { largestVideo, selectScreenshots, type MediaFile } from './film/filmMedia.ts';
+export { CommandMediaUploader, NO_LINK_REASON, type CommandMediaUploaderSettings } from './media/commandMediaUploader.ts';
+export { FileMediaLinkCache, MEDIA_LINKS_FILE } from './media/fileMediaLinkCache.ts';
+export { Sha256FileFingerprints } from './media/sha256FileFingerprints.ts';

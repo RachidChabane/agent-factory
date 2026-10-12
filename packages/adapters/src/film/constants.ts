@@ -1,7 +1,3 @@
-export const NICE_EXECUTABLE = 'nice';
-export const NICE_LEVEL_FLAG = '-n';
-/** Films and their transcoding give way to everything else on the operator's machine. */
-export const FILM_NICENESS = 10;
 export const FFMPEG_EXECUTABLE = 'ffmpeg';
 export const TRANSCODE_TIMEOUT_MS = 10 * 60_000;
 export const MILLISECONDS_PER_MINUTE = 60_000;
@@ -18,6 +14,3 @@ export const MAX_FACT_LABEL_CHARACTERS = 80;
 export const MAX_FACT_VALUE_CHARACTERS = 240;
 export const TRUNCATION_MARK = '…';
 
-export const FAILURE_TAIL_LINES = 6;
-export const FAILURE_TAIL_CHARACTERS = 600;
-export const FAILURE_LINE_SEPARATOR = ' | ';

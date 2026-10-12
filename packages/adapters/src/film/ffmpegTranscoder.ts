@@ -2,8 +2,8 @@ import { dirname } from 'node:path';
 import { FilmRecordingError, type CommandRunner, type VideoTranscoder } from '@agent-factory/application';
 import { CommandSpawnError } from '../process/errors.ts';
 import { FFMPEG_EXECUTABLE, TRANSCODE_TIMEOUT_MS } from './constants.ts';
-import { failureTail } from './failureTail.ts';
-import { niced } from './niceCommand.ts';
+import { failureTail } from '../process/failureTail.ts';
+import { niced } from '../process/niceCommand.ts';
 
 /** H.264 wants an even width and height. */
 export const EVEN_DIMENSIONS_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2';
