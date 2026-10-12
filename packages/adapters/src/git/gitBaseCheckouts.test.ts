@@ -53,6 +53,14 @@ describe('GitBaseCheckouts', () => {
     expect(await readFile(join(checkout.path, 'src/app.txt'), 'utf8')).toBe('base content\n');
   });
 
+  it('fetches into one clone for several checkout sets at once without fighting over the ref lock', async () => {
+    const sets = [createCheckouts(), createCheckouts(), createCheckouts()];
+    await repositories.pushToRemote('src/app.txt', 'moved upstream\n', 'upstream');
+    const checkouts = await Promise.all(sets.flatMap((set, index) => [set.checkout(`gate-${index}-a`), set.checkout(`gate-${index}-b`)]));
+    const head = git(repositories.remote, 'rev-parse', TEST_BASE_BRANCH);
+    expect(checkouts.map((checkout) => checkout.sha)).toEqual(Array.from({ length: 6 }, () => head));
+  });
+
   it('checks out an older revision of the base instead of its head', async () => {
     const audited = git(repositories.remote, 'rev-parse', TEST_BASE_BRANCH);
     await repositories.pushToRemote('src/app.txt', 'moved upstream\n', 'upstream');

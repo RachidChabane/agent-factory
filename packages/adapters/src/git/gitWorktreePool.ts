@@ -11,7 +11,7 @@ import {
 import { GitCommandError, InvalidPoolLocationError, WorktreePoolExhaustedError } from './errors.ts';
 import { GitCli } from './gitCli.ts';
 import { LeaseStore, type Lease } from './leaseStore.ts';
-import { SerialQueue } from './serialQueue.ts';
+import { repositoryQueue, type SerialQueue } from './serialQueue.ts';
 
 export interface GitWorktreePoolSettings {
   readonly targetClonePath: string;
@@ -27,7 +27,7 @@ export interface GitWorktreePoolSettings {
 export class GitWorktreePool implements WorktreePool {
   private readonly git: GitCli;
   private readonly leases: LeaseStore;
-  private readonly queue = new SerialQueue();
+  private readonly queue: SerialQueue;
   private readonly targetClonePath: string;
   private readonly poolRoot: string;
   private readonly baseBranch: string;
@@ -37,6 +37,7 @@ export class GitWorktreePool implements WorktreePool {
 
   constructor(runner: CommandRunner, settings: GitWorktreePoolSettings) {
     this.targetClonePath = resolve(settings.targetClonePath);
+    this.queue = repositoryQueue(this.targetClonePath);
     this.poolRoot = resolve(settings.poolDirectory, settings.repositoryName);
     if (isInside(this.targetClonePath, this.poolRoot)) {
       throw new InvalidPoolLocationError(this.poolRoot, this.targetClonePath);

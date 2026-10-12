@@ -4,7 +4,7 @@ import type { BaseCheckout, BaseCheckouts, CommandRunner } from '@agent-factory/
 import { DEFAULT_REMOTE_NAME } from './constants.ts';
 import { GitCommandError } from './errors.ts';
 import { GitCli } from './gitCli.ts';
-import { SerialQueue } from './serialQueue.ts';
+import { repositoryQueue, type SerialQueue } from './serialQueue.ts';
 
 const SAFE_CHECKOUT_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const PARENT_DIRECTORY_MARKER = '..';
@@ -30,7 +30,7 @@ function assertSafeName(name: string): void {
 
 export class GitBaseCheckouts implements BaseCheckouts {
   private readonly git: GitCli;
-  private readonly queue = new SerialQueue();
+  private readonly queue: SerialQueue;
   private readonly targetClonePath: string;
   private readonly checkoutsDirectory: string;
   private readonly baseBranch: string;
@@ -39,6 +39,7 @@ export class GitBaseCheckouts implements BaseCheckouts {
   constructor(runner: CommandRunner, settings: GitBaseCheckoutsSettings) {
     this.git = new GitCli(runner, settings.environment);
     this.targetClonePath = resolve(settings.targetClonePath);
+    this.queue = repositoryQueue(this.targetClonePath);
     this.checkoutsDirectory = resolve(settings.checkoutsDirectory);
     this.baseBranch = settings.baseBranch;
     this.remoteName = settings.remoteName ?? DEFAULT_REMOTE_NAME;

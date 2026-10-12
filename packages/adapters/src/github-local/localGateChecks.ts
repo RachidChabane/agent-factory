@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import type { CheckRunSummary, Clock } from '@agent-factory/application';
+import { SerialQueue } from '../git/serialQueue.ts';
 
 /** The directory of a local forge where the outcome of each commit's gate is kept. */
 export const CHECKS_DIRECTORY = 'checks';
@@ -52,6 +53,8 @@ export class LocalGateChecks {
   private readonly clock: Clock;
   private readonly signal: AbortSignal;
   private readonly running = new Map<string, Promise<void>>();
+  /** One gate at a time, as a forge with a single runner: gates of several commits wait their turn. */
+  private readonly queue = new SerialQueue();
 
   constructor(forgeDirectory: string, runner: LocalCheckRunner, clock: Clock, signal: AbortSignal) {
     this.directory = join(forgeDirectory, CHECKS_DIRECTORY);
@@ -75,7 +78,7 @@ export class LocalGateChecks {
 
   private start(sha: string): void {
     if (this.running.has(sha) || this.signal.aborted) return;
-    const run = this.runGate(sha).finally(() => this.running.delete(sha));
+    const run = this.queue.run(() => this.runGate(sha)).finally(() => this.running.delete(sha));
     this.running.set(sha, run);
   }
 
