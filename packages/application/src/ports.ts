@@ -9,6 +9,7 @@ import type {
   RateLimitSnapshot,
   ResourceSnapshot,
   TokenUsage,
+  UsageReading,
 } from '@agent-factory/domain';
 
 export const RUN_SUBJECT_KINDS = ['issue', 'request', 'audit', 'release'] as const;
@@ -356,4 +357,9 @@ export interface OperationLog {
 
 export interface Sleeper {
   sleep(milliseconds: number, signal: AbortSignal): Promise<void>;
+}
+
+/** Reads the subscription usage of one Claude account without calling a model. */
+export interface UsageReportSource {
+  read(account: string, signal: AbortSignal): Promise<UsageReading>;
 }

@@ -140,7 +140,13 @@ function setup(
   let resources: ResourceSnapshot = { freeMemoryPercent: 70, pressure: 'normal' };
   const drivers = new ControlledDriverFactory();
   const notifier = new RecordingNotifier();
-  const budget = new BudgetGovernor(events, clock, { accounts: [], thresholds: { five_hour: 0.9, seven_day: 0.85 }, dailyCapUsd: null, perRunCapUsd: null });
+  const budget = new BudgetGovernor(events, clock, {
+    accounts: [],
+    thresholds: { session: 0.9, weekly_all: 0.85, weekly_scoped: 0.85 },
+    dailyCap: { kind: 'none' },
+    perRunCapUsd: null,
+    staleAfterMs: 30 * MINUTE_MS,
+  });
   const evaluated: string[] = [];
   const releases: ReleaseEvaluator = {
     evaluate: (release) => {

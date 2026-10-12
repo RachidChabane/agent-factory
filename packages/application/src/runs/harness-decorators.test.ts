@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AgentHarness, AgentRunEvent, AgentRunRequest, AgentRunResult } from '../ports.ts';
 import { InMemoryEventStore, runResult } from '../audit/testing/fakes.ts';
 import { BudgetExhaustedError, BudgetGovernor } from '../budget/budget-governor.ts';
-import { RATE_LIMIT_OBSERVED_EVENT } from '../budget/budget-events.ts';
+import { USAGE_READ_EVENT } from '../budget/budget-events.ts';
 import { AgentRunAdmission, ResourcesUnavailableError } from '../resources/agent-run-admission.ts';
 import { GovernedHarness } from './governed-harness.ts';
 import { closeOrphanRuns, ORPHAN_RUN_DETAIL } from './orphan-runs.ts';
@@ -13,7 +13,9 @@ import { agentRunRequest, InMemoryRunLogStore, SteppingClock } from './test-supp
 const START = new Date('2026-10-10T12:00:00.000Z');
 const IN_ONE_HOUR = new Date('2026-10-10T13:00:00.000Z');
 const IN_TWO_DAYS = new Date('2026-10-12T12:00:00.000Z');
-const THRESHOLDS = { five_hour: 0.9, seven_day: 0.85 };
+const THRESHOLDS = { session: 0.9, weekly_all: 0.85, weekly_scoped: 0.85 };
+const STALE_AFTER_MS = 30 * 60_000;
+const NO_CAP = { kind: 'none' } as const;
 
 class EventfulHarness implements AgentHarness {
   readonly requests: AgentRunRequest[] = [];
@@ -32,7 +34,7 @@ function setup(accounts: readonly string[] = [], freeMemoryPercent = 80) {
   const clock = new SteppingClock(START);
   const logs = new InMemoryRunLogStore(clock);
   const base = new EventfulHarness();
-  const governor = new BudgetGovernor(events, clock, { accounts, thresholds: THRESHOLDS, dailyCapUsd: null, perRunCapUsd: null });
+  const governor = new BudgetGovernor(events, clock, { accounts, thresholds: THRESHOLDS, dailyCap: NO_CAP, perRunCapUsd: null, staleAfterMs: STALE_AFTER_MS });
   const admission = new AgentRunAdmission(
     { snapshot: () => Promise.resolve({ freeMemoryPercent, pressure: 'normal' }) },
     { minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' },
@@ -107,8 +109,13 @@ describe('recording and governing agent runs', () => {
     ];
     await harness.run(agentRunRequest(), () => undefined, SIGNAL);
     expect(base.requests[0]?.account).toBeNull();
-    expect(events.records.filter((record) => record.type === RATE_LIMIT_OBSERVED_EVENT)).toHaveLength(1);
-    expect(await governor.standings()).toEqual([{ account: 'default', snapshots: [snapshot] }]);
+    expect(events.records.filter((record) => record.type === USAGE_READ_EVENT)).toHaveLength(1);
+    expect(await governor.usage()).toEqual([
+      {
+        account: 'default',
+        limits: [{ kind: 'session', scope: null, utilization: 0.5, resetsAt: IN_ONE_HOUR, source: 'agent-stream', readAt: START, freshness: 'fresh' }],
+      },
+    ]);
   });
 
   it('moves to the next account once the first crosses a threshold, then pauses when every account is spent', async () => {
@@ -125,7 +132,7 @@ describe('recording and governing agent runs', () => {
   it('pauses every run once the daily spend reaches the configured cap', async () => {
     const events = new InMemoryEventStore();
     const clock = new SteppingClock(START);
-    const capped = new BudgetGovernor(events, clock, { accounts: [], thresholds: THRESHOLDS, dailyCapUsd: 0.5, perRunCapUsd: null });
+    const capped = new BudgetGovernor(events, clock, { accounts: [], thresholds: THRESHOLDS, dailyCap: { kind: 'usd', amount: 0.5 }, perRunCapUsd: null, staleAfterMs: STALE_AFTER_MS });
     const base = new EventfulHarness();
     const harness = new GovernedHarness(new RecordingHarness(base, events, clock, new InMemoryRunLogStore(clock)), new AgentRunAdmission({ snapshot: () => Promise.resolve({ freeMemoryPercent: 80, pressure: 'normal' }) }, { minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' }), capped);
     base.result = runResult({ runId: 'run-1', costUsd: 0.6 });
@@ -151,7 +158,7 @@ describe('recording and governing agent runs', () => {
     const { base, harness, governor } = setup();
     await harness.run(agentRunRequest({ maxBudgetUsd: 8 }), () => undefined, SIGNAL);
     expect(base.requests[0]?.maxBudgetUsd).toBe(8);
-    governor.updateLimits({ thresholds: THRESHOLDS, dailyCapUsd: null, perRunCapUsd: 2.5 });
+    governor.updateLimits({ thresholds: THRESHOLDS, dailyCap: NO_CAP, perRunCapUsd: 2.5 });
     await harness.run(agentRunRequest({ runId: 'run-2', maxBudgetUsd: 8 }), () => undefined, SIGNAL);
     expect(base.requests[1]?.maxBudgetUsd).toBe(2.5);
     await harness.run(agentRunRequest({ runId: 'run-3', maxBudgetUsd: 1 }), () => undefined, SIGNAL);
@@ -163,8 +170,8 @@ describe('recording and governing agent runs', () => {
     base.result = runResult({ runId: 'run-1', costUsd: 0.6 });
     await harness.run(agentRunRequest(), () => undefined, SIGNAL);
     expect(await governor.check()).toMatchObject({ kind: 'selected' });
-    governor.updateLimits({ thresholds: { five_hour: 0.9, seven_day: 0.5 }, dailyCapUsd: 0.5, perRunCapUsd: null });
-    expect(governor.thresholds.seven_day).toBe(0.5);
+    governor.updateLimits({ thresholds: { ...THRESHOLDS, weekly_all: 0.5 }, dailyCap: { kind: 'usd', amount: 0.5 }, perRunCapUsd: null });
+    expect(governor.thresholds.weekly_all).toBe(0.5);
     expect(await governor.check()).toMatchObject({ kind: 'exhausted' });
   });
 
