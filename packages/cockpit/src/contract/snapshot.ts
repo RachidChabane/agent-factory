@@ -8,8 +8,10 @@ import {
   BEFORE_PROOF_KINDS,
   BILLING_MODES,
   BRANCH_TEST_RESULTS,
+  DELEGABLE_GESTURES,
   EFFORT_LEVELS,
   ISSUE_STATES,
+  MERGE_CONDITIONS,
   PAUSE_ABOVE_PRESSURE_LEVELS,
   PAUSE_CAUSES,
   PROMOTION_POLICIES,
@@ -53,6 +55,7 @@ import {
   CHECK_RUN_OUTCOMES,
   COMMIT_ATTRIBUTIONS,
   COST_BASIS_VIEWS,
+  DELEGATED_TARGET_KINDS,
   DEPLOYMENT_OUTCOMES,
   ENVIRONMENT_STATUSES,
   FORGE_KINDS,
@@ -62,6 +65,7 @@ import {
   NOTIFICATION_CHANNEL_KINDS,
   PAUSE_SCOPES,
   PULL_REQUEST_STATES,
+  READY_NOTICE_STATUSES,
   RELEASE_SOURCES,
   RUN_STATUSES,
   RUN_SUBJECT_KINDS,
@@ -158,6 +162,31 @@ export const RequestViewSchema = z.object({
 });
 export type RequestView = z.infer<typeof RequestViewSchema>;
 
+// ---------------------------------------------------------------- delegated decisions
+
+/** A gesture of the operator that the project's orchestrator made, with the reason it gave and the rule that allowed it. */
+export const DelegatedDecisionViewSchema = z.object({
+  at: IsoDateTimeSchema,
+  actor: z.string().min(1),
+  gesture: z.enum(DELEGABLE_GESTURES),
+  target: z.object({ kind: z.enum(DELEGATED_TARGET_KINDS), number: IssueNumberSchema }),
+  /** The issue whose record the gesture belongs to; the pull request's issue for a merge. */
+  issueNumber: IssueNumberSchema,
+  reason: z.string().min(1),
+  rule: z.string().min(1),
+});
+export type DelegatedDecisionView = z.infer<typeof DelegatedDecisionViewSchema>;
+
+/** What a project delegates, and to whom: the policy of its configuration. */
+export const AutonomyViewSchema = z.object({
+  actor: z.string().min(1),
+  validateSpecs: z.boolean(),
+  answerDecisions: z.boolean(),
+  resume: z.boolean(),
+  merge: z.array(z.object({ types: z.array(IssueTypeIdSchema), requires: z.array(z.enum(MERGE_CONDITIONS)) })),
+});
+export type AutonomyView = z.infer<typeof AutonomyViewSchema>;
+
 // ---------------------------------------------------------------- issues
 
 export const IssueSpecViewSchema = z.object({
@@ -223,6 +252,8 @@ export const IssueViewSchema = z.object({
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
   url: z.string(),
+  /** The gestures the project's orchestrator made on this issue or on its pull request, newest first. */
+  delegated: z.array(DelegatedDecisionViewSchema),
 });
 export type IssueView = z.infer<typeof IssueViewSchema>;
 
@@ -471,6 +502,40 @@ export const FilmOrderViewSchema = z.object({
 });
 export type FilmOrderView = z.infer<typeof FilmOrderViewSchema>;
 
+/** A link to a file of a pull request, made reachable by the operator's upload command. */
+export const MediaLinkViewSchema = z.object({ label: z.string().min(1), url: z.string().min(1) });
+export type MediaLinkView = z.infer<typeof MediaLinkViewSchema>;
+
+/** What keeps the ready notice of a pull request from going out. */
+export const ReadyHoldViewSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('checks-running') }),
+  z.object({ kind: z.literal('checks-failed') }),
+  z.object({ kind: z.literal('films-pending'), scenarios: z.array(z.string().min(1)) }),
+  z.object({ kind: z.literal('films-failed'), scenarios: z.array(z.string().min(1)) }),
+]);
+export type ReadyHoldView = z.infer<typeof ReadyHoldViewSchema>;
+
+/** The notice that the pull request is ready to merge: sent for its head with the links it carried, held, or due. */
+export const ReadyNoticeViewSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal(READY_NOTICE_STATUSES[0]),
+    sentAt: IsoDateTimeSchema,
+    headSha: z.string().min(1),
+    links: z.array(MediaLinkViewSchema),
+    /** The files whose upload failed, with the reason, so their link is missing. */
+    failures: z.array(z.object({ label: z.string().min(1), reason: z.string().min(1) })),
+  }),
+  z.object({
+    status: z.literal(READY_NOTICE_STATUSES[1]),
+    holds: z.array(ReadyHoldViewSchema).min(1),
+    /** When the checks the hold depends on were last read from the forge; null when they never were. */
+    checksReadAt: IsoDateTimeSchema.nullable(),
+  }),
+  z.object({ status: z.literal(READY_NOTICE_STATUSES[2]) }),
+  z.object({ status: z.literal(READY_NOTICE_STATUSES[3]) }),
+]);
+export type ReadyNoticeView = z.infer<typeof ReadyNoticeViewSchema>;
+
 export const PullRequestViewSchema = z.object({
   number: IssueNumberSchema,
   title: z.string(),
@@ -491,6 +556,10 @@ export const PullRequestViewSchema = z.object({
   films: z.array(FilmViewSchema),
   /** The scenarios ordered for it, whichever way they ended or wait. */
   filmOrders: z.array(FilmOrderViewSchema),
+  /** The notice that the pull request is ready to merge, with the links to its media. */
+  readyNotice: ReadyNoticeViewSchema,
+  /** The gestures the project's orchestrator made on this pull request, newest first. */
+  delegated: z.array(DelegatedDecisionViewSchema),
   reviewRounds: z.array(ReviewRoundSchema),
   externalFeedback: z.array(ExternalFeedbackSchema),
   files: z.array(ChangedFileSchema),
@@ -778,6 +847,8 @@ export const ProjectSettingsViewSchema = z.object({
   releaseModel: z.enum(RELEASE_MODEL_KINDS),
   /** The films of the project's pull requests; null when the project declares no film command. */
   films: z.object({ timeZone: z.string().min(1), timeoutMinutes: CountSchema }).nullable(),
+  /** What the project delegates to its orchestrator. */
+  autonomy: AutonomyViewSchema,
 });
 export type ProjectSettingsView = z.infer<typeof ProjectSettingsViewSchema>;
 
@@ -926,6 +997,8 @@ export const ProjectViewSchema = z.object({
   references: z.array(ReferenceViewSchema),
   tools: z.array(ToolViewSchema),
   settings: ProjectSettingsViewSchema,
+  /** The gestures the project's orchestrator made in place of the operator, newest first; the oldest are left out. */
+  delegatedDecisions: z.array(DelegatedDecisionViewSchema),
 });
 export type ProjectView = z.infer<typeof ProjectViewSchema>;
 

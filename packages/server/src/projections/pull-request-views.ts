@@ -19,11 +19,13 @@ import {
   type FactoryEventRecord,
   type PipelineJournal,
 } from '@agent-factory/application';
+import { delegatedDecisionViews, pullRequestDecisions } from './autonomy-views.ts';
 import { firstOf, iso, lastOf, type EventIndex } from './event-index.ts';
 import { withoutLocalPaths } from './local-paths.ts';
 import { baseRunSummary, branchRunSummary } from './proof-summary.ts';
 import { NEVER_READ, observedView, type Observed } from '../snapshot/cached-reading.ts';
 import { filmMergeReason, filmOrderViews, filmViews } from './film-views.ts';
+import { readyNoticeView } from './ready-views.ts';
 import { imageKey, logKey, type ForgePullRequest, type ProjectSnapshotContext } from './snapshot-context.ts';
 
 const FAILING_CONCLUSIONS: readonly CheckRunSummary['conclusion'][] = ['failure', 'cancelled'];
@@ -218,6 +220,8 @@ export function projectPullRequests(
       evidence: evidenceOf(journal, context, records),
       films: filmViews(journal, records, context),
       filmOrders: filmOrderViews(journal, context),
+      readyNotice: readyNoticeView(journal, state === 'open', { checks, baseChecks: context.baseChecks, filming: context.films !== null }),
+      delegated: pullRequestDecisions(delegatedDecisionViews(records), pullRequest.number),
       reviewRounds: reviewRounds(journal, index),
       externalFeedback: feedbackOf(journal),
       files: changedFiles(journal),

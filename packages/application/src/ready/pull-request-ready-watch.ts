@@ -5,9 +5,9 @@ import { failedFilmScenarios, pendingFilmScenarios } from '../film/film-pending.
 import { NOTICES, type OperatorNotifications } from '../notifications/operator-notifications.ts';
 import { PIPELINE_EVENTS, type PullRequestReadyAnnouncedRecord } from '../pipeline/journal-events.ts';
 import { IssueJournalWriter } from '../pipeline/journal-writer.ts';
-import { MERGEABLE_STATES } from '../pipeline/mergeable-states.ts';
 import { currentHeadOf, isAnnouncedReady, type PipelineJournal } from '../pipeline/pipeline-journal.ts';
 import type { CheckRunSummary, Clock, EventStore, GitHubGateway, IssueStateStore, OperationLog } from '../ports.ts';
+import { isAwaitingMerge } from './awaiting-merge.ts';
 import { requiredChecksVerdict } from './ready-checks.ts';
 import { readyMediaOf } from './ready-media.ts';
 import { NO_PUBLISHED_MEDIA, type MediaPublisher, type PublishedMedia } from './media-publisher.ts';
@@ -54,10 +54,6 @@ function keyOf(issueNumber: number, headSha: string): string {
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function isAwaitingMerge(journal: PipelineJournal): boolean {
-  return journal.pullRequest !== null && journal.mergeSha === null && journal.evidenceRemoval === null && journal.state !== null && MERGEABLE_STATES.includes(journal.state);
 }
 
 /**

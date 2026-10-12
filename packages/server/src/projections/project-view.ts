@@ -3,6 +3,7 @@ import { healthSamplesSince, type FactoryEventRecord } from '@agent-factory/appl
 import type { ProjectConfig } from '../config/agent-factory-config.ts';
 import type { Observed } from '../snapshot/cached-reading.ts';
 import { projectAudits, projectSkippedChanges } from './audit-views.ts';
+import { delegatedDecisionViews } from './autonomy-views.ts';
 import { environmentView, type EnvironmentDeployments } from './environment-views.ts';
 import { indexEvents } from './event-index.ts';
 import { pauseViews, projectSettingsView, schedulerView } from './installation-views.ts';
@@ -72,6 +73,7 @@ export function projectView(project: ProjectConfig, records: readonly FactoryEve
     references: readings.references,
     tools: readings.tools,
     settings: projectSettingsView(project),
+    delegatedDecisions: delegatedDecisionViews(records),
   };
   return { view, questions: pendingQuestions(index, journals) };
 }

@@ -23,6 +23,7 @@ import {
   type ImplementerAttemptRecord,
   type PipelineJournal,
 } from '@agent-factory/application';
+import { delegatedDecisionViews } from './autonomy-views.ts';
 import { firstOf, iso, type EventIndex } from './event-index.ts';
 import type { PendingIssue, ProjectSnapshotContext } from './snapshot-context.ts';
 
@@ -206,6 +207,7 @@ function issueView(
     updatedAt: iso(updated),
     costUsd: context.issueCosts.get(number) ?? 0,
     url: context.links.issue(number),
+    delegated: delegatedDecisionViews(records),
   };
 }
 

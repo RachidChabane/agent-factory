@@ -6,6 +6,7 @@ import { failedAfter, NEVER_READ, readOn } from '../readings.ts';
 import type { RunWorld } from '../runs.ts';
 import { hours, type FixtureClock } from '../time.ts';
 import { DEPENDENCY_AUTOMATION, DOCS_AUTOMATION, storefrontAudits, storefrontSkippedChanges } from './audits.ts';
+import { STOREFRONT_AUTONOMY, storefrontDelegatedDecisions, storefrontReadyNotices, withDelegation } from './autonomy.ts';
 import { storefrontEnvironments, storefrontWorkflowRuns } from './delivery.ts';
 import { activeIssues } from './issues-active.ts';
 import { deliveredIssues } from './issues-delivered.ts';
@@ -121,7 +122,14 @@ function tools(clock: FixtureClock): ToolView[] {
 
 export function buildStorefront(clock: FixtureClock, runs: RunWorld): ProjectView {
   const audits = newestFirst(storefrontAudits(clock), (audit) => audit.detectedAt);
-  const pullRequests = oldestFirstByNumber(storefrontPullRequests(clock, runs));
+  const decisions = storefrontDelegatedDecisions(clock);
+  const delegated = withDelegation(
+    [...deliveredIssues(clock, runs), ...activeIssues(clock, runs)],
+    storefrontPullRequests(clock, runs),
+    decisions,
+    storefrontReadyNotices(clock),
+  );
+  const pullRequests = oldestFirstByNumber(delegated.pullRequests);
   return {
     id: STOREFRONT_ID,
     name: 'Storefront',
@@ -132,7 +140,7 @@ export function buildStorefront(clock: FixtureClock, runs: RunWorld): ProjectVie
     scheduler: { worktreeShortage: null },
     issueTypes: issueTypeInfos(null),
     requests: newestFirst(storefrontRequests(clock, runs), (request) => request.receivedAt),
-    issues: oldestFirstByNumber([...deliveredIssues(clock, runs), ...activeIssues(clock, runs)]),
+    issues: oldestFirstByNumber(delegated.issues),
     pullRequests,
     workflows: readOn(storefrontWorkflowRuns(clock), clock.minutesAgo(WORKFLOWS_READ_MINUTES_AGO)),
     environments: storefrontEnvironments(clock),
@@ -154,6 +162,8 @@ export function buildStorefront(clock: FixtureClock, runs: RunWorld): ProjectVie
         { name: DOCS_AUTOMATION, branches: ['docs-sync/**'], authors: [] },
       ],
       releaseModel: 'release-please',
+      autonomy: STOREFRONT_AUTONOMY,
     }),
+    delegatedDecisions: decisions,
   };
 }
