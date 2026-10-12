@@ -107,6 +107,11 @@ reviews and opens the pull request with its evidence. You do nothing unless it a
 
 - **Needs a person**: the issue stopped, with the reason. Fix what it names, then
   **Resume** (`agent-factory resume <issue>`), or **Abandon** with a reason.
+- **Review again**: the retry budget is spent on a review that blocked an implementation whose
+  gate passed, and you judge the finding wrong. **Review again**
+  (`agent-factory resume <issue> --review-again`) has the same implementation reviewed once
+  more in a fresh context, on the same head, without a new implementer attempt. A review
+  that blocks again escalates the issue again.
 - **A decision**: an agent asked a question only a person can answer (a product
   choice, a constraint of the repository). Answer it from the issue page, or with
   `agent-factory resume <issue> --answer "<text>"`; the agent continues with it.

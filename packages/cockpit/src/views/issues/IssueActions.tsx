@@ -1,10 +1,10 @@
 import { useId, useState } from 'react';
-import { Archive, CircleCheck, FilePen, Pause, Play, RotateCcw } from 'lucide-react';
+import { Archive, CircleCheck, FilePen, Pause, Play, RotateCcw, ScanSearch } from 'lucide-react';
 import { useProject } from '../../app/ProjectRoute.tsx';
 import type { CommandBody, IssueView } from '../../contract/index.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { useVocabulary } from '../../i18n/vocabulary.ts';
-import { canAbandonIssue, canPauseIssue, canResumeEscalation, canResumePausedIssue, canRewriteCheck, canValidateSpec } from '../../model/actions.ts';
+import { canAbandonIssue, canPauseIssue, canResumeEscalation, canResumePausedIssue, canReviewAgain, canRewriteCheck, canValidateSpec } from '../../model/actions.ts';
 import { Button } from '../../ui/components/Button.tsx';
 import { CommandButton } from '../../widgets/CommandButton.tsx';
 import { AbandonDialog } from './AbandonDialog.tsx';
@@ -50,6 +50,17 @@ function ResumeAction({ issue, target }: { readonly issue: IssueView; readonly t
   );
 }
 
+/** Reviews the implementation of an issue that escalated on its review again, in a fresh context, without a new implementer attempt. */
+function ReviewAgainAction({ issue, target }: { readonly issue: IssueView; readonly target: IssueRef }) {
+  const { t } = useI18n();
+  if (!canReviewAgain(issue)) return null;
+  return (
+    <CommandButton command="issue.resume" body={{ ...target, reviewAgain: true }} icon={<ScanSearch size={ICON_SIZE} />}>
+      {t('issues.action.reviewAgain')}
+    </CommandButton>
+  );
+}
+
 export function IssueActions({ issue }: { readonly issue: IssueView }) {
   const { t } = useI18n();
   const project = useProject();
@@ -65,6 +76,7 @@ export function IssueActions({ issue }: { readonly issue: IssueView }) {
       ) : null}
       <StartAction issue={issue} target={target} />
       <ResumeAction issue={issue} target={target} />
+      <ReviewAgainAction issue={issue} target={target} />
       {canPauseIssue(issue) ? (
         <CommandButton
           command="issue.pause"

@@ -55,6 +55,7 @@ export const AUTHOR_OPTION = '--author';
 export const EXPECTED_HEAD_OPTION = '--expected-head';
 export const LABELS_OPTION = '--labels';
 export const ANSWER_OPTION = '--answer';
+export const REVIEW_AGAIN_FLAG = '--review-again';
 export const REASON_OPTION = '--reason';
 export const SCENARIO_OPTION = '--scenario';
 export const SKIP_GATE_PREFLIGHT_FLAG = '--skip-gate-preflight';
@@ -101,6 +102,7 @@ export const USAGE = [
   '  stop [--now]                                 stop the running factory once its running work finishes; --now stops its agents too',
   '  run-issue <issue>                            drive a validated issue to an open pull request, resuming where it stopped',
   '  resume <issue> [--answer <text>]             after an escalation, return the issue to the stage it left; --answer carries the decision asked for',
+  '  resume <issue> --review-again                after a review escalation whose gate passed, review the same implementation again, without an implementer attempt',
   '  merge <pull-request> --expected-head <sha>   remove the evidence and squash-merge the reviewed head (full sha)',
   '',
   'Work items',
@@ -131,7 +133,7 @@ export type CliCommand =
   | { readonly kind: 'watch'; readonly intervalSeconds: number; readonly once: boolean; readonly json: boolean; readonly port: number | null }
   | { readonly kind: 'stop'; readonly now: boolean }
   | { readonly kind: 'run-issue'; readonly issueNumber: number }
-  | { readonly kind: 'resume'; readonly issueNumber: number; readonly answer: string | null }
+  | { readonly kind: 'resume'; readonly issueNumber: number; readonly answer: string | null; readonly reviewAgain: boolean }
   | { readonly kind: 'merge'; readonly pullRequestNumber: number; readonly expectedHeadSha: string }
   | { readonly kind: 'rehearsal-init'; readonly sourceClonePath: string }
   | { readonly kind: 'rehearsal-reset'; readonly sourceClonePath: string }
@@ -357,14 +359,16 @@ function parseRehearsal(rest: readonly string[]): ParsedCommand {
 }
 
 function parseResume(rest: readonly string[]): ParsedCommand {
-  return withOptions(rest, [ANSWER_OPTION], [], ({ positional, values }) => {
+  return withOptions(rest, [ANSWER_OPTION], [REVIEW_AGAIN_FLAG], ({ positional, values, flags }) => {
     const problem = exactly(positional, ['issue number']);
     if (problem !== null) return failure(problem);
     const issueNumber = positiveInteger(positional[0], 'issue number');
     if (typeof issueNumber === 'string') return failure(issueNumber);
     const answer = values.get(ANSWER_OPTION);
     if (answer !== undefined && answer.trim() === '') return failure(`${ANSWER_OPTION} needs the text of the answer`);
-    return done({ kind: 'resume', issueNumber, answer: answer ?? null });
+    const reviewAgain = flags.has(REVIEW_AGAIN_FLAG);
+    if (reviewAgain && answer !== undefined) return failure(`${REVIEW_AGAIN_FLAG} cannot be combined with ${ANSWER_OPTION}`);
+    return done({ kind: 'resume', issueNumber, answer: answer ?? null, reviewAgain });
   });
 }
 

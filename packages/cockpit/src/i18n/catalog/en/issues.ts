@@ -68,6 +68,7 @@ export const enIssues = {
   'issues.action.startWaiting': 'Waits for {issues} to be merged',
   'issues.action.resume': 'Resume',
   'issues.action.resumeEscalation': 'Resume at “{state}”',
+  'issues.action.reviewAgain': 'Review again',
   'issues.action.pause': 'Pause',
   'issues.action.rewrite': 'Rewrite a check',
   'issues.action.abandon': 'Abandon',

@@ -53,7 +53,8 @@ export const COMMAND_BODY_SCHEMAS = {
   'issue.validate-spec': IssueRefSchema,
   'issue.start': IssueRefSchema,
   'issue.pause': IssueRefSchema,
-  'issue.resume': IssueRefSchema,
+  /** `reviewAgain` orders a new review of the implementation an issue escalated on after its review, in place of the plain resume. */
+  'issue.resume': IssueRefSchema.extend({ reviewAgain: z.boolean().optional() }),
   'issue.abandon': IssueRefSchema.extend({ reason: z.string().trim().min(1) }),
   'issue.rewrite-check': IssueRefSchema.extend({ path: z.string().min(1), instruction: z.string().min(1) }),
   'run.stop': RunRefSchema,
