@@ -1,0 +1,17 @@
+{
+  "name": "@agent-factory/application",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@agent-factory/domain": "workspace:*",
+    "zod": "4.1.11"
+  }
+}

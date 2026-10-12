@@ -1,0 +1,328 @@
+{
+  "config": {
+    "configFile": "/work/shop/playwright.config.ts",
+    "rootDir": "/work/shop/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "list"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/work/shop/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/work/shop/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.55.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "cart.spec.ts",
+      "file": "cart.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "refund restores the stock",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 2,
+                  "error": {
+                    "message": "Error: refund must restore the stock\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m1\u001b[39m",
+                    "stack": "Error: refund must restore the stock\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m1\u001b[39m\n    at /work/shop/e2e/cart.spec.ts:26:56",
+                    "location": {
+                      "file": "/work/shop/e2e/cart.spec.ts",
+                      "column": 56,
+                      "line": 26
+                    },
+                    "snippet": "  24 |   const stock = { apple: 1 };\n  25 |   refund(stock, 'apple');\n> 26 |   expect(stock.apple, 'refund must restore the stock').toBe(2);\n     |                                                        ^\n  27 | });\n  28 |"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/work/shop/e2e/cart.spec.ts",
+                        "column": 56,
+                        "line": 26
+                      },
+                      "message": "Error: refund must restore the stock\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m1\u001b[39m\n\n  24 |   const stock = { apple: 1 };\n  25 |   refund(stock, 'apple');\n> 26 |   expect(stock.apple, 'refund must restore the stock').toBe(2);\n     |                                                        ^\n  27 | });\n  28 |\n    at /work/shop/e2e/cart.spec.ts:26:56"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-10T02:45:52.324Z",
+                  "annotations": [],
+                  "attachments": [],
+                  "errorLocation": {
+                    "file": "/work/shop/e2e/cart.spec.ts",
+                    "column": 56,
+                    "line": 26
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "1981448f0b79506fb670-0a6b3ab588f2ee276fa3",
+          "file": "cart.spec.ts",
+          "line": 20,
+          "column": 1
+        }
+      ],
+      "suites": [
+        {
+          "title": "cart total",
+          "file": "cart.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "adds two items",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-10T02:45:51.678Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1981448f0b79506fb670-095d1b4b6387f99f90e2",
+              "file": "cart.spec.ts",
+              "line": 4,
+              "column": 3
+            },
+            {
+              "title": "applies a discount above twenty",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 1,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m22.5\u001b[39m\nReceived: \u001b[31m25\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m22.5\u001b[39m\nReceived: \u001b[31m25\u001b[39m\n    at /work/shop/e2e/cart.spec.ts:10:29",
+                        "location": {
+                          "file": "/work/shop/e2e/cart.spec.ts",
+                          "column": 29,
+                          "line": 10
+                        },
+                        "snippet": "   8 |\n   9 |   test('applies a discount above twenty', () => {\n> 10 |     expect(total([10, 15])).toBe(22.5);\n     |                             ^\n  11 |   });\n  12 |\n  13 |   test('renders the receipt', async () => {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/work/shop/e2e/cart.spec.ts",
+                            "column": 29,
+                            "line": 10
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m22.5\u001b[39m\nReceived: \u001b[31m25\u001b[39m\n\n   8 |\n   9 |   test('applies a discount above twenty', () => {\n> 10 |     expect(total([10, 15])).toBe(22.5);\n     |                             ^\n  11 |   });\n  12 |\n  13 |   test('renders the receipt', async () => {\n    at /work/shop/e2e/cart.spec.ts:10:29"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-10T02:45:51.687Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/work/shop/e2e/cart.spec.ts",
+                        "column": 29,
+                        "line": 10
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "1981448f0b79506fb670-9536d24cd16394e960e3",
+              "file": "cart.spec.ts",
+              "line": 7,
+              "column": 3
+            },
+            {
+              "title": "renders the receipt",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 2,
+                      "error": {
+                        "message": "Error: Cannot find module '/work/shop/src/receipt.ts' imported from /work/shop/e2e/cart.spec.ts",
+                        "stack": "Error: Cannot find module '/work/shop/src/receipt.ts' imported from /work/shop/e2e/cart.spec.ts"
+                      },
+                      "errors": [
+                        {
+                          "message": "Error: Cannot find module '/work/shop/src/receipt.ts' imported from /work/shop/e2e/cart.spec.ts"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-10T02:45:52.017Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "1981448f0b79506fb670-9343ec2918a9ea1bd49a",
+              "file": "cart.spec.ts",
+              "line": 10,
+              "column": 3
+            },
+            {
+              "title": "prints the receipt",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/work/shop/e2e/cart.spec.ts",
+                        "line": 18,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-10T02:45:52.324Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/work/shop/e2e/cart.spec.ts",
+                            "line": 18,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "1981448f0b79506fb670-5105516c55a2b417ab1a",
+              "file": "cart.spec.ts",
+              "line": 16,
+              "column": 8
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-10T02:45:51.374Z",
+    "duration": 965.2819999999999,
+    "expected": 1,
+    "skipped": 1,
+    "unexpected": 3,
+    "flaky": 0
+  }
+}

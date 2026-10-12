@@ -1,0 +1,136 @@
+import { ISSUE_SUBJECT_PREFIX } from '@agent-factory/domain';
+import type { IssueState } from '@agent-factory/domain';
+import { EVIDENCE_DIRECTORY } from '../acceptance/acceptance-manifest.ts';
+import type { CheckConclusion, CheckRunSummary, EventStore, Worktree } from '../ports.ts';
+import { evidenceRemovalCommitMessage } from './conventional-commit.ts';
+import { PIPELINE_EVENTS, PullRequestOpenedSchema } from './journal-events.ts';
+import { IssueJournalWriter } from './journal-writer.ts';
+import type { PipelineDependencies } from './pipeline-dependencies.ts';
+import { MergeRefusedError, PullRequestNotFromFactoryError, WorktreeUnavailableError } from './pipeline-errors.ts';
+import { loadJournal, type PipelineJournal } from './pipeline-journal.ts';
+
+const FIRST_SEQUENCE = 0;
+const ISSUE_NUMBER_PATTERN = new RegExp(`^${ISSUE_SUBJECT_PREFIX}(\\d+)$`);
+const REFUSED_CONCLUSIONS: readonly CheckConclusion[] = ['failure', 'cancelled'];
+const PENDING_CONCLUSION: CheckConclusion = 'pending';
+
+export function checksBlockingMerge(checks: readonly CheckRunSummary[]): string | null {
+  const failing = checks.filter((check) => REFUSED_CONCLUSIONS.includes(check.conclusion));
+  if (failing.length > 0) return `checks failed: ${describeChecks(failing)}`;
+  const pending = checks.filter((check) => check.conclusion === PENDING_CONCLUSION);
+  return pending.length > 0 ? `checks still running: ${describeChecks(pending)}` : null;
+}
+export const MERGEABLE_STATES: readonly IssueState[] = ['pr-open', 'ci', 'ready-to-merge'];
+
+export type MergeOnOrderDependencies = Pick<
+  PipelineDependencies,
+  'github' | 'pool' | 'sourceControl' | 'events' | 'states' | 'files'
+>;
+
+export interface MergeOrder {
+  readonly pullRequestNumber: number;
+  readonly expectedHeadSha: string;
+}
+
+export interface MergeOutcome {
+  readonly issueNumber: number;
+  readonly pullRequestNumber: number;
+  readonly mergeSha: string;
+}
+
+export async function issueOfPullRequest(events: EventStore, pullRequestNumber: number): Promise<number> {
+  const opened = (await events.read(ISSUE_SUBJECT_PREFIX, FIRST_SEQUENCE)).filter(
+    (event) => event.type === PIPELINE_EVENTS.pullRequestOpened && PullRequestOpenedSchema.safeParse(event.payload).data?.number === pullRequestNumber,
+  );
+  const issueNumber = Number(ISSUE_NUMBER_PATTERN.exec(opened.at(-1)?.subject ?? '')?.[1]);
+  if (!Number.isInteger(issueNumber)) throw new PullRequestNotFromFactoryError(pullRequestNumber);
+  return issueNumber;
+}
+
+function describeChecks(checks: readonly CheckRunSummary[]): string {
+  return checks.map((check) => `${check.name} (${check.conclusion})`).join(', ');
+}
+
+export class MergeOnOrder {
+  private readonly dependencies: MergeOnOrderDependencies;
+
+  constructor(dependencies: MergeOnOrderDependencies) {
+    this.dependencies = dependencies;
+  }
+
+  async merge(order: MergeOrder): Promise<MergeOutcome> {
+    const { events, states } = this.dependencies;
+    const issueNumber = await issueOfPullRequest(events, order.pullRequestNumber);
+    const writer = new IssueJournalWriter(events, states, issueNumber);
+    let journal = await loadJournal(events, issueNumber);
+    if (journal.mergeSha !== null) return { issueNumber, pullRequestNumber: order.pullRequestNumber, mergeSha: journal.mergeSha };
+    if (journal.state === null || !MERGEABLE_STATES.includes(journal.state)) {
+      throw new MergeRefusedError(order.pullRequestNumber, `issue #${issueNumber} is ${journal.state ?? 'unknown'}, not awaiting a merge`);
+    }
+    const worktree = await this.worktreeOf(journal);
+    if (journal.evidenceRemoval === null) {
+      await this.removeEvidence(order, journal, worktree, writer);
+      journal = await loadJournal(events, issueNumber);
+    } else if (journal.evidenceRemoval.reviewedHeadSha !== order.expectedHeadSha) {
+      throw new MergeRefusedError(
+        order.pullRequestNumber,
+        `the merge was already prepared for head ${journal.evidenceRemoval.reviewedHeadSha}, not ${order.expectedHeadSha}`,
+      );
+    }
+    const removal = journal.evidenceRemoval;
+    if (removal === null) throw new MergeRefusedError(order.pullRequestNumber, 'the evidence removal was not recorded');
+    await this.dependencies.sourceControl.push(worktree);
+    await this.advanceTo(journal, writer, order);
+    const mergeSha = await this.dependencies.github.squashMerge(order.pullRequestNumber, removal.headSha);
+    await writer.record(PIPELINE_EVENTS.pullRequestMerged, { mergeSha });
+    await writer.transition('merged', `pull request #${order.pullRequestNumber} squash-merged as ${mergeSha}`);
+    await this.dependencies.pool.release(worktree);
+    await writer.record(PIPELINE_EVENTS.worktreeReleased, { path: worktree.path });
+    return { issueNumber, pullRequestNumber: order.pullRequestNumber, mergeSha };
+  }
+
+  private async worktreeOf(journal: PipelineJournal): Promise<Worktree> {
+    const recorded = journal.worktree;
+    if (recorded === null) throw new WorktreeUnavailableError('(released)');
+    const worktree = await this.dependencies.pool.reattach(journal.issueNumber, recorded, journal.lastCommitSha ?? recorded.baseSha);
+    if (worktree === null) throw new WorktreeUnavailableError(recorded.path);
+    return worktree;
+  }
+
+  private async removeEvidence(order: MergeOrder, journal: PipelineJournal, worktree: Worktree, writer: IssueJournalWriter): Promise<void> {
+    const { github, sourceControl, files } = this.dependencies;
+    const branch = worktree.branch;
+    const pullRequest = await github.findOpenPullRequest(branch);
+    if (pullRequest === null || pullRequest.number !== order.pullRequestNumber) {
+      throw new MergeRefusedError(order.pullRequestNumber, `no open pull request on ${branch}`);
+    }
+    const localHead = await sourceControl.headSha(worktree);
+    if (pullRequest.headSha !== order.expectedHeadSha || localHead !== order.expectedHeadSha) {
+      throw new MergeRefusedError(
+        order.pullRequestNumber,
+        `the head is ${pullRequest.headSha} on GitHub and ${localHead} locally, not the expected ${order.expectedHeadSha}`,
+      );
+    }
+    await this.assertChecksGreen(order);
+    let headSha = order.expectedHeadSha;
+    if (await files.exists(worktree.path, EVIDENCE_DIRECTORY)) {
+      await files.remove(worktree.path, EVIDENCE_DIRECTORY);
+      headSha = await sourceControl.commitAll(worktree, evidenceRemovalCommitMessage(journal.issueNumber));
+    }
+    await writer.record(PIPELINE_EVENTS.evidenceRemoved, { reviewedHeadSha: order.expectedHeadSha, headSha });
+  }
+
+  private async assertChecksGreen(order: MergeOrder): Promise<void> {
+    const blocking = checksBlockingMerge(await this.dependencies.github.checks(order.expectedHeadSha));
+    if (blocking !== null) throw new MergeRefusedError(order.pullRequestNumber, blocking);
+  }
+
+  private async advanceTo(journal: PipelineJournal, writer: IssueJournalWriter, order: MergeOrder): Promise<void> {
+    if (journal.state === 'pr-open') {
+      await writer.transition('ci', `checks on ${order.expectedHeadSha} are green`);
+    }
+    if (journal.state === 'pr-open' || journal.state === 'ci') {
+      await writer.transition('ready-to-merge', `the operator ordered the merge of ${order.expectedHeadSha}`);
+    }
+  }
+}

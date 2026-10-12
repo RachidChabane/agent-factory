@@ -1,4 +1,5 @@
 packages:
   - packages/domain
   - packages/plugin
+  - packages/application
   - tools/*

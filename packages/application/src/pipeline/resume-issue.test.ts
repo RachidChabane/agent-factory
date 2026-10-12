@@ -1,0 +1,179 @@
+import { describe, expect, it } from 'vitest';
+import { renderSpecBody } from '../spec/render-spec-body.ts';
+import { ResumeRefusedError, SpecNotValidatedError } from './pipeline-errors.ts';
+import { DECISION_REQUEST_PATH } from './decision-request.ts';
+import { ResumeIssue } from './resume-issue.ts';
+import { CHECK_PATH, ISSUE_NUMBER, issueRecord, NO_FINDINGS, PipelineScenario, SPEC } from './testing/pipeline-scenario.ts';
+
+const AMBIGUITY = 'Criterion 2 is ambiguous: "opens" may mean a new tab or the same tab. Tell me which reading to use.';
+const CLARIFIED_CRITERION = 'The link opens the conversation in the same tab.';
+const DECISION_QUESTION = 'The router offers no deep link to a conversation. May I write a custom route guard?';
+const OPERATOR_ANSWER = 'Yes, write the guard in app/middleware and keep it under 30 lines.';
+
+function decisionAsker(scenario: PipelineScenario): void {
+  scenario.harness.script('implementer', {
+    outcome: 'decision-requested',
+    effect: (request) => scenario.workspace.write(request.workingDirectory, DECISION_REQUEST_PATH, `${DECISION_QUESTION}\n`),
+  });
+}
+
+function ambiguousAuthor(scenario: PipelineScenario): void {
+  scenario.harness.script('acceptance-author', {
+    finalText: AMBIGUITY,
+    effect: (request) => scenario.workspace.write(request.workingDirectory, CHECK_PATH, 'half-written check'),
+  });
+}
+
+describe('ResumeIssue', () => {
+  it('hands the acceptance-author explanation to the operator when it writes no manifest', async () => {
+    const scenario = new PipelineScenario();
+    ambiguousAuthor(scenario);
+    const outcome = await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    expect(outcome).toEqual({
+      kind: 'needs-human',
+      issueNumber: ISSUE_NUMBER,
+      reason: `The acceptance-author run finished without its result: .factory/acceptance.json was not written.\n\nIt said:\n${AMBIGUITY}`,
+    });
+  });
+
+  it('re-reads the clarified spec and has the checks written again from a clean worktree', async () => {
+    const scenario = new PipelineScenario();
+    ambiguousAuthor(scenario);
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    const clarified = { ...SPEC, acceptanceCriteria: [SPEC.acceptanceCriteria[0] ?? '', CLARIFIED_CRITERION] };
+    scenario.github.issues.set(ISSUE_NUMBER, issueRecord({ body: renderSpecBody(clarified) }));
+
+    const resumed = await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER);
+
+    expect(resumed).toEqual({
+      issueNumber: ISSUE_NUMBER,
+      resumedAt: 'authoring-checks',
+      specChanged: true,
+      checksReauthored: true,
+      decisionAnswered: false,
+      feedbackCycleGranted: false,
+    });
+    const journal = await scenario.journal();
+    expect(journal).toMatchObject({ state: 'authoring-checks', workspacePrepared: false, manifest: null, beforeProof: null, frozen: null });
+    expect(journal.spec?.acceptanceCriteria[1]).toBe(CLARIFIED_CRITERION);
+    expect(scenario.workspace.read(scenario.worktree().path, CHECK_PATH)).toBeUndefined();
+
+    const outcome = await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    expect(outcome.kind).toBe('pr-open');
+    expect(scenario.harness.requestsOf('acceptance-author').at(-1)?.prompt).toContain(CLARIFIED_CRITERION);
+    expect(await scenario.states.path(ISSUE_NUMBER)).toContain('needs-human');
+  });
+
+  it('resumes without recording the spec again when the operator left it as it was', async () => {
+    const scenario = new PipelineScenario();
+    ambiguousAuthor(scenario);
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    expect(await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).toMatchObject({ specChanged: false, checksReauthored: true });
+    expect(scenario.events.records.filter((event) => event.type === 'pipeline.spec-captured')).toHaveLength(1);
+  });
+
+  it('runs the step that escalated again after the checks were frozen', async () => {
+    const scenario = new PipelineScenario();
+    scenario.harness.script('reviewer', { finalText: 'Looks fine to me.' }, { finalText: NO_FINDINGS });
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('needs-human');
+    expect(await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).toMatchObject({
+      issueNumber: ISSUE_NUMBER,
+      resumedAt: 'reviewing',
+      specChanged: false,
+      checksReauthored: false,
+      decisionAnswered: false,
+    });
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+    expect(scenario.harness.requestsOf('reviewer')).toHaveLength(2);
+  });
+
+  it('refuses to resume when the issue would only escalate again', async () => {
+    const spent = new PipelineScenario();
+    spent.lintFailuresLeft = 4;
+    await spent.pipeline().runIssue(ISSUE_NUMBER);
+    await expect(new ResumeIssue(spent.dependencies()).resume(ISSUE_NUMBER)).rejects.toThrow('the implementer retry budget is spent');
+
+    const tampered = new PipelineScenario();
+    tampered.harness.script('implementer', {
+      effect: (request) => tampered.workspace.write(request.workingDirectory, CHECK_PATH, "test.skip('weakened', () => {});\n"),
+    });
+    await tampered.pipeline().runIssue(ISSUE_NUMBER);
+    await expect(new ResumeIssue(tampered.dependencies()).resume(ISSUE_NUMBER)).rejects.toThrow('a frozen acceptance check was modified');
+    expect((await tampered.journal()).state).toBe('needs-human');
+  });
+
+  it('resumes the implementer session with the operator answer to its decision request', async () => {
+    const scenario = new PipelineScenario();
+    decisionAsker(scenario);
+    let staleRequest: string | undefined = 'not checked';
+    scenario.harness.script('implementer', {
+      effect: (request) => {
+        staleRequest = scenario.workspace.read(request.workingDirectory, DECISION_REQUEST_PATH);
+        scenario.implement(request);
+      },
+    });
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+
+    expect(await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER, `  ${OPERATOR_ANSWER}\n`)).toEqual({
+      issueNumber: ISSUE_NUMBER,
+      resumedAt: 'implementing',
+      specChanged: false,
+      checksReauthored: false,
+      decisionAnswered: true,
+      feedbackCycleGranted: false,
+    });
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+    const [asking, answered] = scenario.harness.requestsOf('implementer');
+    expect(answered?.resumeSessionId).toBe(`session-${asking?.runId ?? ''}`);
+    expect(answered?.prompt).toContain(OPERATOR_ANSWER);
+    expect(answered?.prompt).not.toContain(DECISION_QUESTION);
+    expect(staleRequest).toBeUndefined();
+  });
+
+  it('gives a fresh implementer session the question and the answer when the asking run has no session', async () => {
+    const scenario = new PipelineScenario();
+    scenario.harness.script('implementer', {
+      outcome: 'decision-requested',
+      sessionId: null,
+      effect: (request) => scenario.workspace.write(request.workingDirectory, DECISION_REQUEST_PATH, DECISION_QUESTION),
+    });
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER, OPERATOR_ANSWER);
+
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+    const answered = scenario.harness.requestsOf('implementer')[1];
+    expect(answered?.resumeSessionId).toBeNull();
+    expect(answered?.prompt).toContain(DECISION_QUESTION);
+    expect(answered?.prompt).toContain(OPERATOR_ANSWER);
+  });
+
+  it('refuses to resume a decision request without an answer, and an answer when no decision is pending', async () => {
+    const asking = new PipelineScenario();
+    decisionAsker(asking);
+    await asking.pipeline().runIssue(ISSUE_NUMBER);
+    await expect(new ResumeIssue(asking.dependencies()).resume(ISSUE_NUMBER)).rejects.toThrow("needs the operator's answer");
+    await expect(new ResumeIssue(asking.dependencies()).resume(ISSUE_NUMBER, '  ')).rejects.toThrow("needs the operator's answer");
+    expect((await asking.journal()).state).toBe('needs-human');
+
+    const ambiguous = new PipelineScenario();
+    ambiguousAuthor(ambiguous);
+    await ambiguous.pipeline().runIssue(ISSUE_NUMBER);
+    await expect(new ResumeIssue(ambiguous.dependencies()).resume(ISSUE_NUMBER, OPERATOR_ANSWER)).rejects.toThrow('nothing to answer');
+  });
+
+  it('refuses an issue that is not waiting for a human', async () => {
+    const scenario = new PipelineScenario();
+    await expect(new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).rejects.toBeInstanceOf(ResumeRefusedError);
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    await expect(new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).rejects.toThrow('it is pr-open, not needs-human');
+  });
+
+  it('refuses a spec the operator no longer validates', async () => {
+    const scenario = new PipelineScenario();
+    ambiguousAuthor(scenario);
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    scenario.github.issues.set(ISSUE_NUMBER, issueRecord({ labels: ['type:ui', 'spec:draft'] }));
+    await expect(new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).rejects.toBeInstanceOf(SpecNotValidatedError);
+    expect((await scenario.journal()).state).toBe('needs-human');
+  });
+});

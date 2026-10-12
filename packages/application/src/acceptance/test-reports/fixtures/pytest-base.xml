@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="1" tests="5" time="0.014" timestamp="2026-10-10T04:44:33.175750+02:00" hostname="ci-runner"><testcase classname="tests.test_checkout" name="test_total_of_two_items" file="tests/test_checkout.py" line="5" time="0.000" /><testcase classname="tests.test_checkout" name="test_discount_is_applied_above_twenty" file="tests/test_checkout.py" line="9" time="0.000"><failure message="assert 25 == 22.5&#10; +  where 25 = total([10, 15])">def test_discount_is_applied_above_twenty():
+&gt;       assert total([10, 15]) == 22.5
+E       assert 25 == 22.5
+E        +  where 25 = total([10, 15])
+
+tests/test_checkout.py:11: AssertionError</failure></testcase><testcase classname="tests.test_checkout" name="test_receipt_lists_items" file="tests/test_checkout.py" line="13" time="0.000"><failure message="ModuleNotFoundError: No module named 'shop.receipt'">def test_receipt_lists_items():
+&gt;       from shop.receipt import render_receipt
+E       ModuleNotFoundError: No module named 'shop.receipt'
+
+tests/test_checkout.py:15: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_checkout" name="test_receipt_is_printed" file="tests/test_checkout.py" line="19" time="0.000"><skipped type="pytest.skip" message="covered by the end-to-end journey">/work/shop/tests/test_checkout.py:20: covered by the end-to-end journey</skipped></testcase><testcase classname="tests.test_checkout.TestRefunds" name="test_refund_restores_stock" file="tests/test_checkout.py" line="25" time="0.000"><failure message="AssertionError: refund must restore the stock&#10;assert 1 == 2">self = &lt;test_checkout.TestRefunds object at 0x1092a8b90&gt;
+
+    def test_refund_restores_stock(self):
+        stock = {"apple": 1}
+        refund(stock, "apple")
+&gt;       assert stock["apple"] == 2, "refund must restore the stock"
+E       AssertionError: refund must restore the stock
+E       assert 1 == 2
+
+tests/test_checkout.py:29: AssertionError</failure></testcase></testsuite></testsuites>
