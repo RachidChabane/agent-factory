@@ -17,7 +17,8 @@
     "lint": "script/lint",
     "test": "script/test",
     "scan": "script/scan",
-    "factory": "script/factory"
+    "factory": "script/factory",
+    "demo:films": "script/demo-films"
   },
   "devDependencies": {
     "@types/node": "24.5.2",

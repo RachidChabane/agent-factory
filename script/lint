@@ -8,7 +8,7 @@ run_heavy pnpm exec eslint .
 run_heavy pnpm -r --workspace-concurrency=1 --if-present run typecheck
 script/schema --check
 
-shell_files=(script/setup script/lint script/test script/scan script/ci script/lockfile script/schema script/install-tool script/lib/*.sh .githooks/*)
+shell_files=(script/setup script/lint script/test script/scan script/ci script/lockfile script/schema script/demo-films script/install-tool script/lib/*.sh .githooks/*)
 if command -v shellcheck > /dev/null 2>&1; then
   shellcheck -x "${shell_files[@]}"
 else
