@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { contentTypeOf, parseByteRange, sendBytes, sendFile } from './static-files.ts';
+import { contentTypeOf, entityTag, IMMUTABLE_CACHE_CONTROL, parseByteRange, REVALIDATE_CACHE_CONTROL, sendBytes, sendFile } from './static-files.ts';
 
 const CONTENT = '0123456789';
 const SIZE = CONTENT.length;
@@ -50,10 +50,11 @@ describe('sending files and bytes', () => {
     directory = await mkdtemp(join(tmpdir(), 'static-files-'));
     await writeFile(join(directory, 'video.mp4'), CONTENT);
     await writeFile(join(directory, 'empty.mp4'), '');
+    await writeFile(join(directory, 'hashed-app.js'), CONTENT);
     server = createServer((request, response) => {
       const name = (request.url ?? '/').slice(1);
       if (`/${name}` === BYTES_ROUTE) sendBytes(request, response, Buffer.from(CONTENT), { 'content-type': 'video/mp4' });
-      else void sendFile(request, response, join(directory, name));
+      else void sendFile(request, response, join(directory, name), name.startsWith('hashed-') ? IMMUTABLE_CACHE_CONTROL : undefined);
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -111,5 +112,29 @@ describe('sending files and bytes', () => {
     const empty = await fetch(`${base}/empty.mp4`);
     expect(empty.status).toBe(200);
     expect(empty.headers.get('content-length')).toBe('0');
+  });
+
+  it('revalidates a file by default and answers 304 when its entity tag still matches', async () => {
+    const first = await fetch(`${base}/video.mp4`);
+    expect(first.headers.get('cache-control')).toBe(REVALIDATE_CACHE_CONTROL);
+    const etag = first.headers.get('etag');
+    expect(etag).toMatch(/^W\/"[0-9a-f]+-[0-9a-f]+"$/);
+    const revalidated = await fetch(`${base}/video.mp4`, { headers: { 'if-none-match': etag ?? '' } });
+    expect(revalidated.status).toBe(304);
+    expect(revalidated.headers.get('etag')).toBe(etag);
+    expect(await revalidated.text()).toBe('');
+    const changed = await fetch(`${base}/video.mp4`, { headers: { 'if-none-match': entityTag(SIZE + 1, 0) } });
+    expect(changed.status).toBe(200);
+  });
+
+  it('answers 304 to the revalidation of a file even when the request names a range', async () => {
+    const etag = (await fetch(`${base}/video.mp4`)).headers.get('etag') ?? '';
+    const revalidated = await fetch(`${base}/video.mp4`, { headers: { 'if-none-match': etag, range: 'bytes=0-1' } });
+    expect(revalidated.status).toBe(304);
+  });
+
+  it('marks a content-hashed file as immutable', async () => {
+    const response = await fetch(`${base}/hashed-app.js`);
+    expect(response.headers.get('cache-control')).toBe(IMMUTABLE_CACHE_CONTROL);
   });
 });
