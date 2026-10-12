@@ -28,6 +28,7 @@ export async function issueCreateCommand(specPath: string, options: IssueCreateO
     context.output.line(`This creates an issue on ${forgeName(project)}:`);
     context.output.line(`Title: ${plan.title}`);
     context.output.line(`Labels: ${plan.labels.join(LABEL_SEPARATOR)}`);
+    if (plan.films.length > 0) context.output.line(`Films: ${plan.films.join(LABEL_SEPARATOR)}`);
     context.output.line('');
     context.output.line(plan.body.trimEnd());
     context.output.line('');

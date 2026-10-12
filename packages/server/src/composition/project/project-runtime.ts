@@ -41,6 +41,7 @@ import { RandomRunIds } from '../system.ts';
 import { baseWorkspaces } from './base-workspaces.ts';
 import { agentDeniedReadPaths, agentShellCommands, commandSandbox, knownSecretSource, projectEngineSockets } from './confinement.ts';
 import { deliveryEnvironments, monitoredEnvironments, releaseGateHealth } from './delivery.ts';
+import { openProjectFilms, type ProjectFilms } from './films.ts';
 import { openForge, projectGitEnvironment } from './forge.ts';
 import { ProjectRepository } from './project-repository.ts';
 import { localGateChecks } from './local-checks.ts';
@@ -66,6 +67,8 @@ export interface ProjectRuntime {
   readonly delivery: readonly DeliveryEnvironment[];
   readonly releaseHealth: readonly EnvironmentHealth[];
   readonly health: HealthMonitor;
+  /** The films of the project, when it declares a film command. */
+  readonly films: ProjectFilms | null;
   readonly notifications: OperatorNotifications;
   readonly log: OperationLog;
   /** Takes the settings that apply without a restart (roles, concurrency) from a reloaded configuration. */
@@ -166,6 +169,7 @@ export async function openProject(installation: InstallationContext, initial: Pr
     stackSlots: new StackSlots(),
   };
   const log = projectLog(installation.log, config.id);
+  const cockpitUrl = projectCockpitUrl(installation.config.server.publicUrl, config.id);
   return {
     id: config.id,
     get config(): ProjectConfig {
@@ -190,7 +194,8 @@ export async function openProject(installation: InstallationContext, initial: Pr
     delivery: deliveryEnvironments(config),
     releaseHealth: releaseGateHealth(config),
     health: new HealthMonitor({ events, clock }, { environments: monitoredEnvironments(config), intervalMs: config.delivery.healthIntervalMs }),
-    notifications: new OperatorNotifications(installation.notifier, projectCockpitUrl(installation.config.server.publicUrl, config.id), log),
+    films: openProjectFilms(installation, config, settings, dependencies, cockpitUrl),
+    notifications: new OperatorNotifications(installation.notifier, cockpitUrl, log),
     log,
     reconfigure: (reloaded) => {
       const next = reloaded.projects.find((candidate) => candidate.id === config.id);

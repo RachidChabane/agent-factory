@@ -126,6 +126,21 @@ projects:
         - name: web
           run: PORT=$((3000 + AGENT_FACTORY_SLOT)) npm run dev
           ready: curl -fsS "http://127.0.0.1:$((3000 + AGENT_FACTORY_SLOT))/healthz"
+    # Films: the factory records the scenarios a spec names in its Films: header (and the ones the operator orders)
+    # against the base and against the head of each pull request, and commits both recordings on its branch.
+    # The command runs outside the sandbox, with your environment and sessions, like one of your own scripts: declare
+    # only a command you trust. It writes into {output}: report.json ({ "status": "recorded" | "skipped", "reason",
+    # "facts": [{ "label", "value" }], "keyFrames": [paths] }), one video (.mp4 .webm .mov .mkv) and screenshots.
+    # A video that is not an MP4 is turned into one with ffmpeg. {replay} is the replayFile of the first recording,
+    # given to the second one after an option such as --replay.
+    evidence:
+      films:
+        command: [node, record-film.mjs, --ref, "{ref}", --out, "{output}", --scenario, "{scenario}", --replay, "{replay}"]
+        workingDirectory: ~/tools/storefront-films
+        environment: { FILMS_ACCOUNT: sandbox-shopper }
+        timeoutMinutes: 20
+        replayFile: replay.json
+        timeZone: Europe/Paris
     # What confined code may reach beyond its worktree. Agents may always run the setup and gate commands above.
     sandbox:
       # Lets the agents look package versions up; registry credentials stay unreadable.

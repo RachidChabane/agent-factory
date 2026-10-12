@@ -1636,6 +1636,53 @@
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
+              },
+              "films": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "workingDirectory": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "environment": {
+                    "default": {},
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "timeoutMinutes": {
+                    "default": 20,
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "replayFile": {
+                    "default": "replay.json",
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "command",
+                  "workingDirectory"
+                ],
+                "additionalProperties": false
               }
             },
             "additionalProperties": false

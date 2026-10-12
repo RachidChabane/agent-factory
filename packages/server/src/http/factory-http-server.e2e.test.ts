@@ -201,6 +201,10 @@ describe('the factory HTTP server end to end, with two projects', () => {
       const added = (changed?.patch.split('\n') ?? []).filter((line) => line.startsWith('+') && !line.startsWith('+++')).map((line) => line.slice(1));
       const served = await fetch(`${base}${repositoryFilePath(FIRST_PROJECT, diff.headSha, changed?.path ?? '')}`);
       expect(served.status).toBe(200);
+      expect(served.headers.get('accept-ranges')).toBe('bytes');
+      const ranged = await fetch(`${base}${repositoryFilePath(FIRST_PROJECT, diff.headSha, changed?.path ?? '')}`, { headers: { range: 'bytes=0-1' } });
+      expect(ranged.status).toBe(206);
+      expect((await ranged.arrayBuffer()).byteLength).toBe(2);
       const text = await served.text();
       expect(added.length).toBeGreaterThan(0);
       for (const line of added) expect(text).toContain(line);
@@ -434,6 +438,36 @@ describe('the factory HTTP server end to end, with two projects', () => {
     expect((await fetch(`${base}/api/projects/nope/evidence/1/report.md`)).status).toBe(404);
     expect((await fetch(`${base}/api/events?after=x`)).status).toBe(400);
     expect((await installation.events.read(RUN_SUBJECT_PREFIX, 0)).length).toBe(0);
+  });
+
+  it('serves a recorded film from the evidence directory as a video, in whole or by range', async () => {
+    const directory = join(rehearsal.config.projects[0]?.directories.evidence ?? '', 'issue-9', 'films', 'flow', 'before');
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'film.mp4'), 'ftypmp42-data');
+    const url = `${base}/api/projects/${FIRST_PROJECT}/evidence/9/films/flow/before/film.mp4`;
+
+    const whole = await fetch(url);
+    expect(whole.status).toBe(200);
+    expect(whole.headers.get('content-type')).toBe('video/mp4');
+    expect(whole.headers.get('accept-ranges')).toBe('bytes');
+    expect(await whole.text()).toBe('ftypmp42-data');
+    const partial = await fetch(url, { headers: { range: 'bytes=0-1' } });
+    expect(partial.status).toBe(206);
+    expect(partial.headers.get('content-range')).toBe('bytes 0-1/13');
+    expect(await partial.text()).toBe('ft');
+    const beyond = await fetch(url, { headers: { range: 'bytes=50-' } });
+    expect(beyond.status).toBe(416);
+    expect(beyond.headers.get('content-range')).toBe('bytes */13');
+    expect(await (await fetch(url, { headers: { range: 'bytes=0-1,4-5' } })).text()).toBe('ftypmp42-data');
+  });
+
+  it('refuses to order a film on a project that films nothing, or with a name that is no scenario', async () => {
+    const unconfigured = await post('pr.film', { project: FIRST_PROJECT, issueNumber: 1, scenario: 'checkout-flow' });
+    expect(unconfigured.status).toBe(409);
+    expect(CommandRejectedSchema.parse(await unconfigured.json()).error).toBe(`films are not configured for project ${FIRST_PROJECT}; add evidence.films to its configuration`);
+    const badName = await post('pr.film', { project: FIRST_PROJECT, issueNumber: 1, scenario: '../escape' });
+    expect(badName.status).toBe(400);
+    expect(CommandRejectedSchema.parse(await badName.json()).error).toContain('the scenario name must be letters, digits');
   });
 
   it('drains on order: no new work starts, and the factory stops once its running work finishes', async () => {

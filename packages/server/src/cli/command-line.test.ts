@@ -44,6 +44,16 @@ describe('parseCommandLine', () => {
     expect(parseCommandLine(['issue', 'create', 'spec.md', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', confirmed: false, start: true }));
     expect(parseCommandLine(['pr', 'feedback', '12', 'notes.md', '--author', 'Riley'])).toEqual(ok({ kind: 'pr-feedback', pullRequestNumber: 12, path: 'notes.md', author: 'Riley' }));
     expect(parseCommandLine(['pr', 'feedback', '12', 'notes.md'])).toEqual({ ok: false, error: 'missing --author <name>' });
+    expect(parseCommandLine(['film', '12', '--scenario', 'checkout-flow'])).toEqual(ok({ kind: 'film', issueNumber: 12, scenario: 'checkout-flow' }));
+    expect(parseCommandLine(['film', '--scenario=order.history', '12', '--project', 'storefront'])).toEqual(ok({ kind: 'film', issueNumber: 12, scenario: 'order.history' }, 'storefront'));
+    expect(parseCommandLine(['film', '12'])).toEqual({ ok: false, error: 'missing --scenario <name>' });
+    expect(parseCommandLine(['film', '--scenario', 'checkout-flow'])).toEqual({ ok: false, error: 'missing issue number' });
+    expect(parseCommandLine(['film', 'twelve', '--scenario', 'checkout-flow'])).toEqual({ ok: false, error: 'issue number must be a positive integer, got "twelve"' });
+    expect(parseCommandLine(['film', '12', '--scenario', '../escape'])).toEqual({
+      ok: false,
+      error: expect.stringContaining('--scenario must be letters, digits, dot, underscore and hyphen'),
+    });
+    expect(parseCommandLine(['film', '12', '--scenario', 'checkout-flow', '--all'])).toEqual({ ok: false, error: 'unknown option --all' });
     expect(parseCommandLine(['audit', '8d33a43', '38ab3a0'])).toEqual(ok({ kind: 'audit', commits: ['8d33a43', '38ab3a0'] }));
     expect(parseCommandLine(['audit'])).toEqual({ ok: false, error: 'missing commit' });
     expect(parseCommandLine(['audit', 'main'])).toEqual({ ok: false, error: 'commit must be a hexadecimal sha of 7 to 40 characters, got "main"' });

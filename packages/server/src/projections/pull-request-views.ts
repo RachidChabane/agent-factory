@@ -22,6 +22,7 @@ import { firstOf, iso, lastOf, type EventIndex } from './event-index.ts';
 import { withoutLocalPaths } from './local-paths.ts';
 import { baseRunSummary, branchRunSummary } from './proof-summary.ts';
 import { NEVER_READ, observedView, type Observed } from '../snapshot/cached-reading.ts';
+import { filmMergeReason, filmOrderViews, filmViews } from './film-views.ts';
 import { imageKey, logKey, type ForgePullRequest, type ProjectSnapshotContext } from './snapshot-context.ts';
 
 const FAILING_CONCLUSIONS: readonly CheckRunSummary['conclusion'][] = ['failure', 'cancelled'];
@@ -160,10 +161,17 @@ function feedbackOf(journal: PipelineJournal): ExternalFeedback[] {
   }));
 }
 
-function mergeBlockers(journal: PipelineJournal, checks: Observed<readonly CheckRunSummary[]>, preExisting: ReadonlySet<string>, evidenceComplete: boolean): string[] {
+function mergeBlockers(
+  journal: PipelineJournal,
+  checks: Observed<readonly CheckRunSummary[]>,
+  preExisting: ReadonlySet<string>,
+  evidenceComplete: boolean,
+  filmReason: string | null,
+): string[] {
   const blockers: string[] = [];
   if (journal.state === null || !MERGEABLE_STATES.includes(journal.state)) blockers.push(`the issue is ${journal.state ?? 'unknown'}`);
   if (!evidenceComplete) blockers.push('evidence is missing');
+  if (filmReason !== null) blockers.push(filmReason);
   if (checks.value === null) blockers.push('the checks of the head commit were not read yet');
   for (const check of checks.value ?? []) {
     if (FAILING_CONCLUSIONS.includes(check.conclusion) && !preExisting.has(check.name)) blockers.push(`check ${check.name} failed`);
@@ -197,7 +205,7 @@ export function projectPullRequests(
     const evidenceComplete = journal.evidence !== null && missing.length === 0;
     const onForge = context.pullRequestsOnForge.get(pullRequest.number);
     const state = stateOf(journal, onForge);
-    const blockers = state === 'open' ? mergeBlockers(journal, checks, preExisting, evidenceComplete) : [];
+    const blockers = state === 'open' ? mergeBlockers(journal, checks, preExisting, evidenceComplete, filmMergeReason(journal, context)) : [];
     views.push({
       number: pullRequest.number,
       title: onForge?.title ?? pullRequestTitle(spec, context.conventions, journal.evidence?.changes.map((change) => change.path)),
@@ -213,6 +221,8 @@ export function projectPullRequests(
       evidenceComplete,
       missingEvidence: missing,
       evidence: evidenceOf(journal, context, records),
+      films: filmViews(journal, records, context),
+      filmOrders: filmOrderViews(journal, context),
       reviewRounds: reviewRounds(journal, index),
       externalFeedback: feedbackOf(journal),
       files: changedFiles(journal),

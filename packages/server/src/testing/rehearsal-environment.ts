@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { LocalGitHubGateway, RehearsalRepositories, SpawnCommandRunner } from '@agent-factory/adapters';
 import { renderSpecBody } from '@agent-factory/application';
-import type { IssueSpec } from '@agent-factory/domain';
+import { filmLabel, type IssueSpec } from '@agent-factory/domain';
 import { stringify } from 'yaml';
 import { CONFIG_FILE_NAME, parseAgentFactoryConfig, projectOf, type AgentFactoryConfig, type ProjectConfig } from '../config/agent-factory-config.ts';
 import { projectGitEnvironment } from '../composition/project/forge.ts';
@@ -78,7 +78,8 @@ export interface RehearsalProject {
   readonly id: string;
   readonly config: ProjectConfig;
   readonly forge: LocalGitHubGateway;
-  addDocIssue(title: string): Promise<number>;
+  /** A validated documentation issue; `films` are the scenarios its spec declares. */
+  addDocIssue(title: string, films?: readonly string[]): Promise<number>;
   /** Pushes a commit straight to the base branch of the project's local forge, as someone outside the factory would. */
   pushDirectCommit(path: string, content: string, message: string): string;
 }
@@ -118,6 +119,7 @@ function docIssue(title: string): IssueSpec {
     expectedProof: 'The rendered page.',
     dependsOn: [],
     commitKind: null,
+    films: [],
   };
 }
 
@@ -149,9 +151,10 @@ async function rehearsalProject(config: AgentFactoryConfig, id: string, source: 
     id,
     config: project,
     forge,
-    addDocIssue: async (title) => {
+    addDocIssue: async (title, films = []) => {
       const spec = docIssue(title);
-      const issue = await forge.createIssue(title, renderSpecBody(spec, conventions), [conventions.typology.get(spec.type).label, conventions.labels.validated]);
+      const labels = [conventions.typology.get(spec.type).label, conventions.labels.validated, ...films.map(filmLabel)];
+      const issue = await forge.createIssue(title, renderSpecBody({ ...spec, films }, conventions), labels);
       return issue.number;
     },
     pushDirectCommit: (path, content, message) => {

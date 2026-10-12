@@ -1,6 +1,7 @@
 import type { CheckRunSummary, ForgePullRequestState, ProjectConventions } from '@agent-factory/application';
 import type { IssueSpec, TokenUsage } from '@agent-factory/domain';
 import type { Observed } from '../snapshot/cached-reading.ts';
+import type { ProjectFilmContext } from './film-views.ts';
 import type { ImageSize } from '../snapshot/image-size.ts';
 
 export interface RunLogSummary {
@@ -64,4 +65,6 @@ export interface ProjectSnapshotContext {
   readonly issueCosts: ReadonlyMap<number, number>;
   /** The files each audited change touched, for the changes read from the forge so far. */
   readonly changedFiles: ReadonlyMap<string, readonly string[]>;
+  /** The queue of the installation's films, for a project that films; null for one that does not. */
+  readonly films: ProjectFilmContext | null;
 }

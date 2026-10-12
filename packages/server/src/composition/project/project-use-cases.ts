@@ -1,4 +1,4 @@
-import { SpawnCommandRunner } from '@agent-factory/adapters';
+import { CommandFilmRecorder, FfmpegTranscoder, SpawnCommandRunner } from '@agent-factory/adapters';
 import {
   attributionRules,
   auditMerge,
@@ -7,10 +7,13 @@ import {
   DEFAULT_RETRY_DELAY_MS,
   evaluateRelease,
   FactoryDaemon,
+  FilmBehaviour,
   IssueJournalWriter,
   IssuePipeline,
   IssueStacks,
+  LoggedAgentRunActivity,
   MarkdownAuditIssueRenderer,
+  MergeOnOrder,
   ProjectSchedulingPauses,
   RedeployEnvironment,
   ResumeIssue,
@@ -23,6 +26,8 @@ import {
   type ReleaseEvaluator,
   type RequestChallenger,
   type RequestDecisionSettings,
+  replaysFirstRecording,
+  type FilmRunner,
 } from '@agent-factory/application';
 import type { RoleSettings } from '../../config/agent-factory-config.ts';
 import type { InstallationContext } from '../installation/installation-context.ts';
@@ -39,7 +44,60 @@ export function repositorySlug(project: ProjectRuntime): string {
 }
 
 export function issuePipeline(project: ProjectRuntime, signal: AbortSignal): IssueDriver {
-  return new IssuePipeline({ ...project.dependencies, runner: new SpawnCommandRunner({ abortSignal: signal }) }, project.settings, { signal });
+  return new IssuePipeline({ ...project.dependencies, runner: new SpawnCommandRunner({ abortSignal: signal }) }, project.settings, {
+    signal,
+    films: project.films?.bodies ?? null,
+  });
+}
+
+/** Merges on the operator's order, once the films of the pull request are in or have failed. */
+export function mergeOnOrder(project: ProjectRuntime): MergeOnOrder {
+  return new MergeOnOrder(project.dependencies, project.films?.guard ?? null);
+}
+
+export class FilmsNotConfiguredError extends Error {
+  constructor(projectId: string) {
+    super(`Films are not configured for project ${projectId}; add evidence.films to its configuration`);
+    this.name = 'FilmsNotConfiguredError';
+  }
+}
+
+/** Films one scenario of a project: the command runs outside any sandbox, and stops with the signal. */
+export function filmBehaviour(project: ProjectRuntime, installation: InstallationContext, signal: AbortSignal): FilmBehaviour {
+  const { films, dependencies, settings } = project;
+  if (films === null) throw new FilmsNotConfiguredError(project.id);
+  const runner = new SpawnCommandRunner({ abortSignal: signal });
+  return new FilmBehaviour(
+    {
+      ...dependencies,
+      bodies: films.bodies,
+      queue: films.queue,
+      recorder: new CommandFilmRecorder(runner, { film: films.settings, operatorEnvironment: installation.environment }),
+      transcoder: new FfmpegTranscoder(runner, installation.environment),
+      activity: new LoggedAgentRunActivity(installation.events),
+    },
+    {
+      fileLinks: settings.fileLinks,
+      evidenceCacheDirectory: settings.evidenceCacheDirectory,
+      resources: settings.resources,
+      replayFile: replaysFirstRecording(films.settings.command) ? films.settings.replayFile : null,
+    },
+  );
+}
+
+/** What the daemons ask of the films of a project; null when the project films nothing. */
+export function filmRunner(project: ProjectRuntime, installation: InstallationContext): FilmRunner | null {
+  const { films } = project;
+  if (films === null) return null;
+  return {
+    prepare: (order) => filmBehaviour(project, installation, new AbortController().signal).prepare(order),
+    film: (order, signal) => filmBehaviour(project, installation, signal).film(order, signal),
+    order: (order) => films.queue.order(order),
+    orderDeclared: () => films.queue.orderDeclared(),
+    next: () => films.queue.next(),
+    fail: (order, reason) => films.queue.fail(order, reason),
+    refreshBodies: () => films.bodies.refreshAll(),
+  };
 }
 
 function profileOf(role: RoleSettings) {
@@ -147,6 +205,7 @@ export function projectDaemon(project: ProjectRuntime, installation: Installatio
       pipelines: (signal) => issuePipeline(project, signal),
       audits: auditRunner(project),
       challenges: challenger,
+      films: filmRunner(project, installation),
       releases: releaseEvaluator(project),
       configuration: null,
       reclaimStacks: stackReclaimer(project),
@@ -170,7 +229,7 @@ export function projectScheduler(project: ProjectRuntime, daemon: FactoryDaemon)
   return {
     projectId: project.id,
     start: () => daemon.start(),
-    tick: (signal) => daemon.tick(signal),
+    tick: (signal, hold) => daemon.tick(signal, hold),
     stop: () => daemon.stop(),
     updateConcurrency: (concurrency) => daemon.updateConcurrency(concurrency),
     isIdle: () => daemon.isIdle(),

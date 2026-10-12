@@ -114,6 +114,7 @@ function specOf({ issue, number }: NumberedIssue): IssueSpec {
     outOfScope: [...issue.spec.outOfScope],
     dependsOn: [],
     commitKind: null,
+    films: [],
   };
 }
 

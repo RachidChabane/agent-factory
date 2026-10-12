@@ -5,11 +5,13 @@ import {
   AgentRunAdmission,
   BudgetGovernor,
   ChangeSettings,
+  FilmLedger,
   OperatorNotifications,
   RunSlots,
   type AgentHarness,
   type Clock,
   type CommandRunner,
+  type EventStore,
   type Notifier,
   type OperationLog,
   type ResourceGuard,
@@ -36,6 +38,7 @@ import { usageRefresher, usageReportSource } from './usage.ts';
 export const INSTALLATION_MODES = ['live', 'demo', 'rehearsal'] as const;
 export type InstallationMode = (typeof INSTALLATION_MODES)[number];
 const UTF8 = 'utf8';
+const NO_FILM_TIMEOUT_MS = 0;
 const OPERATOR_VARIABLE = 'USER';
 const UNNAMED_OPERATOR = 'operator';
 
@@ -97,6 +100,13 @@ function selectedProjects(config: AgentFactoryConfig, ids: readonly string[] | u
   return ids === undefined ? config.projects : ids.map((id) => projectOf(config, id));
 }
 
+/** The films of the projects that film wait in one queue; a film is expected to take as long as the longest timeout until some succeed. */
+function filmLedgerOf(config: AgentFactoryConfig, events: EventStore, clock: Clock): FilmLedger | null {
+  const filming = config.projects.flatMap((project) => (project.evidence.films === null ? [] : [{ id: project.id, timeoutMs: project.evidence.films.timeoutMs }]));
+  if (filming.length === 0) return null;
+  return FilmLedger.ofInstallation(events, filming.map((project) => project.id), clock, Math.max(NO_FILM_TIMEOUT_MS, ...filming.map((project) => project.timeoutMs)));
+}
+
 function configurationLoader(config: AgentFactoryConfig, userHome: string): () => Promise<AgentFactoryConfig> {
   return async () => parseAgentFactoryConfig(await readFile(config.configPath, UTF8), config.home, config.configPath, userHome);
 }
@@ -152,6 +162,7 @@ export async function openInstallation(config: AgentFactoryConfig, environment: 
       notifier,
       lifetime: lifetime.signal,
       localChecks: overrides.localChecks ?? 'background',
+      filmLedger: filmLedgerOf(config, events, clock),
       harnessFor: overrides.harnessFor ?? null,
     };
     const projects: ProjectRuntime[] = [];

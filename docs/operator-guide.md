@@ -81,6 +81,31 @@ reviewed. A check that also fails on the base branch is shown but does not block
 Review feedback from people goes back to the factory with **Send feedback** (or
 `agent-factory pr feedback <pr> <file> --author <name>`), which starts a new cycle.
 
+## Behaviour on video
+
+A project that declares `evidence.films` ([configuration](configuration.md#films)) has
+its pull requests filmed: the same scenario recorded on the issue's base and on the
+head of the pull request, by the project's own tool. A spec asks for scenarios with a
+`Films: checkout-flow, order-history` header, and the factory orders them as soon as
+the pull request is open. You order any other scenario with **Film** on the pull
+request page, or `agent-factory film <issue> --scenario <name>`; a running factory
+queues the order, a stopped one records it at once.
+
+- Films wait in one queue for the whole installation and run one at a time. A film
+  starts only when no issue, challenge or audit runs in any project, and while it
+  records, nothing new starts. A pause of the factory or of the project holds the
+  queue; a spent subscription budget does not, because the film command spends none of
+  it.
+- The pull request body announces each scenario at once, with the time it is expected
+  and its place in the queue, and replaces the announcement with the videos and
+  screenshots when they land. The cockpit's **Videos** section shows the same, with
+  the state of each film.
+- **Merge** waits while a film of the pull request is queued or recording, and says
+  when it is expected. A film that failed does not hold the merge; its reason stands in
+  the body and in the cockpit, and you order it again.
+- Each film adds one evidence commit to the branch, so the head to merge is the one the
+  cockpit shows after the film.
+
 ## Releases and environments
 
 The factory reads what is deployed where, samples health, and computes each release's

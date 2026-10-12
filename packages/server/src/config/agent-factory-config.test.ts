@@ -227,4 +227,67 @@ describe('the configuration of a project', () => {
     expect(configProblems(document({}, [minimalProject({ stack: { issueTypes: ['mobile'] } })]))).toContain('projects.0.stack.issueTypes: issue type mobile is not an issue type of the project');
     expect(configProblems(document({}, [minimalProject({ stack: { services: [service, service] } })]))).toContain('projects.0.stack.services: service web is declared twice');
   });
+
+  describe('the film command of a project', () => {
+    const FILMS = {
+      command: ['node', 'record-film.mjs', '--ref', '{ref}', '--out', '{output}', '--scenario', '{scenario}', '--replay', '{replay}'],
+      workingDirectory: '~/tools/storefront-films',
+    };
+
+    function films(extra: Record<string, unknown> = {}): Record<string, unknown> {
+      return minimalProject({ evidence: { films: { ...FILMS, ...extra } } });
+    }
+
+    it('is absent unless the project declares one', () => {
+      expect(projectOf(parse(document()), 'storefront').evidence).toEqual({ maxFileBytes: 5_000_000, maxTotalBytes: 40_000_000, films: null });
+    });
+
+    it('reads the command with its defaults, the machine zone and a working directory resolved from the home of the operator', () => {
+      const declared = projectOf(parse(document({}, [films()])), 'storefront').evidence.films;
+      expect(declared).toEqual({
+        command: FILMS.command,
+        workingDirectory: '/home/operator/tools/storefront-films',
+        environment: {},
+        timeoutMs: 20 * 60_000,
+        replayFile: 'replay.json',
+        timeZone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+    });
+
+    it('reads every key it is given', () => {
+      const declared = projectOf(parse(document({}, [films({ workingDirectory: 'tools/films', environment: { FILMS_ACCOUNT: 'sandbox-shopper', FILMS_API_KEY: 'sandbox-key' }, timeoutMinutes: 45, replayFile: 'choices.json', timeZone: 'Europe/Paris' })])), 'storefront').evidence.films;
+      expect(declared).toMatchObject({
+        workingDirectory: '/home/operator/.agent-factory/projects/storefront/tools/films',
+        environment: { FILMS_ACCOUNT: 'sandbox-shopper', FILMS_API_KEY: 'sandbox-key' },
+        timeoutMs: 45 * 60_000,
+        replayFile: 'choices.json',
+        timeZone: 'Europe/Paris',
+      });
+    });
+
+    it('lets the environment of the command hold names that look like credentials, which check commands refuse', () => {
+      expect(configProblems(document({}, [films({ environment: { SANDBOX_API_TOKEN: 'sandbox-token' } })]))).toEqual([]);
+      expect(configProblems(document({}, [minimalProject({ environment: { set: { SANDBOX_API_TOKEN: 'x' } } })]))).toEqual([
+        expect.stringContaining('looks like a credential'),
+      ]);
+    });
+
+    it('refuses a command without the placeholders that name what to record', () => {
+      expect(configProblems(document({}, [films({ command: ['node', 'record-film.mjs', '{ref}'] })]))).toEqual([
+        'projects.0.evidence.films.command: the command must contain {output}',
+        'projects.0.evidence.films.command: the command must contain {scenario}',
+      ]);
+    });
+
+    it('refuses a replay placeholder that follows no option', () => {
+      const command = ['node', 'record-film.mjs', '{ref}', '{output}', '{scenario}', '{replay}'];
+      expect(configProblems(document({}, [films({ command })]))).toEqual(['projects.0.evidence.films.command: {replay} must follow an option such as --replay']);
+    });
+
+    it('refuses a time zone that does not exist, a replay file that is a path, and an unknown key', () => {
+      expect(configProblems(document({}, [films({ timeZone: 'Mars/Olympus' })]))).toEqual([expect.stringContaining('projects.0.evidence.films.timeZone: is not a time zone name')]);
+      expect(configProblems(document({}, [films({ replayFile: '../replay.json' })]))).toEqual([expect.stringContaining('projects.0.evidence.films.replayFile: must be a file name')]);
+      expect(configProblems(document({}, [films({ resolution: '720p' })]))).toEqual([expect.stringContaining('projects.0.evidence.films')]);
+    });
+  });
 });

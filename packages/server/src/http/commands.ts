@@ -12,7 +12,6 @@ import {
   detectedRelease,
   loadJournal,
   logInTool,
-  MergeOnOrder,
   OrderCheckRewrite,
   pauseScheduling,
   publishAuditIssue,
@@ -37,6 +36,7 @@ import type { ProjectRuntime } from '../composition/project/project-runtime.ts';
 import {
   environmentRedeployer,
   issueResumer,
+  mergeOnOrder,
   releaseCutter,
   releaseEvaluator,
   requestDecisionSettings,
@@ -249,7 +249,7 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
     return startedByDaemon(context, `The answer is recorded and issue #${subject.id} resumes at ${outcome.resumedAt}`);
   }),
   'pr.merge': command(COMMAND_BODY_SCHEMAS['pr.merge'], async (body, context) => {
-    const outcome = await new MergeOnOrder(projectOf(context, body.project).dependencies).merge({ pullRequestNumber: body.number, expectedHeadSha: body.expectedHeadSha });
+    const outcome = await mergeOnOrder(projectOf(context, body.project)).merge({ pullRequestNumber: body.number, expectedHeadSha: body.expectedHeadSha });
     return `Pull request #${outcome.pullRequestNumber} merged as ${outcome.mergeSha.slice(0, 7)}`;
   }),
   'pr.feedback': command(COMMAND_BODY_SCHEMAS['pr.feedback'], async (body, context) => {
@@ -263,6 +263,14 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
     return outcome.kind === 'cycle-started'
       ? startedByDaemon(context, `Feedback recorded; issue #${outcome.issueNumber} starts attempt ${outcome.attempt}`)
       : `Feedback recorded; issue #${outcome.issueNumber} needs a human: ${outcome.reason}`;
+  }),
+  'pr.film': command(COMMAND_BODY_SCHEMAS['pr.film'], async (body, context) => {
+    const project = projectOf(context, body.project);
+    if (project.films === null) throw new CommandRefusedError(`films are not configured for project ${project.id}; add evidence.films to its configuration`);
+    const daemon = requireDaemons(context).project(project.id);
+    if (daemon === null) throw new CommandRefusedError(`the factory is not running project ${project.id}`);
+    await daemon.orderFilm({ issueNumber: body.issueNumber, scenario: body.scenario, operator: context.operator });
+    return startedByDaemon(context, `The film of scenario ${body.scenario} is queued for issue #${body.issueNumber} of ${project.id}`);
   }),
   'deployment.redeploy': command(COMMAND_BODY_SCHEMAS['deployment.redeploy'], async (body, context) => {
     const outcome = await environmentRedeployer(projectOf(context, body.project)).redeploy({ environment: body.environment, confirmVersion: body.confirmVersion, operator: context.operator });

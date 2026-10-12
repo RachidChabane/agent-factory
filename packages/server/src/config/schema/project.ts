@@ -5,8 +5,12 @@ import {
   DEFAULT_BRANCH_PREFIX,
   DEFAULT_COMMIT_SCOPE,
   DEFAULT_FACTORY_LABEL,
+  DEFAULT_FILM_REPLAY_FILE,
+  DEFAULT_FILM_TIMEOUT_MINUTES,
   DEFAULT_KIND_LABEL_PREFIX,
   DEFAULT_VALIDATED_LABEL,
+  filmCommandProblems,
+  isTimeZone,
 } from '@agent-factory/application';
 import {
   AGENT_ROLES,
@@ -21,6 +25,7 @@ import {
 } from '@agent-factory/domain';
 import {
   EnvironmentSetSchema,
+  EnvironmentVariableName,
   Identifier,
   NamedCommandSchema,
   Niceness,
@@ -209,6 +214,30 @@ const StackSchema = z
     for (const name of uniqueBy(stack.services, (service) => service.name)) context.addIssue({ code: 'custom', path: ['services'], message: `service ${name} is declared twice` });
   });
 
+/** The file the first recording writes: a plain file name, so that it stays inside the recording's output directory. */
+const REPLAY_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+const FilmsSchema = z
+  .strictObject({
+    /**
+     * The argument template of the film command, run outside any sandbox with the operator's environment.
+     * It holds `{ref}`, `{output}` and `{scenario}`, and may hold `{replay}` after an option such as `--replay`.
+     */
+    command: z.array(NonEmptyString).min(1),
+    /** Where the command runs: its tool's directory; relative to the project's directory. */
+    workingDirectory: PathString,
+    /** Added to the operator's environment for the command; unlike check commands, credential-looking names are allowed. */
+    environment: z.record(EnvironmentVariableName, z.string()).default({}),
+    timeoutMinutes: PositiveMinutes.default(DEFAULT_FILM_TIMEOUT_MINUTES),
+    /** The file the recording of the base writes in its output directory and the recording of the head replays. */
+    replayFile: z.string().regex(REPLAY_FILE_NAME, 'must be a file name').default(DEFAULT_FILM_REPLAY_FILE),
+    /** The zone of the expected arrival times; the machine's zone when absent. */
+    timeZone: NonEmptyString.refine(isTimeZone, { message: 'is not a time zone name such as Europe/Paris' }).optional(),
+  })
+  .superRefine((films, context) => {
+    for (const problem of filmCommandProblems(films.command)) context.addIssue({ code: 'custom', path: ['command'], message: problem });
+  });
+
 const KnowledgeSourceSchema = z.union([z.strictObject({ path: PathString }), z.strictObject({ repository: PathString })]);
 
 const RoleKey = z.enum(AGENT_ROLES);
@@ -251,6 +280,8 @@ export const ProjectSchema = z
       .strictObject({
         maxFileBytes: z.number().int().positive().default(DEFAULT_EVIDENCE_MAX_FILE_BYTES),
         maxTotalBytes: z.number().int().positive().default(DEFAULT_EVIDENCE_MAX_TOTAL_BYTES),
+        /** Films a pull request records against its base and its head with a command of the project; absent, nothing is filmed. */
+        films: FilmsSchema.optional(),
       })
       .prefault({}),
     delivery: DeliverySchema.prefault({}),
