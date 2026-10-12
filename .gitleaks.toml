@@ -9,3 +9,7 @@ useDefault = true
 description = "Message identifiers of recorded Claude Code stream-json lines"
 regexTarget = "line"
 regexes = ['''"api_message_id":"msg_[A-Za-z0-9]+"''']
+
+[[allowlists]]
+description = "SHA-256 digests of the files the README screenshots are taken from, keyed by their paths"
+paths = ['''^docs/screenshots/manifest\.json$''']

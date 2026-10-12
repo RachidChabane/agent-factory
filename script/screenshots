@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Takes the README screenshots (docs/screenshots/*.png) from the demonstration once its story has played, at
+# 1440x900 in English with the light theme, and records in docs/screenshots/manifest.json the SHA-256 of every
+# file they come from: the cockpit and the demonstration without their unit tests, the examples, and the
+# scripts that take the pictures (the files git would commit). With --check it only recomputes that hash,
+# without a browser, and exits 1 when any of them changed since the screenshots were taken.
+# Usage: script/screenshots [--check]
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+if [ "${1:-}" = "--check" ]; then
+  exec node e2e/capture/main.ts --check
+fi
+source script/lib/heavy.sh
+source script/lib/cockpit-build.sh
+
+ensure_cockpit_build
+# Playwright removes the browsers no installed version needs unless told otherwise; other projects may need them.
+PLAYWRIGHT_SKIP_BROWSER_GC=1 run_heavy pnpm exec playwright install chromium
+run_heavy node e2e/capture/main.ts
