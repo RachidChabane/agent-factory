@@ -1,4 +1,5 @@
 import type { Deployment, EnvironmentView } from '../../contract/index.ts';
+import { useProject } from '../../app/ProjectRoute.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { useVocabulary } from '../../i18n/vocabulary.ts';
 import { shortSha } from '../../model/identifiers.ts';
@@ -9,6 +10,7 @@ import type { TableColumn } from '../../ui/components/Table.tsx';
 import { DataTable } from '../../ui/components/Table.tsx';
 import { OptionalReadingView } from '../../widgets/ReadingView.tsx';
 import { Time } from '../../widgets/Time.tsx';
+import { DeliveredCommits } from './CommitList.tsx';
 import { EnvironmentPanel } from './EnvironmentPanel.tsx';
 import { ForgeLink } from './ForgeLink.tsx';
 
@@ -46,6 +48,31 @@ function CurrentDeployment({ deployment }: { readonly deployment: Deployment }) 
           {t('delivery.deployments.workflowRun')}
         </ForgeLink>
       )}
+      <div className="deployment-current__commits">
+        <p className="small-caps">{t('delivery.commits.delivered')}</p>
+        <DeliveredCommits commits={deployment.changes} />
+      </div>
+    </div>
+  );
+}
+
+/** The commits of the base branch that the current deployment lacks: what the next deployment of this environment would bring. */
+function PendingCommits({ pending }: { readonly pending: DeploymentHistory['pending'] }) {
+  const { t } = useI18n();
+  const project = useProject();
+  return (
+    <div className="deployment-pending" role="group" aria-label={t('delivery.commits.pending.title')}>
+      <p className="small-caps">{t('delivery.commits.pending.title')}</p>
+      {pending === null ? (
+        <p className="subtle">{t('delivery.commits.pending.unknown', { branch: project.baseBranch })}</p>
+      ) : pending.length === 0 ? (
+        <p className="subtle">{t('delivery.commits.pending.none', { branch: project.baseBranch })}</p>
+      ) : (
+        <>
+          <p className="subtle">{t('delivery.commits.pending.count', { count: pending.length, branch: project.baseBranch })}</p>
+          <DeliveredCommits commits={pending} />
+        </>
+      )}
     </div>
   );
 }
@@ -66,6 +93,7 @@ function DeploymentHistoryTable({ environment, history }: { readonly environment
     { id: 'ref', header: t('delivery.deployments.column.ref'), hideOnMobile: true, cell: (deployment) => <span className="mono">{deployment.ref}</span> },
     { id: 'commit', header: t('delivery.deployments.column.commit'), hideOnMobile: true, cell: (deployment) => <span className="mono">{shortSha(deployment.sha)}</span> },
     { id: 'outcome', header: t('delivery.deployments.column.outcome'), cell: (deployment) => <Outcome deployment={deployment} /> },
+    { id: 'commits', header: t('delivery.deployments.column.commits'), hideOnMobile: true, cell: (deployment) => <DeliveredCommits commits={deployment.changes} folded /> },
     { id: 'deployed', header: t('delivery.deployments.column.deployed'), cell: (deployment) => <Time iso={deployment.deployedAt} className="num" /> },
     { id: 'actor', header: t('delivery.deployments.column.actor'), hideOnMobile: true, cell: (deployment) => deployment.actor ?? <span className="subtle">{t('delivery.deployments.actorUnknown')}</span> },
     {
@@ -84,6 +112,7 @@ function DeploymentsContent({ environment, history }: { readonly environment: st
   return (
     <div className="deployments">
       {history.current === null ? <p className="subtle">{t('delivery.deployments.noCurrent')}</p> : <CurrentDeployment deployment={history.current} />}
+      {history.current === null ? null : <PendingCommits pending={history.pending} />}
       {history.history.length === 0 ? null : <DeploymentHistoryTable environment={environment} history={history} />}
     </div>
   );
