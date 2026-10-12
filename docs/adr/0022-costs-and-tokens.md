@@ -17,7 +17,7 @@ A daily cap of zero is ambiguous: no budget, or no cap.
 2. **Hide dollars under a subscription** and show only the subscription's limits.
    Loses the only per-run measure of effort.
 3. **Label the basis of every figure**: each account declares its billing
-   (`subscription` or `api`), and every amount says whether it is API-equivalent,
+   (`subscription` or `api-key`), and every amount says whether it is API-equivalent,
    metered, or a mix; token figures are stated with and without the cache.
 
 ## Decision
