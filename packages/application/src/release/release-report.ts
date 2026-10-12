@@ -1,6 +1,6 @@
 import type { AuditState, MergeAttribution, ReleaseGateResult } from '@agent-factory/domain';
 import { SHORT_SHA_LENGTH } from '../audit/audit-issue-renderer.ts';
-import type { HealthCheckResult } from './health-probe.ts';
+import type { ReleaseHealthResult } from './health-probe.ts';
 
 export const NONE_TEXT = 'none';
 
@@ -30,7 +30,7 @@ export interface ReleaseAuditReportInput {
   readonly changes: readonly ReleaseChange[];
   readonly evidence: readonly ReleaseEvidenceEntry[];
   readonly audits: readonly ReleaseAuditEntry[];
-  readonly health: readonly HealthCheckResult[];
+  readonly health: readonly ReleaseHealthResult[];
   readonly gate: ReleaseGateResult;
 }
 
@@ -75,8 +75,8 @@ function auditLines(audits: readonly ReleaseAuditEntry[]): string[] {
   });
 }
 
-function healthLines(health: readonly HealthCheckResult[]): string[] {
-  return health.map((check) => `- ${check.name}: ${check.passed ? 'pass' : 'fail'} (${check.detail})`);
+function healthLines(health: readonly ReleaseHealthResult[]): string[] {
+  return health.map((check) => `- ${check.environment}, ${check.name}: ${check.passed ? 'pass' : 'fail'} (${check.detail})`);
 }
 
 function gateLines(gate: ReleaseGateResult): string[] {
@@ -91,6 +91,6 @@ export function renderReleaseAuditReport(input: ReleaseAuditReportInput): string
     section('Changes', changeLines(input.changes)),
     section('Evidence', evidenceLines(input.evidence)),
     section('Audits', auditLines(input.audits)),
-    section('PREP health', healthLines(input.health)),
+    section('Health before production', healthLines(input.health)),
   ].join('\n\n') + '\n';
 }

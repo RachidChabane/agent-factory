@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { DEPLOYMENT_ENVIRONMENTS } from '@agent-factory/domain';
 
 export const DEPLOYMENT_SUBJECT_PREFIX = 'deployment/';
 export const REDEPLOY_DISPATCHED_EVENT = 'deployment.redeploy-dispatched';
@@ -9,12 +8,13 @@ export function deploymentSubject(environment: string): string {
 }
 
 export const RedeployDispatchedPayloadSchema = z.object({
-  environment: z.enum(DEPLOYMENT_ENVIRONMENTS),
+  environment: z.string().min(1),
   targetName: z.string().min(1),
   workflow: z.string().min(1),
   ref: z.string().min(1),
   sha: z.string().min(1),
   version: z.string().min(1),
+  inputs: z.record(z.string(), z.string()),
   operator: z.string().min(1),
   simulated: z.boolean(),
   url: z.string(),

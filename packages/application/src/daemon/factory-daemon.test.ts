@@ -40,6 +40,7 @@ const SETTINGS: DaemonSettings = {
   poolSize: 3,
   baseBranch: 'main',
   conventions: DEFAULT_PROJECT_CONVENTIONS,
+  releaseModel: { kind: 'release-please', tagPattern: '*v*' },
   pollIntervalMs: 1_000,
   mergeWatchIntervalMs: 10 * MINUTE_MS,
   issueRefreshMs: 0,

@@ -309,8 +309,8 @@ describe('LocalGitHubGateway', () => {
       const second = await github.openPullRequest({ branch: OTHER_BRANCH, title: 'feat: second', body: 'b', labels: [], closes: [] });
 
       expect(await github.listOpenPullRequests()).toEqual([
-        { number: first.number, title: 'feat: first', branch: BRANCH, headSha: firstHead, url: first.url, labels: PULL_REQUEST_LABELS },
-        { number: second.number, title: 'feat: second', branch: OTHER_BRANCH, headSha: secondHead, url: second.url, labels: [] },
+        { number: first.number, title: 'feat: first', branch: BRANCH, headSha: firstHead, url: first.url, labels: PULL_REQUEST_LABELS, createdAt: NOW },
+        { number: second.number, title: 'feat: second', branch: OTHER_BRANCH, headSha: secondHead, url: second.url, labels: [], createdAt: NOW },
       ]);
     });
 

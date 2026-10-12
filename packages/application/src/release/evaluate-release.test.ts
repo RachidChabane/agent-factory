@@ -4,12 +4,15 @@ import { FakeGitHubGateway, InMemoryEventStore, commit, factoryCommit } from '..
 import { attributionRules, DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import { evaluateRelease } from './evaluate-release.ts';
 import { PULL_REQUEST_OPENED_EVENT, RELEASE_EVALUATED_EVENT, ReleaseEvaluatedPayloadSchema, pullRequestSubject } from './events.ts';
-import { FakeHealthProbe } from './health-probe.ts';
-import { REASON_NO_PREP_CHECKS } from '@agent-factory/domain';
+import { FakeHealthProbe, type EnvironmentHealth, type HealthCheckResult } from './health-probe.ts';
+import { REASON_NO_HEALTH_CHECKS } from '@agent-factory/domain';
 
 const RELEASE = { releaseId: 'v1', branch: 'main', baseSha: 'base' };
 const RULES = attributionRules(DEFAULT_PROJECT_CONVENTIONS);
-const HEALTHY = new FakeHealthProbe([{ name: 'ui', passed: true, detail: 'HTTP 200' }]);
+function staging(results: readonly HealthCheckResult[]): readonly EnvironmentHealth[] {
+  return [{ environment: 'staging', probe: new FakeHealthProbe(results) }];
+}
+const HEALTHY = staging([{ name: 'ui', url: 'https://staging.example.com/', passed: true, statusCode: 200, latencyMs: 90, detail: 'HTTP 200' }]);
 
 function setup() {
   const events = new InMemoryEventStore();
@@ -53,7 +56,7 @@ describe('evaluateRelease', () => {
     await recordPullRequest(events, 10, false);
     await recordAudit(events, 'd1', 'challenge');
     await recordAudit(events, 'd2', null);
-    const probe = new FakeHealthProbe([{ name: 'agent', passed: false, detail: 'HTTP 503' }]);
+    const probe = staging([{ name: 'api', url: 'https://staging.example.com/api/health', passed: false, statusCode: 503, latencyMs: 30, detail: 'HTTP 503' }]);
 
     const result = await evaluateRelease({ events, github, health: probe, rules: RULES }, RELEASE);
     expect(result.promotable).toBe(false);
@@ -62,7 +65,7 @@ describe('evaluateRelease', () => {
       'audit detected is open on commit d2',
       'pull request #10 has incomplete evidence',
       'pull request #11 has incomplete evidence',
-      'PREP health check agent failed',
+      'health check api of staging failed',
     ]);
     expect(result.report).toContain('- #11: no evidence recorded');
     expect(result.report).toContain('Not promotable.');
@@ -95,9 +98,14 @@ describe('evaluateRelease', () => {
     expect((await evaluateRelease({ events, github, health: HEALTHY, rules: RULES }, RELEASE)).promotable).toBe(true);
   });
 
-  it('blocks when no PREP check exists', async () => {
+  it('blocks when the environments before production have checks but none answered', async () => {
     const { events, github } = setup();
-    const result = await evaluateRelease({ events, github, health: new FakeHealthProbe([]), rules: RULES }, RELEASE);
-    expect(result.blockingReasons).toEqual([REASON_NO_PREP_CHECKS]);
+    const result = await evaluateRelease({ events, github, health: staging([]), rules: RULES }, RELEASE);
+    expect(result.blockingReasons).toEqual([REASON_NO_HEALTH_CHECKS]);
+  });
+
+  it('does not require health for a project whose environments declare no check', async () => {
+    const { events, github } = setup();
+    expect((await evaluateRelease({ events, github, health: [], rules: RULES }, RELEASE)).promotable).toBe(true);
   });
 });

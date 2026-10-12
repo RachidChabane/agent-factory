@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PAUSE_CAUSES } from '../notifications/operator-notifications.ts';
+import { PAUSE_CAUSES } from '@agent-factory/domain';
 
 export const DAEMON_SUBJECT = 'daemon';
 export const DAEMON_STARTED_EVENT = 'daemon.started';

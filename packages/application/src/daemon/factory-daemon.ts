@@ -13,7 +13,7 @@ import { recordExternalMerge } from '../pipeline/record-external-merge.ts';
 import type { RunIssueOutcome } from '../pipeline/run-issue-outcome.ts';
 import type { Clock, EventStore, GitHubGateway, IssueRecord, IssueStateStore, OperationLog, Sleeper, WorktreePool } from '../ports.ts';
 import type { ReleaseDescriptor, ReleaseEvaluation } from '../release/evaluate-release.ts';
-import { watchReleases } from '../release/release-watch.ts';
+import { watchReleases, type ReleaseModel } from '../release/release-watch.ts';
 import { ResourcesUnavailableError } from '../resources/agent-run-admission.ts';
 import { closeOrphanRuns } from '../runs/orphan-runs.ts';
 import { pendingChallenges } from '../requests/challenge-queue.ts';
@@ -87,6 +87,7 @@ export interface DaemonSettings {
   readonly baseBranch: string;
   /** The project's labels, branch prefix and other automations. */
   readonly conventions: ProjectConventions;
+  readonly releaseModel: ReleaseModel;
   readonly pollIntervalMs: number;
   readonly mergeWatchIntervalMs: number;
   readonly issueRefreshMs: number;
@@ -247,7 +248,11 @@ export class FactoryDaemon {
       if (recorded !== null) log.info(`issue #${recorded.issueNumber} merged through pull request #${recorded.pullRequestNumber}`);
     }
     for (const auditId of scan.detectedAuditIds) log.info(`change ${auditId} reached ${this.settings.baseBranch} outside the factory; audit queued`);
-    for (const detected of await watchReleases({ events, github }, this.settings.baseBranch)) {
+    for (const detected of await watchReleases({ events, github }, this.settings.baseBranch, this.settings.releaseModel)) {
+      if (detected.detection.supersededBy !== null) {
+        log.info(`release ${detected.descriptor.releaseId} is superseded by ${detected.detection.supersededBy}; it is not evaluated`);
+        continue;
+      }
       const evaluation = await releases.evaluate(detected.descriptor);
       await notifications.send(NOTICES.releaseGate(detected.descriptor.releaseId, evaluation.promotable, evaluation.blockingReasons));
     }

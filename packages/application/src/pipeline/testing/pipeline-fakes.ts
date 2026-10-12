@@ -421,6 +421,7 @@ export class InMemoryGitHub implements GitHubGateway {
           headSha: this.sourceControl.pushedHead(entry.draft.branch) ?? entry.ref.headSha,
           url: entry.ref.url,
           labels: entry.draft.labels,
+          createdAt: null,
         })),
     );
   }

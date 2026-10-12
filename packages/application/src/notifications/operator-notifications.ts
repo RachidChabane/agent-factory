@@ -1,10 +1,7 @@
-import type { AuditVerdict } from '@agent-factory/domain';
+import type { AuditVerdict, PauseCause } from '@agent-factory/domain';
 import { SHORT_SHA_LENGTH } from '../audit/audit-issue-renderer.ts';
 import type { Notifier, OperationLog, PullRequestRef } from '../ports.ts';
 import { COCKPIT_PATHS, cockpitLink } from './cockpit-links.ts';
-
-export const PAUSE_CAUSES = ['resources', 'budget', 'operator'] as const;
-export type PauseCause = (typeof PAUSE_CAUSES)[number];
 
 export interface OperatorNotice {
   readonly title: string;

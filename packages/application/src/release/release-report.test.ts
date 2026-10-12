@@ -13,12 +13,12 @@ const BLOCKED: ReleaseAuditReportInput = {
   ],
   audits: [{ commitSha: '2222222bbbb', state: 'challenge', summary: 'No test covers the patch.', resolved: false, issueNumber: 77 }],
   health: [
-    { name: 'ui', passed: true, detail: 'HTTP 200' },
-    { name: 'agent', passed: false, detail: 'HTTP 503' },
+    { environment: 'staging', name: 'ui', url: 'https://staging.example.com/', passed: true, statusCode: 200, latencyMs: 90, detail: 'HTTP 200' },
+    { environment: 'staging', name: 'api', url: 'https://staging.example.com/api/health', passed: false, statusCode: 503, latencyMs: 30, detail: 'HTTP 503' },
   ],
   gate: {
     promotable: false,
-    blockingReasons: ['audit challenge is open on commit 2222222bbbb', 'PREP health check agent failed'],
+    blockingReasons: ['audit challenge is open on commit 2222222bbbb', 'health check api of staging failed'],
   },
 };
 
@@ -27,7 +27,7 @@ const GOLDEN_BLOCKED = `# Release audit report: v1.4.0
 ## Gate
 Not promotable.
 - audit challenge is open on commit 2222222bbbb
-- PREP health check agent failed
+- health check api of staging failed
 
 ## Changes
 - \`1111111\` feat: add widget (#10, factory)
@@ -40,9 +40,9 @@ Not promotable.
 ## Audits
 - \`2222222\`: challenge, unresolved, issue #77 - No test covers the patch.
 
-## PREP health
-- ui: pass (HTTP 200)
-- agent: fail (HTTP 503)
+## Health before production
+- staging, ui: pass (HTTP 200)
+- staging, api: fail (HTTP 503)
 `;
 
 describe('renderReleaseAuditReport', () => {
@@ -53,6 +53,6 @@ describe('renderReleaseAuditReport', () => {
   it('renders an empty promotable report', () => {
     expect(
       renderReleaseAuditReport({ releaseId: 'v2', changes: [], evidence: [], audits: [], health: [], gate: { promotable: true, blockingReasons: [] } }),
-    ).toBe('# Release audit report: v2\n\n## Gate\nPromotable.\n\n## Changes\nnone\n\n## Evidence\nnone\n\n## Audits\nnone\n\n## PREP health\nnone\n');
+    ).toBe('# Release audit report: v2\n\n## Gate\nPromotable.\n\n## Changes\nnone\n\n## Evidence\nnone\n\n## Audits\nnone\n\n## Health before production\nnone\n');
   });
 });

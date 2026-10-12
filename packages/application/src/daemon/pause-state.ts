@@ -1,5 +1,5 @@
 import type { EventStore } from '../ports.ts';
-import type { PauseCause } from '../notifications/operator-notifications.ts';
+import type { PauseCause } from '@agent-factory/domain';
 import {
   DAEMON_SUBJECT,
   SCHEDULER_PAUSED_EVENT,

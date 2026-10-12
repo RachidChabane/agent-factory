@@ -26,3 +26,5 @@ export * from './issue-types.ts';
 export * from './issue-type-presets.ts';
 export * from './delivery.ts';
 export * from './glob.ts';
+export * from './scheduling-pause.ts';
+export * from './release-version.ts';

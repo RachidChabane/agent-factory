@@ -2,13 +2,14 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { AUDIT_STATES } from './audit-lifecycle.ts';
 import type { ReleaseGateInput } from './release-gate.ts';
-import { evaluateReleaseGate, REASON_NO_PREP_CHECKS } from './release-gate.ts';
+import { evaluateReleaseGate, REASON_NO_HEALTH_CHECKS } from './release-gate.ts';
 
 const CLEAN: ReleaseGateInput = {
   commitShas: ['a', 'b'],
   audits: [],
   mergedPullRequests: [{ number: 1, evidenceComplete: true }],
-  prepHealthChecks: [{ name: 'smoke', passed: true }],
+  healthRequired: true,
+  healthChecks: [{ environment: 'staging', name: 'smoke', passed: true }],
 };
 
 describe('release gate', () => {
@@ -35,12 +36,13 @@ describe('release gate', () => {
     expect(result.promotable).toBe(true);
   });
 
-  it('blocks on incomplete evidence and failing or missing PREP checks', () => {
+  it('blocks on incomplete evidence and on failing or missing health checks of the environments before production', () => {
     expect(evaluateReleaseGate({ ...CLEAN, mergedPullRequests: [{ number: 7, evidenceComplete: false }] }).blockingReasons)
       .toEqual(['pull request #7 has incomplete evidence']);
-    expect(evaluateReleaseGate({ ...CLEAN, prepHealthChecks: [{ name: 'smoke', passed: false }] }).blockingReasons)
-      .toEqual(['PREP health check smoke failed']);
-    expect(evaluateReleaseGate({ ...CLEAN, prepHealthChecks: [] }).blockingReasons).toEqual([REASON_NO_PREP_CHECKS]);
+    expect(evaluateReleaseGate({ ...CLEAN, healthChecks: [{ environment: 'staging', name: 'smoke', passed: false }] }).blockingReasons)
+      .toEqual(['health check smoke of staging failed']);
+    expect(evaluateReleaseGate({ ...CLEAN, healthChecks: [] }).blockingReasons).toEqual([REASON_NO_HEALTH_CHECKS]);
+    expect(evaluateReleaseGate({ ...CLEAN, healthRequired: false, healthChecks: [] })).toEqual({ promotable: true, blockingReasons: [] });
   });
 
   it('is promotable if and only if there is no blocking reason', () => {
@@ -55,7 +57,8 @@ describe('release gate', () => {
         { maxLength: 4 },
       ),
       mergedPullRequests: fc.array(fc.record({ number: fc.nat(), evidenceComplete: fc.boolean() }), { maxLength: 4 }),
-      prepHealthChecks: fc.array(fc.record({ name: fc.string(), passed: fc.boolean() }), { maxLength: 4 }),
+      healthRequired: fc.boolean(),
+      healthChecks: fc.array(fc.record({ environment: fc.string(), name: fc.string(), passed: fc.boolean() }), { maxLength: 4 }),
     });
     fc.assert(
       fc.property(inputArb, (input) => {

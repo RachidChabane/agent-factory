@@ -27,6 +27,7 @@ export interface HttpHealthProbeSettings {
 
 interface Attempt {
   readonly status: number | null;
+  readonly latencyMs: number | null;
   readonly detail: string;
 }
 
@@ -70,19 +71,21 @@ export class HttpHealthProbe implements HealthProbe {
     }
     const passed = attempt.status !== null && isHealthyStatus(attempt.status);
     const detail = retries === 0 ? attempt.detail : `${attempt.detail} after ${retries} retries while the environment woke up`;
-    return { name: target.name, passed, detail };
+    return { name: target.name, url: target.url, passed, statusCode: attempt.status, latencyMs: attempt.latencyMs, detail };
   }
 
   private async request(url: string): Promise<Attempt> {
     const fetchFunction = this.settings.fetchFunction ?? fetch;
+    const now = this.settings.now ?? Date.now;
+    const startedAt = now();
     try {
       const response = await fetchFunction(url, {
         redirect: 'manual',
         signal: AbortSignal.timeout(this.settings.timeoutMs ?? HEALTH_REQUEST_TIMEOUT_MS),
       });
-      return { status: response.status, detail: `HTTP ${response.status}` };
+      return { status: response.status, latencyMs: Math.max(0, Math.round(now() - startedAt)), detail: `HTTP ${response.status}` };
     } catch (error) {
-      return { status: null, detail: error instanceof Error ? error.message : String(error) };
+      return { status: null, latencyMs: null, detail: error instanceof Error ? error.message : String(error) };
     }
   }
 }

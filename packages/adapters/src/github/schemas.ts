@@ -92,6 +92,7 @@ export const OpenPullRequestListSchema = z.array(
     headRefOid: z.string(),
     url: z.string(),
     labels: z.array(z.object({ name: z.string() })),
+    createdAt: z.iso.datetime({ offset: true }).nullable().default(null),
   }),
 );
 

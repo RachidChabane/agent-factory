@@ -31,10 +31,11 @@ export const ReleaseCommitPayloadSchema = z.object({
   author: z.string().nullable(),
   pullRequestNumber: z.number().int().nullable(),
   attribution: z.enum(RELEASE_COMMIT_ATTRIBUTIONS),
+  automation: z.string().nullable().default(null),
 });
 export type ReleaseCommitPayload = z.infer<typeof ReleaseCommitPayloadSchema>;
 
-export const HealthCheckPayloadSchema = z.object({ name: z.string(), passed: z.boolean(), detail: z.string() });
+export const HealthCheckPayloadSchema = z.object({ environment: z.string(), name: z.string(), passed: z.boolean(), detail: z.string() });
 
 export const ReleaseEvaluatedPayloadSchema = z.object({
   releaseId: z.string(),

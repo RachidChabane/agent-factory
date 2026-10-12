@@ -162,6 +162,8 @@ export interface OpenPullRequestSummary {
   readonly headSha: string;
   readonly url: string;
   readonly labels: readonly string[];
+  /** When the forge created the pull request; null when the forge does not say. */
+  readonly createdAt: Date | null;
 }
 
 export interface TagRef {

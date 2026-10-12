@@ -19,11 +19,19 @@ import type {
 } from '../../ports.ts';
 import type { AgentRole } from '@agent-factory/domain';
 
+const EPOCH = new Date(0);
+
 export class InMemoryEventStore implements EventStore {
   readonly records: FactoryEventRecord[] = [];
+  private readonly clock: { now(): Date } | null;
+
+  /** Records every event at the clock's time, or at the epoch without a clock. */
+  constructor(clock: { now(): Date } | null = null) {
+    this.clock = clock;
+  }
 
   append(type: string, subject: string, payload: unknown): Promise<FactoryEventRecord> {
-    const record = { sequence: this.records.length + 1, occurredAt: new Date(0), type, subject, payload };
+    const record = { sequence: this.records.length + 1, occurredAt: this.clock?.now() ?? EPOCH, type, subject, payload };
     this.records.push(record);
     return Promise.resolve(record);
   }

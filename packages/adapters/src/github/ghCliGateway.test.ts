@@ -345,16 +345,16 @@ describe('GhCliGateway', () => {
 
     it('lists every open pull request ascending by number', async () => {
       const listed = [
-        { number: 9, title: 'Nine', headRefName: 'factory/9', headRefOid: 'sha9', url: 'https://example.test/pull/9', labels: [{ name: 'factory' }] },
+        { number: 9, title: 'Nine', headRefName: 'factory/9', headRefOid: 'sha9', url: 'https://example.test/pull/9', labels: [{ name: 'factory' }], createdAt: '2026-10-08T09:30:00Z' },
         { number: 3, title: 'Three', headRefName: 'factory/3', headRefOid: 'sha3', url: 'https://example.test/pull/3', labels: [] },
       ];
       const { gateway, gh } = await gatewayWith([{ contains: ['pr', 'list'], stdout: JSON.stringify(listed) }]);
       expect(await gateway.listOpenPullRequests()).toEqual([
-        { number: 3, title: 'Three', branch: 'factory/3', headSha: 'sha3', url: 'https://example.test/pull/3', labels: [] },
-        { number: 9, title: 'Nine', branch: 'factory/9', headSha: 'sha9', url: 'https://example.test/pull/9', labels: ['factory'] },
+        { number: 3, title: 'Three', branch: 'factory/3', headSha: 'sha3', url: 'https://example.test/pull/3', labels: [], createdAt: null },
+        { number: 9, title: 'Nine', branch: 'factory/9', headSha: 'sha9', url: 'https://example.test/pull/9', labels: ['factory'], createdAt: new Date('2026-10-08T09:30:00Z') },
       ]);
       expect(await gh.commandLines()).toEqual([
-        `pr list --repo ${OWNER}/${REPOSITORY} --state open --limit 1000 --json number,title,headRefName,headRefOid,url,labels`,
+        `pr list --repo ${OWNER}/${REPOSITORY} --state open --limit 1000 --json number,title,headRefName,headRefOid,url,labels,createdAt`,
       ]);
     });
 

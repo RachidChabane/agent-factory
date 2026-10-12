@@ -1,5 +1,6 @@
 import type { BudgetGovernor } from '../budget/budget-governor.ts';
-import { NOTICES, type OperatorNotifications, type PauseCause } from '../notifications/operator-notifications.ts';
+import type { PauseCause } from '@agent-factory/domain';
+import { NOTICES, type OperatorNotifications } from '../notifications/operator-notifications.ts';
 import type { EventStore } from '../ports.ts';
 import type { AgentRunAdmission } from '../resources/agent-run-admission.ts';
 import { activePauses, pauseScheduling, resumeScheduling } from './pause-state.ts';

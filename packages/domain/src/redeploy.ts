@@ -1,11 +1,5 @@
-export const DEPLOYMENT_ENVIRONMENTS = ['dev', 'prep', 'prod'] as const;
-export type DeploymentEnvironment = (typeof DEPLOYMENT_ENVIRONMENTS)[number];
-
-export const PRODUCTION_ENVIRONMENT: DeploymentEnvironment = 'prod';
-export const FACTORY_REDEPLOYABLE_ENVIRONMENTS: readonly DeploymentEnvironment[] = ['dev', 'prep'];
 export const PRODUCTION_NAME_PATTERN = /(^|[^a-z0-9])(prod|production|prd)([^a-z0-9]|$)/i;
 export const SHORT_SHA_LENGTH = 7;
-export const REDEPLOY_BUILD_MODE = 'skip';
 
 export const DEPLOYED_REF_KINDS = ['tag', 'branch', 'commit'] as const;
 export type DeployedRefKind = (typeof DEPLOYED_REF_KINDS)[number];
@@ -16,9 +10,18 @@ export interface DeployedVersion {
   readonly sha: string;
 }
 
+/** One environment of a project, as the redeploy decision sees it. */
+export interface RedeployTarget {
+  readonly environment: string;
+  /** The name the forge's deployments use for this environment. */
+  readonly deploymentTarget: string;
+  readonly production: boolean;
+  /** Whether the project declares a redeploy workflow for this environment. */
+  readonly redeployable: boolean;
+}
+
 export interface RedeployOrder {
-  readonly environment: DeploymentEnvironment;
-  readonly targetName: string;
+  readonly target: RedeployTarget;
   readonly confirmedVersion: string;
   readonly deployed: DeployedVersion | null;
   readonly branchHeadSha: string | null;
@@ -26,10 +29,7 @@ export interface RedeployOrder {
 
 export interface RedeployDispatch {
   readonly ref: string;
-  readonly targetName: string;
   readonly version: string;
-  readonly build: typeof REDEPLOY_BUILD_MODE;
-  readonly deploy: true;
 }
 
 export type RedeployDecision = { readonly kind: 'dispatch'; readonly dispatch: RedeployDispatch } | { readonly kind: 'refused'; readonly reason: string };
@@ -44,37 +44,36 @@ export function isProductionLookingName(name: string): boolean {
   return PRODUCTION_NAME_PATTERN.test(name);
 }
 
-export function isProductionTarget(environment: DeploymentEnvironment, targetName: string): boolean {
-  return environment === PRODUCTION_ENVIRONMENT || PRODUCTION_NAME_PATTERN.test(targetName);
+/** Production is what the project declares, and anything named like production, whatever the declaration says. */
+export function isProductionTarget(target: Pick<RedeployTarget, 'environment' | 'deploymentTarget' | 'production'>): boolean {
+  return target.production || isProductionLookingName(target.environment) || isProductionLookingName(target.deploymentTarget);
 }
 
 function refused(reason: string): RedeployDecision {
   return { kind: 'refused', reason };
 }
 
-function dispatchAt(order: RedeployOrder, deployed: DeployedVersion): RedeployDecision {
-  return {
-    kind: 'dispatch',
-    dispatch: { ref: deployed.ref, targetName: order.targetName, version: versionOf(deployed), build: REDEPLOY_BUILD_MODE, deploy: true },
-  };
+function dispatchAt(deployed: DeployedVersion): RedeployDecision {
+  return { kind: 'dispatch', dispatch: { ref: deployed.ref, version: versionOf(deployed) } };
 }
 
 export function decideRedeploy(order: RedeployOrder): RedeployDecision {
-  if (isProductionTarget(order.environment, order.targetName)) return refused(REFUSAL_PRODUCTION);
-  if (!FACTORY_REDEPLOYABLE_ENVIRONMENTS.includes(order.environment)) return refused(`${order.environment} is not an environment the factory redeploys`);
+  const { target } = order;
+  if (isProductionTarget(target)) return refused(REFUSAL_PRODUCTION);
+  if (!target.redeployable) return refused(`${target.environment} declares no redeploy workflow`);
   const deployed = order.deployed;
-  if (deployed === null) return refused(`nothing is deployed on ${order.environment}, so there is no version to redeploy`);
+  if (deployed === null) return refused(`nothing is deployed on ${target.environment}, so there is no version to redeploy`);
   const version = versionOf(deployed);
   if (order.confirmedVersion.trim() === '') return refused(`a redeploy needs the operator to confirm the deployed version ${version}`);
   if (order.confirmedVersion.trim() !== version) {
-    return refused(`the operator confirmed ${order.confirmedVersion.trim()} but ${version} is deployed on ${order.environment}`);
+    return refused(`the operator confirmed ${order.confirmedVersion.trim()} but ${version} is deployed on ${target.environment}`);
   }
   switch (deployed.refKind) {
     case 'tag':
-      return dispatchAt(order, deployed);
+      return dispatchAt(deployed);
     case 'branch':
       return order.branchHeadSha === deployed.sha
-        ? dispatchAt(order, deployed)
+        ? dispatchAt(deployed)
         : refused(
             `${version} was deployed from ${deployed.ref}, which has moved to ${order.branchHeadSha ?? 'nothing'}; a dispatch on ${deployed.ref} would deploy another version`,
           );

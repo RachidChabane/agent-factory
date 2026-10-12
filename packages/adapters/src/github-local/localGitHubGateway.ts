@@ -206,6 +206,7 @@ export class LocalGitHubGateway implements GitHubGateway {
           headSha,
           url: this.refOf(pullRequest, headSha).url,
           labels: pullRequest.labels,
+          createdAt: new Date(pullRequest.createdAt),
         };
       }),
     );

@@ -1,15 +1,21 @@
 import { z } from 'zod';
+import { matchesAnyGlob, SEMANTIC_VERSION, supersedingTag } from '@agent-factory/domain';
 import type { EventStore, GitHubGateway, OpenPullRequestSummary, TagRef } from '../ports.ts';
 import type { ReleaseDescriptor } from './evaluate-release.ts';
 import { RELEASE_SUBJECT_PREFIX, releaseSubject } from './events.ts';
 
 export const RELEASE_PLEASE_BRANCH_PREFIX = 'release-please--';
-export const RELEASE_TAG_MARKER = '-v';
 export const RELEASE_DETECTED_EVENT = 'release.detected';
 export const RELEASE_TAGS_SEEDED_EVENT = 'release.tags-seeded';
 export const RELEASE_WATCH_SUBJECT = `${RELEASE_SUBJECT_PREFIX}watch`;
 export const PULL_REQUEST_RELEASE_PREFIX = 'pr-';
 export const RELEASE_SOURCES = ['pull-request', 'tag'] as const;
+
+/** How a project marks its releases: release pull requests and their tags, plain tags, or not at all. */
+export type ReleaseModel =
+  | { readonly kind: 'release-please'; readonly tagPattern: string }
+  | { readonly kind: 'tags'; readonly tagPattern: string }
+  | { readonly kind: 'none' };
 
 const FIRST_SEQUENCE = 0;
 const NAME_COLLATION = new Intl.Collator('en', { numeric: true });
@@ -26,6 +32,10 @@ export const ReleaseDetectedPayloadSchema = z.object({
   headSha: z.string().min(1),
   pullRequestNumber: z.number().int().positive().nullable(),
   title: z.string(),
+  /** When the forge created the release pull request, or the time of the tagged commit. */
+  createdAt: z.iso.datetime({ offset: true }).nullable(),
+  /** The published tag of the version a release pull request announces; such a pull request is never pending. */
+  supersededBy: z.string().nullable(),
 });
 export type ReleaseDetectedPayload = z.infer<typeof ReleaseDetectedPayloadSchema>;
 
@@ -39,12 +49,14 @@ export interface DetectedRelease {
   readonly detection: ReleaseDetectedPayload;
 }
 
-export function isReleaseTag(name: string): boolean {
-  return name.includes(RELEASE_TAG_MARKER);
+export function isReleaseTag(name: string, model: ReleaseModel): boolean {
+  return model.kind !== 'none' && matchesAnyGlob(name, [model.tagPattern]);
 }
 
+/** The name of a tag without its version, so that tags of one component are compared together. */
 export function releaseComponent(tag: string): string {
-  return tag.slice(0, tag.lastIndexOf(RELEASE_TAG_MARKER));
+  const match = SEMANTIC_VERSION.exec(tag);
+  return match === null ? tag : tag.slice(0, match.index);
 }
 
 export function isReleasePullRequest(pullRequest: OpenPullRequestSummary): boolean {
@@ -91,28 +103,63 @@ export async function redetectPullRequestRelease(events: EventStore, detection: 
   return record(events, { ...detection, headSha });
 }
 
-export async function watchReleases(dependencies: ReleaseWatchDependencies, baseBranch: string): Promise<readonly DetectedRelease[]> {
+async function taggedAt(github: GitHubGateway, tag: TagRef): Promise<string | null> {
+  try {
+    return (await github.commit(tag.sha)).committedAt.toISOString();
+  } catch {
+    return null;
+  }
+}
+
+async function detectTags(github: GitHubGateway, events: EventStore, newTags: readonly TagRef[], known: TagRef[]): Promise<readonly DetectedRelease[]> {
+  const detected: DetectedRelease[] = [];
+  for (const tag of newTags) {
+    const base = previousTag(known, tag.name);
+    detected.push(
+      await record(events, {
+        releaseId: tag.name,
+        source: 'tag',
+        ref: tag.name,
+        baseSha: base?.sha ?? null,
+        headSha: tag.sha,
+        pullRequestNumber: null,
+        title: tag.name,
+        createdAt: await taggedAt(github, tag),
+        supersededBy: null,
+      }),
+    );
+    known.push(tag);
+  }
+  return detected;
+}
+
+/**
+ * Notices new releases of a project. The first look only remembers the existing release tags.
+ * After that, every new release tag is detected once, and so is every open release pull
+ * request each time its head moves; a release pull request whose version is already tagged is
+ * recorded as superseded by that tag.
+ */
+export async function watchReleases(dependencies: ReleaseWatchDependencies, baseBranch: string, model: ReleaseModel): Promise<readonly DetectedRelease[]> {
+  if (model.kind === 'none') return [];
   const { events, github } = dependencies;
   const memory = await remember(events);
-  const tags = (await github.listTags()).filter((tag) => isReleaseTag(tag.name));
+  const tags = (await github.listTags()).filter((tag) => isReleaseTag(tag.name, model));
   if (!memory.seeded) {
-    await events.append(RELEASE_TAGS_SEEDED_EVENT, RELEASE_WATCH_SUBJECT, { tags });
+    await events.append(RELEASE_TAGS_SEEDED_EVENT, RELEASE_WATCH_SUBJECT, { tags: tags.map(({ name, sha }) => ({ name, sha })) });
     return [];
   }
-  const detected: DetectedRelease[] = [];
   const known = [...memory.tags];
   const newTags = tags
     .filter((tag) => !known.some((seen) => seen.name === tag.name))
     .sort((left, right) => NAME_COLLATION.compare(left.name, right.name));
-  for (const tag of newTags) {
-    const base = previousTag(known, tag.name);
-    detected.push(
-      await record(events, { releaseId: tag.name, source: 'tag', ref: tag.name, baseSha: base?.sha ?? null, headSha: tag.sha, pullRequestNumber: null, title: tag.name }),
-    );
-    known.push(tag);
-  }
+  const detected = [...(await detectTags(github, events, newTags, known))];
+  if (model.kind !== 'release-please') return detected;
+  const tagNames = known.map((tag) => tag.name);
   for (const pullRequest of (await github.listOpenPullRequests()).filter(isReleasePullRequest)) {
-    const seen = memory.detections.some((detection) => detection.pullRequestNumber === pullRequest.number && detection.headSha === pullRequest.headSha);
+    const supersededBy = supersedingTag(pullRequest.title, tagNames);
+    const seen = memory.detections.some(
+      (detection) => detection.pullRequestNumber === pullRequest.number && detection.headSha === pullRequest.headSha && detection.supersededBy === supersededBy,
+    );
     if (seen) continue;
     detected.push(
       await record(events, {
@@ -123,6 +170,8 @@ export async function watchReleases(dependencies: ReleaseWatchDependencies, base
         headSha: pullRequest.headSha,
         pullRequestNumber: pullRequest.number,
         title: pullRequest.title,
+        createdAt: pullRequest.createdAt === null ? null : pullRequest.createdAt.toISOString(),
+        supersededBy,
       }),
     );
   }

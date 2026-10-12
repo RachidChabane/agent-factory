@@ -244,6 +244,7 @@ export class GhCliGateway implements GitHubGateway {
         headSha: pull.headRefOid,
         url: pull.url,
         labels: pull.labels.map((label) => label.name),
+        createdAt: pull.createdAt === null ? null : new Date(pull.createdAt),
       }))
       .sort((left, right) => left.number - right.number);
   }

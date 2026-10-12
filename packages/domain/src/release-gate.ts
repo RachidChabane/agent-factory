@@ -14,7 +14,9 @@ export interface MergedPullRequestEvidence {
   readonly evidenceComplete: boolean;
 }
 
-export interface PrepHealthCheck {
+/** A health check of an environment the release candidate runs on before production. */
+export interface ReleaseHealthCheck {
+  readonly environment: string;
   readonly name: string;
   readonly passed: boolean;
 }
@@ -23,7 +25,9 @@ export interface ReleaseGateInput {
   readonly commitShas: readonly string[];
   readonly audits: readonly ReleaseAudit[];
   readonly mergedPullRequests: readonly MergedPullRequestEvidence[];
-  readonly prepHealthChecks: readonly PrepHealthCheck[];
+  /** True when the project configures health checks on those environments; then at least one must be recorded. */
+  readonly healthRequired: boolean;
+  readonly healthChecks: readonly ReleaseHealthCheck[];
 }
 
 export interface ReleaseGateResult {
@@ -31,7 +35,7 @@ export interface ReleaseGateResult {
   readonly blockingReasons: readonly string[];
 }
 
-export const REASON_NO_PREP_CHECKS = 'no PREP health check has been recorded';
+export const REASON_NO_HEALTH_CHECKS = 'no health check of the environments before production has been recorded';
 
 function isOpenAudit(audit: ReleaseAudit): boolean {
   if (OPEN_AUDIT_STATES.includes(audit.state)) return true;
@@ -52,11 +56,11 @@ export function evaluateReleaseGate(input: ReleaseGateInput): ReleaseGateResult 
       blockingReasons.push(`pull request #${pullRequest.number} has incomplete evidence`);
     }
   }
-  if (input.prepHealthChecks.length === 0) {
-    blockingReasons.push(REASON_NO_PREP_CHECKS);
+  if (input.healthRequired && input.healthChecks.length === 0) {
+    blockingReasons.push(REASON_NO_HEALTH_CHECKS);
   }
-  for (const check of input.prepHealthChecks) {
-    if (!check.passed) blockingReasons.push(`PREP health check ${check.name} failed`);
+  for (const check of input.healthChecks) {
+    if (!check.passed) blockingReasons.push(`health check ${check.name} of ${check.environment} failed`);
   }
   return { promotable: blockingReasons.length === 0, blockingReasons };
 }

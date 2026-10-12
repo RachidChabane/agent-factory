@@ -1,6 +1,7 @@
 import {
   attributeCommit,
   type AttributionRules,
+  type MergeAttribution,
   evaluateReleaseGate,
   UNRESOLVED_VERDICT_STATES,
   type MergedPullRequestEvidence,
@@ -16,7 +17,7 @@ import {
   releaseSubject,
   type ReleaseEvaluatedPayload,
 } from './events.ts';
-import type { HealthProbe } from './health-probe.ts';
+import type { EnvironmentHealth, ReleaseHealthResult } from './health-probe.ts';
 import {
   renderReleaseAuditReport,
   type ReleaseAuditEntry,
@@ -33,8 +34,16 @@ export interface ReleaseDescriptor {
 export interface EvaluateReleaseDependencies {
   readonly events: EventStore;
   readonly github: GitHubGateway;
-  readonly health: HealthProbe;
+  /** The health checks of the environments a release runs on before production. */
+  readonly health: readonly EnvironmentHealth[];
   readonly rules: AttributionRules;
+}
+
+async function releaseHealth(environments: readonly EnvironmentHealth[]): Promise<readonly ReleaseHealthResult[]> {
+  const results = await Promise.all(
+    environments.map(async ({ environment, probe }) => (await probe.check()).map((result) => ({ ...result, environment }))),
+  );
+  return results.flat();
 }
 
 export interface ReleaseEvaluation {
@@ -46,6 +55,10 @@ export interface ReleaseEvaluation {
 const FIRST_SEQUENCE = 0;
 const ISSUE_CLOSED = 'closed';
 const AUDITED_ATTRIBUTION = 'audit';
+
+function automationOf(attribution: MergeAttribution | undefined): string | null {
+  return attribution?.kind === 'automation' ? attribution.automation : null;
+}
 
 async function recordedEvidence(events: EventStore): Promise<ReadonlyMap<number, boolean>> {
   const records = await events.read(PULL_REQUEST_SUBJECT_PREFIX, FIRST_SEQUENCE);
@@ -114,8 +127,14 @@ export async function evaluateRelease(
     issueNumber: audit.publishedIssueNumber,
   }));
 
-  const healthChecks = await health.check();
-  const gate = evaluateReleaseGate({ commitShas, audits: releaseAudits, mergedPullRequests, prepHealthChecks: healthChecks });
+  const healthChecks = await releaseHealth(health);
+  const gate = evaluateReleaseGate({
+    commitShas,
+    audits: releaseAudits,
+    mergedPullRequests,
+    healthRequired: health.length > 0,
+    healthChecks: healthChecks.map(({ environment, name, passed }) => ({ environment, name, passed })),
+  });
   const report = renderReleaseAuditReport({
     releaseId: release.releaseId,
     changes,
@@ -137,8 +156,9 @@ export async function evaluateRelease(
       author: commit.authorLogin,
       pullRequestNumber: commit.pullRequestNumber,
       attribution: changes[index]?.attribution.kind ?? AUDITED_ATTRIBUTION,
+      automation: automationOf(changes[index]?.attribution),
     })),
-    health: healthChecks.map((check) => ({ name: check.name, passed: check.passed, detail: check.detail })),
+    health: healthChecks.map((check) => ({ environment: check.environment, name: check.name, passed: check.passed, detail: check.detail })),
   };
   await events.append(RELEASE_EVALUATED_EVENT, releaseSubject(release.releaseId), payload);
   return { promotable: gate.promotable, blockingReasons: gate.blockingReasons, report };
