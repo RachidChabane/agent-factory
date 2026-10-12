@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { createResourceGuard, FileRunLogStore, SpawnCommandRunner, type NotifyFetchFunction } from '@agent-factory/adapters';
+import { createResourceGuard, FileRunLogStore, SpawnCommandRunner, type LocalCheckScheduling, type NotifyFetchFunction } from '@agent-factory/adapters';
 import {
   AgentRunAdmission,
   BudgetGovernor,
@@ -54,6 +54,8 @@ export interface InstallationOverrides {
   readonly projects?: readonly string[];
   /** The person running the factory; the USER of the environment when absent. */
   readonly operator?: string;
+  /** `awaited` for a command that ends once it has answered, so a local forge's gate it starts runs to its end. */
+  readonly localChecks?: LocalCheckScheduling;
 }
 
 export interface InstallationRuntime extends InstallationContext {
@@ -149,6 +151,7 @@ export async function openInstallation(config: AgentFactoryConfig, environment: 
       listeningPorts,
       notifier,
       lifetime: lifetime.signal,
+      localChecks: overrides.localChecks ?? 'background',
       harnessFor: overrides.harnessFor ?? null,
     };
     const projects: ProjectRuntime[] = [];

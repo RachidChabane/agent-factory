@@ -1,4 +1,4 @@
-import { LocalGateChecks, SpawnCommandRunner, type LocalCheckRun, type LocalCheckRunner, type LocalCheckStep } from '@agent-factory/adapters';
+import { LocalGateChecks, SpawnCommandRunner, type LocalCheckRun, type LocalCheckRunner, type LocalCheckScheduling, type LocalCheckStep } from '@agent-factory/adapters';
 import { accessOf, ShellCommands, type Clock, type CommandRunner, type NamedCommand } from '@agent-factory/application';
 import type { AgentFactoryConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
 import { factoryPorts, ListeningPorts } from '../listening-ports.ts';
@@ -19,6 +19,7 @@ export interface LocalChecksSettings {
   readonly clock: Clock;
   /** Aborted when the installation stops, which stops a gate in progress. */
   readonly lifetime: AbortSignal;
+  readonly scheduling: LocalCheckScheduling;
 }
 
 function logOf(command: NamedCommand, output: string, exitCode: number | null): string {
@@ -73,5 +74,5 @@ class ProjectGateRunner implements LocalCheckRunner {
 /** The checks of a project's local forge when it runs the project's gate as its continuous integration, or null. */
 export function localGateChecks(config: AgentFactoryConfig, project: ProjectConfig, settings: LocalChecksSettings): LocalGateChecks | null {
   if (project.forge.kind !== 'local' || project.forge.checks !== 'gate') return null;
-  return new LocalGateChecks(project.forge.directory, new ProjectGateRunner(config, project, settings), settings.clock, settings.lifetime);
+  return new LocalGateChecks(project.forge.directory, new ProjectGateRunner(config, project, settings), settings.clock, settings.lifetime, settings.scheduling);
 }

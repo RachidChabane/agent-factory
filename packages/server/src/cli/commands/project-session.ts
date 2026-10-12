@@ -21,9 +21,12 @@ export async function selectedProject(context: CliContext, requested: string | n
   return { config, project: selectProject(config, requested) };
 }
 
-/** Opens the installation with only the project the command acts on, and closes it once the work is done. */
+/**
+ * Opens the installation with only the project the command acts on, and closes it once the work is done. The
+ * command ends once it has answered, so the gate of a local forge it starts is awaited rather than left behind.
+ */
 export async function withProjectSession<T>(context: CliContext, selected: SelectedProject, work: (session: ProjectSession) => Promise<T>): Promise<T> {
-  const installation = await context.openInstallation(selected.config, { projects: [selected.project.id] });
+  const installation = await context.openInstallation(selected.config, { projects: [selected.project.id], localChecks: 'awaited' });
   try {
     return await work({ installation, project: installation.project(selected.project.id) });
   } finally {

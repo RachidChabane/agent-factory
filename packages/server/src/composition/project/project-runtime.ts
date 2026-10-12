@@ -121,7 +121,15 @@ export async function openProject(installation: InstallationContext, initial: Pr
   let settings = pipelineSettings(installation.config, config, environment);
   const gitEnvironment = projectGitEnvironment(config, environment);
   const events = new ProjectEventStore(installation.events, config.id);
-  const gateChecks = localGateChecks(installation.config, config, { runner, environment, platform: installation.platform, home: installation.userHome, clock, lifetime: installation.lifetime });
+  const gateChecks = localGateChecks(installation.config, config, {
+    runner,
+    environment,
+    platform: installation.platform,
+    home: installation.userHome,
+    clock,
+    lifetime: installation.lifetime,
+    scheduling: installation.localChecks,
+  });
   const forge = await openForge(config, runner, environment, clock, gateChecks);
   const files = new NodeWorkspaceFiles();
   const specReader: SpecReader = { read: (issue) => parseIssueSpec(issue, settings.conventions) };

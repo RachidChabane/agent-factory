@@ -14,6 +14,13 @@ const UTF8 = 'utf8';
 /** The name of the check while the gate of a commit is still running. */
 export const RUNNING_GATE_CHECK = 'gate';
 
+/**
+ * When the gate of a commit runs once its checks are asked for: in the `background` of a factory that keeps
+ * running, which answers pending meanwhile, or `awaited` by a command that ends once it has answered.
+ */
+export const LOCAL_CHECK_SCHEDULINGS = ['background', 'awaited'] as const;
+export type LocalCheckScheduling = (typeof LOCAL_CHECK_SCHEDULINGS)[number];
+
 /** One step of a project's gate on a commit, as a continuous integration job reports it. */
 export interface LocalCheckStep {
   readonly name: string;
@@ -42,32 +49,43 @@ const OutcomeSchema = z.object({
 type Outcome = z.infer<typeof OutcomeSchema>;
 
 /**
- * The checks of a local forge: the first time a commit's checks are asked for, its gate starts in
- * the background and the commit shows one pending check; once the gate has run, each step is a
- * check that passed or failed, with the gate's log as its link. A gate that could not run at all
- * shows as one failed check whose log says why.
+ * The checks of a local forge: the first time a commit's checks are asked for, its gate starts; in the
+ * background, the commit shows one pending check meanwhile, and awaited, the answer waits for the gate.
+ * Once the gate has run, each step is a check that passed or failed, with the gate's log as its link. A
+ * gate that could not run at all shows as one failed check whose log says why.
  */
+function checksOf(outcome: Outcome, url: string): readonly CheckRunSummary[] {
+  return outcome.steps.map((step) => ({ name: step.name, conclusion: step.passed ? 'success' : 'failure', url, durationMs: step.durationMs }));
+}
+
 export class LocalGateChecks {
   private readonly directory: string;
   private readonly runner: LocalCheckRunner;
   private readonly clock: Clock;
   private readonly signal: AbortSignal;
+  private readonly scheduling: LocalCheckScheduling;
   private readonly running = new Map<string, Promise<void>>();
   /** One gate at a time, as a forge with a single runner: gates of several commits wait their turn. */
   private readonly queue = new SerialQueue();
 
-  constructor(forgeDirectory: string, runner: LocalCheckRunner, clock: Clock, signal: AbortSignal) {
+  constructor(forgeDirectory: string, runner: LocalCheckRunner, clock: Clock, signal: AbortSignal, scheduling: LocalCheckScheduling = 'background') {
     this.directory = join(forgeDirectory, CHECKS_DIRECTORY);
     this.runner = runner;
     this.clock = clock;
     this.signal = signal;
+    this.scheduling = scheduling;
   }
 
   async of(sha: string): Promise<readonly CheckRunSummary[]> {
-    const outcome = await this.readOutcome(sha);
     const url = pathToFileURL(this.logPath(sha)).href;
-    if (outcome !== null) return outcome.steps.map((step) => ({ name: step.name, conclusion: step.passed ? 'success' : 'failure', url, durationMs: step.durationMs }));
-    this.start(sha);
+    const outcome = await this.readOutcome(sha);
+    if (outcome !== null) return checksOf(outcome, url);
+    const run = this.start(sha);
+    if (this.scheduling === 'awaited' && run !== null) {
+      await run;
+      const settled = await this.readOutcome(sha);
+      if (settled !== null) return checksOf(settled, url);
+    }
     return [{ name: RUNNING_GATE_CHECK, conclusion: 'pending', url, durationMs: null }];
   }
 
@@ -76,10 +94,13 @@ export class LocalGateChecks {
     await Promise.allSettled([...this.running.values()]);
   }
 
-  private start(sha: string): void {
-    if (this.running.has(sha) || this.signal.aborted) return;
+  private start(sha: string): Promise<void> | null {
+    if (this.signal.aborted) return null;
+    const started = this.running.get(sha);
+    if (started !== undefined) return started;
     const run = this.queue.run(() => this.runGate(sha)).finally(() => this.running.delete(sha));
     this.running.set(sha, run);
+    return run;
   }
 
   private async runGate(sha: string): Promise<void> {

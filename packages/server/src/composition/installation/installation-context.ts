@@ -1,3 +1,4 @@
+import type { LocalCheckScheduling } from '@agent-factory/adapters';
 import type { AgentFactoryConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
 import type {
   AgentHarness,
@@ -41,6 +42,8 @@ export interface InstallationContext {
   readonly notifier: Notifier;
   /** Aborted when the installation closes: work the installation started in the background stops with it. */
   readonly lifetime: AbortSignal;
+  /** When the gate of a local forge runs once a commit's checks are asked for. */
+  readonly localChecks: LocalCheckScheduling;
   /** The agent that runs instead of the Claude CLI, in tests and in the demonstration. */
   readonly harnessFor: ((project: ProjectConfig) => AgentHarness) | null;
 }
