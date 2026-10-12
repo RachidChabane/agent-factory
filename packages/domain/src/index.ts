@@ -20,3 +20,6 @@ export * from './tool-connection.ts';
 export * from './settings-bounds.ts';
 export * from './redeploy.ts';
 export * from './gate-preflight.ts';
+export * from './usage.ts';
+export * from './token-usage.ts';
+export * from './cost.ts';
