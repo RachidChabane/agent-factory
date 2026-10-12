@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { Button } from './Button.tsx';
 import { IconButton } from './IconButton.tsx';
 
@@ -35,15 +36,17 @@ interface CopyButtonProps {
   readonly withText?: boolean | undefined;
 }
 
-export function CopyButton({ text, label = 'Copier', withText = false }: CopyButtonProps) {
+export function CopyButton({ text, label, withText = false }: CopyButtonProps) {
+  const { t } = useI18n();
   const { copied, copy } = useCopy(text);
+  const copyLabel = label ?? t('common.copy');
   const icon = copied ? <Check size={14} /> : <Copy size={14} />;
   if (withText) {
     return (
       <Button size="sm" variant="secondary" icon={icon} onClick={copy}>
-        {copied ? 'Copié' : label}
+        {copied ? t('common.copied') : copyLabel}
       </Button>
     );
   }
-  return <IconButton size="sm" label={copied ? 'Copié' : label} icon={icon} onClick={copy} />;
+  return <IconButton size="sm" label={copied ? t('common.copied') : copyLabel} icon={icon} onClick={copy} />;
 }

@@ -1,22 +1,17 @@
-import type { FactoryEventRecord, RunLogLine } from '../contract/index.ts';
-import {
-  CockpitSnapshotSchema,
-  FactoryEventRecordSchema,
-  RunLogLineSchema,
-  RunLogPageSchema,
-  TelemetrySampleSchema,
-} from '../contract/index.ts';
+import type { CockpitSnapshot, RunLogLine, RunView, TelemetrySample } from '../contract/index.ts';
+import { CockpitSnapshotSchema, RunLogLineSchema, RunLogPageSchema, StreamEventSchema, TelemetrySampleSchema } from '../contract/index.ts';
 import type { Clock } from '../model/clock.ts';
 import { OFFLINE_AFTER_ATTEMPTS, reconnectDelay } from './backoff.ts';
-import { applyFactoryEvent } from './event-appliers.ts';
 import { describeZodError, parseJsonMessage } from './parse.ts';
-import { applyRunLogLines } from './run-summary.ts';
 import type { RunLogStore } from './run-log-store.ts';
-import type { ActivityEntry, MessageChannel } from './state.ts';
+import { applyRunLogLines } from './run-summary.ts';
+import type { MessageChannel } from './state.ts';
 import type { CockpitStore } from './store.ts';
 import type { CockpitTransport, StreamSubscription } from './transport.ts';
 
 export const RESYNC_DEBOUNCE_MS = 250;
+/** How often the snapshot is reloaded while the stream is open, for what the forge changes without telling the factory: checks, deployments, health. */
+export const READINGS_RESYNC_MS = 30_000;
 export const RUN_LOG_FLUSH_MS = 100;
 
 export interface Timers {
@@ -42,10 +37,24 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function bySequence(left: FactoryEventRecord, right: FactoryEventRecord): number {
-  return left.sequence - right.sequence;
+/** Replaces the runs a telemetry sample reports and keeps the history it does not mention. */
+export function upsertRuns(runs: readonly RunView[], sampled: readonly RunView[]): readonly RunView[] {
+  if (sampled.length === 0) return runs;
+  const sampledById = new Map(sampled.map((run) => [run.id, run]));
+  const known = new Set(runs.map((run) => run.id));
+  const updated = runs.map((run) => sampledById.get(run.id) ?? run);
+  return [...updated, ...sampled.filter((run) => !known.has(run.id))];
 }
 
+export function applyTelemetry(snapshot: CockpitSnapshot, sample: TelemetrySample): CockpitSnapshot {
+  return { ...snapshot, resources: sample.resources, usage: sample.usage, runs: [...upsertRuns(snapshot.runs, sample.runs)] };
+}
+
+/**
+ * Keeps the store in step with the factory: the snapshot is loaded once and again after every
+ * event or accepted command and at a steady pace while the stream is open, telemetry and run logs
+ * are folded in as they stream.
+ */
 export class SyncController {
   private readonly deps: SyncDependencies;
   private stream: StreamSubscription | null = null;
@@ -54,9 +63,10 @@ export class SyncController {
   private retryHandle: ReturnType<typeof setTimeout> | null = null;
   private resyncHandle: ReturnType<typeof setTimeout> | null = null;
   private flushHandle: ReturnType<typeof setTimeout> | null = null;
+  private readingsHandle: ReturnType<typeof setTimeout> | null = null;
   private loadingSnapshot = false;
   private resyncRequested = false;
-  private pendingEvents: FactoryEventRecord[] = [];
+  private reconnecting = false;
   private runLogQueue: RunLogLine[] = [];
   private readonly catchUpsInFlight = new Set<string>();
   private readonly catchUpsRequested = new Set<string>();
@@ -74,6 +84,7 @@ export class SyncController {
     this.stopped = true;
     this.stream?.close();
     this.stream = null;
+    this.stopReadingsClock();
     for (const handle of [this.retryHandle, this.resyncHandle, this.flushHandle]) {
       if (handle !== null) this.deps.timers.clearTimeout(handle);
     }
@@ -88,6 +99,7 @@ export class SyncController {
     void this.catchUpRunLog(runId);
   }
 
+  /** Reloads the snapshot soon; many requests in a burst make one load. */
   requestResync(): void {
     if (this.stopped || this.resyncHandle !== null) return;
     this.resyncHandle = this.deps.timers.setTimeout(() => {
@@ -96,11 +108,31 @@ export class SyncController {
     }, RESYNC_DEBOUNCE_MS);
   }
 
+  /** Reloads the snapshot every `READINGS_RESYNC_MS` while the stream is open. */
+  private startReadingsClock(): void {
+    this.stopReadingsClock();
+    this.readingsHandle = this.deps.timers.setTimeout(() => {
+      this.readingsHandle = null;
+      this.requestResync();
+      this.startReadingsClock();
+    }, READINGS_RESYNC_MS);
+  }
+
+  private stopReadingsClock(): void {
+    if (this.readingsHandle === null) return;
+    this.deps.timers.clearTimeout(this.readingsHandle);
+    this.readingsHandle = null;
+  }
+
   private async connect(): Promise<void> {
     const loaded = await this.loadSnapshot();
     if (this.stopped) return;
-    if (loaded) this.openStream();
-    else this.scheduleReconnect();
+    if (loaded) {
+      this.reconnecting = false;
+      this.openStream();
+    } else {
+      this.scheduleReconnect();
+    }
   }
 
   private async resync(): Promise<void> {
@@ -135,7 +167,6 @@ export class SyncController {
       return false;
     } finally {
       this.loadingSnapshot = false;
-      this.replayPendingEvents();
     }
   }
 
@@ -146,12 +177,18 @@ export class SyncController {
       onOpen: () => {
         this.attempt = 0;
         this.deps.store.setConnection({ status: 'live', attempt: 0, nextRetryAt: null, lastMessageAt: this.deps.clock.now() });
+        this.startReadingsClock();
+        if (this.reconnecting) {
+          this.reconnecting = false;
+          this.requestResync();
+        }
       },
       onFactoryEvent: (data) => this.receiveFactoryEvent(data),
       onRunLog: (data) => this.receiveRunLog(data),
       onTelemetry: (data) => this.receiveTelemetry(data),
       onDisconnect: () => {
         this.stream = null;
+        this.stopReadingsClock();
         this.scheduleReconnect();
       },
     });
@@ -161,6 +198,7 @@ export class SyncController {
     if (this.stopped) return;
     const delay = reconnectDelay(this.attempt, this.deps.random);
     this.attempt += 1;
+    this.reconnecting = true;
     this.deps.store.setConnection({
       status: this.attempt > OFFLINE_AFTER_ATTEMPTS ? 'offline' : 'reconnecting',
       attempt: this.attempt,
@@ -175,60 +213,13 @@ export class SyncController {
   }
 
   private receiveFactoryEvent(data: string): void {
-    const parsed = parseJsonMessage(data, FactoryEventRecordSchema);
+    const parsed = parseJsonMessage(data, StreamEventSchema);
     if (!parsed.ok) {
       this.reject('factory', parsed.reason);
       this.requestResync();
       return;
     }
-    this.handleRecord(parsed.value);
-  }
-
-  private handleRecord(record: FactoryEventRecord): void {
-    const state = this.deps.store.getState();
-    if (this.loadingSnapshot || state.snapshot === null) {
-      this.pendingEvents.push(record);
-      return;
-    }
-    if (record.sequence <= state.lastSequence) return;
-    if (record.sequence > state.lastSequence + 1) {
-      this.pendingEvents.push(record);
-      this.requestResync();
-      return;
-    }
-    const outcome = applyFactoryEvent(state.snapshot, record);
-    const entry = (applied: boolean): ActivityEntry => ({
-      sequence: record.sequence,
-      type: record.type,
-      subject: record.subject,
-      occurredAt: record.occurredAt,
-      applied,
-    });
-    switch (outcome.kind) {
-      case 'applied':
-        this.deps.store.updateSnapshot(outcome.snapshot, record.sequence, [entry(true)]);
-        return;
-      case 'ignored':
-        this.deps.store.updateSnapshot(state.snapshot, record.sequence, [entry(true)]);
-        return;
-      case 'malformed':
-        this.reject('factory', outcome.reason);
-        this.deps.store.updateSnapshot(state.snapshot, record.sequence, [entry(false)]);
-        this.requestResync();
-        return;
-      case 'resync':
-      case 'unknown':
-        this.deps.store.updateSnapshot(state.snapshot, record.sequence, [entry(false)]);
-        this.requestResync();
-        return;
-    }
-  }
-
-  private replayPendingEvents(): void {
-    if (this.pendingEvents.length === 0) return;
-    const pending = this.pendingEvents.sort(bySequence);
-    this.pendingEvents = [];
-    for (const record of pending) this.handleRecord(record);
+    if (this.deps.store.recordEvent(parsed.value)) this.requestResync();
   }
 
   private receiveRunLog(data: string): void {
@@ -250,10 +241,7 @@ export class SyncController {
     const lines = this.runLogQueue;
     this.runLogQueue = [];
     if (lines.length === 0) return;
-    const state = this.deps.store.getState();
-    if (state.snapshot !== null) {
-      this.deps.store.updateSnapshot(applyRunLogLines(state.snapshot, lines), state.lastSequence, []);
-    }
+    this.deps.store.patchSnapshot((snapshot) => applyRunLogLines(snapshot, lines));
     const byRun = new Map<string, RunLogLine[]>();
     for (const line of lines) {
       if (!this.deps.runLogs.isTracked(line.runId)) continue;
@@ -271,14 +259,7 @@ export class SyncController {
       this.reject('telemetry', parsed.reason);
       return;
     }
-    const state = this.deps.store.getState();
-    if (state.snapshot === null) return;
-    const snapshot = {
-      ...state.snapshot,
-      resources: parsed.value.resources,
-      costs: { ...state.snapshot.costs, subscription: parsed.value.subscription },
-    };
-    this.deps.store.updateSnapshot(snapshot, state.lastSequence, []);
+    this.deps.store.patchSnapshot((snapshot) => applyTelemetry(snapshot, parsed.value));
   }
 
   private async catchUpRunLog(runId: string): Promise<void> {

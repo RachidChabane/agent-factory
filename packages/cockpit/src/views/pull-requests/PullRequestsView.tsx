@@ -1,91 +1,57 @@
 import './pull-requests.css';
 import { useMemo } from 'react';
 import { useParams } from 'react-router';
-import { GitMerge, GitPullRequest } from 'lucide-react';
-import { useNow } from '../../app/context.tsx';
-import { useSnapshot } from '../../app/hooks.ts';
-import type { PullRequestView } from '../../contract/index.ts';
-import { relativeTime, toEpoch } from '../../format/format.ts';
-import { issueTypeLabel } from '../../i18n/labels.ts';
-import { paths, VIEW_TITLES } from '../../model/routes.ts';
-import { checksSummaryMark } from '../../model/status.ts';
+import { GitPullRequest } from 'lucide-react';
+import { useProject } from '../../app/ProjectRoute.tsx';
+import type { PullRequestState } from '../../contract/index.ts';
+import { PULL_REQUEST_STATES } from '../../contract/index.ts';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { EmptyState } from '../../ui/components/EmptyState.tsx';
-import { Skeleton } from '../../ui/components/Skeleton.tsx';
-import { StatusMark } from '../../ui/components/StatusMark.tsx';
-import { ListItemLink, SplitLayout } from '../../ui/layout/Page.tsx';
+import { ListPane, ListSection, SplitLayout } from '../../ui/layout/Page.tsx';
 import { PullRequestDetail } from './PullRequestDetail.tsx';
+import { PullRequestListItem } from './PullRequestListItem.tsx';
+import { groupPullRequests, orderedPullRequests } from './pull-request-model.ts';
 
-const STATE_ORDER: Readonly<Record<PullRequestView['state'], number>> = { open: 0, merged: 1, closed: 2 };
-
-function sortPullRequests(pullRequests: readonly PullRequestView[]): readonly PullRequestView[] {
-  return pullRequests.toSorted(
-    (left, right) => STATE_ORDER[left.state] - STATE_ORDER[right.state] || toEpoch(right.openedAt) - toEpoch(left.openedAt),
-  );
-}
-
-function listMark(pullRequest: PullRequestView) {
-  if (pullRequest.state === 'merged') return <StatusMark mark="success" label="Mergée" />;
-  if (pullRequest.state === 'closed') return <StatusMark mark="blocked" label="Fermée" />;
-  if (pullRequest.mergeable) return <StatusMark mark="waiting" label="Prête à merger" />;
-  return <StatusMark mark={checksSummaryMark(pullRequest.checks.map((check) => check.conclusion))} />;
-}
+const ICON_SIZE = 16;
 
 export function PullRequestsView() {
-  const snapshot = useSnapshot();
-  const now = useNow();
-  const { pullRequestNumber } = useParams();
-  const sorted = useMemo(() => sortPullRequests(snapshot?.pullRequests ?? []), [snapshot]);
-  const selected = pullRequestNumber === undefined ? (sorted[0] ?? null) : (sorted.find((entry) => String(entry.number) === pullRequestNumber) ?? null);
-
-  if (snapshot === null) {
-    return (
-      <div className="detail">
-        <Skeleton width="40%" height={20} />
-        <Skeleton height={320} />
-      </div>
-    );
-  }
+  const { t } = useI18n();
+  const project = useProject();
+  const { number } = useParams();
+  const groups = useMemo(() => groupPullRequests(project.pullRequests), [project.pullRequests]);
+  const selected = number === undefined ? (orderedPullRequests(groups)[0] ?? null) : (project.pullRequests.find((entry) => String(entry.number) === number) ?? null);
+  const headings: Readonly<Record<PullRequestState, string>> = {
+    open: t('pullRequests.group.open'),
+    merged: t('pullRequests.group.merged'),
+    closed: t('pullRequests.group.closed'),
+  };
   return (
     <SplitLayout
-      listLabel="Liste des pull requests"
-      hasSelection={pullRequestNumber !== undefined}
+      listLabel={t('pullRequests.listLabel')}
+      hasSelection={number !== undefined}
       list={
-        <>
-          <header className="list-pane__header">
-            <h1 className="list-pane__title">
-              {VIEW_TITLES['pull-requests']} <span className="list-pane__count num">{sorted.length}</span>
-            </h1>
-          </header>
-          <div className="list-pane__items">
-            {sorted.map((pullRequest) => (
-              <ListItemLink key={pullRequest.number} to={paths.pullRequest(pullRequest.number)} active={pullRequest.number === selected?.number}>
-                {listMark(pullRequest)}
-                <span className="list-item__body">
-                  <span className="list-item__title">
-                    <span className="pr-list__number num">#{pullRequest.number}</span> {pullRequest.title}
-                  </span>
-                  <span className="list-item__meta">
-                    <span>{issueTypeLabel(pullRequest.type)}</span>
-                    <span className="dot-separator" />
-                    <span className="mono truncate">{pullRequest.branch}</span>
-                  </span>
-                  {pullRequest.state === 'open' && pullRequest.mergeable ? (
-                    <span className="pr-list__ready">
-                      <GitMerge size={12} aria-hidden="true" /> prête à merger
-                    </span>
-                  ) : null}
-                </span>
-                <span className="list-item__aside num">{relativeTime(pullRequest.mergedAt ?? pullRequest.openedAt, now)}</span>
-              </ListItemLink>
-            ))}
-          </div>
-        </>
+        <ListPane title={t('pullRequests.title')} count={project.pullRequests.length}>
+          {project.pullRequests.length === 0 ? (
+            <EmptyState compact icon={<GitPullRequest size={ICON_SIZE} />} title={t('pullRequests.empty')} description={t('pullRequests.emptyDescription')} />
+          ) : null}
+          {PULL_REQUEST_STATES.map((state) =>
+            groups[state].length === 0 ? null : (
+              <ListSection key={state} title={headings[state]} count={groups[state].length}>
+                {groups[state].map((pullRequest) => (
+                  <PullRequestListItem key={pullRequest.number} pullRequest={pullRequest} projectId={project.id} active={pullRequest.number === selected?.number} />
+                ))}
+              </ListSection>
+            ),
+          )}
+        </ListPane>
       }
       detail={
         selected === null ? (
-          <EmptyState icon={<GitPullRequest size={16} />} title={pullRequestNumber === undefined ? 'Aucune pull request' : 'Pull request introuvable'} description="Les pull requests de l’usine apparaissent ici avec leurs preuves." />
+          number === undefined ? null : (
+            <EmptyState icon={<GitPullRequest size={ICON_SIZE} />} headingLevel={2} title={t('pullRequests.notFound')} description={t('pullRequests.notFoundDescription')} />
+          )
         ) : (
-          <PullRequestDetail key={selected.number} pullRequest={selected} />
+          <PullRequestDetail key={`${project.id}:${selected.number}`} pullRequest={selected} requested={number !== undefined} />
         )
       }
     />

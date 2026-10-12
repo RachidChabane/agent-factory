@@ -1,58 +1,89 @@
-export const VIEW_IDS = [
-  'board',
-  'requests',
-  'issues',
-  'runs',
-  'pull-requests',
-  'ci',
-  'releases',
-  'audits',
-  'health',
-  'costs',
-  'knowledge',
-  'settings',
-] as const;
-export type ViewId = (typeof VIEW_IDS)[number];
+export const PROJECT_SECTIONS = ['requests', 'issues', 'pull-requests', 'delivery', 'releases', 'audits', 'knowledge', 'settings'] as const;
+export type ProjectSection = (typeof PROJECT_SECTIONS)[number];
 
-export const VIEW_PATHS: Readonly<Record<ViewId, string>> = {
+export const PROJECT_QUERY_PARAMETER = 'project';
+export const ISSUE_VIEW_QUERY_PARAMETER = 'view';
+export const ISSUE_GRAPH_VIEW = 'graph';
+export const NEW_REQUEST_QUERY_PARAMETER = 'new';
+export const MERGE_QUERY_PARAMETER = 'merge';
+export const QUERY_FLAG = '1';
+
+/** The route patterns of the router, the single place where the URL space of the cockpit is declared. */
+export const ROUTE_PATTERNS = {
   board: '/',
-  requests: '/requests',
-  issues: '/issues',
+  project: '/projects/:project',
+  requests: 'requests',
+  request: 'requests/:requestId',
+  issues: 'issues',
+  issue: 'issues/:issueNumber',
+  pullRequests: 'pull-requests',
+  pullRequest: 'pull-requests/:number',
+  delivery: 'delivery',
+  releases: 'releases',
+  release: 'releases/:releaseId',
+  audits: 'audits',
+  audit: 'audits/:auditId',
+  knowledge: 'knowledge',
+  projectSettings: 'settings',
   runs: '/runs',
-  'pull-requests': '/pull-requests',
-  ci: '/ci',
-  releases: '/releases',
-  audits: '/audits',
-  health: '/health',
-  costs: '/costs',
-  knowledge: '/knowledge',
+  run: '/runs/:runId',
+  usage: '/usage',
   settings: '/settings',
-};
-
-export const VIEW_TITLES: Readonly<Record<ViewId, string>> = {
-  board: 'Tableau',
-  requests: 'Demandes',
-  issues: 'Issues',
-  runs: 'Runs',
-  'pull-requests': 'Pull requests',
-  ci: 'CI & déploiements',
-  releases: 'Releases',
-  audits: 'Audits',
-  health: 'Santé',
-  costs: 'Coûts',
-  knowledge: 'Connaissances',
-  settings: 'Réglages',
-};
-
-export const ISSUE_GRAPH_QUERY = 'vue';
-export const ISSUE_GRAPH_VALUE = 'graphe';
-
-export const paths = {
-  request: (id: string): string => `${VIEW_PATHS.requests}/${encodeURIComponent(id)}`,
-  issue: (number: number): string => `${VIEW_PATHS.issues}/${number}`,
-  issueGraph: (): string => `${VIEW_PATHS.issues}?${ISSUE_GRAPH_QUERY}=${ISSUE_GRAPH_VALUE}`,
-  run: (id: string): string => `${VIEW_PATHS.runs}/${encodeURIComponent(id)}`,
-  pullRequest: (number: number): string => `${VIEW_PATHS['pull-requests']}/${number}`,
-  release: (id: string): string => `${VIEW_PATHS.releases}/${encodeURIComponent(id)}`,
-  audit: (id: string): string => `${VIEW_PATHS.audits}/${encodeURIComponent(id)}`,
 } as const;
+
+const encode = encodeURIComponent;
+
+function projectPath(project: string): string {
+  return `/projects/${encode(project)}`;
+}
+
+function sectionPath(project: string, section: ProjectSection): string {
+  return `${projectPath(project)}/${section}`;
+}
+
+function withQuery(path: string, name: string, value: string): string {
+  return `${path}?${name}=${encode(value)}`;
+}
+
+/** Every address the cockpit links to. Notification links rely on the project sub-paths below. */
+export const paths = {
+  board: (project?: string | null): string => (project == null ? '/' : withQuery('/', PROJECT_QUERY_PARAMETER, project)),
+  runs: (project?: string | null): string => (project == null ? '/runs' : withQuery('/runs', PROJECT_QUERY_PARAMETER, project)),
+  run: (runId: string): string => `/runs/${encode(runId)}`,
+  usage: (): string => '/usage',
+  settings: (): string => '/settings',
+  project: projectPath,
+  section: sectionPath,
+  requests: (project: string): string => sectionPath(project, 'requests'),
+  request: (project: string, requestId: string): string => `${sectionPath(project, 'requests')}/${encode(requestId)}`,
+  newRequest: (project: string): string => withQuery(sectionPath(project, 'requests'), NEW_REQUEST_QUERY_PARAMETER, QUERY_FLAG),
+  issues: (project: string): string => sectionPath(project, 'issues'),
+  issue: (project: string, issueNumber: number): string => `${sectionPath(project, 'issues')}/${issueNumber}`,
+  issueGraph: (project: string): string => withQuery(sectionPath(project, 'issues'), ISSUE_VIEW_QUERY_PARAMETER, ISSUE_GRAPH_VIEW),
+  pullRequests: (project: string): string => sectionPath(project, 'pull-requests'),
+  pullRequest: (project: string, number: number): string => `${sectionPath(project, 'pull-requests')}/${number}`,
+  /** The pull request with the confirmation of its merge already open. */
+  mergePullRequest: (project: string, number: number): string => withQuery(`${sectionPath(project, 'pull-requests')}/${number}`, MERGE_QUERY_PARAMETER, QUERY_FLAG),
+  delivery: (project: string): string => sectionPath(project, 'delivery'),
+  releases: (project: string): string => sectionPath(project, 'releases'),
+  release: (project: string, releaseId: string): string => `${sectionPath(project, 'releases')}/${encode(releaseId)}`,
+  audits: (project: string): string => sectionPath(project, 'audits'),
+  audit: (project: string, auditId: string): string => `${sectionPath(project, 'audits')}/${encode(auditId)}`,
+  knowledge: (project: string): string => sectionPath(project, 'knowledge'),
+  projectSettings: (project: string): string => sectionPath(project, 'settings'),
+} as const;
+
+const PROJECT_PREFIX = /^\/projects\/([^/]+)/;
+
+/** The project a pathname belongs to, or null on an installation-wide page. */
+export function projectOfPath(pathname: string): string | null {
+  const match = PROJECT_PREFIX.exec(pathname);
+  return match?.[1] === undefined ? null : decodeURIComponent(match[1]);
+}
+
+/** The section of a project pathname (`issues` for `/projects/store/issues/12`), or null on the overview. */
+export function sectionOfPath(pathname: string): ProjectSection | null {
+  const segments = pathname.split('/').filter((segment) => segment.length > 0);
+  const [root, , section] = segments;
+  return root === 'projects' ? (PROJECT_SECTIONS.find((candidate) => candidate === section) ?? null) : null;
+}

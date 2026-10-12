@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RunLogLine } from '../contract/index.ts';
-import { fixtureSnapshot } from '../test/render.tsx';
+import { runAt } from '../test/minimal-snapshot.ts';
 import { RunLogStore } from './run-log-store.ts';
 import { foldRunLogLines } from './run-summary.ts';
 
@@ -9,8 +9,7 @@ const PROGRESS = { inputTokens: 12, outputTokens: 640, cacheReadTokens: 9_000, c
 
 describe('foldRunLogLines', () => {
   it('shows the tokens and turns of a running agent as it streams, and its cost once the run reports it', () => {
-    const run = fixtureSnapshot().runs[0];
-    if (run === undefined) throw new Error('the fixture has no run');
+    const run = runAt(Date.parse(AT), 'run_live');
     const progress: RunLogLine = { runId: run.id, index: 0, at: AT, event: { kind: 'progress', usage: PROGRESS, turns: 4 } };
     const live = foldRunLogLines({ ...run, costUsd: 0 }, [progress]);
     expect(live).toMatchObject({ usage: PROGRESS, turns: 4, costUsd: 0 });

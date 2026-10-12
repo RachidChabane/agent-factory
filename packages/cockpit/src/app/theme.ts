@@ -39,11 +39,3 @@ export function persistTheme(storage: Storage | null, theme: Theme): void {
     return;
   }
 }
-
-export function safeLocalStorage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}

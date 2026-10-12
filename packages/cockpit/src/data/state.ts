@@ -1,4 +1,4 @@
-import type { CockpitSnapshot } from '../contract/index.ts';
+import type { CockpitSnapshot, StreamEvent } from '../contract/index.ts';
 
 export const CONNECTION_STATUSES = ['connecting', 'live', 'reconnecting', 'offline'] as const;
 export type ConnectionStatus = (typeof CONNECTION_STATUSES)[number];
@@ -22,22 +22,16 @@ export interface RejectedMessage {
   readonly at: number;
 }
 
-export interface ActivityEntry {
-  readonly sequence: number;
-  readonly type: string;
-  readonly subject: string;
-  readonly occurredAt: string;
-  readonly applied: boolean;
-}
-
 export interface CockpitState {
   readonly connection: ConnectionState;
   readonly snapshot: CockpitSnapshot | null;
+  /** The highest event sequence seen, whether it came with a snapshot or from the stream. */
   readonly lastSequence: number;
   readonly loadError: string | null;
   readonly rejectedCount: number;
   readonly recentRejections: readonly RejectedMessage[];
-  readonly activity: readonly ActivityEntry[];
+  /** The installation's events, newest first: the snapshot's own feed, then what the stream brought. */
+  readonly activity: readonly StreamEvent[];
 }
 
 export const INITIAL_CONNECTION: ConnectionState = {

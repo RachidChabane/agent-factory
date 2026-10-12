@@ -1,19 +1,27 @@
 import { Link } from 'react-router';
 import { Compass } from 'lucide-react';
-import { VIEW_PATHS } from '../model/routes.ts';
+import { useI18n } from '../i18n/I18nProvider.tsx';
+import { paths } from '../model/routes.ts';
 import { EmptyState } from '../ui/components/EmptyState.tsx';
 import { Page } from '../ui/layout/Page.tsx';
 
-export function NotFoundView() {
+interface NotFoundViewProps {
+  /** The identifier of a project that does not exist, when that is what the address named. */
+  readonly project?: string | undefined;
+}
+
+export function NotFoundView({ project }: NotFoundViewProps) {
+  const { t } = useI18n();
   return (
     <Page width="narrow">
       <EmptyState
         icon={<Compass size={16} />}
-        title="Cette page n’existe pas"
-        description="Le lien est peut-être ancien, ou l’élément a été supprimé."
+        headingLevel={1}
+        title={project === undefined ? t('shell.notFoundTitle') : t('shell.projectNotFoundTitle', { project })}
+        description={project === undefined ? t('shell.notFoundDescription') : t('shell.projectNotFoundDescription')}
         action={
-          <Link to={VIEW_PATHS.board} className="link">
-            Revenir au tableau
+          <Link to={paths.board()} className="link">
+            {t('shell.backToBoard')}
           </Link>
         }
       />

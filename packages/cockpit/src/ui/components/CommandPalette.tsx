@@ -1,6 +1,7 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { CornerDownLeft, Search } from 'lucide-react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { Kbd } from './Kbd.tsx';
 
 export interface PaletteItem {
@@ -19,7 +20,7 @@ export function normalizeSearch(text: string): string {
   return text
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
-    .toLocaleLowerCase('fr-FR');
+    .toLowerCase();
 }
 
 export function filterPaletteItems(items: readonly PaletteItem[], query: string): readonly PaletteItem[] {
@@ -44,7 +45,6 @@ interface CommandPaletteProps {
   readonly open: boolean;
   readonly onClose: () => void;
   readonly items: readonly PaletteItem[];
-  readonly placeholder?: string | undefined;
 }
 
 function groupItems(items: readonly PaletteItem[]): readonly { readonly group: string; readonly items: readonly PaletteItem[] }[] {
@@ -53,7 +53,8 @@ function groupItems(items: readonly PaletteItem[]): readonly { readonly group: s
   return [...groups.entries()].map(([group, groupItemsList]) => ({ group, items: groupItemsList }));
 }
 
-export function CommandPalette({ open, onClose, items, placeholder = 'Rechercher ou lancer une action…' }: CommandPaletteProps) {
+export function CommandPalette({ open, onClose, items }: CommandPaletteProps) {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -106,7 +107,7 @@ export function CommandPalette({ open, onClose, items, placeholder = 'Rechercher
     <dialog
       ref={dialogRef}
       className="ds-palette"
-      aria-label="Palette de commandes"
+      aria-label={t('palette.label')}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -123,7 +124,7 @@ export function CommandPalette({ open, onClose, items, placeholder = 'Rechercher
               ref={inputRef}
               className="ds-palette__input"
               value={query}
-              placeholder={placeholder}
+              placeholder={t('palette.placeholder')}
               role="combobox"
               aria-expanded="true"
               aria-controls={listId}
@@ -135,10 +136,10 @@ export function CommandPalette({ open, onClose, items, placeholder = 'Rechercher
               }}
               onKeyDown={onKeyDown}
             />
-            <Kbd>Échap</Kbd>
+            <Kbd>{t('palette.escape')}</Kbd>
           </div>
-          <div className="ds-palette__results" id={listId} role="listbox" aria-label="Résultats">
-            {ordered.length === 0 ? <p className="ds-palette__empty">Aucun résultat pour « {query} »</p> : null}
+          <div className="ds-palette__results" id={listId} role="listbox" aria-label={t('palette.results')}>
+            {ordered.length === 0 ? <p className="ds-palette__empty">{t('palette.empty', { query })}</p> : null}
             {grouped.map((group) => (
               <div key={group.group} role="group" aria-label={group.group} className="ds-palette__group">
                 <p className="ds-palette__group-title small-caps" aria-hidden="true">
@@ -173,13 +174,13 @@ export function CommandPalette({ open, onClose, items, placeholder = 'Rechercher
           <footer className="ds-palette__footer">
             <span>
               <Kbd>↑</Kbd>
-              <Kbd>↓</Kbd> naviguer
+              <Kbd>↓</Kbd> {t('palette.navigate')}
             </span>
             <span>
-              <Kbd>↵</Kbd> ouvrir
+              <Kbd>↵</Kbd> {t('palette.open')}
             </span>
             <span>
-              <Kbd>⌘K</Kbd> basculer
+              <Kbd>⌘K</Kbd> {t('palette.toggle')}
             </span>
           </footer>
         </div>

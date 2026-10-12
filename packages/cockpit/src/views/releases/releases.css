@@ -126,21 +126,6 @@
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-.release-commit__audit {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--text-12);
-  color: var(--text-muted);
-}
-.release-commit__audit:hover,
-.release-commit__issue:hover {
-  color: var(--accent-text);
-}
-.release-commit__issue {
-  font-size: var(--text-12);
-  color: var(--text-muted);
-}
 .release-health {
   display: grid;
   gap: var(--space-1-5);
@@ -178,5 +163,55 @@
   }
   .release-health__detail {
     grid-column: 2;
+  }
+}
+
+.release-timeline {
+  display: grid;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+.release-timeline__row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr);
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2-5) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.release-timeline__row:last-child {
+  border-bottom: 0;
+}
+.release-timeline__row dt {
+  display: grid;
+  gap: 2px;
+  font-weight: var(--weight-medium);
+}
+.release-timeline__hint {
+  font-size: var(--text-12);
+  font-weight: var(--weight-regular);
+  color: var(--text-subtle);
+}
+.release-timeline__row dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.release-commit__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-12);
+  color: var(--text-muted);
+}
+.release-commit__link:hover {
+  color: var(--accent-text);
+}
+
+@media (max-width: 760px) {
+  .release-timeline__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
   }
 }

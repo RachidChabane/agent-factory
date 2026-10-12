@@ -1,25 +1,26 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 
 interface PageHeaderProps {
   readonly title: ReactNode;
   readonly count?: number | undefined;
+  /** What the count counts; "in total" when absent. */
   readonly countLabel?: string | undefined;
   readonly description?: ReactNode | undefined;
   readonly actions?: ReactNode | undefined;
 }
 
-export function PageHeader({ title, count, countLabel = 'au total', description, actions }: PageHeaderProps) {
+export function PageHeader({ title, count, countLabel, description, actions }: PageHeaderProps) {
+  const { t, fmt } = useI18n();
   return (
     <header className="page-header">
       <div className="page-header__heading">
         <h1 className="page-header__title">
           {title}
           {count === undefined ? null : (
-            <span className="page-header__count num">
-              {count} {countLabel}
-            </span>
+            <span className="page-header__count num">{countLabel === undefined ? t('common.countInTotal', { count }) : `${fmt.integer(count)} ${countLabel}`}</span>
           )}
         </h1>
         {description === undefined ? null : <p className="page-header__description">{description}</p>}
@@ -57,6 +58,53 @@ export function SplitLayout({ list, detail, hasSelection, listLabel, listWidth =
         {detail}
       </section>
     </div>
+  );
+}
+
+interface ListPaneProps {
+  readonly title: ReactNode;
+  readonly count?: number | undefined;
+  /** Buttons at the right of the title. */
+  readonly actions?: ReactNode | undefined;
+  /** Filters and search under the title. */
+  readonly toolbar?: ReactNode | undefined;
+  readonly children: ReactNode;
+}
+
+/** The list half of a list and detail page: a title with its count, optional filters, then the items. */
+export function ListPane({ title, count, actions, toolbar, children }: ListPaneProps) {
+  return (
+    <>
+      <header className="list-pane__header">
+        <div className="list-pane__title-row">
+          <h1 className="list-pane__title">
+            {title}
+            {count === undefined ? null : <span className="list-pane__count num">{count}</span>}
+          </h1>
+          {actions === undefined ? null : <div className="list-pane__actions">{actions}</div>}
+        </div>
+        {toolbar}
+      </header>
+      <div className="list-pane__items">{children}</div>
+    </>
+  );
+}
+
+interface ListSectionProps {
+  readonly title: string;
+  readonly count: number;
+  readonly children: ReactNode;
+}
+
+/** A titled group of items inside a list pane. */
+export function ListSection({ title, count, children }: ListSectionProps) {
+  return (
+    <section aria-label={title}>
+      <p className="list-pane__section-title small-caps">
+        {title} · {count}
+      </p>
+      {children}
+    </section>
   );
 }
 

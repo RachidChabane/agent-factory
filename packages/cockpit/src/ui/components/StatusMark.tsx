@@ -1,13 +1,5 @@
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { StatusMark as StatusMarkKind } from '../../model/status.ts';
-
-export const STATUS_MARK_LABELS: Readonly<Record<StatusMarkKind, string>> = {
-  running: 'En cours',
-  waiting: 'Attend votre action',
-  success: 'Réussi',
-  failed: 'Échec',
-  blocked: 'Bloqué',
-  idle: 'En attente',
-};
 
 const DEFAULT_SIZE = 16;
 
@@ -60,6 +52,7 @@ function Glyph({ mark }: { readonly mark: StatusMarkKind }) {
 }
 
 export function StatusMark({ mark, size = DEFAULT_SIZE, label }: StatusMarkProps) {
+  const { t } = useI18n();
   return (
     <svg
       className={`ds-mark ds-mark--${mark}`}
@@ -67,7 +60,7 @@ export function StatusMark({ mark, size = DEFAULT_SIZE, label }: StatusMarkProps
       height={size}
       viewBox="0 0 16 16"
       role="img"
-      aria-label={label ?? STATUS_MARK_LABELS[mark]}
+      aria-label={label ?? t(`mark.${mark}`)}
     >
       <Glyph mark={mark} />
     </svg>

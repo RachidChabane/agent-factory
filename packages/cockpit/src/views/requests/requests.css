@@ -1,17 +1,26 @@
-.requests-list__state {
+.request-list__state {
   font-size: var(--text-12);
   color: var(--text-subtle);
 }
-.requests-list__state--waiting {
+.request-list__state--waiting {
   color: var(--mark-waiting);
 }
-.requests-list__state--running {
+.request-list__state--running {
   color: var(--mark-running);
 }
 
-.request-detail__running {
+.request-detail {
+  min-width: 0;
+}
+.request-notice--link {
   color: inherit;
 }
+.request-notice__text {
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .request-body {
   margin: 0;
   padding: var(--space-4);
@@ -28,17 +37,42 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  min-width: 0;
 }
 .request-attachment {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+.request-attachment a {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1-5);
+  min-width: 0;
   max-width: 100%;
   padding: var(--space-1) var(--space-2-5);
   border-radius: var(--radius-pill);
   background: var(--surface-3);
   color: var(--text-muted);
   font-size: var(--text-12);
+}
+.request-attachment a:hover {
+  color: var(--text);
+}
+.request-attachment--image a {
+  display: grid;
+  gap: var(--space-1-5);
+  padding: var(--space-1-5);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.request-attachment--image img {
+  width: 160px;
+  max-width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
 }
 .request-reply {
   padding: var(--space-4);
@@ -55,6 +89,15 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1-5);
+}
+.challenge-meta {
+  font-size: var(--text-12);
+  overflow-wrap: anywhere;
+}
+.challenge-summary {
+  color: var(--text-muted);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 .challenge-items {
   display: grid;
@@ -80,6 +123,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2-5);
+  min-width: 0;
 }
 .challenge-item__index {
   display: grid;
@@ -98,9 +142,11 @@
   min-width: 0;
   font-size: var(--text-14);
   font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
 }
 .challenge-item__reason {
   color: var(--text-muted);
+  overflow-wrap: anywhere;
 }
 .challenge-item__question {
   display: flex;
@@ -111,6 +157,7 @@
   background: var(--mark-waiting-soft);
   color: var(--text);
   font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
 }
 .challenge-item__question svg {
   flex: none;
@@ -122,6 +169,9 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2-5) var(--space-5);
   margin: 0;
+}
+.challenge-item__facet {
+  min-width: 0;
 }
 .challenge-item__facet dt {
   font-size: var(--text-11);
@@ -136,6 +186,7 @@
   color: var(--text-muted);
   font-size: var(--text-12);
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 .challenge-item__sources {
   display: flex;
@@ -147,12 +198,12 @@
   align-items: center;
   gap: var(--space-1-5);
   max-width: 100%;
+  min-width: 0;
   padding: 2px var(--space-2);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface-2);
   font-size: var(--text-11);
-  min-width: 0;
 }
 .challenge-source__label {
   color: var(--text);
@@ -165,6 +216,13 @@
   min-width: 0;
 }
 
+.request-specs__selection {
+  align-self: center;
+  font-size: var(--text-12);
+}
+.request-specs__chosen {
+  margin-top: var(--space-2);
+}
 .spec-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -173,7 +231,7 @@
 .spec-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-2-5);
+  gap: var(--space-3);
   padding: var(--space-4);
   border-radius: var(--radius-card);
   border: 1px solid var(--border);
@@ -188,6 +246,7 @@
   align-items: center;
   gap: var(--space-2-5);
   flex-wrap: wrap;
+  min-width: 0;
 }
 .spec-card__check {
   width: 16px;
@@ -200,47 +259,20 @@
   min-width: 0;
   font-size: var(--text-14);
   font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
 }
-.spec-card__need {
-  color: var(--text-muted);
-}
-.spec-card__criteria {
-  font-size: var(--text-13);
-}
-.spec-card__facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin: 0;
-  padding-top: var(--space-2-5);
-  border-top: 1px solid var(--border);
-}
-.spec-card__facts dt {
-  font-size: var(--text-11);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-subtle);
-  margin-bottom: 2px;
-}
-.spec-card__facts dd {
-  margin: 0;
+.spec-card__sources {
   font-size: var(--text-12);
-  color: var(--text-muted);
 }
-.spec-card--editing {
-  gap: var(--space-3);
-  border-color: var(--accent);
+.spec-card .spec-content {
+  padding: 0;
+  border: 0;
+  background: none;
 }
-.spec-card__edit-row {
+.spec-edit__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 200px);
   gap: var(--space-3);
-}
-.spec-card__edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
 }
 
 .request-issues {
@@ -258,77 +290,21 @@
   border: 1px solid var(--border);
   background: var(--surface-1);
 }
-.request-issue:hover {
+a.request-issue:hover {
   border-color: var(--border-strong);
+}
+.request-issue--missing {
+  grid-template-columns: auto minmax(0, 1fr);
+  color: var(--text-muted);
 }
 .request-issue__state {
   font-size: var(--text-12);
   color: var(--text-subtle);
 }
 
-.new-request__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: var(--space-3);
-}
-.new-request__drop {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1-5);
-  flex-wrap: wrap;
-  padding: var(--space-4);
-  border-radius: var(--radius-card);
-  border: 1px dashed var(--border-heavy);
-  color: var(--text-muted);
-  font-size: var(--text-12);
-  transition:
-    border-color var(--duration) var(--ease-out),
-    background-color var(--duration) var(--ease-out);
-}
-.new-request__drop.is-dragging {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-.new-request__browse {
-  cursor: pointer;
-}
-.new-request__previews {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.new-request__preview {
-  position: relative;
-  width: 96px;
-  height: 72px;
-  border-radius: var(--radius-control);
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-.new-request__preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.new-request__remove {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgb(0 0 0 / 0.65);
-  color: #fff;
-}
-
 @media (max-width: 760px) {
   .challenge-item__facets,
-  .spec-card__facts,
-  .new-request__row,
-  .spec-card__edit-row {
+  .spec-edit__row {
     grid-template-columns: minmax(0, 1fr);
   }
   .request-issue {

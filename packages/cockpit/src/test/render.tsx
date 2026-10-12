@@ -1,18 +1,17 @@
 import type { ReactElement } from 'react';
-import { render, screen } from '@testing-library/react';
-import type { RenderResult } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router';
-import { CockpitProvider } from '../app/context.tsx';
-import type { CockpitServices } from '../app/services.ts';
-import { createCockpitServices } from '../app/services.ts';
-import { ThemeProvider } from '../app/ThemeProvider.tsx';
+import { Route, Routes } from 'react-router';
+import { AppRoutes } from '../app/AppRoutes.tsx';
+import { Shell } from '../app/Shell.tsx';
+import { SnapshotGate } from '../app/SnapshotGate.tsx';
 import type { CockpitSnapshot } from '../contract/index.ts';
-import { fixedClock } from '../model/clock.ts';
-import { ToastProvider } from '../ui/components/Toast.tsx';
-import { FakeTransport } from './fake-transport.ts';
+import type { RenderedView, RenderOptions } from './harness.tsx';
+import { renderInProviders, TEST_NOW } from './harness.tsx';
 import { buildWorld } from './fixtures/world.ts';
 
-export const TEST_NOW = Date.parse('2026-10-10T09:30:00.000Z');
+export { renderWidget, TEST_NOW, TEST_TIME_ZONE } from './harness.tsx';
+export type { RenderedView, RenderOptions } from './harness.tsx';
+
+const DEFAULT_PATH = '/';
 
 export function fixtureSnapshot(): CockpitSnapshot {
   return buildWorld(TEST_NOW).snapshot;
@@ -23,43 +22,42 @@ export function fixtureRunLogs(): ReadonlyMap<string, unknown> {
   return new Map([...logs.entries()].map(([runId, lines]) => [runId, { runId, total: lines.length, lines }]));
 }
 
-export interface RenderOptions {
-  readonly path?: string | undefined;
-  readonly route?: string | undefined;
-  readonly snapshot?: CockpitSnapshot | undefined;
+export function fixtureDiffs(): ReadonlyMap<string, unknown> {
+  return buildWorld(TEST_NOW).diffs;
 }
 
-export interface RenderedView extends RenderResult {
-  readonly transport: FakeTransport;
-  readonly services: CockpitServices;
+function withWorld(path: string, options: Omit<RenderOptions, 'path'>) {
+  return { ...options, path, snapshot: options.snapshot ?? fixtureSnapshot(), runLogs: fixtureRunLogs(), diffs: fixtureDiffs() };
 }
 
-export function createTestServices(snapshot: CockpitSnapshot): { readonly services: CockpitServices; readonly transport: FakeTransport } {
-  const transport = new FakeTransport(snapshot, snapshot.sequence);
-  for (const [runId, page] of fixtureRunLogs()) transport.runLogs.set(runId, page);
-  const services = createCockpitServices({ transport, clock: fixedClock(TEST_NOW), mode: 'mock', random: () => 0.5 });
-  return { services, transport };
-}
-
-export function renderWithCockpit(element: ReactElement, options: RenderOptions = {}): RenderedView {
-  const { services, transport } = createTestServices(options.snapshot ?? fixtureSnapshot());
-  const path = options.path ?? '/';
-  const result = render(
-    <ThemeProvider initial="dark">
-      <ToastProvider>
-        <CockpitProvider services={services}>
-          <MemoryRouter initialEntries={[path]}>
-            <Routes>
-              <Route path={options.route ?? '*'} element={element} />
-            </Routes>
-          </MemoryRouter>
-        </CockpitProvider>
-      </ToastProvider>
-    </ThemeProvider>,
+/** A component alone, in the providers and a router, over the fixture world once the snapshot is loaded. */
+export function renderWithCockpit(element: ReactElement, options: RenderOptions = {}): Promise<RenderedView> {
+  return renderInProviders(
+    <SnapshotGate>
+      <Routes>
+        <Route path="*" element={element} />
+      </Routes>
+    </SnapshotGate>,
+    withWorld(options.path ?? DEFAULT_PATH, options),
   );
-  return { ...result, transport, services };
 }
 
-export async function waitForSnapshot(text: string | RegExp): Promise<HTMLElement> {
-  return screen.findByText(text, undefined, { timeout: 2000 });
+/** The routes of the cockpit at an address, without the shell around them. */
+export function renderRoute(path: string, options: Omit<RenderOptions, 'path'> = {}): Promise<RenderedView> {
+  return renderInProviders(
+    <SnapshotGate>
+      <AppRoutes />
+    </SnapshotGate>,
+    withWorld(path, options),
+  );
+}
+
+/** The whole application at an address: the shell and the routes. */
+export function renderApp(path = DEFAULT_PATH, options: Omit<RenderOptions, 'path'> = {}): Promise<RenderedView> {
+  return renderInProviders(
+    <Shell>
+      <AppRoutes />
+    </Shell>,
+    withWorld(path, options),
+  );
 }

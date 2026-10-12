@@ -91,6 +91,21 @@ describe('HttpTransport', () => {
   });
 });
 
+describe('pull request diffs', () => {
+  it('asks for the diff of a pull request of a project at its own address', async () => {
+    const fetchFn = vi.fn(async () => jsonResponse(200, { pullRequestNumber: 57, files: [] }));
+    const transport = new HttpTransport(fetchFn, (url) => new FakeEventSource(url));
+    await expect(transport.loadPullRequestDiff('store front', 57)).resolves.toEqual({ pullRequestNumber: 57, files: [] });
+    expect(fetchFn).toHaveBeenCalledWith('/api/projects/store%20front/pull-requests/57/diff', { headers: { accept: 'application/json' } });
+  });
+
+  it('surfaces the refusal of the factory when it knows no such pull request', async () => {
+    const fetchFn = vi.fn(async () => jsonResponse(404, { error: 'no pull request 99' }));
+    const transport = new HttpTransport(fetchFn, (url) => new FakeEventSource(url));
+    await expect(transport.loadPullRequestDiff('storefront', 99)).rejects.toEqual(new TransportError('no pull request 99', 404));
+  });
+});
+
 describe('command token', () => {
   it('sends the token the page carries with every command', async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, { sequence: 1 }));

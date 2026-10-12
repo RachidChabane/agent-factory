@@ -1,7 +1,11 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { IconButton } from './IconButton.tsx';
+
+/** The field a dialog puts the cursor in when it opens: the one marked, else the first of its form. */
+const FIRST_FIELD_SELECTOR = '[data-autofocus], input:not([type="hidden"]):not([type="file"]), textarea, select';
 
 interface ModalSurfaceProps {
   readonly open: boolean;
@@ -15,13 +19,17 @@ interface ModalSurfaceProps {
 }
 
 function ModalSurface({ open, onClose, title, description, children, footer, variant, size = 'md' }: ModalSurfaceProps) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const descriptionId = useId();
   useEffect(() => {
     const dialog = ref.current;
     if (dialog === null) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      dialog.querySelector<HTMLElement>(FIRST_FIELD_SELECTOR)?.focus();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
   const onBackdrop = (event: MouseEvent<HTMLDialogElement>) => {
@@ -47,12 +55,12 @@ function ModalSurface({ open, onClose, title, description, children, footer, var
                 {title}
               </h2>
               {description === undefined ? null : (
-                <p id={descriptionId} className="ds-modal-description">
+                <div id={descriptionId} className="ds-modal-description">
                   {description}
-                </p>
+                </div>
               )}
             </div>
-            <IconButton label="Fermer" icon={<X size={16} />} size="sm" onClick={onClose} />
+            <IconButton label={t('common.close')} icon={<X size={16} />} size="sm" onClick={onClose} />
           </header>
           {children === undefined ? null : <div className={`ds-${variant}__body`}>{children}</div>}
           {footer === undefined ? null : <footer className={`ds-${variant}__footer`}>{footer}</footer>}

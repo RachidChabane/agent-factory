@@ -8,6 +8,7 @@ import {
   API_STATE_PATH,
   commandPath,
   eventsPath,
+  pullRequestDiffPath,
   runLogPath,
 } from '../contract/index.ts';
 import type { CockpitTransport, StreamHandlers, StreamSubscription } from './transport.ts';
@@ -66,6 +67,10 @@ export class HttpTransport implements CockpitTransport {
 
   async loadRunLog(runId: string, afterIndex: number | null): Promise<unknown> {
     return this.getJson(runLogPath(runId, afterIndex));
+  }
+
+  async loadPullRequestDiff(project: string, pullRequestNumber: number): Promise<unknown> {
+    return this.getJson(pullRequestDiffPath(project, pullRequestNumber));
   }
 
   async sendCommand(name: string, body: unknown): Promise<unknown> {

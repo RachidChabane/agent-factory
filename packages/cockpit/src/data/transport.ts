@@ -14,6 +14,8 @@ export interface CockpitTransport {
   loadSnapshot(): Promise<unknown>;
   openStream(afterSequence: number, handlers: StreamHandlers): StreamSubscription;
   loadRunLog(runId: string, afterIndex: number | null): Promise<unknown>;
+  /** What a pull request changes, file by file, read when asked for. */
+  loadPullRequestDiff(project: string, pullRequestNumber: number): Promise<unknown>;
   sendCommand(name: string, body: unknown): Promise<unknown>;
 }
 

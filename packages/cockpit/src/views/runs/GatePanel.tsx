@@ -1,37 +1,38 @@
-import type { LogEntry } from '../../data/run-log-entries.ts';
-import { clockTime } from '../../format/format.ts';
-import { GATE_STEP_OUTCOME_LABELS } from '../../i18n/labels.ts';
+import { useMemo } from 'react';
+import type { RunLogView } from '../../data/run-log-store.ts';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { useVocabulary } from '../../i18n/vocabulary.ts';
+import { Badge } from '../../ui/components/Badge.tsx';
 import { EmptyState } from '../../ui/components/EmptyState.tsx';
 import { StatusMark } from '../../ui/components/StatusMark.tsx';
-import { gateHistory } from './run-log-model.ts';
+import { Time } from '../../widgets/Time.tsx';
+import { gateHistory, gateStepMark } from './run-log-model.ts';
 
-const STEP_MARKS = { passed: 'success', failed: 'failed', skipped: 'idle' } as const;
+const MARK_SIZE = 14;
 
-export function GatePanel({ entries }: { readonly entries: readonly LogEntry[] }) {
-  const history = gateHistory(entries);
-  if (history.length === 0) {
-    return <EmptyState compact title="Le gate n’a pas encore tourné" description="Le hook Stop exécute le gate déterministe avant que l’agent puisse terminer." />;
-  }
+/** Every pass of the completion gate the agent went through, the latest first, with each step and what the steps that did not pass said. */
+export function GatePanel({ log }: { readonly log: RunLogView }) {
+  const { t } = useI18n();
+  const vocabulary = useVocabulary();
+  const history = useMemo(() => gateHistory(log.entries), [log]);
+  if (history.length === 0) return <EmptyState compact title={t('runs.gate.empty')} description={t('runs.gate.emptyDescription')} />;
   return (
-    <ol className="gate-history">
+    <ol className="gate-history" aria-label={t('runs.gate.list')}>
       {history.toReversed().map((gate, position) => (
         <li key={gate.index} className={`gate-run${gate.passed ? ' is-passed' : ' is-failed'}`}>
           <header className="gate-run__header">
             <StatusMark mark={gate.passed ? 'success' : 'failed'} />
-            <span className="gate-run__title">
-              {position === 0 ? 'Dernier passage' : `Passage ${history.length - position}`} · {gate.passed ? 'réussi' : 'en échec'}
-            </span>
-            <time className="gate-run__time num" dateTime={gate.at}>
-              {clockTime(gate.at)}
-            </time>
+            <span className="gate-run__title">{position === 0 ? t('runs.gate.latest') : t('runs.gate.pass', { number: history.length - position })}</span>
+            <Badge tone={gate.passed ? 'success' : 'failed'}>{vocabulary.gateStepOutcome(gate.passed ? 'passed' : 'failed')}</Badge>
+            <Time iso={gate.at} mode="time" className="gate-run__time num" />
           </header>
-          <ul className="gate-run__steps">
+          <ul className="gate-run__steps" aria-label={t('runs.gate.steps')}>
             {gate.steps.map((step) => (
               <li key={step.name} className="gate-run__step">
-                <StatusMark mark={STEP_MARKS[step.outcome]} size={14} />
+                <StatusMark mark={gateStepMark(step.outcome)} size={MARK_SIZE} label={vocabulary.gateStepOutcome(step.outcome)} />
                 <span className="gate-run__step-name mono">{step.name}</span>
-                <span className={`gate-run__step-outcome gate-run__step-outcome--${step.outcome}`}>{GATE_STEP_OUTCOME_LABELS[step.outcome]}</span>
-                {step.outcome === 'failed' ? <span className="gate-run__step-detail">{step.detail}</span> : null}
+                <span className={`gate-run__step-outcome gate-run__step-outcome--${step.outcome}`}>{vocabulary.gateStepOutcome(step.outcome)}</span>
+                {step.outcome === 'passed' ? null : <span className="gate-run__step-detail">{step.detail}</span>}
               </li>
             ))}
           </ul>

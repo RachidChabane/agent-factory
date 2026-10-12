@@ -1,6 +1,7 @@
-import type { CockpitSnapshot } from '../contract/index.ts';
-import type { ActivityEntry, CockpitState, ConnectionState, MessageChannel } from './state.ts';
-import { ACTIVITY_ENTRIES_KEPT, INITIAL_STATE, RECENT_REJECTIONS_KEPT } from './state.ts';
+import type { CockpitSnapshot, StreamEvent } from '../contract/index.ts';
+import { mergeActivity } from './activity.ts';
+import type { CockpitState, ConnectionState, MessageChannel } from './state.ts';
+import { INITIAL_STATE, RECENT_REJECTIONS_KEPT } from './state.ts';
 
 type Listener = () => void;
 
@@ -21,18 +22,34 @@ export class CockpitStore {
     };
   };
 
+  /** A freshly loaded snapshot replaces the previous one; events already seen stay in the feed. */
   replaceSnapshot(snapshot: CockpitSnapshot): void {
-    this.update({ ...this.state, snapshot, lastSequence: snapshot.sequence, loadError: null });
-  }
-
-  updateSnapshot(snapshot: CockpitSnapshot, lastSequence: number, activity: readonly ActivityEntry[]): void {
-    const merged = activity.length === 0 ? this.state.activity : [...activity.toReversed(), ...this.state.activity];
     this.update({
       ...this.state,
       snapshot,
-      lastSequence,
-      activity: merged.slice(0, ACTIVITY_ENTRIES_KEPT),
+      lastSequence: Math.max(this.state.lastSequence, snapshot.sequence),
+      loadError: null,
+      activity: mergeActivity(snapshot.activity, this.state.activity),
     });
+  }
+
+  /** Changes the snapshot in place, as telemetry and run logs do between two loads. */
+  patchSnapshot(update: (snapshot: CockpitSnapshot) => CockpitSnapshot): void {
+    const snapshot = this.state.snapshot;
+    if (snapshot === null) return;
+    const next = update(snapshot);
+    if (next !== snapshot) this.update({ ...this.state, snapshot: next });
+  }
+
+  /** Records an event of the stream once; an event already in the feed is ignored. */
+  recordEvent(event: StreamEvent): boolean {
+    if (this.state.activity.some((entry) => entry.sequence === event.sequence)) return false;
+    this.update({
+      ...this.state,
+      lastSequence: Math.max(this.state.lastSequence, event.sequence),
+      activity: mergeActivity([event], this.state.activity),
+    });
+    return true;
   }
 
   setConnection(connection: Partial<ConnectionState>): void {

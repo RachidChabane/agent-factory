@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 
 export const DIFF_LINE_KINDS = ['hunk', 'add', 'del', 'context'] as const;
 export type DiffLineKind = (typeof DIFF_LINE_KINDS)[number];
@@ -49,6 +50,7 @@ interface DiffViewerProps {
 }
 
 export function DiffViewer({ path, patch, additions, deletions }: DiffViewerProps) {
+  const { t } = useI18n();
   const lines = useMemo(() => parseUnifiedPatch(patch), [patch]);
   return (
     <figure className="ds-diff">
@@ -59,7 +61,7 @@ export function DiffViewer({ path, patch, additions, deletions }: DiffViewerProp
           <span className="ds-diff__del">−{deletions}</span>
         </span>
       </figcaption>
-      <div className="ds-diff__scroll" tabIndex={0} aria-label={`Différences de ${path}`}>
+      <div className="ds-diff__scroll" tabIndex={0} aria-label={t('diff.label', { path })}>
         <table className="ds-diff__table">
           <tbody>
             {lines.map((line, index) => (

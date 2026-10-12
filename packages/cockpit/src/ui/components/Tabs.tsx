@@ -4,6 +4,8 @@ import { useId, useRef } from 'react';
 export interface TabItem<T extends string> {
   readonly id: T;
   readonly label: string;
+  /** The full name of the item for assistive technology, when the visible label is short. */
+  readonly accessibleLabel?: string | undefined;
   readonly count?: number | undefined;
   readonly icon?: ReactNode | undefined;
 }
@@ -109,6 +111,8 @@ export function Segmented<T extends string>({ label, items, value, onChange, siz
             type="button"
             role="radio"
             aria-checked={selected}
+            aria-label={item.accessibleLabel}
+            title={item.accessibleLabel}
             tabIndex={selected ? 0 : -1}
             className={`ds-segmented__item${selected ? ' is-selected' : ''}`}
             onClick={() => onChange(item.id)}

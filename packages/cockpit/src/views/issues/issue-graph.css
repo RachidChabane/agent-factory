@@ -1,0 +1,212 @@
+.issue-graph {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  min-width: 0;
+}
+.issue-graph__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.issue-graph__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5) var(--space-4);
+  font-size: var(--text-12);
+  color: var(--text-muted);
+}
+.issue-graph__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+.issue-graph__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--mark-idle);
+}
+.issue-graph__swatch--running {
+  background: var(--mark-running);
+}
+.issue-graph__swatch--waiting {
+  background: var(--mark-waiting);
+}
+.issue-graph__swatch--success {
+  background: var(--mark-success);
+}
+.issue-graph__swatch--failed {
+  background: var(--mark-failed);
+}
+.issue-graph__swatch--blocked {
+  background: var(--mark-blocked);
+}
+.issue-graph__line {
+  width: 18px;
+  border-top: 1.5px solid var(--border-heavy);
+}
+.issue-graph__line--blocking {
+  border-top: 1.5px dashed var(--mark-blocked);
+}
+.issue-graph__zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.issue-graph__zoom-value {
+  min-width: 44px;
+  text-align: center;
+  font-size: var(--text-12);
+  color: var(--text-muted);
+}
+.issue-graph__note {
+  font-size: var(--text-12);
+}
+.issue-graph__viewport {
+  overflow: auto;
+  min-width: 0;
+  min-height: 360px;
+  max-height: calc(100dvh - 260px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(circle at 1px 1px, var(--border-strong) 1px, transparent 0) 0 0 / 22px 22px,
+    var(--surface-inset);
+}
+.issue-graph__sizer {
+  position: relative;
+}
+.issue-graph__canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+.issue-graph__edges {
+  position: absolute;
+  inset: 0;
+  max-width: none;
+  overflow: visible;
+  pointer-events: none;
+}
+.issue-graph__edge {
+  fill: none;
+  stroke: var(--border-heavy);
+  stroke-width: 1.5;
+}
+.issue-graph__edge.is-blocking {
+  stroke: var(--mark-blocked);
+  stroke-dasharray: 5 4;
+}
+.issue-graph__arrow {
+  fill: var(--border-heavy);
+}
+.issue-graph__arrow.is-blocking {
+  fill: var(--mark-blocked);
+}
+.issue-graph__nodes {
+  position: absolute;
+  inset: 0;
+}
+.issue-graph__item {
+  position: absolute;
+}
+.issue-node {
+  --node: var(--mark-idle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--node);
+  overflow: hidden;
+  transition: border-color var(--duration) var(--ease-out);
+}
+.issue-node--running {
+  --node: var(--mark-running);
+}
+.issue-node--waiting {
+  --node: var(--mark-waiting);
+}
+.issue-node--success {
+  --node: var(--mark-success);
+}
+.issue-node--failed {
+  --node: var(--mark-failed);
+}
+.issue-node--blocked {
+  --node: var(--mark-blocked);
+}
+.issue-node.is-blocked {
+  border-style: dashed;
+}
+.issue-node:hover,
+.issue-node:focus-visible {
+  border-color: var(--node);
+}
+.issue-node:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.issue-node__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-11);
+  color: var(--text-subtle);
+}
+.issue-node__number {
+  font-weight: var(--weight-semibold);
+  flex: none;
+}
+.issue-node__type {
+  min-width: 0;
+}
+.issue-node__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--text-13);
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.issue-node__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin-top: auto;
+  font-size: var(--text-11);
+  color: var(--text-muted);
+}
+.issue-node__missing {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-heavy);
+  color: var(--text-muted);
+  font-size: var(--text-11);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .issue-graph__viewport {
+    max-height: calc(100dvh - 220px);
+  }
+}

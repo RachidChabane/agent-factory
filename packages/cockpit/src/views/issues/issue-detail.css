@@ -1,0 +1,296 @@
+.issue-detail__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+.issue-actions__hint {
+  align-self: center;
+  max-width: 280px;
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+  overflow-wrap: anywhere;
+}
+.issue-notice__text {
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.issue-notice--link {
+  color: inherit;
+}
+
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  overflow-x: auto;
+}
+.pipeline__stage {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1-5);
+  font-size: var(--text-11);
+  color: var(--text-subtle);
+  text-align: center;
+}
+.pipeline__stage::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: calc(-50% + 8px);
+  right: calc(50% + 8px);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--border-strong);
+}
+.pipeline__stage:first-child::before {
+  display: none;
+}
+.pipeline__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border-heavy);
+  background: var(--surface-1);
+}
+.pipeline__stage--done {
+  color: var(--text-muted);
+}
+.pipeline__stage--done::before,
+.pipeline__stage--current::before,
+.pipeline__stage--stuck::before {
+  background: var(--mark-success);
+}
+.pipeline__stage--done .pipeline__dot {
+  border-color: var(--mark-success);
+  background: var(--mark-success);
+}
+.pipeline__stage--current {
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}
+.pipeline__stage--current .pipeline__dot {
+  border-color: var(--mark-running);
+  box-shadow: 0 0 0 4px var(--mark-running-soft);
+}
+.pipeline__stage--stuck {
+  color: var(--mark-failed);
+  font-weight: var(--weight-semibold);
+}
+.pipeline__stage--stuck .pipeline__dot {
+  border-color: var(--mark-failed);
+  box-shadow: 0 0 0 4px var(--mark-failed-soft);
+}
+
+.issue-deps {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  min-width: 0;
+}
+.issue-deps__summary {
+  color: var(--mark-running);
+  font-size: var(--text-12);
+}
+.issue-deps__group {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.issue-deps__none {
+  font-size: var(--text-12);
+}
+.issue-deps__list {
+  display: grid;
+  gap: var(--space-1);
+}
+.issue-deps__item,
+.issue-deps__missing {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2-5);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  min-width: 0;
+}
+.issue-deps__missing {
+  grid-template-columns: auto minmax(0, 1fr);
+  color: var(--text-muted);
+  border-style: dashed;
+}
+.issue-deps__item:hover {
+  border-color: var(--border-strong);
+}
+.issue-deps__state {
+  font-size: var(--text-11);
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+
+.issue-checks {
+  display: grid;
+  gap: var(--space-2);
+}
+.issue-check {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  min-width: 0;
+}
+.issue-check__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.issue-check__path {
+  overflow-wrap: anywhere;
+}
+.issue-check__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+}
+.issue-check__proof {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  font-size: var(--text-12);
+}
+.issue-check__hash {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted);
+}
+.issue-check__detail {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.issue-check__screenshot {
+  grid-column: 1 / -1;
+  max-width: 360px;
+}
+.issue-check__screenshot img {
+  width: 100%;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border);
+}
+
+.attempts {
+  display: grid;
+  gap: 0;
+}
+.attempt {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+.attempt::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 16px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.attempt:last-child::before {
+  display: none;
+}
+.attempt__dot {
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 50%;
+  border: 2px solid var(--mark-idle);
+  background: var(--bg);
+  z-index: 1;
+}
+.attempt__dot--running {
+  border-color: var(--mark-running);
+}
+.attempt__dot--success {
+  border-color: var(--mark-success);
+  background: var(--mark-success);
+}
+.attempt__dot--failed {
+  border-color: var(--mark-failed);
+}
+.attempt__body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.attempt__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-weight: var(--weight-semibold);
+}
+.attempt__summary {
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.attempt__meta {
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+  overflow-wrap: anywhere;
+}
+
+.issue-cost {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  min-width: 0;
+}
+.issue-cost__amount {
+  font-size: var(--text-16);
+  font-weight: var(--weight-semibold);
+}
+
+@media (max-width: 1180px) {
+  .issue-detail__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .pipeline {
+    grid-template-columns: repeat(9, 72px);
+  }
+  .issue-check {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .issue-check__proof {
+    justify-content: flex-start;
+  }
+  .issue-deps__item {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+  .issue-deps__state {
+    display: none;
+  }
+}

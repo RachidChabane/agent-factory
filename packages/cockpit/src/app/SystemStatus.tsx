@@ -1,130 +1,165 @@
 import { useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { Gauge, MemoryStick } from 'lucide-react';
-import type { MemoryPressure, ResourceSample, SubscriptionWindowView } from '../contract/index.ts';
-import { percent, percentValue, untilTime } from '../format/format.ts';
-import { CONNECTION_STATUS_LABELS, MEMORY_PRESSURE_LABELS, WINDOW_LABELS, WINDOW_SHORT_LABELS } from '../i18n/labels.ts';
+import type { MemoryPressure, UsageAccountView, UsageLimitView } from '../contract/index.ts';
+import { useI18n } from '../i18n/I18nProvider.tsx';
+import { MINUTE_MS } from '../i18n/formatters.ts';
+import { useVocabulary } from '../i18n/vocabulary.ts';
+import { paths } from '../model/routes.ts';
+import { currentLimits, effectiveFreshness, latestReadFailed, limitTone } from '../model/usage.ts';
 import { Meter } from '../ui/components/Charts.tsx';
 import { Popover } from '../ui/components/Popover.tsx';
+import { AccountLabel } from '../widgets/AccountLabel.tsx';
+import { ReadStamp } from '../widgets/ReadStamp.tsx';
 import { useNow } from './context.tsx';
-import { useCockpitState, useSnapshot } from './hooks.ts';
-
-const SUBSCRIPTION_WARN_RATIO = 0.75;
-const SUBSCRIPTION_CRITICAL_RATIO = 0.9;
+import { useCockpitState, useMaybeSnapshot } from './hooks.ts';
 
 type MeterTone = 'success' | 'running' | 'failed';
 
 const PRESSURE_TONES: Readonly<Record<MemoryPressure, MeterTone>> = { normal: 'success', warn: 'running', critical: 'failed' };
 
-export function memoryTone(resources: ResourceSample): MeterTone {
-  if (resources.pressure !== 'normal') return PRESSURE_TONES[resources.pressure];
-  return resources.freeMemoryPercent < resources.thresholdPercent ? 'failed' : 'success';
+export function memoryTone(sample: { readonly freeMemoryPercent: number; readonly pressure: MemoryPressure }, minimumFreeMemoryPercent: number): MeterTone {
+  if (sample.pressure !== 'normal') return PRESSURE_TONES[sample.pressure];
+  return sample.freeMemoryPercent < minimumFreeMemoryPercent ? 'failed' : 'success';
 }
 
-export function subscriptionTone(utilization: number): MeterTone {
-  if (utilization >= SUBSCRIPTION_CRITICAL_RATIO) return 'failed';
-  if (utilization >= SUBSCRIPTION_WARN_RATIO) return 'running';
-  return 'success';
+function highestUtilization(accounts: readonly UsageAccountView[], now: number): number | null {
+  const utilizations = accounts.flatMap((account) => currentLimits(account, now)).map((limit) => limit.utilization);
+  return utilizations.length === 0 ? null : Math.max(...utilizations);
 }
 
-function ResourceGauge({ resources }: { readonly resources: ResourceSample }) {
+function LimitRow({ limit }: { readonly limit: UsageLimitView }) {
+  const { t, fmt } = useI18n();
+  const vocabulary = useVocabulary();
+  const now = useNow();
+  const name = limit.scope === null ? vocabulary.usageLimitKind(limit.kind) : `${vocabulary.usageLimitKind(limit.kind)} · ${limit.scope}`;
+  const freshness = effectiveFreshness(limit, now);
+  const showValue = freshness === 'fresh';
   return (
-    <span className="gauge gauge--memory">
-      <MemoryStick size={14} aria-hidden="true" className="gauge__icon" />
-      <span className="gauge__value num">{percentValue(resources.freeMemoryPercent)}</span>
-      <Meter
-        size="sm"
-        value={resources.freeMemoryPercent / 100}
-        marker={resources.thresholdPercent / 100}
-        tone={memoryTone(resources)}
-        label="Mémoire libre"
-        valueText={`${percentValue(resources.freeMemoryPercent)} libre, pression ${MEMORY_PRESSURE_LABELS[resources.pressure]}`}
-      />
-    </span>
-  );
-}
-
-function SubscriptionGauge({ windows }: { readonly windows: readonly SubscriptionWindowView[] }) {
-  return (
-    <span className="gauge gauge--subscription">
-      <Gauge size={14} aria-hidden="true" className="gauge__icon" />
-      {windows.map((window) => (
-        <span key={window.window} className={`gauge__window gauge__window--${window.window}`}>
-          <span className="gauge__label">{WINDOW_SHORT_LABELS[window.window]}</span>
-          <span className="gauge__value num">{percent(window.utilization)}</span>
-          <Meter
-            size="sm"
-            value={window.utilization}
-            tone={subscriptionTone(window.utilization)}
-            label={WINDOW_LABELS[window.window]}
-            valueText={percent(window.utilization)}
-          />
-        </span>
-      ))}
-    </span>
+    <div className="system-panel__window">
+      <div className="system-panel__row">
+        <span>{name}</span>
+        <strong className="num">{showValue ? fmt.percent(limit.utilization) : vocabulary.usageFreshness(freshness)}</strong>
+      </div>
+      {showValue ? <Meter value={limit.utilization} marker={limit.pauseAt} tone={limitTone(limit)} label={name} valueText={fmt.percent(limit.utilization)} /> : null}
+      {limit.resetsAt === null || freshness === 'window-reset' ? (
+        freshness === 'window-reset' ? <p className="system-panel__hint">{t('status.limitWindowReset')}</p> : null
+      ) : (
+        <p className="system-panel__hint">{t('status.limitResets', { when: fmt.until(limit.resetsAt, now) })}</p>
+      )}
+    </div>
   );
 }
 
 export function SystemStatus() {
-  const snapshot = useSnapshot();
+  const { t, fmt } = useI18n();
+  const vocabulary = useVocabulary();
+  const snapshot = useMaybeSnapshot();
   const connection = useCockpitState((state) => state.connection);
   const now = useNow();
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   if (snapshot === null) return <span className="system-status system-status--loading" aria-hidden="true" />;
-  const { resources } = snapshot;
-  const windows = snapshot.costs.subscription;
+  const { resources, usage, installation } = snapshot;
+  const sample = resources.sample.value;
+  const highest = highestUtilization(usage.accounts, now);
+  const slots = installation.runSlots;
   return (
     <span className="system-status-anchor">
-      <button
-        ref={anchor}
-        type="button"
-        className="system-status"
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-label="État de la machine et de l’abonnement"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <ResourceGauge resources={resources} />
+      <button ref={anchor} type="button" className="system-status" aria-expanded={open} aria-haspopup="dialog" aria-label={t('status.label')} onClick={() => setOpen((value) => !value)}>
+        {sample === null ? null : (
+          <span className="gauge gauge--memory">
+            <MemoryStick size={14} aria-hidden="true" className="gauge__icon" />
+            <span className="gauge__value num">{fmt.percentPoints(sample.freeMemoryPercent)}</span>
+            <Meter
+              size="sm"
+              value={sample.freeMemoryPercent / 100}
+              marker={resources.minimumFreeMemoryPercent / 100}
+              tone={memoryTone(sample, resources.minimumFreeMemoryPercent)}
+              label={t('status.memory')}
+              valueText={fmt.percentPoints(sample.freeMemoryPercent)}
+            />
+          </span>
+        )}
         <span className="system-status__divider" aria-hidden="true" />
-        <SubscriptionGauge windows={windows} />
+        <span className="gauge gauge--slots">
+          <span className="gauge__label">{t('sidebar.slots', { running: fmt.integer(slots.running), limit: fmt.integer(slots.limit) })}</span>
+        </span>
+        {highest === null ? null : (
+          <>
+            <span className="system-status__divider" aria-hidden="true" />
+            <span className="gauge gauge--subscription">
+              <Gauge size={14} aria-hidden="true" className="gauge__icon" />
+              <span className="gauge__label">{t('status.gaugeUsage')}</span>
+              <span className="gauge__value num">{fmt.percent(highest)}</span>
+            </span>
+          </>
+        )}
         <span className={`connection-dot connection-dot--${connection.status}`} aria-hidden="true" />
       </button>
-      <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchor} label="État du système" width={320}>
+      <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchor} label={t('status.label')} width={340}>
         <div className="system-panel">
           <section className="system-panel__section">
-            <p className="small-caps">Machine</p>
-            <div className="system-panel__row">
-              <span>Mémoire libre</span>
-              <strong className="num">{percentValue(resources.freeMemoryPercent)}</strong>
-            </div>
-            <Meter
-              value={resources.freeMemoryPercent / 100}
-              marker={resources.thresholdPercent / 100}
-              tone={memoryTone(resources)}
-              label="Mémoire libre"
-              valueText={percentValue(resources.freeMemoryPercent)}
-            />
-            <p className="system-panel__hint">
-              Pression {MEMORY_PRESSURE_LABELS[resources.pressure]} · seuil {percentValue(resources.thresholdPercent)} ·{' '}
-              {resources.schedulingPaused ? 'nouveaux runs suspendus' : 'nouveaux runs autorisés'}
-            </p>
+            <p className="small-caps">{t('status.machine')}</p>
+            {sample === null ? (
+              <p className="system-panel__hint">{t('status.noSample')}</p>
+            ) : (
+              <>
+                <div className="system-panel__row">
+                  <span>{t('status.memory')}</span>
+                  <strong className="num">{fmt.percentPoints(sample.freeMemoryPercent)}</strong>
+                </div>
+                <Meter
+                  value={sample.freeMemoryPercent / 100}
+                  marker={resources.minimumFreeMemoryPercent / 100}
+                  tone={memoryTone(sample, resources.minimumFreeMemoryPercent)}
+                  label={t('status.memory')}
+                  valueText={fmt.percentPoints(sample.freeMemoryPercent)}
+                />
+                <p className="system-panel__hint">
+                  {t('status.memoryDetail', { pressure: vocabulary.memoryPressure(sample.pressure), threshold: fmt.percentPoints(resources.minimumFreeMemoryPercent) })} ·{' '}
+                  {resources.schedulingPaused ? t('status.schedulingPaused') : t('status.schedulingAllowed')}
+                </p>
+              </>
+            )}
+            <ReadStamp readAt={resources.sample.readAt} error={resources.sample.error} kind="resources" />
           </section>
           <section className="system-panel__section">
-            <p className="small-caps">Abonnement Claude</p>
-            {windows.map((window) => (
-              <div key={window.window} className="system-panel__window">
-                <div className="system-panel__row">
-                  <span>{WINDOW_LABELS[window.window]}</span>
-                  <strong className="num">{percent(window.utilization)}</strong>
+            <p className="small-caps">{t('status.slots')}</p>
+            <div className="system-panel__row">
+              <span>{t('status.slotsValue', { running: fmt.integer(slots.running), limit: fmt.integer(slots.limit) })}</span>
+              {slots.queued > 0 ? <strong className="num">{t('sidebar.queued', { count: fmt.integer(slots.queued) })}</strong> : null}
+            </div>
+          </section>
+          <section className="system-panel__section">
+            <p className="small-caps">{t('status.subscription')}</p>
+            {usage.accounts.every((account) => account.limits.length === 0) ? <p className="system-panel__hint">{t('status.noUsage')}</p> : null}
+            {usage.accounts
+              .filter((account) => account.limits.length > 0)
+              .map((account) => (
+                <div key={account.name} className="system-panel__account">
+                  <p className="system-panel__account-name">
+                    <AccountLabel name={account.name} identity={account.identity} />
+                  </p>
+                  {account.limits.map((limit) => (
+                    <LimitRow key={`${limit.kind}-${limit.scope ?? ''}`} limit={limit} />
+                  ))}
+                  <ReadStamp
+                    readAt={account.readAt}
+                    error={latestReadFailed(account) ? (account.lastFailure?.reason ?? null) : null}
+                    staleAfterMs={usage.staleAfterMinutes * MINUTE_MS}
+                  />
                 </div>
-                <Meter value={window.utilization} tone={subscriptionTone(window.utilization)} label={WINDOW_LABELS[window.window]} valueText={percent(window.utilization)} />
-                <p className="system-panel__hint">Réinitialisation {untilTime(window.resetsAt, now)}</p>
-              </div>
-            ))}
+              ))}
+            <Link to={paths.usage()} className="link" onClick={() => setOpen(false)}>
+              {t('status.openUsage')}
+            </Link>
           </section>
           <section className="system-panel__section system-panel__section--inline">
             <span className={`connection-dot connection-dot--${connection.status}`} aria-hidden="true" />
-            <span>{CONNECTION_STATUS_LABELS[connection.status]}</span>
+            <span>
+              {t('status.connection')}: {t(`connection.${connection.status}`)}
+            </span>
           </section>
         </div>
       </Popover>

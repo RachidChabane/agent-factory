@@ -1,53 +1,58 @@
-import { GitMerge } from 'lucide-react';
-import { useCommand } from '../../app/hooks.ts';
+import { useProject } from '../../app/ProjectRoute.tsx';
 import type { PullRequestView } from '../../contract/index.ts';
-import { shortSha } from '../../format/format.ts';
-import { Button } from '../../ui/components/Button.tsx';
+import type { Translate } from '../../i18n/create-i18n.ts';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { shortSha } from '../../model/identifiers.ts';
 import { PropertyList } from '../../ui/components/Card.tsx';
-import { Dialog } from '../../ui/components/Dialog.tsx';
+import { CommandDialog } from '../../widgets/CommandDialog.tsx';
+import type { ChecksDigest } from './pull-request-model.ts';
+import { digestChecks } from './pull-request-model.ts';
+
+const CHECKS_SEPARATOR = ' · ';
+
+function describeChecks(checks: ChecksDigest, t: Translate): string {
+  if (checks.kind === 'unread') return t('pullRequests.merge.checksUnread');
+  if (checks.kind === 'none') return t('pullRequests.checksNone');
+  const summary = t('pullRequests.checksSummary', { passed: checks.passed, count: checks.total });
+  return checks.failingOnBase === 0 ? summary : [summary, t('pullRequests.merge.checksFailingOnBase', { count: checks.failingOnBase })].join(CHECKS_SEPARATOR);
+}
 
 interface MergeDialogProps {
   readonly pullRequest: PullRequestView;
-  readonly open: boolean;
   readonly onClose: () => void;
 }
 
-export function MergeDialog({ pullRequest, open, onClose }: MergeDialogProps) {
-  const command = useCommand();
-  const passing = pullRequest.checks.filter((check) => check.conclusion === 'success').length;
-  const confirm = () => {
-    void command
-      .run('pr.merge', { number: pullRequest.number, expectedHeadSha: pullRequest.headSha }, `#${pullRequest.number} mergée`)
-      .then((merged) => {
-        if (merged) onClose();
-      });
-  };
+/** What the operator is about to merge, and the head the factory will refuse to merge past. */
+export function MergeDialog({ pullRequest, onClose }: MergeDialogProps) {
+  const { t } = useI18n();
+  const project = useProject();
+  const checksText = describeChecks(digestChecks(pullRequest.checks), t);
   return (
-    <Dialog
-      open={open}
+    <CommandDialog
+      open
       onClose={onClose}
-      title={`Merger #${pullRequest.number} ?`}
-      description="L’usine fusionne la branche en squash sur la branche par défaut, uniquement si sa tête n’a pas bougé depuis cet écran."
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Annuler
-          </Button>
-          <Button variant="primary" icon={<GitMerge size={14} />} loading={command.pending === 'pr.merge'} onClick={confirm}>
-            Merger #{pullRequest.number}
-          </Button>
-        </>
-      }
+      command="pr.merge"
+      body={{ project: project.id, number: pullRequest.number, expectedHeadSha: pullRequest.headSha }}
+      title={t('pullRequests.merge.title', { number: pullRequest.number })}
+      description={t('pullRequests.merge.description', { branch: project.baseBranch })}
+      confirmLabel={t('pullRequests.merge.confirm', { number: pullRequest.number })}
     >
       <PropertyList
         items={[
-          { label: 'Pull request', value: pullRequest.title },
-          { label: 'Branche', value: <span className="mono">{pullRequest.branch}</span> },
-          { label: 'Tête attendue', value: <span className="mono">{shortSha(pullRequest.headSha)}</span> },
-          { label: 'Checks', value: `${passing} sur ${pullRequest.checks.length} réussis` },
-          { label: 'Preuves', value: pullRequest.evidenceComplete ? 'complètes' : 'incomplètes' },
+          { label: t('pullRequests.merge.pullRequest'), value: pullRequest.title },
+          { label: t('pullRequests.merge.branch'), value: <span className="mono">{pullRequest.branch}</span> },
+          {
+            label: t('pullRequests.merge.head'),
+            value: (
+              <span className="mono" title={pullRequest.headSha}>
+                {shortSha(pullRequest.headSha)}
+              </span>
+            ),
+          },
+          { label: t('pullRequests.merge.checks'), value: checksText },
+          { label: t('pullRequests.merge.evidence'), value: pullRequest.evidenceComplete ? t('pullRequests.evidence.complete') : t('pullRequests.evidence.incomplete') },
         ]}
       />
-    </Dialog>
+    </CommandDialog>
   );
 }

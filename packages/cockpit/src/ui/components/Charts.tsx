@@ -48,7 +48,7 @@ export function TrendLine({ points, label, format, tone = 'accent', threshold = 
         width="100%"
         height={height}
         role="img"
-        aria-label={`${label} : ${format(values.at(-1) ?? 0)}`}
+        aria-label={`${label}: ${format(values.at(-1) ?? 0)}`}
         onPointerMove={(event) => onMove(event.clientX, event.currentTarget.getBoundingClientRect())}
         onPointerLeave={() => setHover(null)}
       >

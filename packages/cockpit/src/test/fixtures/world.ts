@@ -1,51 +1,56 @@
-import { DEFAULT_ISSUE_TYPES } from '@agent-factory/domain';
-import type { CockpitSnapshot, RunLogLine } from '../../contract/index.ts';
-import { buildAudits, buildEnvironments, buildReleases, buildWorkflows } from './delivery.ts';
-import { buildIssues } from './issues.ts';
-import { buildCosts, buildHealth, buildKnowledge, buildResources, buildSettings } from './operations.ts';
-import { buildPullRequests } from './pull-requests.ts';
-import { buildRequests } from './requests.ts';
-import type { LiveScript } from './runs.ts';
+import type { CockpitSnapshot, PullRequestDiff, RunLogLine } from '../../contract/index.ts';
+import { diffKey } from '../fake-transport.ts';
+import { activityFeed } from './activity.ts';
+import { costsView } from './costs.ts';
+import { installationInfo, installationResources, installationSettings, installationTools } from './installation.ts';
+import { buildLedger } from './ledger/project.ts';
+import { ledgerDiffs } from './ledger/pull-requests.ts';
 import { buildRuns } from './runs.ts';
-import { fixtureClock, REPOSITORY } from './time.ts';
+import { buildStorefront } from './storefront/project.ts';
+import { storefrontDiffs } from './storefront/pull-requests.ts';
+import { fixtureClock } from './time.ts';
+import { usageView } from './usage.ts';
 
-export const INITIAL_SEQUENCE = 1842;
+export { LEDGER_ID, STOREFRONT_ID } from './project-ids.ts';
 
-export interface MockWorld {
+export interface FixtureWorld {
   readonly snapshot: CockpitSnapshot;
-  readonly logs: Map<string, RunLogLine[]>;
-  readonly live: readonly LiveScript[];
+  readonly logs: ReadonlyMap<string, readonly RunLogLine[]>;
+  /** The diffs the factory serves on demand, by `diffKey(project, pullRequestNumber)`. */
+  readonly diffs: ReadonlyMap<string, PullRequestDiff>;
 }
 
-export function buildWorld(now: number): MockWorld {
+export const INITIAL_SEQUENCE = 1_842;
+
+/** The whole fictional installation as it is `now`: two projects, their runs, the machine and the accounts. */
+export function buildWorld(now: number): FixtureWorld {
   const clock = fixtureClock(now);
-  const { runs, logs, live } = buildRuns(clock);
+  const runs = buildRuns(clock);
+  const installation = installationInfo(clock, runs);
+  const storefront = buildStorefront(clock, runs);
+  const ledger = buildLedger(clock, runs);
+  const projects = [storefront, ledger];
+  const diffs = new Map<string, PullRequestDiff>([
+    ...storefrontDiffs(clock, storefront.pullRequests).map((diff): [string, PullRequestDiff] => [diffKey(storefront.id, diff.pullRequestNumber), diff]),
+    ...ledgerDiffs(clock, ledger.pullRequests).map((diff): [string, PullRequestDiff] => [diffKey(ledger.id, diff.pullRequestNumber), diff]),
+  ]);
+  const usage = usageView(clock);
+  const tools = installationTools(clock);
   return {
     snapshot: {
       sequence: INITIAL_SEQUENCE,
       generatedAt: new Date(now).toISOString(),
-      factory: {
-        repository: REPOSITORY,
-        defaultBranch: 'main',
-        operator: 'Alex Morgan',
-        schedulerPaused: false,
-        issueTypes: DEFAULT_ISSUE_TYPES.map((type) => ({ id: type.id, label: type.label, proof: type.proof })),
-      },
-      requests: buildRequests(clock),
-      issues: buildIssues(clock),
-      runs,
-      pullRequests: buildPullRequests(clock),
-      workflows: buildWorkflows(clock),
-      environments: buildEnvironments(clock),
-      releases: buildReleases(clock),
-      audits: buildAudits(clock),
-      health: buildHealth(clock),
-      costs: buildCosts(clock),
-      knowledge: buildKnowledge(clock),
-      settings: buildSettings(clock),
-      resources: buildResources(clock),
+      installation,
+      activity: activityFeed({ installation, projects, runs: runs.runs, tools, usage }, INITIAL_SEQUENCE),
+      projects,
+      runs: [...runs.runs],
+      usage,
+      costs: costsView(clock, runs),
+      resources: installationResources(clock),
+      tools,
+      settings: installationSettings(),
     },
-    logs,
-    live,
+    logs: runs.logs,
+    diffs,
   };
 }

@@ -1,81 +1,71 @@
 import './audits.css';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'react-router';
 import { ShieldAlert } from 'lucide-react';
-import { useNow } from '../../app/context.tsx';
-import { useSnapshot } from '../../app/hooks.ts';
-import type { AuditView } from '../../contract/index.ts';
-import { relativeTime, toEpoch } from '../../format/format.ts';
-import { AUDIT_REASON_LABELS, AUDIT_STATE_LABELS } from '../../i18n/labels.ts';
-import { paths, VIEW_TITLES } from '../../model/routes.ts';
-import { auditMark } from '../../model/status.ts';
+import { useProject } from '../../app/ProjectRoute.tsx';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { EmptyState } from '../../ui/components/EmptyState.tsx';
-import { Skeleton } from '../../ui/components/Skeleton.tsx';
-import { StatusMark } from '../../ui/components/StatusMark.tsx';
-import { ListItemLink, SplitLayout } from '../../ui/layout/Page.tsx';
+import { Segmented } from '../../ui/components/Tabs.tsx';
+import { ListPane, ListSection, SplitLayout } from '../../ui/layout/Page.tsx';
 import { AuditDetail } from './AuditDetail.tsx';
+import { AuditListItem } from './AuditListItem.tsx';
+import type { AuditGroup, AuditListId } from './audit-model.ts';
+import { AUDIT_GROUPS, AUDIT_LISTS, groupAudits, orderedAudits } from './audit-model.ts';
+import { SkippedChanges } from './SkippedChanges.tsx';
 
-function needsOperator(audit: AuditView): boolean {
-  return (audit.state === 'challenge' || audit.state === 'rewrite') && !audit.resolved;
-}
-
-function sortAudits(audits: readonly AuditView[]): readonly AuditView[] {
-  return audits.toSorted((left, right) => Number(needsOperator(right)) - Number(needsOperator(left)) || toEpoch(right.detectedAt) - toEpoch(left.detectedAt));
-}
+const ICON_SIZE = 16;
 
 export function AuditsView() {
-  const snapshot = useSnapshot();
-  const now = useNow();
+  const { t } = useI18n();
+  const project = useProject();
   const { auditId } = useParams();
-  const sorted = useMemo(() => sortAudits(snapshot?.audits ?? []), [snapshot]);
-  const selected = auditId === undefined ? (sorted[0] ?? null) : (sorted.find((audit) => audit.id === auditId) ?? null);
-  if (snapshot === null) {
-    return (
-      <div className="detail">
-        <Skeleton width="40%" height={20} />
-        <Skeleton lines={8} />
-      </div>
-    );
-  }
+  const [list, setList] = useState<AuditListId>('audits');
+  const groups = useMemo(() => groupAudits(project.audits), [project.audits]);
+  const selected = auditId === undefined ? (orderedAudits(groups)[0] ?? null) : (project.audits.find((audit) => audit.id === auditId) ?? null);
+  const headings: Readonly<Record<AuditGroup, string>> = {
+    attention: t('audits.group.attention'),
+    inProgress: t('audits.group.inProgress'),
+    settled: t('audits.group.settled'),
+  };
+  const switches: Readonly<Record<AuditListId, { readonly label: string; readonly count: number; readonly accessibleLabel: string }>> = {
+    audits: { label: t('audits.view.audits'), count: project.audits.length, accessibleLabel: t('audits.view.auditsLabel', { count: project.audits.length }) },
+    skipped: { label: t('audits.view.skipped'), count: project.skippedChanges.length, accessibleLabel: t('audits.view.skippedLabel', { count: project.skippedChanges.length }) },
+  };
+  const switcher = (
+    <>
+      <Segmented size="sm" label={t('audits.viewLabel')} value={list} onChange={setList} items={AUDIT_LISTS.map((id) => ({ id, ...switches[id] }))} />
+      <p className="audits-list__hint">{t('audits.hint')}</p>
+    </>
+  );
   return (
     <SplitLayout
-      listLabel="Liste des audits"
+      listLabel={t('audits.listLabel')}
       hasSelection={auditId !== undefined}
       list={
-        <>
-          <header className="list-pane__header">
-            <h1 className="list-pane__title">
-              {VIEW_TITLES.audits} <span className="list-pane__count num">{sorted.length}</span>
-            </h1>
-            <p className="audits-list__hint">Chaque changement arrivé sur la branche par défaut sans passer par l’usine est audité.</p>
-          </header>
-          <div className="list-pane__items">
-            {sorted.map((audit) => (
-              <ListItemLink key={audit.id} to={paths.audit(audit.id)} active={audit.id === selected?.id}>
-                <StatusMark mark={auditMark(audit)} />
-                <span className="list-item__body">
-                  <span className="list-item__title">{audit.commitMessage}</span>
-                  <span className="list-item__meta">
-                    <span className="mono">{audit.id}</span>
-                    <span className="dot-separator" />
-                    <span className="truncate">{audit.authorName ?? audit.authorLogin ?? '—'}</span>
-                  </span>
-                  <span className={`audits-list__state${needsOperator(audit) ? ' is-attention' : ''}`}>
-                    {AUDIT_STATE_LABELS[audit.state]}
-                    {audit.resolved ? ' · résolu' : ''} · {AUDIT_REASON_LABELS[audit.reason]}
-                  </span>
-                </span>
-                <span className="list-item__aside num">{relativeTime(audit.detectedAt, now)}</span>
-              </ListItemLink>
-            ))}
-          </div>
-        </>
+        <ListPane title={t('audits.title')} count={project.audits.length} toolbar={switcher}>
+          {list === 'skipped' ? (
+            <SkippedChanges />
+          ) : (
+            <>
+              {project.audits.length === 0 ? <EmptyState compact icon={<ShieldAlert size={ICON_SIZE} />} title={t('audits.empty')} description={t('audits.emptyDescription')} /> : null}
+              {AUDIT_GROUPS.map((group) =>
+                groups[group].length === 0 ? null : (
+                  <ListSection key={group} title={headings[group]} count={groups[group].length}>
+                    {groups[group].map((audit) => (
+                      <AuditListItem key={audit.id} audit={audit} projectId={project.id} active={audit.id === selected?.id} />
+                    ))}
+                  </ListSection>
+                ),
+              )}
+            </>
+          )}
+        </ListPane>
       }
       detail={
         selected === null ? (
-          <EmptyState icon={<ShieldAlert size={16} />} title={auditId === undefined ? 'Aucun audit' : 'Audit introuvable'} description="Tout ce qui arrive sur main hors de l’usine apparaîtra ici." />
+          auditId === undefined ? null : <EmptyState icon={<ShieldAlert size={ICON_SIZE} />} headingLevel={2} title={t('audits.notFound')} description={t('audits.notFoundDescription')} />
         ) : (
-          <AuditDetail key={selected.id} audit={selected} snapshot={snapshot} />
+          <AuditDetail key={`${project.id}:${selected.id}`} audit={selected} />
         )
       }
     />

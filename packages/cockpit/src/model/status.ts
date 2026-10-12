@@ -1,10 +1,11 @@
-import type { AuditState, BaseTestResult, BranchTestResult, IssueState, ReleaseState, RequestState } from '@agent-factory/domain';
+import type { AuditState, BaseTestResult, BranchTestResult, IssueState, ReleaseState, RequestState, UsageFreshness } from '@agent-factory/domain';
 import { ACTIVE_PIPELINE_STATES, ISSUE_ABANDONED_STATE, MERGED_OR_BEYOND_STATES } from '@agent-factory/domain';
 import type {
   AuditView,
   CheckConclusion,
   DeploymentOutcome,
   EnvironmentStatus,
+  PullRequestState,
   RunStatus,
   ToolStatus,
   WorkflowRun,
@@ -69,8 +70,15 @@ const RELEASE_MARKS: Readonly<Record<ReleaseState, StatusMark>> = {
   verified: 'success',
 };
 
-export function releaseMark(state: ReleaseState): StatusMark {
-  return RELEASE_MARKS[state];
+/** A release another version has overtaken is settled history, whatever state it was left in. */
+export function releaseMark(state: ReleaseState, supersededBy: string | null = null): StatusMark {
+  return supersededBy === null ? RELEASE_MARKS[state] : 'idle';
+}
+
+const PULL_REQUEST_MARKS: Readonly<Record<PullRequestState, StatusMark>> = { open: 'running', merged: 'success', closed: 'blocked' };
+
+export function pullRequestMark(state: PullRequestState): StatusMark {
+  return PULL_REQUEST_MARKS[state];
 }
 
 const CONCLUSION_MARKS: Readonly<Record<CheckConclusion, StatusMark>> = {
@@ -106,6 +114,7 @@ const ENVIRONMENT_MARKS: Readonly<Record<EnvironmentStatus, StatusMark>> = {
   degraded: 'waiting',
   deploying: 'running',
   down: 'failed',
+  unknown: 'idle',
 };
 
 export function environmentMark(status: EnvironmentStatus): StatusMark {
@@ -119,8 +128,15 @@ const TOOL_MARKS: Readonly<Record<ToolStatus, StatusMark>> = {
   error: 'failed',
 };
 
-export function toolMark(status: ToolStatus): StatusMark {
-  return TOOL_MARKS[status];
+/** A tool never checked has no status to show: it is idle, not broken. */
+export function toolMark(status: ToolStatus | null): StatusMark {
+  return status === null ? 'idle' : TOOL_MARKS[status];
+}
+
+const FRESHNESS_MARKS: Readonly<Record<UsageFreshness, StatusMark>> = { fresh: 'success', stale: 'waiting', 'window-reset': 'idle' };
+
+export function freshnessMark(freshness: UsageFreshness): StatusMark {
+  return FRESHNESS_MARKS[freshness];
 }
 
 export function checksSummaryMark(conclusions: readonly CheckConclusion[]): StatusMark {

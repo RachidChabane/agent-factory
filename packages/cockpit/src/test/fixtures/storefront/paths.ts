@@ -1,0 +1,21 @@
+/** Where the frozen acceptance checks of each issue live in the repository. */
+export const CHECK_PATH = {
+  statusFilter: 'e2e/orders/status-filter.spec.ts',
+  statusFilterEmpty: 'e2e/orders/status-filter-empty.spec.ts',
+  pagination: 'api/src/routes/orders/__tests__/pagination.test.ts',
+  promoSavings: 'e2e/cart/promo-savings.spec.ts',
+  searchEval: 'evals/search/query-understanding.eval.json',
+  searchChips: 'web/src/search/filter-chips.test.ts',
+  searchJourney: 'e2e/search/natural-language-search.spec.ts',
+  checkoutJourney: 'e2e/checkout/keyboard-journey.spec.ts',
+  expiredPromo: 'web/src/cart/promo-messages.test.ts',
+  ciCache: '.github/workflows/__tests__/ci-cache.test.mjs',
+  deliveryBanner: 'e2e/product/delivery-banner.spec.ts',
+  promoRounding: 'api/src/promo/discount.test.ts',
+  cartBadge: 'web/src/cart/cart-badge.test.tsx',
+  savedAddress: 'api/src/accounts/__tests__/saved-address.test.ts',
+  reorderHistory: 'e2e/orders/reorder.spec.ts',
+  reorderPayment: 'e2e/orders/reorder-payment.spec.ts',
+  dateHelpers: 'web/src/lib/dates.test.ts',
+  localSetup: 'docs/development/local-setup.md',
+} as const;

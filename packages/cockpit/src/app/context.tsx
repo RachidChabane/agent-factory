@@ -13,6 +13,7 @@ export function useServices(): CockpitServices {
   return services;
 }
 
+/** The time the page is drawn at, refreshed every few seconds so that ages stay true. */
 export function useNow(): number {
   return useContext(NowContext);
 }

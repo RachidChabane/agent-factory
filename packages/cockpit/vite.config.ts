@@ -6,6 +6,14 @@ import { COCKPIT_DEV_SERVER_PORT, COMMAND_TOKEN_META_NAME } from './src/contract
 const DEFAULT_API_ORIGIN = 'http://127.0.0.1:7430';
 const TEST_WORKER_CEILING = 2;
 const CHUNK_WARNING_KILOBYTES = 600;
+const TEST_TIME_ZONE = 'UTC';
+
+/** Libraries that change less often than the cockpit itself, so a browser keeps them cached across releases. */
+const VENDOR_CHUNKS: Readonly<Record<string, string[]>> = {
+  react: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
+  router: ['react-router'],
+  schema: ['zod'],
+};
 
 const TOKEN_PATTERN = new RegExp(`<meta name="${COMMAND_TOKEN_META_NAME}" content="([0-9a-f]+)">`);
 
@@ -38,9 +46,11 @@ export default defineConfig(({ mode }) => {
       target: 'es2022',
       sourcemap: true,
       chunkSizeWarningLimit: CHUNK_WARNING_KILOBYTES,
+      rollupOptions: { output: { manualChunks: VENDOR_CHUNKS } },
     },
     test: {
       environment: 'jsdom',
+      env: { TZ: TEST_TIME_ZONE },
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.{ts,tsx}'],
       maxWorkers: TEST_WORKER_CEILING,

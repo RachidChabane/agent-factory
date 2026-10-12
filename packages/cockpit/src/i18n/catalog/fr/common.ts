@@ -1,0 +1,63 @@
+import type { TwinOf } from '../types.ts';
+import type { enCommon } from '../en/common.ts';
+
+export const frCommon = {
+  'common.appName': 'Agent Factory',
+  'common.agentName': 'Claude',
+  'common.close': 'Fermer',
+  'common.cancel': 'Annuler',
+  'common.confirm': 'Confirmer',
+  'common.save': 'Enregistrer',
+  'common.retry': 'Réessayer',
+  'common.copy': 'Copier',
+  'common.copied': 'Copié',
+  'common.copyCommand': 'Copier la commande',
+  'common.copyContent': 'Copier le contenu',
+  'common.copyIdentifier': 'Copier l’identifiant',
+  'common.loading': 'Chargement…',
+  'common.search': 'Rechercher',
+  'common.clear': 'Effacer',
+  'common.all': 'Tous',
+  'common.none': 'Aucun',
+  'common.reset': 'Réinitialiser',
+  'common.refresh': 'Actualiser',
+  'common.back': 'Retour',
+  'common.open': 'Ouvrir',
+  'common.edit': 'Modifier',
+  'common.add': 'Ajouter',
+  'common.remove': 'Retirer',
+  'common.send': 'Envoyer',
+  'common.yes': 'Oui',
+  'common.no': 'Non',
+  'common.project': 'Projet',
+  'common.openOnForge': 'Ouvrir sur la forge',
+  'common.countInTotal': '{count} au total',
+  'common.optional': 'facultatif',
+  'common.required': 'obligatoire',
+  'common.pageLoading': 'Chargement de la page',
+
+  'time.justNow': 'à l’instant',
+
+  'mark.running': 'En cours',
+  'mark.waiting': 'Action requise',
+  'mark.success': 'Réussi',
+  'mark.failed': 'Échec',
+  'mark.blocked': 'Bloqué',
+  'mark.idle': 'En attente',
+
+  'toast.dismiss': 'Fermer la notification',
+  'toast.commandFailed': 'La commande a échoué',
+  'toast.region': 'Notifications',
+
+  'diff.label': 'Modifications de {path}',
+  'compare.before': 'Avant',
+  'compare.after': 'Après',
+  'compare.slider': 'Curseur avant et après',
+  'compare.position': '{percent} % avant',
+
+  'agent.working': 'Agent au travail',
+  'chart.noData': 'Aucune donnée à tracer',
+
+  'pager.showMore': 'Afficher plus',
+  'pager.showLess': 'Afficher moins',
+} as const satisfies TwinOf<typeof enCommon>;

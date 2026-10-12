@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { CopyButton } from './CopyButton.tsx';
 
 interface CodeBlockProps {
@@ -11,12 +12,13 @@ interface CodeBlockProps {
 }
 
 export function CodeBlock({ code, title, copyable = true, maxHeight, tone = 'default', wrap = false }: CodeBlockProps) {
+  const { t } = useI18n();
   return (
     <figure className={`ds-code ds-code--${tone}`}>
       {title === undefined && !copyable ? null : (
         <figcaption className="ds-code__header">
           <span className="ds-code__title">{title}</span>
-          {copyable ? <CopyButton text={code} label="Copier le contenu" /> : null}
+          {copyable ? <CopyButton text={code} label={t('common.copyContent')} /> : null}
         </figcaption>
       )}
       <pre className={`ds-code__body${wrap ? ' is-wrapped' : ''}`} style={maxHeight === undefined ? undefined : { maxHeight }} tabIndex={0}>
@@ -31,10 +33,11 @@ interface InlineCommandProps {
 }
 
 export function InlineCommand({ command }: InlineCommandProps) {
+  const { t } = useI18n();
   return (
     <span className="ds-inline-command">
       <code className="truncate">{command}</code>
-      <CopyButton text={command} label="Copier la commande" />
+      <CopyButton text={command} label={t('common.copyCommand')} />
     </span>
   );
 }

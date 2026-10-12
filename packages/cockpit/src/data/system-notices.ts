@@ -4,9 +4,6 @@ const SYSTEM_TYPE = 'system';
 const STREAM_EVENT_TYPE = 'stream_event';
 const FAILED_HOOK_EXIT_CODE = 1;
 const FAILED_HOOK_OUTCOME = 'error';
-const SYSTEM_NOISE_PREFIX = 'système';
-const STREAM_NOISE_LABEL = 'flux de jetons';
-const NOISE_SEPARATOR = ' · ';
 
 const HookStartedSchema = z.object({
   type: z.literal(SYSTEM_TYPE),
@@ -55,7 +52,8 @@ export type SystemNotice =
   | { readonly kind: 'hook-response'; readonly hookName: string; readonly hookEvent: string; readonly exitCode: number | null; readonly output: string }
   | { readonly kind: 'task'; readonly phase: 'started' | 'finished'; readonly description: string; readonly status: string | null }
   | { readonly kind: 'notice'; readonly text: string }
-  | { readonly kind: 'noise'; readonly label: string };
+  /** A line the log shows only on request: a system event the cockpit does not interpret, or a token stream event (no subtype). */
+  | { readonly kind: 'noise'; readonly subtype: string | null };
 
 function parseJson(line: string): unknown {
   try {
@@ -92,6 +90,6 @@ export function parseSystemNotice(line: string): SystemNotice | null {
   const known = noticeOf(value);
   if (known !== null) return known;
   const system = SystemEnvelopeSchema.safeParse(value);
-  if (system.success) return { kind: 'noise', label: `${SYSTEM_NOISE_PREFIX}${NOISE_SEPARATOR}${system.data.subtype}` };
-  return StreamEnvelopeSchema.safeParse(value).success ? { kind: 'noise', label: STREAM_NOISE_LABEL } : null;
+  if (system.success) return { kind: 'noise', subtype: system.data.subtype };
+  return StreamEnvelopeSchema.safeParse(value).success ? { kind: 'noise', subtype: null } : null;
 }

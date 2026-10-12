@@ -30,7 +30,7 @@ export type LogEntry =
   | (EntryBase & { readonly kind: 'hook-started'; readonly hookName: string; readonly hookEvent: string; readonly line: string })
   | (EntryBase & { readonly kind: 'task'; readonly phase: 'started' | 'finished'; readonly description: string; readonly status: string | null; readonly line: string })
   | (EntryBase & { readonly kind: 'notice'; readonly text: string; readonly line: string })
-  | (EntryBase & { readonly kind: 'noise'; readonly label: string; readonly line: string })
+  | (EntryBase & { readonly kind: 'noise'; readonly subtype: string | null; readonly line: string })
   | (EntryBase & { readonly kind: 'gate'; readonly passed: boolean; readonly steps: readonly GateStepView[] })
   | (EntryBase & { readonly kind: 'rate-limit'; readonly snapshots: readonly SubscriptionWindowView[] })
   | (EntryBase & { readonly kind: 'raw'; readonly line: string });
@@ -115,6 +115,6 @@ function noticeEntry(base: { readonly index: number; readonly at: string }, noti
     case 'notice':
       return { ...base, kind: 'notice', text: notice.text, line };
     case 'noise':
-      return { ...base, kind: 'noise', label: notice.label, line };
+      return { ...base, kind: 'noise', subtype: notice.subtype, line };
   }
 }

@@ -1,74 +1,94 @@
-import { useNavigate } from 'react-router';
-import { useNow } from '../../app/context.tsx';
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { useProject } from '../../app/ProjectRoute.tsx';
+import { useSnapshot } from '../../app/hooks.ts';
 import type { IssueView } from '../../contract/index.ts';
-import { relativeTime } from '../../format/format.ts';
-import { ISSUE_STATE_LABELS, issueTypeLabel } from '../../i18n/labels.ts';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { useVocabulary } from '../../i18n/vocabulary.ts';
 import { paths } from '../../model/routes.ts';
 import { issueMark } from '../../model/status.ts';
 import { Badge } from '../../ui/components/Badge.tsx';
-import { EmptyState } from '../../ui/components/EmptyState.tsx';
 import { StatusMark } from '../../ui/components/StatusMark.tsx';
 import type { TableColumn } from '../../ui/components/Table.tsx';
 import { DataTable } from '../../ui/components/Table.tsx';
+import { Money } from '../../widgets/Money.tsx';
+import { Time } from '../../widgets/Time.tsx';
 
-export function IssueTable({ issues, all }: { readonly issues: readonly IssueView[]; readonly all: readonly IssueView[] }) {
+const STATE_COLUMN_WIDTH = '190px';
+const TYPE_COLUMN_WIDTH = '130px';
+const NUMBER_COLUMN_WIDTH = '72px';
+const PULL_REQUEST_COLUMN_WIDTH = '120px';
+const UPDATED_COLUMN_WIDTH = '110px';
+const COST_COLUMN_WIDTH = '200px';
+
+/** The link keeps its own destination: the row around it opens the issue, and must neither hijack the click nor the key. */
+function keepOwnDestination(event: MouseEvent | KeyboardEvent): void {
+  event.stopPropagation();
+}
+
+interface IssueTableProps {
+  readonly issues: readonly IssueView[];
+  readonly empty: ReactNode;
+}
+
+export function IssueTable({ issues, empty }: IssueTableProps) {
+  const { t } = useI18n();
+  const vocabulary = useVocabulary();
+  const project = useProject();
+  const { costs } = useSnapshot();
   const navigate = useNavigate();
-  const now = useNow();
-  const byNumber = new Map(all.map((issue) => [issue.number, issue]));
   const columns: readonly TableColumn<IssueView>[] = [
-    { id: 'mark', header: <span className="visually-hidden">État</span>, width: '36px', cell: (issue) => <StatusMark mark={issueMark(issue.state)} /> },
-    { id: 'number', header: 'N°', width: '64px', cell: (issue) => <span className="issues-table__number num">#{issue.number}</span> },
+    { id: 'number', header: t('issues.column.number'), width: NUMBER_COLUMN_WIDTH, cell: (issue) => <span className="issue-table__number num">#{issue.number}</span> },
     {
       id: 'title',
-      header: 'Titre',
+      header: t('issues.column.title'),
       primary: true,
       cell: (issue) => (
-        <span className="issues-table__title">
+        <span className="issue-table__title">
           <span className="truncate">{issue.title}</span>
-          {issue.paused ? <Badge tone="idle">en pause</Badge> : null}
+          {issue.paused ? <Badge tone="idle">{t('issues.paused')}</Badge> : null}
         </span>
       ),
     },
-    { id: 'type', header: 'Type', width: '130px', hideOnMobile: true, cell: (issue) => <Badge>{issueTypeLabel(issue.type)}</Badge> },
-    { id: 'state', header: 'État', width: '170px', cell: (issue) => <span className="issues-table__state">{ISSUE_STATE_LABELS[issue.state]}</span> },
+    { id: 'type', header: t('issues.column.type'), width: TYPE_COLUMN_WIDTH, hideOnMobile: true, cell: (issue) => <Badge>{vocabulary.issueType(issue.type)}</Badge> },
     {
-      id: 'dependencies',
-      header: 'Dépend de',
-      width: '140px',
+      id: 'state',
+      header: t('issues.column.state'),
+      width: STATE_COLUMN_WIDTH,
+      cell: (issue) => (
+        <span className="issue-table__state">
+          <span aria-hidden="true">
+            <StatusMark mark={issueMark(issue.state)} size={14} />
+          </span>
+          {vocabulary.issueState(issue.state)}
+        </span>
+      ),
+    },
+    {
+      id: 'pullRequest',
+      header: t('issues.column.pullRequest'),
+      width: PULL_REQUEST_COLUMN_WIDTH,
       hideOnMobile: true,
       cell: (issue) =>
-        issue.dependsOn.length === 0 ? (
-          <span className="subtle">—</span>
+        issue.pullRequestNumber === null ? (
+          <span className="subtle">{t('issues.noPullRequest')}</span>
         ) : (
-          <span className="issues-table__deps">
-            {issue.dependsOn.map((number) => {
-              const dependency = byNumber.get(number);
-              return (
-                <span key={number} className="issues-table__dep num">
-                  {dependency === undefined ? null : <StatusMark mark={issueMark(dependency.state)} size={11} />}#{number}
-                </span>
-              );
-            })}
-          </span>
+          <Link to={paths.pullRequest(project.id, issue.pullRequestNumber)} className="link num" onClick={keepOwnDestination} onKeyDown={keepOwnDestination}>
+            {t('issues.pullRequest', { number: issue.pullRequestNumber })}
+          </Link>
         ),
     },
-    {
-      id: 'pr',
-      header: 'PR',
-      width: '72px',
-      hideOnMobile: true,
-      cell: (issue) => (issue.pullRequestNumber === null ? <span className="subtle">—</span> : <span className="num">#{issue.pullRequestNumber}</span>),
-    },
-    { id: 'updated', header: 'Mis à jour', width: '96px', align: 'end', hideOnMobile: true, cell: (issue) => <span className="subtle num">{relativeTime(issue.updatedAt, now)}</span> },
+    { id: 'updated', header: t('issues.column.updated'), width: UPDATED_COLUMN_WIDTH, hideOnMobile: true, cell: (issue) => <Time iso={issue.updatedAt} className="subtle num" /> },
+    { id: 'cost', header: t('issues.column.cost'), width: COST_COLUMN_WIDTH, align: 'end', hideOnMobile: true, cell: (issue) => <Money amount={issue.costUsd} basis={costs.basis} /> },
   ];
   return (
     <DataTable
-      label="Issues"
+      label={t('issues.table.label')}
       rows={issues}
       columns={columns}
       rowKey={(issue) => String(issue.number)}
-      onActivate={(issue) => void navigate(paths.issue(issue.number))}
-      empty={<EmptyState compact title="Aucune issue dans ce groupe" />}
+      onActivate={(issue) => void navigate(paths.issue(project.id, issue.number))}
+      empty={empty}
     />
   );
 }

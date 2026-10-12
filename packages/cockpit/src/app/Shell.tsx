@@ -1,17 +1,25 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { Menu, Moon, Search, Sun, WifiOff } from 'lucide-react';
-import { VIEW_PATHS, VIEW_TITLES } from '../model/routes.ts';
+import { Menu, Moon, Search, Sun } from 'lucide-react';
+import { useI18n } from '../i18n/I18nProvider.tsx';
+import type { MessageKey } from '../i18n/catalog/index.ts';
+import { projectOfPath, sectionOfPath } from '../model/routes.ts';
 import { CommandPalette } from '../ui/components/CommandPalette.tsx';
 import { IconButton } from '../ui/components/IconButton.tsx';
 import { Kbd } from '../ui/components/Kbd.tsx';
-import { CONNECTION_STATUS_LABELS } from '../i18n/labels.ts';
-import { useCockpitState } from './hooks.ts';
-import { GO_TO_PREFIX_KEY, GO_TO_TIMEOUT_MS, NAVIGATION_ITEMS } from './navigation.ts';
+import { DrainDialog } from '../widgets/DrainDialog.tsx';
+import { ActivityButton } from './ActivityFeed.tsx';
+import { ConnectionBanner, ModeBanner } from './Banners.tsx';
+import { ConfigurationBanners } from './ConfigurationBanners.tsx';
+import { useSelectedProject } from './derived.ts';
+import { LanguageSwitch } from './LanguageSwitch.tsx';
+import { FACTORY_NAVIGATION, GO_TO_PREFIX_KEY, GO_TO_TIMEOUT_MS, PROJECT_NAVIGATION, SECTION_LABELS, WORKSPACE_NAVIGATION } from './navigation.ts';
+import type { NavigationItem } from './navigation.ts';
 import { NotificationCenter } from './NotificationCenter.tsx';
 import { usePaletteItems } from './palette-items.tsx';
 import { Sidebar } from './Sidebar.tsx';
+import { SnapshotGate } from './SnapshotGate.tsx';
 import { SystemStatus } from './SystemStatus.tsx';
 import { useTheme } from './ThemeProvider.tsx';
 
@@ -22,13 +30,29 @@ function isEditable(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(EDITABLE_SELECTOR) !== null;
 }
 
-function currentTitle(pathname: string): string {
-  const match = NAVIGATION_ITEMS.filter((item) => item.id !== 'board').find((item) => pathname.startsWith(VIEW_PATHS[item.id]));
-  return VIEW_TITLES[match?.id ?? 'board'];
+/** The title shown in the top bar on a narrow screen, where the sidebar is hidden. */
+export function pageTitleKey(pathname: string): MessageKey | null {
+  if (projectOfPath(pathname) !== null) {
+    const section = sectionOfPath(pathname);
+    return section === null ? 'nav.overview' : SECTION_LABELS[section];
+  }
+  if (pathname.startsWith('/runs')) return 'nav.runs';
+  if (pathname.startsWith('/usage')) return 'nav.usage';
+  if (pathname.startsWith('/settings')) return 'nav.settings';
+  return null;
+}
+
+function shortcutTarget(key: string, project: string | null): string | null {
+  const global: readonly NavigationItem[] = [...WORKSPACE_NAVIGATION, ...FACTORY_NAVIGATION];
+  const globalItem = global.find((item) => item.shortcut === key);
+  if (globalItem !== undefined) return globalItem.href(project);
+  if (project === null) return null;
+  return PROJECT_NAVIGATION.find((item) => item.shortcut === key)?.href(project) ?? null;
 }
 
 function useGlobalShortcuts(openPalette: () => void): void {
   const navigate = useNavigate();
+  const project = useSelectedProject();
   const pendingGo = useRef<number | null>(null);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -40,10 +64,10 @@ function useGlobalShortcuts(openPalette: () => void): void {
       if (event.metaKey || event.ctrlKey || event.altKey || isEditable(event.target)) return;
       if (pendingGo.current !== null && event.timeStamp - pendingGo.current < GO_TO_TIMEOUT_MS) {
         pendingGo.current = null;
-        const target = NAVIGATION_ITEMS.find((item) => item.shortcut === event.key.toLowerCase());
-        if (target !== undefined) {
+        const target = shortcutTarget(event.key.toLowerCase(), project);
+        if (target !== null) {
           event.preventDefault();
-          void navigate(VIEW_PATHS[target.id]);
+          void navigate(target);
         }
         return;
       }
@@ -51,71 +75,63 @@ function useGlobalShortcuts(openPalette: () => void): void {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [navigate, openPalette]);
-}
-
-function ConnectionBanner() {
-  const connection = useCockpitState((state) => state.connection);
-  const loadError = useCockpitState((state) => state.loadError);
-  const hasSnapshot = useCockpitState((state) => state.snapshot !== null);
-  if (connection.status === 'live' || connection.status === 'connecting') return null;
-  return (
-    <div className={`connection-banner connection-banner--${connection.status}`} role="status">
-      <WifiOff size={14} aria-hidden="true" />
-      <span>
-        {CONNECTION_STATUS_LABELS[connection.status]}
-        {hasSnapshot ? ' — les données affichées peuvent être en retard.' : ' — impossible de joindre le serveur de l’usine.'}
-      </span>
-      {loadError === null ? null : <span className="connection-banner__detail mono truncate">{loadError}</span>}
-    </div>
-  );
+  }, [navigate, openPalette, project]);
 }
 
 export function Shell({ children }: { readonly children: ReactNode }) {
+  const { t } = useI18n();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [navigationOpen, setNavigationOpen] = useState(false);
   const { theme, toggle } = useTheme();
   const location = useLocation();
   const openPalette = useCallback(() => setPaletteOpen((open) => !open), []);
   const closePalette = useCallback(() => setPaletteOpen(false), []);
-  const paletteItems = usePaletteItems();
+  const [drainOpen, setDrainOpen] = useState(false);
+  const askDrain = useCallback(() => setDrainOpen(true), []);
+  const paletteItems = usePaletteItems(askDrain);
+  const titleKey = pageTitleKey(location.pathname);
   useGlobalShortcuts(openPalette);
   useEffect(() => setNavigationOpen(false), [location.pathname]);
   return (
     <div className={`shell${navigationOpen ? ' is-navigation-open' : ''}`}>
       <a href="#content" className="skip-link">
-        Aller au contenu
+        {t('nav.skipToContent')}
       </a>
       <div className="shell__sidebar">
         <Sidebar onNavigate={() => setNavigationOpen(false)} />
       </div>
-      <button type="button" className="shell__scrim" aria-label="Fermer la navigation" tabIndex={-1} onClick={() => setNavigationOpen(false)} />
+      <button type="button" className="shell__scrim" aria-label={t('nav.close')} tabIndex={-1} onClick={() => setNavigationOpen(false)} />
       <div className="shell__main">
+        <ModeBanner />
         <header className="topbar">
-          <IconButton className="topbar__menu" label="Ouvrir la navigation" icon={<Menu size={18} />} onClick={() => setNavigationOpen(true)} />
-          <span className="topbar__title">{location.pathname === VIEW_PATHS.board ? null : currentTitle(location.pathname)}</span>
-          <button type="button" className="topbar__search" onClick={() => setPaletteOpen(true)} aria-label="Rechercher partout (⌘K)">
+          <IconButton className="topbar__menu" label={t('nav.open')} icon={<Menu size={18} />} onClick={() => setNavigationOpen(true)} />
+          <span className="topbar__title">{titleKey === null ? null : t(titleKey)}</span>
+          <button type="button" className="topbar__search" onClick={() => setPaletteOpen(true)} aria-label={t('topbar.search')}>
             <Search size={15} aria-hidden="true" />
-            <span className="topbar__search-text">Rechercher une issue, un run, une PR ou une action…</span>
+            <span className="topbar__search-text">{t('topbar.searchText')}</span>
             <Kbd>⌘K</Kbd>
           </button>
           <div className="topbar__actions">
             <SystemStatus />
-            <IconButton className="topbar__palette" label="Rechercher" icon={<Search size={16} />} onClick={() => setPaletteOpen(true)} />
+            <IconButton className="topbar__palette" label={t('topbar.searchShort')} icon={<Search size={16} />} onClick={() => setPaletteOpen(true)} />
+            <ActivityButton />
             <NotificationCenter />
+            <LanguageSwitch />
             <IconButton
-              label={theme === 'dark' ? 'Passer au thème clair' : 'Passer au thème sombre'}
+              label={theme === 'dark' ? t('topbar.theme.toLight') : t('topbar.theme.toDark')}
               icon={theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
               onClick={toggle}
             />
           </div>
         </header>
         <ConnectionBanner />
+        <ConfigurationBanners />
         <main id="content" className="shell__content" tabIndex={-1}>
-          {children}
+          <SnapshotGate>{children}</SnapshotGate>
         </main>
       </div>
       <CommandPalette open={paletteOpen} onClose={closePalette} items={paletteItems} />
+      <DrainDialog open={drainOpen} onClose={() => setDrainOpen(false)} />
     </div>
   );
 }

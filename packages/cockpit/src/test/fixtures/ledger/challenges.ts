@@ -1,0 +1,130 @@
+import type { ChallengeReport } from '../../../contract/index.ts';
+import { ISSUE } from './ids.ts';
+
+export type ChallengeBody = Omit<ChallengeReport, 'runId' | 'completedAt'>;
+
+export const ACCOUNTANT_EXPORTS_CHALLENGE: ChallengeBody = {
+  summary: 'Two of the three needs are worth building as asked: retries and the CSV export. A weekly PDF statement duplicates the invoice emails and is not planned.',
+  items: [
+    {
+      id: 'item-1',
+      title: 'Retry failed payments automatically',
+      verdict: 'keep',
+      currentState: 'A payment that fails once stays failed until someone retries it by hand.',
+      intent: 'Temporary failures of the payment provider do not leave invoices unpaid.',
+      idea: 'Retry temporary failures with a growing delay and give up after a few attempts.',
+      method: 'A retry schedule of 1, 2, 4 and 8 minutes for temporary errors only.',
+      reason: 'Most unpaid invoices of the last quarter failed on a temporary error.',
+      question: null,
+      sources: [{ label: 'Payment creation', reference: 'src/ledger/payments/create.py:12' }],
+    },
+    {
+      id: 'item-2',
+      title: 'Export invoices as CSV',
+      verdict: 'keep',
+      currentState: 'Accountants copy invoices from the API responses into a spreadsheet.',
+      intent: 'An accountant can load a period of invoices into their tools.',
+      idea: 'A CSV endpoint with one row per invoice.',
+      method: 'GET /invoices.csv with an optional date range.',
+      reason: 'Simple, read-only, and it removes a monthly manual task.',
+      question: null,
+      sources: [{ label: 'Invoice model', reference: 'src/ledger/billing/model.py:8' }],
+    },
+    {
+      id: 'item-3',
+      title: 'Email a weekly PDF statement',
+      verdict: 'decline',
+      currentState: 'Customers already receive one email per invoice.',
+      intent: 'Customers have a periodic summary of what they owe.',
+      idea: 'A weekly email with a PDF.',
+      method: 'Render a statement template and send it every Monday.',
+      reason: 'The invoice emails cover the need and a statement needs a template that no one has designed.',
+      question: null,
+      sources: [],
+    },
+  ],
+  specs: [
+    {
+      id: 'spec-1',
+      itemIds: ['item-1'],
+      title: 'Retry failed payments with exponential backoff',
+      type: 'feature',
+      need: 'A payment that fails once on a temporary error stays failed until someone retries it by hand.',
+      acceptanceCriteria: [
+        'A payment that fails with a temporary error is retried after 1, 2, 4 and 8 minutes.',
+        'A payment that fails with a permanent error is not retried.',
+        'After the last retry the payment is marked failed and the customer is notified.',
+      ],
+      outOfScope: ['Changing the payment provider'],
+      expectedProof: 'Tests with a controlled clock and a provider that fails a given number of times.',
+      problems: [],
+      issueNumber: ISSUE.paymentRetries,
+    },
+    {
+      id: 'spec-2',
+      itemIds: ['item-2'],
+      title: 'Export invoices as CSV',
+      type: 'feature',
+      need: 'Accountants copy invoices from the API responses into a spreadsheet every month.',
+      acceptanceCriteria: [
+        'GET /invoices.csv returns one row per invoice with number, date, customer, net, tax and total.',
+        'Amounts are written with a point and two decimals.',
+        'The export can be limited to a date range.',
+      ],
+      outOfScope: ['Other file formats'],
+      expectedProof: 'Tests that read the CSV back for a known set of invoices.',
+      problems: [],
+      issueNumber: ISSUE.invoiceCsvExport,
+    },
+  ],
+  reply: 'Thanks Dana. Retries and the CSV export are accepted and queued. The weekly PDF statement is not planned: the invoice emails already cover it.',
+};
+
+export const USAGE_BASED_BILLING_CHALLENGE: ChallengeBody = {
+  summary: 'Usage-based billing starts with recording usage. The first piece is specified; the pricing rules need a decision before they can be.',
+  items: [
+    {
+      id: 'item-1',
+      title: 'Record usage events per customer',
+      verdict: 'keep',
+      currentState: 'The API has no notion of usage; invoices are built from fixed subscription lines.',
+      intent: 'Every billable action of a customer is recorded once and can be summed per period.',
+      idea: 'An append-only table of usage events keyed by customer, meter and an idempotency key.',
+      method: 'POST /usage-events with an idempotency key, and a sum per meter and period.',
+      reason: 'Everything else depends on it and it can ship without changing any invoice.',
+      question: null,
+      sources: [{ label: 'Invoice lines', reference: 'src/ledger/billing/model.py:31' }],
+    },
+    {
+      id: 'item-2',
+      title: 'Price usage with tiers',
+      verdict: 'ask',
+      currentState: 'No price list exists for metered products.',
+      intent: 'Customers are billed according to the tiers of their plan.',
+      idea: 'Tiered pricing per meter, evaluated when the invoice is issued.',
+      method: 'A tier table per meter and a pricing function over the period sum.',
+      reason: 'Whether tiers apply to the whole quantity or marginally changes every number.',
+      question: 'Do the tiers apply to the whole quantity once a threshold is crossed, or only to the units above each threshold?',
+      sources: [],
+    },
+  ],
+  specs: [
+    {
+      id: 'spec-1',
+      itemIds: ['item-1'],
+      title: 'Record usage events per customer',
+      type: 'api',
+      need: 'The API cannot record what a customer consumed, so usage cannot be billed.',
+      acceptanceCriteria: [
+        'POST /usage-events stores an event for a customer and a meter.',
+        'Posting the same idempotency key twice stores one event.',
+        'GET /usage-summary returns the sum per meter for a period.',
+      ],
+      outOfScope: ['Pricing', 'Invoicing'],
+      expectedProof: 'Integration tests that post events, replay one of them and read the summary.',
+      problems: [],
+      issueNumber: null,
+    },
+  ],
+  reply: 'Thanks Sam. Recording usage can start now. Before pricing can be specified we need one answer: do tiers apply to the whole quantity or marginally?',
+};

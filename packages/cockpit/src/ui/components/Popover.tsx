@@ -9,11 +9,12 @@ interface PopoverProps {
   readonly label: string;
   readonly align?: 'start' | 'end' | undefined;
   readonly width?: number | undefined;
+  readonly className?: string | undefined;
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function Popover({ open, onClose, anchorRef, children, label, align = 'end', width }: PopoverProps) {
+export function Popover({ open, onClose, anchorRef, children, label, align = 'end', width, className }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return undefined;
@@ -43,7 +44,7 @@ export function Popover({ open, onClose, anchorRef, children, label, align = 'en
       ref={ref}
       role="dialog"
       aria-label={label}
-      className={`ds-popover ds-popover--${align}`}
+      className={['ds-popover', `ds-popover--${align}`, className].filter(Boolean).join(' ')}
       style={width === undefined ? undefined : { width }}
     >
       {children}

@@ -1,80 +1,125 @@
 import { describe, expect, it } from 'vitest';
-import { DAY_MS } from '../format/format.ts';
+import { HOUR_MS, WEEK_MS } from '../i18n/formatters.ts';
+import { mapProject, mapRuns } from '../test/fixtures/mutate.ts';
 import { fixtureSnapshot, TEST_NOW } from '../test/render.tsx';
-import { deriveBoard, DONE_WINDOW_MS, EMPTY_BOARD_FILTER, filterBoard } from './board.ts';
+import { BOARD_COLUMNS, deriveBoard, EMPTY_BOARD_FILTER, filterBoard } from './board.ts';
+
+const board = () => deriveBoard(fixtureSnapshot(), TEST_NOW);
+const keys = (column: (typeof BOARD_COLUMNS)[number], source = board()) => source.columns[column].map((card) => card.key);
 
 describe('deriveBoard', () => {
-  const board = deriveBoard(fixtureSnapshot(), TEST_NOW);
-  const keys = (column: keyof typeof board.columns) => board.columns[column].map((card) => card.key);
-
-  it('collects everything that waits on the operator in "Vous concerne", most urgent first', () => {
-    expect(keys('needs-you')).toEqual([
-      'issue:225',
-      'issue:223',
-      'release:storefront-v2.3.1',
-      'audit:A-15',
-      'request:R-17',
-      'issue:232',
-      'issue:231',
-      'request:R-18',
-    ]);
-    expect(board.columns['needs-you'][0]).toMatchObject({ attention: 'question', mark: 'waiting', href: '/runs/run_5d0911' });
+  it('places every visible card in the column of its state', () => {
+    const derived = board();
+    expect(keys('needs-human', derived)).toEqual(['storefront:issue:49']);
+    expect(keys('pull-requests', derived).toSorted()).toEqual(['ledger:pr:22', 'storefront:pr:57', 'storefront:pr:60', 'storefront:pr:62']);
+    expect(derived.columns.requests.map((card) => card.kind)).toEqual(Array(7).fill('request'));
+    expect(derived.total).toBe(BOARD_COLUMNS.reduce((sum, column) => sum + derived.columns[column].length, 0));
   });
 
-  it('shows live agent runs on their work item with the agent glyph and the last log line', () => {
-    const live = board.columns['in-progress'].filter((card) => card.live);
-    expect(live.map((card) => card.key)).toEqual(['issue:230', 'issue:227']);
-    expect(live[1]).toMatchObject({ role: 'implementer', mark: 'running', href: '/runs/run_7f3a2c', detailFromAgent: true });
+  it('puts what waits for the operator first, then agents at work, then the most recent', () => {
+    const requests = board().columns.requests;
+    expect(requests.slice(0, 5).every((card) => card.attention !== null)).toBe(true);
+    const implementation = board().columns.implementation;
+    expect(implementation[0]?.key).toBe('storefront:issue:45');
   });
 
-  it('keeps only the last seven days in "Terminé"', () => {
-    expect(keys('done')).toEqual(expect.arrayContaining(['issue:221', 'issue:217', 'release:storefront-v2.3.0']));
-    const later = deriveBoard(fixtureSnapshot(), TEST_NOW + DONE_WINDOW_MS - 5 * DAY_MS);
-    const laterKeys = later.columns.done.map((card) => card.key);
-    expect(laterKeys).toContain('issue:221');
-    expect(laterKeys).not.toContain('issue:217');
-    expect(laterKeys).not.toContain('release:storefront-v2.3.0');
+  it('absorbs the issue of an open pull request into the card of the pull request', () => {
+    expect(keys('pull-requests')).not.toContain('storefront:issue:52');
+    const card = board().columns['pull-requests'].find((candidate) => candidate.key === 'storefront:pr:57');
+    expect(card).toMatchObject({ kind: 'pull-request', issueNumber: 52, mergeable: true, evidenceComplete: true, checksMark: 'success', attention: 'merge' });
   });
 
-  it('translates the release blocking reason for the card preview', () => {
-    const release = board.columns['needs-you'].find((card) => card.key === 'release:storefront-v2.3.1');
-    expect(release?.detail).toBe('Audit « à challenger » ouvert sur le commit e27b4d9');
+  it('marks the checks of a pull request failed for a failure the change caused, not for one the base branch shares', () => {
+    const checksMarkOf = (snapshot = fixtureSnapshot()) => deriveBoard(snapshot, TEST_NOW).columns['pull-requests'].find((card) => card.key === 'storefront:pr:62');
+    expect(checksMarkOf()).toMatchObject({ checksMark: 'failed' });
+    const sharedOnly = mapProject(fixtureSnapshot(), 'storefront', (project) => ({
+      ...project,
+      pullRequests: project.pullRequests.map((pullRequest) =>
+        pullRequest.number === 62
+          ? { ...pullRequest, checks: { ...pullRequest.checks, value: (pullRequest.checks.value ?? []).filter((check) => check.conclusion !== 'failure' || check.failsOnBase) } }
+          : pullRequest,
+      ),
+    }));
+    expect(checksMarkOf(sharedOnly)).toMatchObject({ checksMark: 'running' });
+    const settled = mapProject(sharedOnly, 'storefront', (project) => ({
+      ...project,
+      pullRequests: project.pullRequests.map((pullRequest) =>
+        pullRequest.number === 62 ? { ...pullRequest, checks: { ...pullRequest.checks, value: (pullRequest.checks.value ?? []).filter((check) => check.conclusion !== 'pending') } } : pullRequest,
+      ),
+    }));
+    expect(checksMarkOf(settled)).toMatchObject({ checksMark: 'success' });
   });
 
-  it('names an audit by the short sha of its commit, the way a commit is referred to everywhere else', () => {
-    const snapshot = fixtureSnapshot();
-    const audit = snapshot.audits.find((entry) => entry.id === 'A-15');
-    const sha = 'c0ffee14802ab85811fbd907f94990dfa598b157';
-    const real = deriveBoard({ ...snapshot, audits: snapshot.audits.map((entry) => (entry === audit ? { ...entry, id: sha, commitSha: sha } : entry)) }, TEST_NOW);
-    expect(real.columns['needs-you'].find((card) => card.key === `audit:${sha}`)?.reference).toBe('c0ffee1');
-    expect(audit).toBeDefined();
+  it('keeps an issue whose pull request is closed or whose pull request is absent as an issue card', () => {
+    const snapshot = mapProject(fixtureSnapshot(), 'storefront', (project) => ({ ...project, pullRequests: project.pullRequests.filter((pullRequest) => pullRequest.number !== 57) }));
+    const derived = deriveBoard(snapshot, TEST_NOW);
+    expect(derived.columns['pull-requests'].map((card) => card.key)).toContain('storefront:issue:52');
   });
 
-  it('abandons an issue into "Terminé" without asking the operator anything', () => {
-    const snapshot = fixtureSnapshot();
-    const abandoned = deriveBoard({ ...snapshot, issues: snapshot.issues.map((issue) => (issue.number === 223 ? { ...issue, state: 'abandoned', resumeTarget: null } : issue)) }, TEST_NOW);
-    const card = [...abandoned.columns.done, ...abandoned.columns['needs-you'], ...abandoned.columns['in-progress']].find((entry) => entry.key === 'issue:223');
-    expect(card).toMatchObject({ column: 'done', attention: null, mark: 'blocked' });
+  it('shows the delivered work of the last week only', () => {
+    const later = deriveBoard(fixtureSnapshot(), TEST_NOW + WEEK_MS);
+    expect(later.columns.delivered).toEqual([]);
+    expect(board().columns.delivered.length).toBeGreaterThan(0);
   });
 
-  it('asks the operator for the merge order of an open pull request that nothing blocks', () => {
-    const snapshot = fixtureSnapshot();
-    const pullRequest = snapshot.pullRequests.find((entry) => entry.state === 'open' && entry.mergeable);
-    if (pullRequest === undefined) throw new Error('the fixture has no mergeable pull request');
-    const issues = snapshot.issues.map((issue) => (issue.number === pullRequest.issueNumber ? { ...issue, state: 'pr-open' as const } : issue));
-    const runs = snapshot.runs.filter((run) => run.subject.id !== String(pullRequest.issueNumber));
-    const board = deriveBoard({ ...snapshot, issues, runs }, TEST_NOW);
-    expect(board.columns['needs-you'].find((card) => card.key === `issue:${pullRequest.issueNumber}`)).toMatchObject({
-      attention: 'merge',
-      mark: 'waiting',
-      href: `/pull-requests/${pullRequest.number}`,
-    });
+  it('leaves abandoned issues and settled requests off the board', () => {
+    const all = BOARD_COLUMNS.flatMap((column) => keys(column));
+    expect(all).not.toContain('storefront:issue:79');
+    expect(all).not.toContain('storefront:request:R-17');
+    expect(all).not.toContain('storefront:request:R-12');
   });
 
-  it('filters by text, kind and role', () => {
-    expect(filterBoard(board, { ...EMPTY_BOARD_FILTER, query: 'savings' }).total).toBe(3);
-    expect(filterBoard(board, { ...EMPTY_BOARD_FILTER, query: 'sam/brief' }).columns['needs-you'].map((card) => card.key)).toEqual(['audit:A-15']);
-    expect(filterBoard(board, { ...EMPTY_BOARD_FILTER, kinds: ['audit'] }).total).toBe(3);
-    expect(filterBoard(board, { ...EMPTY_BOARD_FILTER, roles: ['acceptance-author'] }).columns['in-progress'].map((card) => card.key)).toEqual(['issue:230']);
+  it('attaches the live run of an issue to its card, with the question it asks', () => {
+    const live = board().columns.implementation.find((card) => card.key === 'storefront:issue:45');
+    expect(live).toMatchObject({ liveRunId: 'run_7f3a2c', role: 'implementer', runningSubagents: 2 });
+    const escalated = board().columns['needs-human'][0];
+    expect(escalated).toMatchObject({ attention: 'question', liveRunId: 'run_5d0911' });
+    expect(escalated?.detail).toMatch(/promo-savings/);
+  });
+
+  it('says which issues a blocked issue waits for, never the ones that are merged', () => {
+    const blocked = board().columns.specs.find((card) => card.key === 'storefront:issue:70');
+    expect(blocked).toMatchObject({ kind: 'issue', blockedBy: [61] });
+    const snapshot = mapProject(fixtureSnapshot(), 'storefront', (project) => ({
+      ...project,
+      issues: project.issues.map((issue) => (issue.number === 61 ? { ...issue, state: 'merged' as const } : issue)),
+    }));
+    const derived = deriveBoard(snapshot, TEST_NOW);
+    expect(derived.columns.specs.find((card) => card.key === 'storefront:issue:70')).toMatchObject({ blockedBy: [] });
+  });
+
+  it('marks a card live only while its run is alive', () => {
+    const snapshot = mapRuns(fixtureSnapshot(), (runs) => runs.map((run) => (run.id === 'run_7f3a2c' ? { ...run, status: 'stopped' as const } : run)));
+    const card = deriveBoard(snapshot, TEST_NOW).columns.implementation.find((candidate) => candidate.key === 'storefront:issue:45');
+    expect(card?.liveRunId).toBeNull();
+  });
+
+  it('keeps an old delivery off the board by the time it was last touched', () => {
+    const snapshot = mapProject(fixtureSnapshot(), 'storefront', (project) => ({
+      ...project,
+      issues: project.issues.map((issue) => (issue.number === 41 ? { ...issue, updatedAt: new Date(TEST_NOW - WEEK_MS - HOUR_MS).toISOString() } : issue)),
+    }));
+    expect(keys('delivered', deriveBoard(snapshot, TEST_NOW))).not.toContain('storefront:issue:41');
+  });
+});
+
+describe('filterBoard', () => {
+  it('keeps the cards of one project', () => {
+    const filtered = filterBoard(board(), { ...EMPTY_BOARD_FILTER, project: 'ledger' });
+    expect(BOARD_COLUMNS.flatMap((column) => filtered.columns[column]).every((card) => card.project === 'ledger')).toBe(true);
+    expect(filtered.total).toBeGreaterThan(0);
+  });
+
+  it('matches every word of the query against the title, the reference and the branch', () => {
+    expect(filterBoard(board(), { ...EMPTY_BOARD_FILTER, query: 'order history' }).total).toBeGreaterThan(0);
+    expect(filterBoard(board(), { ...EMPTY_BOARD_FILTER, query: 'order zebra' }).total).toBe(0);
+    expect(filterBoard(board(), { ...EMPTY_BOARD_FILTER, query: '#45' }).total).toBe(1);
+  });
+
+  it('keeps one kind of card, or only what needs the operator', () => {
+    const requests = filterBoard(board(), { ...EMPTY_BOARD_FILTER, kinds: ['request'] });
+    expect(BOARD_COLUMNS.flatMap((column) => requests.columns[column]).every((card) => card.kind === 'request')).toBe(true);
+    const attention = filterBoard(board(), { ...EMPTY_BOARD_FILTER, attentionOnly: true });
+    expect(BOARD_COLUMNS.flatMap((column) => attention.columns[column]).every((card) => card.attention !== null)).toBe(true);
   });
 });

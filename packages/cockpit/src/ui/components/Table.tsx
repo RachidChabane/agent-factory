@@ -31,6 +31,7 @@ export function DataTable<T>({ label, rows, columns, rowKey, onActivate, activeK
     rowRefs.current[bounded]?.focus();
   };
   const onKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, index: number, row: T) => {
+    if (event.target !== event.currentTarget) return;
     const step = NAVIGATION_STEP[event.key];
     if (step !== undefined) {
       event.preventDefault();

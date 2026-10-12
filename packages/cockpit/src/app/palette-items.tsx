@@ -1,229 +1,255 @@
 import { useMemo } from 'react';
+import type { NavigateFunction } from 'react-router';
 import { useNavigate } from 'react-router';
-import {
-  CircleCheck,
-  CircleDot,
-  GitMerge,
-  GitPullRequest,
-  Inbox,
-  MessageSquare,
-  Moon,
-  Pause,
-  Play,
-  Plus,
-  RefreshCw,
-  Rocket,
-  RotateCcw,
-  Scale,
-  ShieldAlert,
-  SquareTerminal,
-  Sun,
-} from 'lucide-react';
-import { MERGED_OR_BEYOND_STATES } from '@agent-factory/domain';
-import type { CockpitSnapshot } from '../contract/index.ts';
-import { ISSUE_STATE_LABELS, RELEASE_STATE_LABELS, REQUEST_STATE_LABELS, ROLE_LABELS, RUN_STATUS_LABELS } from '../i18n/labels.ts';
-import { MERGE_QUERY_PARAMETER, NEW_REQUEST_QUERY_PARAMETER, QUERY_FLAG } from '../model/query-flags.ts';
-import { paths, VIEW_PATHS, VIEW_TITLES } from '../model/routes.ts';
+import { CirclePlay, FilePlus2, GitMerge, HeartPulse, Inbox, Pause, Play, Power, RefreshCw, Rocket, ScanSearch, ShieldCheck, SquareCheck } from 'lucide-react';
+import type { CockpitSnapshot, CommandBody, CommandName, ProjectView } from '../contract/index.ts';
+import type { Translate } from '../i18n/create-i18n.ts';
+import { useI18n } from '../i18n/I18nProvider.tsx';
+import { canChallengeRequest, canCutRelease, canEvaluateRelease, canPublishAuditIssue, canStartIssue, canValidateSpec, drainBlock } from '../model/actions.ts';
+import { deriveAttention } from '../model/attention.ts';
+import { shortSha } from '../model/identifiers.ts';
+import { paths } from '../model/routes.ts';
 import type { PaletteItem } from '../ui/components/CommandPalette.tsx';
-import type { CommandRunner } from './hooks.ts';
-import { useCommand, useSnapshot } from './hooks.ts';
-import { NAVIGATION_ITEMS } from './navigation.ts';
-import { useTheme } from './ThemeProvider.tsx';
+import { useCommand } from './hooks.ts';
+import { useMaybeSnapshot } from './hooks.ts';
+import type { NavigationItem } from './navigation.ts';
+import { FACTORY_NAVIGATION, PROJECT_NAVIGATION, WORKSPACE_NAVIGATION } from './navigation.ts';
 
-const ICON_SIZE = 15;
+type RunCommand = <Name extends CommandName>(name: Name, body: CommandBody<Name>) => void;
 
 interface PaletteContext {
-  readonly navigate: (to: string) => void;
-  readonly command: CommandRunner;
+  readonly snapshot: CockpitSnapshot;
+  readonly t: Translate;
+  readonly navigate: NavigateFunction;
+  readonly run: RunCommand;
+  /** Opens the confirmation that stops the factory once its running work finishes. */
+  readonly askDrain: () => void;
 }
 
-function actionItems(snapshot: CockpitSnapshot, { navigate, command }: PaletteContext): PaletteItem[] {
-  const group = 'Actions';
-  const merged = new Set(snapshot.issues.filter((issue) => MERGED_OR_BEYOND_STATES.includes(issue.state)).map((issue) => issue.number));
-  const items: PaletteItem[] = [
-    {
-      id: 'action:new-request',
-      group,
-      label: 'Nouvelle demande…',
-      icon: <Plus size={ICON_SIZE} />,
-      keywords: 'coller créer demande request',
-      perform: () => navigate(`${VIEW_PATHS.requests}?${NEW_REQUEST_QUERY_PARAMETER}=${QUERY_FLAG}`),
-    },
+function navigationItem(context: PaletteContext, item: NavigationItem, href: string): PaletteItem {
+  const { t, navigate } = context;
+  const Icon = item.icon;
+  return {
+    id: `go:${href}`,
+    group: t('palette.group.go'),
+    label: t('palette.goTo', { page: t(item.label) }),
+    icon: <Icon size={14} />,
+    keywords: `${item.id} ${t(item.label)}`,
+    perform: () => void navigate(href),
+  };
+}
+
+function projectNavigationItems(context: PaletteContext, project: ProjectView): PaletteItem[] {
+  const { t, navigate } = context;
+  return PROJECT_NAVIGATION.map((item) => {
+    const Icon = item.icon;
+    const href = item.href(project.id);
+    return {
+      id: `project:${project.id}:${item.id}`,
+      group: t('palette.group.projects'),
+      label: item.id === 'overview' ? t('palette.goToProject', { project: project.name }) : t('palette.goToProjectPage', { page: t(item.label), project: project.name }),
+      icon: <Icon size={14} />,
+      keywords: `${project.id} ${project.name} ${item.id} ${t(item.label)}`,
+      perform: () => void navigate(href),
+    };
+  });
+}
+
+function actionItem(context: PaletteContext, entry: Pick<PaletteItem, 'id' | 'label' | 'icon' | 'hint' | 'keywords' | 'perform'>): PaletteItem {
+  return { group: context.t('palette.group.actions'), ...entry };
+}
+
+function pauseItems(context: PaletteContext): PaletteItem[] {
+  const { snapshot, t, run } = context;
+  const installationPaused = snapshot.installation.pauses.some((pause) => pause.cause === 'operator');
+  const items = [
+    actionItem(context, {
+      id: 'scheduler:installation',
+      label: installationPaused ? t('pause.resumeInstallation') : t('pause.pauseInstallation'),
+      icon: installationPaused ? <Play size={14} /> : <Pause size={14} />,
+      keywords: 'scheduler pause resume',
+      perform: () => run(installationPaused ? 'scheduler.resume' : 'scheduler.pause', { project: null }),
+    }),
   ];
-  for (const request of snapshot.requests.filter((entry) => entry.state === 'received')) {
-    items.push({
-      id: `action:challenge:${request.id}`,
-      group,
-      label: `Lancer le challenge ${request.id}`,
-      hint: request.title,
-      icon: <Scale size={ICON_SIZE} />,
-      perform: () => void command.run('request.challenge', { requestId: request.id }, `Challenge de ${request.id} lancé`),
-    });
+  for (const project of snapshot.projects) {
+    const paused = project.pauses.some((pause) => pause.cause === 'operator');
+    items.push(
+      actionItem(context, {
+        id: `scheduler:${project.id}`,
+        label: paused ? t('palette.resumeProject', { project: project.name }) : t('palette.pauseProject', { project: project.name }),
+        icon: paused ? <Play size={14} /> : <Pause size={14} />,
+        keywords: `${project.id} scheduler pause resume`,
+        perform: () => run(paused ? 'scheduler.resume' : 'scheduler.pause', { project: project.id }),
+      }),
+    );
   }
-  for (const issue of snapshot.issues) {
-    if (issue.state === 'spec-draft') {
-      items.push({
-        id: `action:validate:${issue.number}`,
-        group,
-        label: `Valider la spec #${issue.number}`,
-        hint: issue.title,
-        icon: <CircleCheck size={ICON_SIZE} />,
-        perform: () => void command.run('issue.validate-spec', { issueNumber: issue.number }, `Spec #${issue.number} validée`),
-      });
-    }
-    if (issue.state === 'spec-validated' && issue.dependsOn.every((number) => merged.has(number))) {
-      items.push({
-        id: `action:start:${issue.number}`,
-        group,
-        label: `Démarrer #${issue.number}`,
-        hint: issue.title,
-        icon: <Play size={ICON_SIZE} />,
-        perform: () => void command.run('issue.start', { issueNumber: issue.number }, `#${issue.number} démarrée`),
-      });
-    }
-    if (issue.state === 'needs-human') {
-      items.push({
-        id: `action:resume:${issue.number}`,
-        group,
-        label: `Traiter l’escalade #${issue.number}`,
-        hint: issue.title,
-        icon: <RotateCcw size={ICON_SIZE} />,
-        perform: () => navigate(paths.issue(issue.number)),
-      });
-    }
-  }
-  for (const pullRequest of snapshot.pullRequests.filter((entry) => entry.state === 'open' && entry.mergeable)) {
-    items.push({
-      id: `action:merge:${pullRequest.number}`,
-      group,
-      label: `Merger #${pullRequest.number}…`,
-      hint: pullRequest.title,
-      icon: <GitMerge size={ICON_SIZE} />,
-      perform: () => navigate(`${paths.pullRequest(pullRequest.number)}?${MERGE_QUERY_PARAMETER}=${QUERY_FLAG}`),
-    });
-  }
-  for (const run of snapshot.runs.filter((entry) => entry.pendingQuestion !== null)) {
-    items.push({
-      id: `action:answer:${run.id}`,
-      group,
-      label: `Répondre à la question du run ${run.id}`,
-      hint: run.pendingQuestion?.text,
-      icon: <MessageSquare size={ICON_SIZE} />,
-      perform: () => navigate(paths.run(run.id)),
-    });
-  }
-  for (const release of snapshot.releases.filter((entry) => entry.state === 'blocked' || entry.state === 'promotable' || entry.state === 'auditing')) {
-    items.push({
-      id: `action:evaluate:${release.id}`,
-      group,
-      label: `Réévaluer le gate ${release.id}`,
-      icon: <RefreshCw size={ICON_SIZE} />,
-      perform: () => void command.run('release.evaluate', { releaseId: release.id }, `Gate ${release.id} réévalué`),
-    });
-  }
-  items.push(
-    snapshot.factory.schedulerPaused
-      ? {
-          id: 'action:scheduler-resume',
-          group,
-          label: 'Reprendre l’ordonnanceur',
-          icon: <Play size={ICON_SIZE} />,
-          perform: () => void command.run('scheduler.resume', {}, 'Ordonnanceur relancé'),
-        }
-      : {
-          id: 'action:scheduler-pause',
-          group,
-          label: 'Mettre l’ordonnanceur en pause',
-          icon: <Pause size={ICON_SIZE} />,
-          perform: () => void command.run('scheduler.pause', {}, 'Ordonnanceur en pause'),
-        },
-  );
   return items;
 }
 
-function entityItems(snapshot: CockpitSnapshot, navigate: (to: string) => void): PaletteItem[] {
+function drainItems(context: PaletteContext): PaletteItem[] {
+  const { snapshot, t, askDrain } = context;
+  if (drainBlock(snapshot.installation) !== null) return [];
   return [
-    ...snapshot.requests.map((request) => ({
-      id: `request:${request.id}`,
-      group: 'Demandes',
-      label: `${request.id} · ${request.title}`,
-      hint: REQUEST_STATE_LABELS[request.state],
-      icon: <Inbox size={ICON_SIZE} />,
-      keywords: request.requester,
-      perform: () => navigate(paths.request(request.id)),
-    })),
-    ...snapshot.issues.map((issue) => ({
-      id: `issue:${issue.number}`,
-      group: 'Issues',
-      label: `#${issue.number} · ${issue.title}`,
-      hint: ISSUE_STATE_LABELS[issue.state],
-      icon: <CircleDot size={ICON_SIZE} />,
-      keywords: `${issue.type} ${issue.branch ?? ''}`,
-      perform: () => navigate(paths.issue(issue.number)),
-    })),
-    ...snapshot.runs.map((run) => ({
-      id: `run:${run.id}`,
-      group: 'Runs',
-      label: `${run.id} · ${ROLE_LABELS[run.role]} · ${run.subject.kind === 'issue' ? `#${run.subject.id}` : run.subject.id}`,
-      hint: RUN_STATUS_LABELS[run.status],
-      icon: <SquareTerminal size={ICON_SIZE} />,
-      keywords: `${run.model} ${run.branch ?? ''}`,
-      perform: () => navigate(paths.run(run.id)),
-    })),
-    ...snapshot.pullRequests.map((pullRequest) => ({
-      id: `pr:${pullRequest.number}`,
-      group: 'Pull requests',
-      label: `#${pullRequest.number} · ${pullRequest.title}`,
-      icon: <GitPullRequest size={ICON_SIZE} />,
-      keywords: pullRequest.branch,
-      perform: () => navigate(paths.pullRequest(pullRequest.number)),
-    })),
-    ...snapshot.releases.map((release) => ({
-      id: `release:${release.id}`,
-      group: 'Releases',
-      label: `Release ${release.id}`,
-      hint: RELEASE_STATE_LABELS[release.state],
-      icon: <Rocket size={ICON_SIZE} />,
-      perform: () => navigate(paths.release(release.id)),
-    })),
-    ...snapshot.audits.map((audit) => ({
-      id: `audit:${audit.id}`,
-      group: 'Audits',
-      label: `${audit.id} · ${audit.commitMessage}`,
-      icon: <ShieldAlert size={ICON_SIZE} />,
-      keywords: `${audit.authorLogin ?? ''} ${audit.authorName ?? ''} ${audit.commitSha}`,
-      perform: () => navigate(paths.audit(audit.id)),
-    })),
+    actionItem(context, {
+      id: 'factory:drain',
+      label: t('drain.label'),
+      icon: <Power size={14} />,
+      keywords: 'factory drain stop restart',
+      perform: askDrain,
+    }),
   ];
 }
 
-export function usePaletteItems(): readonly PaletteItem[] {
-  const snapshot = useSnapshot();
+/** Merging asks for the operator's confirmation on the page of the pull request, so the palette leads there. */
+function mergeItems(context: PaletteContext, project: ProjectView): PaletteItem[] {
+  const { snapshot, t, navigate } = context;
+  return deriveAttention(snapshot, project.id)
+    .filter((item) => item.kind === 'merge')
+    .map((item) =>
+      actionItem(context, {
+        id: `merge:${item.key}`,
+        label: t('palette.mergePullRequest', { reference: item.reference }),
+        hint: `${project.name} · ${item.title}`,
+        icon: <GitMerge size={14} />,
+        keywords: `${project.id} ${item.reference} ${item.title} merge pull request`,
+        perform: () => void navigate(item.href),
+      }),
+    );
+}
+
+function projectActionItems(context: PaletteContext, project: ProjectView): PaletteItem[] {
+  const { t, navigate, run } = context;
+  const items: PaletteItem[] = [
+    actionItem(context, {
+      id: `new-request:${project.id}`,
+      label: t('palette.newRequest', { project: project.name }),
+      icon: <FilePlus2 size={14} />,
+      keywords: `${project.id} request create`,
+      perform: () => void navigate(paths.newRequest(project.id)),
+    }),
+  ];
+  for (const issue of project.issues) {
+    if (canValidateSpec(issue)) {
+      items.push(
+        actionItem(context, {
+          id: `validate:${project.id}:${issue.number}`,
+          label: t('palette.validateSpec', { number: issue.number }),
+          hint: `${project.name} · ${issue.title}`,
+          icon: <SquareCheck size={14} />,
+          keywords: `${project.id} #${issue.number} ${issue.title} spec validate`,
+          perform: () => run('issue.validate-spec', { project: project.id, issueNumber: issue.number }),
+        }),
+      );
+    }
+    if (canStartIssue(issue, project)) {
+      items.push(
+        actionItem(context, {
+          id: `start:${project.id}:${issue.number}`,
+          label: t('palette.startIssue', { number: issue.number }),
+          hint: `${project.name} · ${issue.title}`,
+          icon: <CirclePlay size={14} />,
+          keywords: `${project.id} #${issue.number} ${issue.title} start`,
+          perform: () => run('issue.start', { project: project.id, issueNumber: issue.number }),
+        }),
+      );
+    }
+  }
+  items.push(...mergeItems(context, project));
+  for (const request of project.requests) {
+    if (!canChallengeRequest(request)) continue;
+    items.push(
+      actionItem(context, {
+        id: `challenge:${project.id}:${request.id}`,
+        label: t('palette.startChallenge', { request: request.id }),
+        hint: `${project.name} · ${request.title}`,
+        icon: <Inbox size={14} />,
+        keywords: `${project.id} ${request.id} ${request.title} challenge`,
+        perform: () => run('request.challenge', { project: project.id, requestId: request.id }),
+      }),
+    );
+  }
+  for (const release of project.releases) {
+    if (canCutRelease(release)) {
+      items.push(
+        actionItem(context, {
+          id: `cut:${project.id}:${release.id}`,
+          label: t('palette.cutRelease', { release: release.id }),
+          hint: project.name,
+          icon: <Rocket size={14} />,
+          keywords: `${project.id} ${release.id} release cut`,
+          perform: () => run('release.cut', { project: project.id, releaseId: release.id }),
+        }),
+      );
+    }
+    if (canEvaluateRelease(release)) {
+      items.push(
+        actionItem(context, {
+          id: `evaluate:${project.id}:${release.id}`,
+          label: t('palette.evaluateRelease', { release: release.id }),
+          hint: project.name,
+          icon: <ScanSearch size={14} />,
+          keywords: `${project.id} ${release.id} release evaluate gate`,
+          perform: () => run('release.evaluate', { project: project.id, releaseId: release.id }),
+        }),
+      );
+    }
+  }
+  for (const audit of project.audits) {
+    if (!canPublishAuditIssue(audit)) continue;
+    items.push(
+      actionItem(context, {
+        id: `publish-audit:${project.id}:${audit.id}`,
+        label: t('palette.publishAudit', { audit: shortSha(audit.commitSha) }),
+        hint: `${project.name} · ${audit.commitMessage}`,
+        icon: <ShieldCheck size={14} />,
+        keywords: `${project.id} ${audit.id} ${audit.commitSha} audit publish issue`,
+        perform: () => run('audit.publish-issue', { project: project.id, auditId: audit.id }),
+      }),
+    );
+  }
+  for (const environment of project.environments) {
+    items.push(
+      actionItem(context, {
+        id: `health:${project.id}:${environment.name}`,
+        label: t('palette.checkHealth', { environment: environment.name }),
+        hint: project.name,
+        icon: <HeartPulse size={14} />,
+        keywords: `${project.id} ${environment.name} health check`,
+        perform: () => run('health.check', { project: project.id, environment: environment.name }),
+      }),
+    );
+  }
+  return items;
+}
+
+/** Everything the palette offers: a page for every view and every project, and the commands that make sense from anywhere. */
+export function buildPaletteItems(context: PaletteContext): readonly PaletteItem[] {
+  const { snapshot, t, run } = context;
+  return [
+    ...[...WORKSPACE_NAVIGATION, ...FACTORY_NAVIGATION].map((item) => navigationItem(context, item, item.href(null))),
+    ...snapshot.projects.flatMap((project) => projectNavigationItems(context, project)),
+    actionItem(context, {
+      id: 'usage:refresh',
+      label: t('palette.refreshUsage'),
+      icon: <RefreshCw size={14} />,
+      keywords: 'usage subscription refresh',
+      perform: () => run('usage.refresh', {}),
+    }),
+    ...pauseItems(context),
+    ...drainItems(context),
+    ...snapshot.projects.flatMap((project) => projectActionItems(context, project)),
+  ];
+}
+
+export function usePaletteItems(askDrain: () => void): readonly PaletteItem[] {
+  const snapshot = useMaybeSnapshot();
   const navigate = useNavigate();
-  const command = useCommand();
-  const { theme, toggle } = useTheme();
+  const { t } = useI18n();
+  const runner = useCommand();
+  const { run: sendCommand } = runner;
   return useMemo(() => {
-    const navigation: PaletteItem[] = NAVIGATION_ITEMS.map((item) => {
-      const Icon = item.icon;
-      return {
-        id: `view:${item.id}`,
-        group: 'Navigation',
-        label: VIEW_TITLES[item.id],
-        hint: `G puis ${item.shortcut.toUpperCase()}`,
-        icon: <Icon size={ICON_SIZE} />,
-        perform: () => navigate(VIEW_PATHS[item.id]),
-      };
-    });
-    const themeItem: PaletteItem = {
-      id: 'action:theme',
-      group: 'Actions',
-      label: theme === 'dark' ? 'Passer au thème clair' : 'Passer au thème sombre',
-      icon: theme === 'dark' ? <Sun size={ICON_SIZE} /> : <Moon size={ICON_SIZE} />,
-      keywords: 'thème sombre clair apparence',
-      perform: toggle,
-    };
-    if (snapshot === null) return [themeItem, ...navigation];
-    const context = { navigate: (to: string) => void navigate(to), command };
-    return [...actionItems(snapshot, context), themeItem, ...navigation, ...entityItems(snapshot, context.navigate)];
-  }, [snapshot, navigate, command, theme, toggle]);
+    if (snapshot === null) return [];
+    const run: RunCommand = (name, body) => void sendCommand(name, body);
+    return buildPaletteItems({ snapshot, t, navigate, run, askDrain });
+  }, [snapshot, t, navigate, sendCommand, askDrain]);
 }

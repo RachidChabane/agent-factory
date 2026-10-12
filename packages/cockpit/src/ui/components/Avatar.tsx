@@ -7,8 +7,8 @@ function initials(name: string): string {
     .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
     .split(/[\s-]+/)
     .filter((word) => word.length > 0);
-  const letters = words.length >= INITIALS_LENGTH ? words.slice(0, INITIALS_LENGTH).map((word) => word[0]) : [...(words[0] ?? '?').slice(0, INITIALS_LENGTH)];
-  return letters.join('').toLocaleUpperCase('fr-FR');
+  const letters = words.length >= INITIALS_LENGTH ? words.slice(0, INITIALS_LENGTH).map((word) => word[0]) : [...(words[0] ?? '').slice(0, INITIALS_LENGTH)];
+  return letters.join('').toUpperCase();
 }
 
 interface AvatarProps {

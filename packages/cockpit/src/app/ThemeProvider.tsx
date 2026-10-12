@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { safeLocalStorage } from '../platform/storage.ts';
 import type { Theme } from './theme.ts';
-import { applyTheme, persistTheme, safeLocalStorage } from './theme.ts';
+import { applyTheme, persistTheme } from './theme.ts';
 
 interface ThemeApi {
   readonly theme: Theme;

@@ -46,10 +46,10 @@ describe('RunLogEntries system lines', () => {
   });
 
   it('hides an unknown system subtype as noise labelled with its subtype', () => {
-    expect(parseSystemNotice('{"type":"system","subtype":"compact_boundary","session_id":"s"}')).toEqual({ kind: 'noise', label: 'système · compact_boundary' });
+    expect(parseSystemNotice('{"type":"system","subtype":"compact_boundary","session_id":"s"}')).toEqual({ kind: 'noise', subtype: 'compact_boundary' });
   });
 
   it('keeps a known subtype whose payload is malformed out of the typed rows', () => {
-    expect(parseSystemNotice('{"type":"system","subtype":"task_started"}')).toEqual({ kind: 'noise', label: 'système · task_started' });
+    expect(parseSystemNotice('{"type":"system","subtype":"task_started"}')).toEqual({ kind: 'noise', subtype: 'task_started' });
   });
 });

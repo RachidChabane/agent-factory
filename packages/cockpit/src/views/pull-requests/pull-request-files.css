@@ -1,0 +1,59 @@
+/* changed files */
+.pr-files {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.pr-file {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.pr-file__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  text-align: left;
+  width: 100%;
+  min-width: 0;
+}
+.pr-file__toggle:hover {
+  background: var(--surface-hover);
+}
+.pr-file__source {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  font-size: var(--text-12);
+}
+.pr-file__note {
+  padding: 0 var(--space-1);
+  font-size: var(--text-12);
+}
+.pr-files__status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+.pr-files__mismatch {
+  flex-basis: 100%;
+  font-size: var(--text-12);
+  color: var(--mark-running);
+}
+.pr-file__path {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pr-file__stats {
+  display: inline-flex;
+  gap: var(--space-2);
+  font-size: var(--text-12);
+}

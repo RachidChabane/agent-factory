@@ -1,0 +1,279 @@
+import type { MessageCatalog } from '../types.ts';
+
+export const enVocabulary = {
+  'vocab.issueState.spec-draft': 'Spec to validate',
+  'vocab.issueState.spec-validated': 'Queued',
+  'vocab.issueState.blocked': 'Blocked',
+  'vocab.issueState.authoring-checks': 'Writing checks',
+  'vocab.issueState.checks-frozen': 'Checks frozen',
+  'vocab.issueState.rewriting-check': 'Rewriting a check',
+  'vocab.issueState.implementing': 'Implementing',
+  'vocab.issueState.gating': 'Gate',
+  'vocab.issueState.reviewing': 'Review',
+  'vocab.issueState.producing-evidence': 'Producing evidence',
+  'vocab.issueState.pr-open': 'Pull request open',
+  'vocab.issueState.ci': 'CI',
+  'vocab.issueState.ready-to-merge': 'Ready to merge',
+  'vocab.issueState.merged': 'Merged',
+  'vocab.issueState.in-dev': 'In dev',
+  'vocab.issueState.in-release': 'In release',
+  'vocab.issueState.in-prep': 'In pre-production',
+  'vocab.issueState.in-prod': 'In production',
+  'vocab.issueState.closed': 'Closed',
+  'vocab.issueState.abandoned': 'Abandoned',
+  'vocab.issueState.needs-human': 'Needs a human',
+
+  'vocab.requestState.received': 'Received',
+  'vocab.requestState.challenging': 'Being challenged',
+  'vocab.requestState.challenged': 'Challenged',
+  'vocab.requestState.accepted': 'Accepted',
+  'vocab.requestState.declined': 'Declined',
+  'vocab.requestState.waiting-requester': 'Waiting for the requester',
+
+  'vocab.releaseState.open': 'Open',
+  'vocab.releaseState.cut': 'Cut',
+  'vocab.releaseState.auditing': 'Auditing',
+  'vocab.releaseState.blocked': 'Blocked',
+  'vocab.releaseState.promotable': 'Promotable',
+  'vocab.releaseState.promoted': 'Promoted',
+  'vocab.releaseState.verified': 'Verified',
+
+  'vocab.releaseSource.pull-request': 'Release pull request',
+  'vocab.releaseSource.tag': 'Tag',
+
+  'vocab.auditState.detected': 'Detected',
+  'vocab.auditState.auditing': 'Auditing',
+  'vocab.auditState.keep': 'Keep',
+  'vocab.auditState.challenge': 'To challenge',
+  'vocab.auditState.rewrite': 'To rewrite',
+
+  'vocab.auditReason.direct-push': 'Direct push',
+  'vocab.auditReason.bot-author': 'Bot author',
+  'vocab.auditReason.branch-not-factory': 'Branch outside the factory',
+  'vocab.auditReason.missing-factory-label': 'Factory label missing',
+  'vocab.auditReason.on-demand': 'Requested by the operator',
+
+  'vocab.auditFindingLevel.intent': 'Intent',
+  'vocab.auditFindingLevel.idea': 'Idea',
+  'vocab.auditFindingLevel.method': 'Method',
+
+  'vocab.commitAttribution.factory-merge': 'Factory merge',
+  'vocab.commitAttribution.automation': 'Other automation',
+  'vocab.commitAttribution.audit': 'Audited change',
+
+  'vocab.challengeVerdict.keep': 'Keep',
+  'vocab.challengeVerdict.adjust': 'Adjust',
+  'vocab.challengeVerdict.split': 'Split',
+  'vocab.challengeVerdict.ask': 'Question',
+  'vocab.challengeVerdict.decline': 'Decline',
+
+  'vocab.runStatus.running': 'Running',
+  'vocab.runStatus.waiting': 'Waiting for an answer',
+  'vocab.runStatus.succeeded': 'Succeeded',
+  'vocab.runStatus.failed': 'Failed',
+  'vocab.runStatus.stopped': 'Stopped',
+
+  'vocab.runOutcome.success': 'Success',
+  'vocab.runOutcome.decision-requested': 'Decision requested',
+  'vocab.runOutcome.max-turns': 'Turn limit reached',
+  'vocab.runOutcome.budget-exceeded': 'Budget exceeded',
+  'vocab.runOutcome.error': 'Error',
+  'vocab.runOutcome.timeout': 'Timed out',
+  'vocab.runOutcome.aborted': 'Aborted',
+
+  'vocab.runSubjectKind.issue': 'Issue',
+  'vocab.runSubjectKind.request': 'Request',
+  'vocab.runSubjectKind.audit': 'Audit',
+  'vocab.runSubjectKind.release': 'Release',
+
+  'vocab.subagentStatus.running': 'Running',
+  'vocab.subagentStatus.done': 'Done',
+  'vocab.subagentStatus.failed': 'Failed',
+
+  'vocab.role.challenger': 'Challenger',
+  'vocab.role.acceptance-author': 'Checks author',
+  'vocab.role.implementer': 'Implementer',
+  'vocab.role.reviewer': 'Reviewer',
+  'vocab.role.auditor': 'Auditor',
+  'vocab.role.release-auditor': 'Release auditor',
+  'vocab.role.summarizer': 'Summarizer',
+
+  'vocab.effort.low': 'Low',
+  'vocab.effort.medium': 'Medium',
+  'vocab.effort.high': 'High',
+  'vocab.effort.xhigh': 'Very high',
+  'vocab.effort.max': 'Maximum',
+
+  'vocab.reviewSeverity.blocking': 'Blocking',
+  'vocab.reviewSeverity.non-blocking': 'Non-blocking',
+
+  'vocab.reviewCategory.criteria-coverage': 'Criteria coverage',
+  'vocab.reviewCategory.scope-creep': 'Scope creep',
+  'vocab.reviewCategory.check-integrity': 'Check integrity',
+  'vocab.reviewCategory.correctness': 'Correctness',
+  'vocab.reviewCategory.security': 'Security',
+  'vocab.reviewCategory.repository-rules': 'Repository rules',
+
+  'vocab.checkConclusion.success': 'Passed',
+  'vocab.checkConclusion.failure': 'Failed',
+  'vocab.checkConclusion.pending': 'Pending',
+  'vocab.checkConclusion.neutral': 'Neutral',
+  'vocab.checkConclusion.skipped': 'Skipped',
+  'vocab.checkConclusion.cancelled': 'Cancelled',
+
+  'vocab.checkRunOutcome.passed': 'Passed',
+  'vocab.checkRunOutcome.failed': 'Failed',
+
+  'vocab.gateStepOutcome.passed': 'Passed',
+  'vocab.gateStepOutcome.failed': 'Failed',
+  'vocab.gateStepOutcome.skipped': 'Skipped',
+
+  'vocab.pullRequestState.open': 'Open',
+  'vocab.pullRequestState.merged': 'Merged',
+  'vocab.pullRequestState.closed': 'Closed',
+
+  'vocab.environmentStatus.healthy': 'Healthy',
+  'vocab.environmentStatus.degraded': 'Degraded',
+  'vocab.environmentStatus.deploying': 'Deploying',
+  'vocab.environmentStatus.down': 'Down',
+  'vocab.environmentStatus.unknown': 'Unknown',
+
+  'vocab.deploymentOutcome.success': 'Succeeded',
+  'vocab.deploymentOutcome.failure': 'Failed',
+  'vocab.deploymentOutcome.in-progress': 'In progress',
+
+  'vocab.workflowStatus.queued': 'Queued',
+  'vocab.workflowStatus.in_progress': 'In progress',
+  'vocab.workflowStatus.completed': 'Completed',
+
+  'vocab.promotionPolicy.automatic': 'Automatic',
+  'vocab.promotionPolicy.batch': 'In release batches',
+  'vocab.promotionPolicy.manual': 'Manual',
+
+  'vocab.releaseModel.release-please': 'Release pull requests',
+  'vocab.releaseModel.tags': 'Tags',
+  'vocab.releaseModel.none': 'No release model',
+
+  'vocab.memoryPressure.normal': 'normal',
+  'vocab.memoryPressure.warn': 'high',
+  'vocab.memoryPressure.critical': 'critical',
+
+  'vocab.toolSessionOutcome.succeeded': 'Succeeded',
+  'vocab.toolSessionOutcome.failed': 'Failed',
+  'vocab.toolSessionOutcome.timed-out': 'Timed out',
+  'vocab.toolStatus.connected': 'Connected',
+  'vocab.toolStatus.unauthenticated': 'Not signed in',
+  'vocab.toolStatus.missing': 'Missing',
+  'vocab.toolStatus.error': 'Error',
+
+  'vocab.toolScope.installation': 'Installation',
+  'vocab.toolScope.project': 'Project',
+
+  'vocab.usageLimitKind.session': 'Session',
+  'vocab.usageLimitKind.weekly_all': 'Weekly, all models',
+  'vocab.usageLimitKind.weekly_scoped': 'Weekly, one model',
+
+  'vocab.usageFreshness.fresh': 'Fresh',
+  'vocab.usageFreshness.stale': 'Stale',
+  'vocab.usageFreshness.window-reset': 'Window reset',
+
+  'vocab.usageSource.usage-report': 'Usage report',
+  'vocab.usageSource.agent-stream': 'Agent stream',
+
+  'vocab.billing.subscription': 'Subscription',
+  'vocab.billing.api-key': 'API key',
+
+  'vocab.costBasis.subscription-equivalent': 'API-equivalent price of subscription usage',
+  'vocab.costBasis.metered': 'Metered API price',
+  'vocab.costBasis.mixed': 'Mixed: metered and subscription-equivalent',
+
+  'vocab.pauseCause.resources': 'Machine resources',
+  'vocab.pauseCause.budget': 'Budget',
+  'vocab.pauseCause.operator': 'Operator',
+  'vocab.pauseCause.drain': 'Draining',
+
+  'vocab.pauseScope.installation': 'Installation',
+  'vocab.pauseScope.project': 'Project',
+
+  'vocab.attemptKind.session': 'Session',
+  'vocab.attemptKind.correction': 'Correction',
+  'vocab.attemptKind.fresh-session': 'Fresh session',
+
+  'vocab.attemptOutcome.running': 'Running',
+  'vocab.attemptOutcome.passed': 'Passed',
+  'vocab.attemptOutcome.gate-failed': 'Gate failed',
+  'vocab.attemptOutcome.review-failed': 'Review failed',
+  'vocab.attemptOutcome.error': 'Error',
+
+  'vocab.beforeResult.failed': 'Fails on the base',
+  'vocab.beforeResult.passed': 'Passes on the base',
+  'vocab.beforeResult.scored': 'Base score',
+  'vocab.beforeResult.not-run': 'Not run',
+
+  'vocab.beforeProofKind.fails-on-base': 'Must fail on the base',
+  'vocab.beforeProofKind.base-score': 'Base score recorded',
+  'vocab.beforeProofKind.none': 'No proof before',
+
+  'vocab.baseExpectation.fails': 'Expected to fail on the base',
+  'vocab.baseExpectation.passes': 'Expected to pass on the base',
+
+  'vocab.baseTestResult.red-assertion': 'Red (assertion)',
+  'vocab.baseTestResult.red-error': 'Red (error)',
+  'vocab.baseTestResult.green': 'Green',
+  'vocab.baseTestResult.skipped': 'Skipped',
+
+  'vocab.branchTestResult.green': 'Green',
+  'vocab.branchTestResult.red': 'Red',
+  'vocab.branchTestResult.skipped': 'Skipped',
+  'vocab.branchTestResult.missing': 'Missing',
+  'vocab.branchTestResult.not-run': 'Not run',
+
+  'vocab.proofStrategy.fails-on-base': 'Fails on the base',
+  'vocab.proofStrategy.fails-on-base-when-expressible': 'Fails on the base when it can',
+  'vocab.proofStrategy.base-score': 'Base score',
+  'vocab.proofStrategy.none': 'No proof before',
+
+  'vocab.testRunner.pytest': 'pytest',
+  'vocab.testRunner.vitest': 'Vitest',
+  'vocab.testRunner.playwright': 'Playwright',
+  'vocab.testRunner.node-test': 'Node test runner',
+  'vocab.testRunner.eval': 'Evaluation',
+
+  'vocab.evidenceKind.image-compare': 'Before and after',
+  'vocab.evidenceKind.recording': 'Recording',
+  'vocab.evidenceKind.red-green': 'Red to green',
+  'vocab.evidenceKind.acceptance-tests': 'Acceptance tests',
+  'vocab.evidenceKind.eval-scores': 'Evaluation scores',
+  'vocab.evidenceKind.report': 'Report',
+
+  'vocab.forgeKind.github': 'GitHub',
+  'vocab.forgeKind.local': 'Local forge',
+
+  'vocab.installationMode.live': 'Live',
+  'vocab.installationMode.demo': 'Demo',
+  'vocab.installationMode.rehearsal': 'Rehearsal',
+
+  'vocab.notificationChannel.system': 'Desktop notification',
+  'vocab.notificationChannel.google-chat': 'Google Chat',
+  'vocab.notificationChannel.slack': 'Slack',
+  'vocab.notificationChannel.webhook': 'Webhook',
+
+  'vocab.remoteAccess.none': 'None',
+  'vocab.remoteAccess.tailscale': 'Tailscale',
+
+  'vocab.knowledgeSourceKind.path': 'Folder',
+  'vocab.knowledgeSourceKind.repository': 'Repository',
+
+  'vocab.issueType.feature': 'Feature',
+  'vocab.issueType.fix': 'Fix',
+  'vocab.issueType.ui': 'UI',
+  'vocab.issueType.api': 'API',
+  'vocab.issueType.security': 'Security',
+  'vocab.issueType.infra': 'Infrastructure and CI',
+  'vocab.issueType.data': 'Data',
+  'vocab.issueType.dependencies': 'Dependencies',
+  'vocab.issueType.docs': 'Documentation',
+  'vocab.issueType.refactor': 'Refactoring',
+  'vocab.issueType.release': 'Release',
+  'vocab.issueType.prompt': 'Prompt',
+} as const satisfies MessageCatalog;
