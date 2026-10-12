@@ -9,6 +9,7 @@ import {
   RunSlots,
   type AgentHarness,
   type Clock,
+  type CommandRunner,
   type Notifier,
   type OperationLog,
   type ResourceGuard,
@@ -75,6 +76,11 @@ export interface InstallationRuntime extends InstallationContext {
   /** Applies a settings change to the configuration file and records it; the running daemon picks it up. */
   changeSettings(change: SettingsChange, operator: string): Promise<number>;
   close(): void;
+}
+
+/** A runner that stops its command when the signal aborts, for the logins and keep-alives of the tools. */
+function sessionRunner(signal: AbortSignal): CommandRunner {
+  return new SpawnCommandRunner({ abortSignal: signal });
 }
 
 function processLog(clock: Clock): OperationLog {
@@ -173,8 +179,8 @@ export async function openInstallation(config: AgentFactoryConfig, environment: 
         return found;
       },
       projectTools: (id) => projectToolProber(projectOf(live.config, id), toolSettings),
-      toolSessions: new ConfiguredToolSessions(config.tools, runner, { environment, home: userHome }),
-      projectToolSessions: (id) => new ConfiguredToolSessions(projectOf(live.config, id).tools, runner, { environment, home: userHome }),
+      toolSessions: new ConfiguredToolSessions(config.tools, sessionRunner, { environment, home: userHome }),
+      projectToolSessions: (id) => new ConfiguredToolSessions(projectOf(live.config, id).tools, sessionRunner, { environment, home: userHome }),
       changeSettings: (change, operator) => new ChangeSettings({ events, document: settingsDocument }).change(change, operator),
       close: () => {
         lifetime.abort();

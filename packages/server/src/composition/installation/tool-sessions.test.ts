@@ -37,7 +37,7 @@ describe('the declared sessions of the tools', () => {
         tool('slow', 'sleep 5', null, 300),
         tool('plain', null, null),
       ],
-      new SpawnCommandRunner(),
+      (signal) => new SpawnCommandRunner({ abortSignal: signal }),
       { environment: { PATH: process.env['PATH'], MARKER: 'from the operator environment' }, home },
     );
   });

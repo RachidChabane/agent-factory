@@ -38,20 +38,22 @@ function seconds(milliseconds: number): number {
  */
 export class ConfiguredToolSessions implements ToolSessionCommands {
   private readonly tools: readonly ToolCheckConfig[];
-  private readonly runner: CommandRunner;
+  private readonly runnerFor: (signal: AbortSignal) => CommandRunner;
   private readonly settings: ToolSessionSettings;
 
-  constructor(tools: readonly ToolCheckConfig[], runner: CommandRunner, settings: ToolSessionSettings) {
+  /** `runnerFor` gives a runner that stops its command once the signal aborts, as when the factory stops. */
+  constructor(tools: readonly ToolCheckConfig[], runnerFor: (signal: AbortSignal) => CommandRunner, settings: ToolSessionSettings) {
     this.tools = tools;
-    this.runner = runner;
+    this.runnerFor = runnerFor;
     this.settings = settings;
   }
 
-  async run(tool: string, purpose: ToolSessionPurpose): Promise<ToolSessionRun> {
+  async run(tool: string, purpose: ToolSessionPurpose, signal: AbortSignal): Promise<ToolSessionRun> {
     const declared = this.tools.find((candidate) => candidate.name === tool);
     const session = purpose === 'login' ? (declared?.login ?? null) : (declared?.keepAlive ?? null);
     if (session === null) throw purpose === 'login' ? new ToolLoginUnavailableError(tool) : new ToolKeepAliveUnavailableError(tool);
-    const result = await this.runner.run([SHELL, SHELL_COMMAND_FLAG, session.command], this.settings.home, session.timeoutMs, definedEnvironment(this.settings.environment));
+    const runner = this.runnerFor(signal);
+    const result = await runner.run([SHELL, SHELL_COMMAND_FLAG, session.command], this.settings.home, session.timeoutMs, definedEnvironment(this.settings.environment));
     if (result.timedOut) return { outcome: 'timed-out', detail: `timed out after ${seconds(session.timeoutMs)} s` };
     const ended = `exit code ${result.exitCode} after ${seconds(result.durationMs)} s`;
     return { outcome: result.exitCode === EXIT_CODE_OK ? 'succeeded' : 'failed', detail: ended };
