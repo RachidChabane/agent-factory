@@ -8,7 +8,6 @@ import type {
   EffortLevel,
   GateStepOutcome,
   IssueState,
-  IssueType,
   RateLimitWindow,
   ReleaseState,
   RequestState,
@@ -97,7 +96,7 @@ export const ISSUE_TYPE_LABELS: Readonly<Record<string, string>> = {
 };
 
 export function issueTypeLabel(type: string): string {
-  return issueTypeLabel(type) ?? type;
+  return ISSUE_TYPE_LABELS[type] ?? type;
 }
 
 export const ROLE_LABELS: Readonly<Record<AgentRole, string>> = {
