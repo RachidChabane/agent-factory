@@ -55,7 +55,7 @@ const storefront: DemoProject = {
       beforeAcceptance: [{ name: 'lint', run: 'node scripts/lint.js' }],
       afterAcceptance: [{ name: 'unit', run: 'node --test' }],
     },
-    knowledge: [{ repository: 'docs' }],
+    knowledge: [{ repository: 'docs/pricing.md' }],
     delivery: {
       release: { kind: 'tags', tagPattern: 'v*.*.*' },
       environments: [
