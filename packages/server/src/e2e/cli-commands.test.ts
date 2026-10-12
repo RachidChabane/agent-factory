@@ -19,7 +19,7 @@ describe('the factory commands of the example run', () => {
   });
 
   it('create an issue from a spec file and validate it at once', () => {
-    expect(commandOf(createStartedIssue(SPEC_PATH))).toEqual({ kind: 'issue-create', specPath: SPEC_PATH, blockedBy: [], confirmed: false, start: true });
+    expect(commandOf(createStartedIssue(SPEC_PATH))).toEqual({ kind: 'issue-create', specPath: SPEC_PATH, blockedBy: [], confirmed: false, start: true, delegation: null });
   });
 
   it('run an issue to its pull request', () => {
@@ -27,7 +27,7 @@ describe('the factory commands of the example run', () => {
   });
 
   it('merge a pull request at the reviewed head', () => {
-    expect(commandOf(mergePullRequest(2, HEAD_SHA))).toEqual({ kind: 'merge', pullRequestNumber: 2, expectedHeadSha: HEAD_SHA });
+    expect(commandOf(mergePullRequest(2, HEAD_SHA))).toEqual({ kind: 'merge', pullRequestNumber: 2, expectedHeadSha: HEAD_SHA, delegation: null });
   });
 
   it('read the status of an issue', () => {
