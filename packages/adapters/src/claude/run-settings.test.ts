@@ -260,7 +260,9 @@ describe('reference snapshots', () => {
   it('forbids writing into a snapshot to the file tools and to the sandbox, every role alike', () => {
     for (const role of AGENT_ROLES) {
       const { settings } = renderRunSettings(input({ role, references: MOUNTS }));
-      expect(settings.permissions.deny).toEqual(expect.arrayContaining([`Edit(/${SNAPSHOT}/**)`, `Edit(/${OTHER_SNAPSHOT}/**)`]));
+      expect(settings.permissions.deny).toEqual(
+        expect.arrayContaining([`Edit(/${SNAPSHOT}/**)`, `Write(/${SNAPSHOT}/**)`, `Edit(/${OTHER_SNAPSHOT}/**)`, `Write(/${OTHER_SNAPSHOT}/**)`]),
+      );
       expect(settings.sandbox.filesystem.denyWrite).toEqual(expect.arrayContaining([SNAPSHOT, OTHER_SNAPSHOT]));
       expect(settings.sandbox.filesystem.allowWrite).not.toContain(SNAPSHOT);
     }

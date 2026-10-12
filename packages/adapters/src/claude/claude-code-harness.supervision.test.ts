@@ -203,7 +203,7 @@ describe('ClaudeCodeHarness supervision with a fake claude', () => {
       expect(prompt).toContain(`\`example-org/design-tokens\` at \`v1.0.0\` (commit \`${SNAPSHOT_COMMIT}\`), read from \`${mount().path}\``);
       expect(prompt).toContain(`- \`cp -R ${mount().path}/\``);
       expect(settings.permissions.allow).toContain(`Bash(cp ${mount().path}/*)`);
-      expect(settings.permissions.deny).toContain(`Edit(/${mount().path}/**)`);
+      expect(settings.permissions.deny).toEqual(expect.arrayContaining([`Edit(/${mount().path}/**)`, `Write(/${mount().path}/**)`]));
       expect(settings.sandbox.filesystem.allowRead).toContain(mount().path);
       expect(settings.sandbox.filesystem.denyWrite).toContain(mount().path);
     });

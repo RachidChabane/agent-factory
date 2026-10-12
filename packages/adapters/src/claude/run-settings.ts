@@ -100,7 +100,7 @@ export function renderRunSettings(input: RunSettingsInput): RenderedRunSettings 
       absolutePathRule(CLAUDE_TOOLS.read, join(path, RECURSIVE_GLOB)),
     ]),
     ...protectedFiles.map((file) => absolutePathRule(CLAUDE_TOOLS.edit, file)),
-    ...referencePaths.map((path) => absolutePathRule(CLAUDE_TOOLS.edit, join(path, RECURSIVE_GLOB))),
+    ...referencePaths.flatMap((path) => [CLAUDE_TOOLS.edit, CLAUDE_TOOLS.write].map((tool) => absolutePathRule(tool, join(path, RECURSIVE_GLOB)))),
   ]);
   return {
     settings: {
