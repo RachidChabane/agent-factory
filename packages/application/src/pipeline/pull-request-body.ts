@@ -59,7 +59,8 @@ function shortSha(sha: string): string {
   return sha.slice(0, SHORT_SHA_LENGTH);
 }
 
-function isImage(path: string): boolean {
+/** Whether the file is an image the pull request shows inline, and a notice can link. */
+export function isImagePath(path: string): boolean {
   const lower = path.toLowerCase();
   return IMAGE_EXTENSIONS.some((extension) => lower.endsWith(extension));
 }
@@ -95,7 +96,7 @@ function afterSentence(input: PullRequestBodyInput): string {
 function evidenceCell(input: PullRequestBodyInput, file: EvidenceFile | undefined, phase: EvidencePhase): string {
   if (file === undefined) return NOT_PRODUCED;
   const alt = `${file.caption}, ${phase}`;
-  return isImage(file.sourcePath)
+  return isImagePath(file.sourcePath)
     ? `![${alt}](${input.fileLinks.rawFile(input.evidenceSha, file.bundlePath)})`
     : `[${file.sourcePath}](${input.fileLinks.file(input.evidenceSha, file.bundlePath)})`;
 }

@@ -27,15 +27,28 @@ export function failingOnBase(checks: readonly CheckRunSummary[], baseChecks: re
   return new Set(checks.filter((check) => isRefused(check) && failedOnBase.has(check.name)).map((check) => check.name));
 }
 
+/** The checks of a head that keep it from merging: the ones that fail and the ones still running. */
+export interface MergeCheckProblems {
+  readonly failing: readonly CheckRunSummary[];
+  readonly pending: readonly CheckRunSummary[];
+}
+
 /**
- * Why the checks of a head block its merge, or null. A check that fails the same way on the base
- * branch was failing before the change, so it does not block; a pending one does, until it ends.
+ * The checks of a head that block its merge. A check that fails the same way on the base branch was
+ * failing before the change, so it does not block; a pending one does, until it ends.
  */
-export function checksBlockingMerge(checks: readonly CheckRunSummary[], baseChecks: readonly CheckRunSummary[] = []): string | null {
+export function mergeCheckProblems(checks: readonly CheckRunSummary[], baseChecks: readonly CheckRunSummary[] = []): MergeCheckProblems {
   const preExisting = failingOnBase(checks, baseChecks);
-  const failing = checks.filter((check) => isRefused(check) && !preExisting.has(check.name));
+  return {
+    failing: checks.filter((check) => isRefused(check) && !preExisting.has(check.name)),
+    pending: checks.filter((check) => check.conclusion === PENDING_CONCLUSION),
+  };
+}
+
+/** Why the checks of a head block its merge, or null. */
+export function checksBlockingMerge(checks: readonly CheckRunSummary[], baseChecks: readonly CheckRunSummary[] = []): string | null {
+  const { failing, pending } = mergeCheckProblems(checks, baseChecks);
   if (failing.length > 0) return `checks failed: ${describeChecks(failing)}`;
-  const pending = checks.filter((check) => check.conclusion === PENDING_CONCLUSION);
   return pending.length > 0 ? `checks still running: ${describeChecks(pending)}` : null;
 }
 

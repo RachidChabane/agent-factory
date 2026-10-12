@@ -13,6 +13,7 @@ import { FilmRefusedError } from '../film/film-errors.ts';
 import type { FilmOrder } from '../film/film-order.ts';
 import type { FilmRunner } from '../film/film-runner.ts';
 import { closeOrphanFilms } from '../film/orphan-films.ts';
+import type { PullRequestReadyScanner } from '../ready/pull-request-ready-watch.ts';
 import { recordExternalMerge } from '../pipeline/record-external-merge.ts';
 import type { RunIssueOutcome } from '../pipeline/run-issue-outcome.ts';
 import type { Clock, EventStore, GitHubGateway, IssueRecord, IssueStateStore, OperationLog, Sleeper, WorktreePool } from '../ports.ts';
@@ -85,6 +86,8 @@ export interface DaemonDependencies {
   readonly challenges: RequestChallenger | null;
   /** The films of the project; their queue is the installation's. Null when the project films nothing. */
   readonly films: FilmRunner | null;
+  /** Tells the operator which pull requests became ready to merge. */
+  readonly pullRequestReady: PullRequestReadyScanner | null;
   readonly releases: ReleaseEvaluator;
   readonly configuration: ConfigurationSource | null;
   /** Stops the stacks an earlier factory left running; says how many it stopped. */
@@ -127,6 +130,7 @@ export class FactoryDaemon {
   private readonly deferredUntil = new Map<number, number>();
   private backgroundTask: Promise<void> | null = null;
   private backgroundController: AbortController | null = null;
+  private readyScan: Promise<void> | null = null;
   private lastWatchAt: number | null = null;
   private validated: { readonly at: number; readonly issues: readonly IssueRecord[] } | null = null;
   private concurrency: number;
@@ -256,6 +260,7 @@ export class FactoryDaemon {
   async tick(signal: AbortSignal, hold: SchedulingHold = SLOTS_FREE): Promise<void> {
     await this.guard('reloading the configuration', () => this.reloadConfiguration());
     await this.guard('watching merges and releases', () => this.watch());
+    this.startReadyScan(signal);
     const pauses = await this.refreshPauses();
     await this.guard('pausing issues', () => this.stopPausedIssues());
     if (pauses.size > 0 || signal.aborted) return;
@@ -270,7 +275,7 @@ export class FactoryDaemon {
   }
 
   async settle(): Promise<void> {
-    await Promise.allSettled([...[...this.running.values()].map((drive) => drive.task), this.backgroundTask ?? Promise.resolve()]);
+    await Promise.allSettled([...[...this.running.values()].map((drive) => drive.task), this.backgroundTask ?? Promise.resolve(), this.readyScan ?? Promise.resolve()]);
   }
 
   private async guard<T>(what: string, action: () => Promise<T>): Promise<T | null> {
@@ -280,6 +285,21 @@ export class FactoryDaemon {
       this.dependencies.log.warn(`${what} failed: ${message(error)}`);
       await this.dependencies.notifications.send(NOTICES.failed(what, message(error)));
       return null;
+    }
+  }
+
+  /** Announces the pull requests that became ready, without holding the tick: uploading their media can take long. */
+  private startReadyScan(signal: AbortSignal): void {
+    const { pullRequestReady } = this.dependencies;
+    if (pullRequestReady === null || this.readyScan !== null) return;
+    this.readyScan = this.guard('announcing ready pull requests', () => this.announceReadyPullRequests(pullRequestReady, signal)).then(() => {
+      this.readyScan = null;
+    });
+  }
+
+  private async announceReadyPullRequests(scanner: PullRequestReadyScanner, signal: AbortSignal): Promise<void> {
+    for (const announced of await scanner.scan(signal)) {
+      this.dependencies.log.info(`pull request #${announced.pullRequestNumber} announced as ready at ${announced.headSha}`);
     }
   }
 

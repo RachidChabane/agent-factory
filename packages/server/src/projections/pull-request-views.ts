@@ -8,6 +8,7 @@ import {
   acceptanceCommand,
   commandSection,
   criterionChecksOf,
+  isImagePath,
   stripAnsi,
   failingOnBase,
   MERGEABLE_STATES,
@@ -27,7 +28,6 @@ import { imageKey, logKey, type ForgePullRequest, type ProjectSnapshotContext } 
 
 const FAILING_CONCLUSIONS: readonly CheckRunSummary['conclusion'][] = ['failure', 'cancelled'];
 const PENDING_CONCLUSION: CheckRunSummary['conclusion'] = 'pending';
-const IMAGE_EXTENSIONS: readonly string[] = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 const RED_GREEN_ID = 'red-green';
 const EVAL_SCORES_ID = 'eval-scores';
 const ACCEPTANCE_TESTS_ID = 'acceptance-tests';
@@ -35,11 +35,6 @@ const NO_COMMAND = 'gate';
 /** A proof is only recorded on a worktree, so its base is always known; this never shows. */
 const NO_BASE_SHA = '';
 const FIRST_CRITERION = 1;
-
-function isImage(path: string): boolean {
-  const lower = path.toLowerCase();
-  return IMAGE_EXTENSIONS.some((extension) => lower.endsWith(extension));
-}
 
 export function proofLogExcerpt(text: string, command: string | null, maxCharacters: number): string {
   const clean = stripAnsi(text);
@@ -73,7 +68,7 @@ function evidenceOf(journal: PipelineJournal, context: ProjectSnapshotContext, r
   const images: Evidence[] = [...new Set(files.map((file) => file.sourcePath))].flatMap((sourcePath) => {
     const before = files.find((file) => file.sourcePath === sourcePath && file.phase === 'before');
     const after = files.find((file) => file.sourcePath === sourcePath && file.phase === 'after');
-    if (before === undefined || after === undefined || !isImage(sourcePath)) return [];
+    if (before === undefined || after === undefined || !isImagePath(sourcePath)) return [];
     const beforePath = `${before.phase}/${sourcePath}`;
     const afterPath = `${after.phase}/${sourcePath}`;
     const size = context.imageSizes.get(imageKey(issueNumber, afterPath)) ?? context.imageSizes.get(imageKey(issueNumber, beforePath)) ?? null;

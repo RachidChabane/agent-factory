@@ -206,6 +206,7 @@ export function projectDaemon(project: ProjectRuntime, installation: Installatio
       audits: auditRunner(project),
       challenges: challenger,
       films: filmRunner(project, installation),
+      pullRequestReady: null,
       releases: releaseEvaluator(project),
       configuration: null,
       reclaimStacks: stackReclaimer(project),

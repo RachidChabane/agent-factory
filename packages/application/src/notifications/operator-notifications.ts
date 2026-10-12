@@ -1,13 +1,15 @@
 import type { AuditVerdict, PauseCause } from '@agent-factory/domain';
 import { SHORT_SHA_LENGTH } from '../audit/audit-issue-renderer.ts';
 import type { WorktreesFullPayload } from '../daemon/daemon-events.ts';
-import type { Notifier, OperationLog, PullRequestRef } from '../ports.ts';
+import type { NoticeLink, Notifier, OperationLog, PullRequestRef } from '../ports.ts';
 import { COCKPIT_PATHS, cockpitLink } from './cockpit-links.ts';
 
 export interface OperatorNotice {
   readonly title: string;
   readonly body: string;
   readonly path: string;
+  /** Links to files the notice is about, each a label and an address the operator can open. */
+  readonly media?: readonly NoticeLink[];
 }
 
 const PAUSE_TITLES: Readonly<Record<PauseCause, string>> = {
@@ -25,10 +27,21 @@ const RESUME_TITLES: Readonly<Record<PauseCause, string>> = {
 };
 
 const LIST_SEPARATOR = ', ';
+const WORD_SEPARATOR = ' ';
+const NO_MEDIA: readonly NoticeLink[] = [];
 
 function holderText(holder: WorktreesFullPayload['holders'][number]): string {
   if (holder.pullRequestNumber !== null) return `issue #${holder.issueNumber} with pull request #${holder.pullRequestNumber}`;
   return holder.state === 'needs-human' ? `issue #${holder.issueNumber} waiting for a person` : `issue #${holder.issueNumber} in progress`;
+}
+
+/** What the notice that a pull request is ready tells: the pull request, its recorded films and the links to its media. */
+export interface ReadyNoticeFacts {
+  readonly issueNumber: number;
+  readonly pullRequest: PullRequestRef;
+  readonly title: string;
+  readonly films: readonly string[];
+  readonly media: readonly NoticeLink[];
 }
 
 export const NOTICES = {
@@ -82,6 +95,17 @@ export const NOTICES = {
     body: `The report, the draft reply and ${specCount} proposed spec(s) wait for your review.`,
     path: COCKPIT_PATHS.request(requestId),
   }),
+  pullRequestReady: (ready: ReadyNoticeFacts): OperatorNotice => ({
+    title: `Pull request #${ready.pullRequest.number} is ready to merge`,
+    body: [
+      `${ready.title} (issue #${ready.issueNumber}).`,
+      'Its required checks passed.',
+      ready.films.length === 0 ? 'No film was recorded.' : `Films recorded: ${ready.films.join(LIST_SEPARATOR)}.`,
+      ready.pullRequest.url,
+    ].join(WORD_SEPARATOR),
+    path: COCKPIT_PATHS.pullRequest(ready.pullRequest.number),
+    media: ready.media,
+  }),
   filmFinished: (issueNumber: number, pullRequestNumber: number, scenario: string): OperatorNotice => ({
     title: `Films of scenario ${scenario} recorded for issue #${issueNumber}`,
     body: `Pull request #${pullRequestNumber} carries the before and after recordings.`,
@@ -110,12 +134,15 @@ export class OperatorNotifications {
     this.log = log;
   }
 
-  async send(notice: OperatorNotice): Promise<void> {
+  /** Sends the notice to every channel; says whether every one took it. A failed delivery is logged, never thrown. */
+  async send(notice: OperatorNotice): Promise<boolean> {
     this.log.info(`${notice.title}: ${notice.body}`);
     try {
-      await this.notifier.notify(notice.title, notice.body, cockpitLink(this.cockpitUrl, notice.path));
+      await this.notifier.notify(notice.title, notice.body, cockpitLink(this.cockpitUrl, notice.path), notice.media ?? NO_MEDIA);
+      return true;
     } catch (error) {
       this.log.warn(`notification "${notice.title}" was not delivered: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
     }
   }
 }

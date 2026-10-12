@@ -36,6 +36,7 @@ import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.
 import { FilmRefusedError } from '../film/film-errors.ts';
 import type { FilmRunner } from '../film/film-runner.ts';
 import { ORPHAN_FILM_REASON } from '../film/orphan-films.ts';
+import type { PullRequestReadyScanner } from '../ready/pull-request-ready-watch.ts';
 import { SLOTS_HELD } from './scheduling-hold.ts';
 
 const START = new Date('2026-10-10T08:00:00.000Z');
@@ -141,6 +142,7 @@ function setup(
   overrides: {
     readonly audits?: AuditRunner | null;
     readonly films?: FilmRunner | null;
+    readonly pullRequestReady?: PullRequestReadyScanner | null;
     readonly settings?: Partial<DaemonSettings>;
     readonly configuration?: ConfigurationSource | null;
   } = {},
@@ -184,6 +186,7 @@ function setup(
       audits: overrides.audits ?? null,
       challenges: null,
       films: overrides.films ?? null,
+      pullRequestReady: overrides.pullRequestReady ?? null,
       releases,
       configuration: overrides.configuration ?? null,
       reclaimStacks: () => Promise.resolve(0),
@@ -592,5 +595,68 @@ describe('worktrees held by open pull requests', () => {
     expect(events.typesOf('daemon')).toEqual([]);
     drivers.finish(1, { kind: 'needs-human', issueNumber: 1, reason: 'stop' });
     await daemon.settle();
+  });
+});
+
+describe('the scan for ready pull requests', () => {
+  class ControlledScanner implements PullRequestReadyScanner {
+    scans = 0;
+    failure: Error | null = null;
+    private release: (() => void) | null = null;
+
+    async scan(): Promise<readonly never[]> {
+      this.scans += 1;
+      if (this.failure !== null) throw this.failure;
+      await new Promise<void>((resolve) => {
+        this.release = resolve;
+      });
+      return [];
+    }
+
+    finish(): void {
+      this.release?.();
+    }
+  }
+
+  it('runs beside the tick, one scan at a time, and the daemon settles once it ends', async () => {
+    const scanner = new ControlledScanner();
+    const { daemon } = setup({ pullRequestReady: scanner });
+    await daemon.tick(SIGNAL);
+    await daemon.tick(SIGNAL);
+    expect(scanner.scans).toBe(1);
+    let settled = false;
+    const settling = daemon.settle().then(() => {
+      settled = true;
+    });
+    await flush();
+    expect(settled).toBe(false);
+    scanner.finish();
+    await settling;
+    await daemon.tick(SIGNAL);
+    expect(scanner.scans).toBe(2);
+    scanner.finish();
+    await daemon.settle();
+  });
+
+  it('keeps running while scheduling is paused, since it starts no agent', async () => {
+    const scanner = new ControlledScanner();
+    const { daemon, events } = setup({ pullRequestReady: scanner });
+    await pauseScheduling(events, 'operator', 'paused by the operator', null);
+    await daemon.tick(SIGNAL);
+    expect(scanner.scans).toBe(1);
+    scanner.finish();
+    await daemon.settle();
+  });
+
+  it('tells the operator when a scan fails and tries again at the next tick', async () => {
+    const scanner = new ControlledScanner();
+    scanner.failure = new Error('the forge answered HTTP 502');
+    const { daemon, notifier } = setup({ pullRequestReady: scanner });
+    await daemon.tick(SIGNAL);
+    await daemon.settle();
+    await daemon.tick(SIGNAL);
+    await daemon.settle();
+    expect(scanner.scans).toBe(2);
+    expect(notifier.titles).toEqual(['Factory error: announcing ready pull requests', 'Factory error: announcing ready pull requests']);
   });
 });
