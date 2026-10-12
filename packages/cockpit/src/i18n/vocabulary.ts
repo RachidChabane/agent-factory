@@ -7,6 +7,7 @@ import type {
   BeforeProofKind,
   BillingMode,
   BranchTestResult,
+  DelegableGesture,
   EffortLevel,
   GateStepOutcome,
   IssueState,
@@ -111,6 +112,7 @@ export interface Vocabulary {
   testRunner(value: TestRunner): string;
   evidenceKind(value: EvidenceKind): string;
   forgeKind(value: ForgeKind): string;
+  delegableGesture(value: DelegableGesture): string;
   installationMode(value: InstallationMode): string;
   notificationChannel(value: NotificationChannelKind): string;
   remoteAccess(value: RemoteAccess): string;
@@ -171,6 +173,7 @@ export function createVocabulary(i18n: Pick<I18n, 't' | 'has'>): Vocabulary {
     testRunner: (value) => t(`vocab.testRunner.${value}`),
     evidenceKind: (value) => t(`vocab.evidenceKind.${value}`),
     forgeKind: (value) => t(`vocab.forgeKind.${value}`),
+    delegableGesture: (value) => t(`vocab.gesture.${value}`),
     installationMode: (value) => t(`vocab.installationMode.${value}`),
     notificationChannel: (value) => t(`vocab.notificationChannel.${value}`),
     remoteAccess: (value) => t(`vocab.remoteAccess.${value}`),

@@ -280,4 +280,8 @@ export const enVocabulary = {
   'vocab.issueType.refactor': 'Refactoring',
   'vocab.issueType.release': 'Release',
   'vocab.issueType.prompt': 'Prompt',
+  'vocab.gesture.validate-spec': 'Spec validated',
+  'vocab.gesture.answer-decision': 'Decision answered',
+  'vocab.gesture.resume': 'Issue resumed',
+  'vocab.gesture.merge': 'Pull request merged',
 } as const satisfies MessageCatalog;

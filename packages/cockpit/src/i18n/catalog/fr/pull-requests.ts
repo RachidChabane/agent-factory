@@ -189,4 +189,28 @@ export const frPullRequests = {
   'pullRequests.films.order.scenario': 'Nom du scénario',
   'pullRequests.films.order.rule': 'Lettres, chiffres, points, tirets et tirets bas, en commençant par une lettre ou un chiffre, au plus {max} caractères.',
   'pullRequests.films.order.error': 'Ce n’est pas un nom de scénario. {rule}',
+
+  'pullRequests.ready.title': 'Notification de prête à merger',
+  'pullRequests.ready.description': 'Le message envoyé à vos canaux quand les checks requis sont passés et qu’aucun film n’est en attente, en cours ou en échec. Il part une fois par tête de la pull request.',
+  'pullRequests.ready.sent': 'Envoyée {when} pour la tête {sha}.',
+  'pullRequests.ready.links': 'Liens de la notification',
+  'pullRequests.ready.linksNone': 'La notification ne portait aucun lien : l’installation ne déclare pas de commande de dépôt, ou aucun fichier n’a pu être déposé.',
+  'pullRequests.ready.open': 'Ouvrir {label}',
+  'pullRequests.ready.failures': 'Fichiers laissés hors de la notification',
+  'pullRequests.ready.failure': '{label} : {reason}',
+  'pullRequests.ready.held': 'Pas encore envoyée',
+  'pullRequests.ready.holds': 'Ce qui retient la notification',
+  'pullRequests.ready.hold.checks-running': 'Les checks requis ne sont pas terminés.',
+  'pullRequests.ready.hold.checks-failed': 'Un check requis a échoué.',
+  'pullRequests.ready.hold.films-pending': {
+    one: 'Le film du scénario {scenarios} est en attente ou en cours.',
+    other: 'Les films des scénarios {scenarios} sont en attente ou en cours.',
+  },
+  'pullRequests.ready.hold.films-failed': {
+    one: 'Le film du scénario {scenarios} a échoué : commandez-le de nouveau, ou mergez sans lui.',
+    other: 'Les films des scénarios {scenarios} ont échoué : commandez-les de nouveau, ou mergez sans eux.',
+  },
+  'pullRequests.ready.checksNeverRead': 'Les checks n’ont pas été relevés',
+  'pullRequests.ready.due': 'Tout est réuni : la notification part au prochain tick de l’usine.',
+  'pullRequests.ready.none': 'Aucune notification de prête à merger n’a été envoyée pour cette pull request.',
 } as const satisfies TwinOf<typeof enPullRequests>;

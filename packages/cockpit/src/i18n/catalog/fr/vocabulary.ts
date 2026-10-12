@@ -281,4 +281,8 @@ export const frVocabulary = {
   'vocab.issueType.refactor': 'Refactorisation',
   'vocab.issueType.release': 'Release',
   'vocab.issueType.prompt': 'Prompt',
+  'vocab.gesture.validate-spec': 'Spec validée',
+  'vocab.gesture.answer-decision': 'Décision tranchée',
+  'vocab.gesture.resume': 'Ticket repris',
+  'vocab.gesture.merge': 'Pull request mergée',
 } as const satisfies TwinOf<typeof enVocabulary>;

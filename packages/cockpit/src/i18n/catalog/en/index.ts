@@ -16,6 +16,7 @@ import { enSettings } from './settings.ts';
 import { enConfiguration } from './configuration.ts';
 import { enRuns } from './runs.ts';
 import { enUsage } from './usage.ts';
+import { enAutonomy } from './autonomy.ts';
 
 export const enFragments = {
   common: enCommon,
@@ -36,6 +37,7 @@ export const enFragments = {
   configuration: enConfiguration,
   runs: enRuns,
   usage: enUsage,
+  autonomy: enAutonomy,
 } as const;
 
 export const en = {
@@ -57,4 +59,5 @@ export const en = {
   ...enConfiguration,
   ...enRuns,
   ...enUsage,
+  ...enAutonomy,
 } as const;
