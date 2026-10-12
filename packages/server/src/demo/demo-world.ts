@@ -12,6 +12,7 @@ import { EXAMPLES_DIRECTORY, FAKE_CLAUDE_MAIN } from './demo-paths.ts';
 export const DEMO_SERVER_PORT = 7431;
 export const DEMO_BASE_BRANCH = 'main';
 const SOURCES_DIRECTORY = 'sources';
+const REFERENCE_SOURCES_DIRECTORY = 'references';
 const DEMO_DIRECTORY = 'demo';
 const SCENARIO_FILE = 'scenario.json';
 const FAKE_STATE_DIRECTORY = 'fake-claude';
@@ -37,12 +38,26 @@ export interface DemoCommit {
   readonly tag: string | null;
 }
 
+/** Another fictional repository the specifications of a project cite, created as a local clone with one tagged commit. */
+export interface DemoReference {
+  readonly name: string;
+  /** The `owner/name` the specifications cite. */
+  readonly repository: string;
+  readonly tag: string;
+  readonly author: DemoCommit['author'];
+  readonly daysAgo: number;
+  /** The files of the tagged commit, by path from the root. */
+  readonly files: Readonly<Record<string, string>>;
+}
+
 export interface DemoProject {
   readonly id: string;
   readonly name: string;
   readonly repository: string;
   readonly example: string;
   readonly history: readonly DemoCommit[];
+  /** The repositories the project's specifications cite; the project's entry names a local clone of each, tagged. */
+  readonly references?: readonly DemoReference[];
   /** The project's entry in config.yaml, without its id, name and forge. */
   readonly settings: (health: DemoHealthEndpoints) => Readonly<Record<string, unknown>>;
   /** Tools with a login and a keep-alive, which keep their sessions as files of the given directory. */
@@ -107,6 +122,24 @@ async function createSource(settings: DemoWorldSettings, project: DemoProject): 
   return source;
 }
 
+/** A local clone holding the files of a cited repository in one commit, tagged, which the project's `references` entry takes its snapshot from. */
+async function createReferenceSource(settings: DemoWorldSettings, reference: DemoReference): Promise<string> {
+  const source = join(settings.home, SOURCES_DIRECTORY, REFERENCE_SOURCES_DIRECTORY, reference.name);
+  await mkdir(source, { recursive: true });
+  const commit: DemoCommit = { author: reference.author, daysAgo: reference.daysAgo, message: `chore: publish ${reference.tag}`, files: reference.files, tag: reference.tag };
+  const plain = localOnlyGitEnvironment(buildGitEnvironment(settings.environment));
+  await git(settings, source, ['init', '--quiet', '--initial-branch', DEMO_BASE_BRANCH], plain);
+  for (const [path, content] of Object.entries(commit.files)) {
+    await mkdir(join(source, path, '..'), { recursive: true });
+    await writeFile(join(source, path), content);
+  }
+  const environment = commitEnvironment(settings, commit);
+  await git(settings, source, ['add', '--all'], environment);
+  await git(settings, source, ['commit', '--quiet', '--message', commit.message], environment);
+  await git(settings, source, ['tag', reference.tag], environment);
+  return source;
+}
+
 async function createForge(settings: DemoWorldSettings, project: DemoProject, source: string): Promise<void> {
   const directory = join(settings.home, PROJECTS_DIRECTORY, project.id);
   const repositoryName = project.repository.split('/').at(-1) ?? project.id;
@@ -118,8 +151,13 @@ async function createForge(settings: DemoWorldSettings, project: DemoProject, so
   });
 }
 
-function projectEntry(project: DemoProject, settings: DemoWorldSettings): Readonly<Record<string, unknown>> {
+function referenceEntries(project: DemoProject, sources: ReadonlyMap<string, string>): readonly Readonly<Record<string, unknown>>[] {
+  return (project.references ?? []).map((reference) => ({ name: reference.name, repository: reference.repository, ref: reference.tag, source: sources.get(reference.name) }));
+}
+
+function projectEntry(project: DemoProject, settings: DemoWorldSettings, referenceSources: ReadonlyMap<string, string>): Readonly<Record<string, unknown>> {
   const entry = project.settings(settings.health);
+  const references = referenceEntries(project, referenceSources);
   const declared: readonly unknown[] = Array.isArray(entry['tools']) ? entry['tools'] : [];
   const sessionTools = project.sessionTools?.(join(settings.home, DEMO_DIRECTORY, SESSIONS_DIRECTORY)) ?? [];
   const tools = [...declared, ...sessionTools];
@@ -130,10 +168,11 @@ function projectEntry(project: DemoProject, settings: DemoWorldSettings): Readon
     clone: CLONE_DIRECTORY,
     ...entry,
     ...(tools.length === 0 ? {} : { tools }),
+    ...(references.length === 0 ? {} : { references }),
   };
 }
 
-function configText(settings: DemoWorldSettings, scenarioPath: string, fakeState: string): string {
+function configText(settings: DemoWorldSettings, scenarioPath: string, fakeState: string, referenceSources: ReadonlyMap<string, string>): string {
   const document = {
     version: 1,
     server: { port: settings.port },
@@ -142,7 +181,7 @@ function configText(settings: DemoWorldSettings, scenarioPath: string, fakeState
       accounts: [{ name: 'primary', configDir: join(DEMO_DIRECTORY, ACCOUNT_DIRECTORY), billing: 'subscription' }],
     },
     ...settings.installation,
-    projects: settings.projects.map((project) => projectEntry(project, settings)),
+    projects: settings.projects.map((project) => projectEntry(project, settings, referenceSources)),
   };
   return `# yaml-language-server: $schema=${CONFIG_SCHEMA_ID}\n${stringify(document, { lineWidth: 0 })}`;
 }
@@ -154,13 +193,15 @@ export async function prepareDemoWorld(settings: DemoWorldSettings): Promise<Dem
   const scenarioPath = join(demoDirectory, SCENARIO_FILE);
   await writeFile(scenarioPath, `${JSON.stringify(settings.scenario, null, 2)}\n`);
   const sources = new Map<string, string>();
+  const referenceSources = new Map<string, string>();
   for (const project of settings.projects) {
+    for (const reference of project.references ?? []) referenceSources.set(reference.name, await createReferenceSource(settings, reference));
     const source = await createSource(settings, project);
     await createForge(settings, project, source);
     sources.set(project.id, source);
   }
   const configPath = join(settings.home, CONFIG_FILE_NAME);
-  const text = configText(settings, scenarioPath, join(demoDirectory, FAKE_STATE_DIRECTORY));
+  const text = configText(settings, scenarioPath, join(demoDirectory, FAKE_STATE_DIRECTORY), referenceSources);
   await writeFile(configPath, text, { mode: 0o600 });
   return { home: settings.home, config: parseAgentFactoryConfig(text, settings.home, configPath, settings.userHome), sources };
 }

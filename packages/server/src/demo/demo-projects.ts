@@ -49,6 +49,20 @@ const storefront: DemoProject = {
       tag: 'v1.4.0',
     },
   ],
+  references: [
+    {
+      name: 'design-tokens',
+      repository: 'example-org/design-tokens',
+      tag: 'v1.0.0',
+      author: RILEY,
+      daysAgo: 30,
+      files: {
+        'README.md': '# Design tokens\n\nThe colours and the spacing the products of example-org share. Every value is a name and a number, in `tokens/`.\n',
+        'tokens/colors.json': '{\n  "brand": "#1f6feb",\n  "surface": "#ffffff",\n  "danger": "#d1242f"\n}\n',
+        'tokens/spacing.json': '{\n  "small": 4,\n  "medium": 8,\n  "large": 16\n}\n',
+      },
+    },
+  ],
   settings: (health: DemoHealthEndpoints) => ({
     commitIdentity: FACTORY_IDENTITY,
     gate: {
