@@ -1,0 +1,123 @@
+.costs-stack {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.costs-windows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.costs-window .ds-stat {
+  gap: var(--space-2);
+}
+.costs-window .ds-stat__value {
+  font-size: var(--text-24);
+}
+.costs-window .ds-meter {
+  margin-top: var(--space-1);
+}
+.costs-window__reset {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: var(--text-13);
+  color: var(--text);
+}
+.costs-window__absolute {
+  color: var(--text-subtle);
+}
+.costs-window__hint {
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+}
+.costs-daily {
+  display: grid;
+  gap: var(--space-5);
+}
+.costs-daily .ds-bar-chart {
+  position: relative;
+  padding-top: var(--space-5);
+}
+.costs-daily__no-cap {
+  order: -1;
+  justify-self: end;
+  margin-bottom: calc(-1 * var(--space-5));
+  font-size: var(--text-11);
+  color: var(--text-subtle);
+}
+.costs-daily__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+.costs-breakdowns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+.costs-breakdown {
+  display: grid;
+  gap: var(--space-3);
+}
+.costs-breakdown__title {
+  font-size: var(--text-12);
+  font-weight: var(--weight-medium);
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.costs-entry {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.costs-entry__tokens {
+  font-size: var(--text-11);
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+.costs-link {
+  color: var(--text);
+}
+.costs-link:hover {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+.costs-caps {
+  display: grid;
+  gap: var(--space-4);
+}
+.costs-caps__fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+.costs-caps__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 1100px) {
+  .costs-breakdowns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .costs-windows,
+  .costs-caps__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .costs-daily__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .costs-caps__actions .ds-button {
+    width: 100%;
+  }
+}

@@ -1,0 +1,111 @@
+.knowledge-toolbar {
+  max-width: 520px;
+}
+.knowledge-skeleton {
+  display: grid;
+  gap: var(--space-4);
+}
+.knowledge-panel {
+  min-width: 0;
+}
+.knowledge-panel .ds-table-wrap {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.knowledge-cell {
+  display: block;
+}
+.knowledge-areas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.knowledge-area {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+.knowledge-area__name {
+  font-size: var(--text-16);
+  font-weight: var(--weight-semibold);
+}
+.knowledge-area__description {
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.knowledge-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+}
+.knowledge-chip {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.knowledge-area__owners {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-13);
+}
+.knowledge-area__owners .small-caps {
+  color: var(--text-subtle);
+}
+.knowledge-decisions {
+  display: grid;
+  gap: var(--space-3);
+}
+.knowledge-decision {
+  display: grid;
+  gap: var(--space-2);
+}
+.knowledge-decision__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2-5);
+}
+.knowledge-decision__id {
+  color: var(--text-muted);
+}
+.knowledge-decision__date {
+  margin-left: auto;
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+}
+.knowledge-decision__title {
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+.knowledge-decision__summary {
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.knowledge-decision__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  font-size: var(--text-13);
+}
+@media (max-width: 1100px) {
+  .knowledge-areas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .knowledge-areas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .knowledge-toolbar {
+    max-width: none;
+  }
+}

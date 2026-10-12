@@ -1,0 +1,99 @@
+.audits-list__hint {
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+}
+.audits-list__state {
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+}
+.audits-list__state.is-attention {
+  color: var(--mark-waiting);
+}
+.audit-detail__release {
+  color: inherit;
+}
+.audit-detail__clean {
+  color: var(--text-muted);
+}
+.audit-detail__fix {
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  background: var(--surface-1);
+  line-height: 1.6;
+}
+.audit-findings {
+  display: grid;
+  gap: var(--space-4);
+}
+.audit-findings__group {
+  display: grid;
+  gap: var(--space-2);
+}
+.audit-findings__level {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-size: var(--text-11);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.audit-finding {
+  display: grid;
+  gap: var(--space-1-5);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.audit-finding__statement {
+  line-height: 1.55;
+}
+.audit-finding__evidence {
+  color: var(--text-subtle);
+  overflow-wrap: anywhere;
+}
+.audit-detail__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+.audit-files {
+  display: grid;
+  gap: var(--space-1-5);
+}
+.audit-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+.audit-file__path {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.audit-file svg {
+  color: var(--text-subtle);
+  flex: none;
+}
+.audit-draft {
+  display: grid;
+  gap: var(--space-2);
+}
+.audit-draft__title {
+  font-weight: var(--weight-semibold);
+}
+
+@media (max-width: 1180px) {
+  .audit-detail__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

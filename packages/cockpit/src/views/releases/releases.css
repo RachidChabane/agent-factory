@@ -1,0 +1,182 @@
+.release-gate {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.release-gate.is-promotable {
+  border-color: color-mix(in srgb, var(--mark-success) 35%, var(--border));
+}
+.release-gate.is-blocked {
+  border-color: color-mix(in srgb, var(--mark-failed) 35%, var(--border));
+}
+.release-gate__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.release-gate.is-promotable .release-gate__status > svg {
+  color: var(--mark-success);
+}
+.release-gate.is-blocked .release-gate__status > svg {
+  color: var(--mark-failed);
+}
+.release-gate__title {
+  font-size: var(--text-16);
+  font-weight: var(--weight-semibold);
+}
+.release-gate__meta {
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+}
+.release-gate__reasons {
+  display: grid;
+  gap: var(--space-1-5);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--mark-failed-soft);
+}
+.release-gate__reasons li {
+  position: relative;
+  padding-left: var(--space-4);
+  color: var(--text);
+}
+.release-gate__reasons li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mark-failed);
+}
+.release-gate__conditions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.release-gate__condition {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.release-gate__condition-label {
+  font-weight: var(--weight-medium);
+}
+.release-gate__condition-detail {
+  grid-column: 2;
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+}
+.release-gate__production {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.release-gate__note {
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+  flex: 1 1 260px;
+}
+
+.release-commits {
+  display: grid;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+.release-commit {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2-5) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.release-commit:last-child {
+  border-bottom: 0;
+}
+.release-commit__sha {
+  color: var(--text-subtle);
+}
+.release-commit__message {
+  display: grid;
+  min-width: 0;
+}
+.release-commit__author {
+  font-size: var(--text-12);
+  color: var(--text-subtle);
+}
+.release-commit__tags {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.release-commit__audit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-12);
+  color: var(--text-muted);
+}
+.release-commit__audit:hover,
+.release-commit__issue:hover {
+  color: var(--accent-text);
+}
+.release-commit__issue {
+  font-size: var(--text-12);
+  color: var(--text-muted);
+}
+.release-health {
+  display: grid;
+  gap: var(--space-1-5);
+}
+.release-health__item {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 220px) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-12);
+}
+.release-health__detail {
+  color: var(--text-subtle);
+}
+
+@media (max-width: 1180px) {
+  .release-gate__conditions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .release-gate {
+    padding: var(--space-4);
+  }
+  .release-commit {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1-5);
+  }
+  .release-commit__tags {
+    justify-content: flex-start;
+  }
+  .release-health__item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .release-health__detail {
+    grid-column: 2;
+  }
+}

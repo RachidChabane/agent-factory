@@ -1,0 +1,74 @@
+[
+  {
+    "runId": "run-fixture",
+    "index": 0,
+    "at": "2026-10-10T04:08:00.000Z",
+    "event": {
+      "kind": "raw",
+      "line": "{\"type\":\"system\",\"subtype\":\"status\",\"status\":\"requesting\",\"session_id\":\"51e4bdcf-3cde-44cb-ba93-ff56c27e5e85\",\"uuid\":\"d6d24da1-6381-4b01-8c18-cefeabe8ab97\"}"
+    }
+  },
+  {
+    "runId": "run-fixture",
+    "index": 1,
+    "at": "2026-10-10T04:08:01.000Z",
+    "event": {
+      "kind": "raw",
+      "line": "{\"type\":\"system\",\"subtype\":\"hook_started\",\"hook_id\":\"a259b57d-a075-42e9-bd01-a2ed299333d1\",\"hook_name\":\"PreToolUse:Edit\",\"hook_event\":\"PreToolUse\",\"uuid\":\"2abb0912-5ee7-4f0f-9eaf-888e67c31d21\",\"session_id\":\"9638f322-0b2d-4fb1-a493-bb3d58fb1b91\"}"
+    }
+  },
+  {
+    "runId": "run-fixture",
+    "index": 2,
+    "at": "2026-10-10T04:08:02.000Z",
+    "event": {
+      "kind": "raw",
+      "line": "{\"type\":\"system\",\"subtype\":\"hook_response\",\"hook_id\":\"48e61efe-556d-41e9-a1ed-70c02520ee8d\",\"hook_name\":\"SessionStart:startup\",\"hook_event\":\"SessionStart\",\"output\":\"{}\\n\",\"stdout\":\"{}\\n\",\"stderr\":\"\",\"exit_code\":0,\"outcome\":\"success\",\"uuid\":\"66b76e05-f49f-4c5f-9efa-c25189d44635\",\"session_id\":\"fd2f974c-cc7e-42e8-a9ed-eea58626dad3\"}"
+    }
+  },
+  {
+    "runId": "run-fixture",
+    "index": 3,
+    "at": "2026-10-10T04:08:03.000Z",
+    "event": {
+      "kind": "raw",
+      "line": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":50,\"estimated_tokens_delta\":50,\"session_id\":\"51e4bdcf-3cde-44cb-ba93-ff56c27e5e85\",\"uuid\":\"d7c7b806-d38a-459a-8383-99bb74950646\"}"
+    }
+  },
+  {
+    "runId": "run-fixture",
+    "index": 4,
+    "at": "2026-10-10T04:08:04.000Z",
+    "event": {
+      "kind": "raw",
+      "line": "{\"type\":\"system\",\"subtype\":\"task_started\",\"task_id\":\"b82tsuu5c\",\"run_id\":\"0mv1vj5p8-dfde7813\",\"tool_use_id\":\"toolu_013aVarnBsdUDT8npKf9CaDg\",\"description\":\"mise run lint\",\"is_backgrounded\":false,\"task_type\":\"local_bash\",\"uuid\":\"c133ea78-837e-44d8-addf-0f91d9c6416e\",\"session_id\":\"9638f322-0b2d-4fb1-a493-bb3d58fb1b91\"}"
+    }
+  },
+  {
+    "runId": "run-fixture",
+    "index": 5,
+    "at": "2026-10-10T04:08:05.000Z",
+    "event": {
+      "kind": "raw",
+      "line": "{\"type\":\"system\",\"subtype\":\"task_notification\",\"task_id\":\"b82tsuu5c\",\"run_id\":\"0mv1vj5p8-dfde7813\",\"tool_use_id\":\"toolu_013aVarnBsdUDT8npKf9CaDg\",\"status\":\"failed\",\"output_file\":\"\",\"summary\":\"mise run lint\",\"uuid\":\"3f6d1cd1-16fa-40ec-9e6f-e6b6d58210a3\",\"session_id\":\"9638f322-0b2d-4fb1-a493-bb3d58fb1b91\"}"
+    }
+  },
+  {
+    "runId": "run-fixture",
+    "index": 6,
+    "at": "2026-10-10T04:08:06.000Z",
+    "event": {
+      "kind": "raw",
+      "line": "{\"type\":\"system\",\"subtype\":\"notification\",\"key\":\"stop-hook-error\",\"text\":\"Stop hook error occurred · ctrl+o to see\",\"priority\":\"immediate\",\"session_id\":\"83361896-370c-445d-93a0-a5ba7106aea0\",\"uuid\":\"efd62b2a-5868-46f6-bd0d-06dcef094417\"}"
+    }
+  },
+  {
+    "runId": "run-fixture",
+    "index": 7,
+    "at": "2026-10-10T04:08:07.000Z",
+    "event": {
+      "kind": "raw",
+      "line": "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"\",\"estimated_tokens\":50}},\"session_id\":\"51e4bdcf-3cde-44cb-ba93-ff56c27e5e85\",\"parent_tool_use_id\":null,\"uuid\":\"553b6b54-f4fc-4b6b-982d-aa3174c3bcaa\",\"thinking_display\":\"updates\",\"api_message_id\":\"msg_011Cfsoz1fwgfYRfNst5Y1P8\"}"
+    }
+  }
+]
