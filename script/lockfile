@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Resolves the dependency graph and rewrites pnpm-lock.yaml without installing anything.
+# CI keeps a copy under build/verify-artifacts/ so a maintainer can download it.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+source script/lib/heavy.sh
+
+run_heavy pnpm install --lockfile-only --no-frozen-lockfile
+mkdir -p build/verify-artifacts
+cp pnpm-lock.yaml build/verify-artifacts/
+git --no-pager diff --stat -- pnpm-lock.yaml

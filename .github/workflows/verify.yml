@@ -1,0 +1,55 @@
+name: Verify
+
+# Runs one front-door script on demand, for a maintainer who wants a targeted run on CI hardware.
+on:
+  workflow_dispatch:
+    inputs:
+      verb:
+        description: The script/<verb> to run
+        type: choice
+        options: [lint, test, e2e, screenshots, scan, ci, lockfile]
+        required: true
+      args:
+        description: Extra arguments for the script, split on whitespace
+        type: string
+        required: false
+        default: ""
+
+permissions: {}
+
+env:
+  AGENT_FACTORY_SKIP_MEMORY_GUARD: "1"
+
+jobs:
+  verify:
+    name: script/${{ inputs.verb }}
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","mac-mini"]') || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install the pinned scanners
+        run: |
+          script/install-tool gitleaks >> "$GITHUB_PATH"
+          script/install-tool actionlint >> "$GITHUB_PATH"
+      - name: Run the script
+        env:
+          VERB: ${{ inputs.verb }}
+          ARGS: ${{ inputs.args }}
+        run: |
+          set -f
+          # shellcheck disable=SC2086 # ARGS is a list of arguments by contract; globbing is off.
+          "script/$VERB" $ARGS
+      - name: Keep what the script produced for download
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verify-${{ inputs.verb }}
+          path: build/verify-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
-# Runs the unit, property, contract and integration tests of every package.
-# Extra arguments go to vitest, for example: script/test --project domain
+# Runs the unit, property, contract and integration tests of every package, or of the
+# packages named first. Arguments after "--" go to each package's test runner.
+# Usage: script/test [package...] [-- runner arguments]
+#   script/test domain application -- --reporter=verbose
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source script/lib/heavy.sh
 
 readonly MAX_TEST_WORKERS="${AGENT_FACTORY_TEST_MAX_WORKERS:-2}"
-run_heavy pnpm -r --workspace-concurrency=1 --if-present run test --maxWorkers="$MAX_TEST_WORKERS" --minWorkers=1 "$@"
+export VITEST_MAX_FORKS="$MAX_TEST_WORKERS" VITEST_MIN_FORKS=1 VITEST_MAX_THREADS="$MAX_TEST_WORKERS" VITEST_MIN_THREADS=1
+
+filters=()
+while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do
+  filters+=(--filter "@agent-factory/$1")
+  shift
+done
+if [ "${1:-}" = "--" ]; then
+  shift
+fi
+run_heavy pnpm -r "${filters[@]}" --workspace-concurrency=1 --if-present run test "$@"

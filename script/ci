@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Everything CI runs, in the same order: lint and type-check, tests, scans.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+script/lint
+script/test
+script/scan

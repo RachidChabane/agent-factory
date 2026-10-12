@@ -10,7 +10,11 @@ permissions: {}
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: true
+
+env:
+  # A CI runner admits jobs by its own capacity rules; the workstation memory guard does not apply.
+  AGENT_FACTORY_SKIP_MEMORY_GUARD: "1"
 
 jobs:
   scan:
@@ -36,3 +40,21 @@ jobs:
         run: actionlint
       - name: Scan the working tree and the whole history
         run: script/scan
+
+  check:
+    name: Lint, type-check and test
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","mac-mini"]') || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install the pinned workflow linter
+        run: script/install-tool actionlint >> "$GITHUB_PATH"
+      - name: Lint and type-check
+        run: script/lint
+      - name: Test
+        run: script/test
