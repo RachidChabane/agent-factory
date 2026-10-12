@@ -10,7 +10,7 @@ import { ConfigMissingError, parseFactoryConfig, type FactoryConfig } from '../c
 import { openEventLog } from '../composition/event-log.ts';
 import { openFactory } from '../composition/factory-container.ts';
 import type { CliContext } from './cli-context.ts';
-import { REQUIRED_LABELS } from './commands/validate-command.ts';
+import { DEFAULT_PROJECT_CONVENTIONS, requiredLabels } from '@agent-factory/application';
 import { runCli } from './factory-cli.ts';
 
 const CONFIG_TEXT = (home: string): string => `
@@ -27,7 +27,7 @@ github: { commitIdentity: { name: Bot, email: bot@example.invalid } }
 const LOCAL_MODE = 'github: { mode: local, commitIdentity:';
 const SPEC_FILE = [
   'Title: Serve the domain from the UI',
-  'Labels: type:infra-ci',
+  'Labels: type:infra',
   '',
   '## Need',
   'The domain reaches the UI.',
@@ -94,7 +94,7 @@ function healthyRunner(home: string): TableRunner {
   return new TableRunner()
     .answer('git --version', 'git version 2.54.0')
     .answer('gh auth status', 'github.com\n  Logged in')
-    .answer('gh label list', JSON.stringify([...REQUIRED_LABELS, 'bug'].map((name) => ({ name }))))
+    .answer('gh label list', JSON.stringify([...requiredLabels(DEFAULT_PROJECT_CONVENTIONS), 'bug'].map((name) => ({ name }))))
     .answer('claude --version', `${PINNED_CLAUDE_VERSION} (Claude Code)`)
     .answer(`git -C ${home}/clone remote get-url origin`, 'git@github.com:acme/widgets.git')
     .answer('memory_pressure -Q', 'System-wide memory free percentage: 61%')
@@ -202,7 +202,6 @@ describe('factory CLI', () => {
       'ok   gws',
       'ok   figma',
     ]);
-    expect(REQUIRED_LABELS).toContain('audit');
   });
 
   it('warns about an optional tool that needs a login without failing validation', async () => {
@@ -261,13 +260,13 @@ describe('factory CLI', () => {
     expect(captured.lines.slice(0, 3)).toEqual([
       'This creates an issue on GitHub in acme/widgets:',
       'Title: Serve the domain from the UI',
-      'Labels: type:infra-ci',
+      'Labels: type:infra',
     ]);
     expect(captured.errors).toEqual(['Nothing was created. Re-run with --confirm to create it.']);
   });
 
   it('refuses a spec file that already carries spec:validated', async () => {
-    await writeFile(join(home, 'spec.md'), SPEC_FILE.replace('Labels: type:infra-ci', 'Labels: type:infra-ci, spec:validated'));
+    await writeFile(join(home, 'spec.md'), SPEC_FILE.replace('Labels: type:infra', 'Labels: type:infra, spec:validated'));
     expect(await runCli(['issue', 'create', join(home, 'spec.md'), '--confirm'], context())).toBe(1);
     expect(captured.errors[0]).toContain('only the operator adds that label');
   });
@@ -356,8 +355,8 @@ describe('factory CLI', () => {
       expect(captured.lines.at(-1)).toBe(`Base main of ${root}/github/widgets.git and ${root}/clone reset to ${sourceBase}`);
 
       await writeFile(join(root, 'spec.md'), SPEC_FILE);
-      expect(await runCli(['rehearsal', 'add-issue', join(root, 'spec.md'), '--labels', 'type:infra-ci,spec:validated'], real)).toBe(0);
-      expect(captured.lines.at(-1)).toBe('Local issue #1: Serve the domain from the UI [type:infra-ci, spec:validated]');
+      expect(await runCli(['rehearsal', 'add-issue', join(root, 'spec.md'), '--labels', 'type:infra,spec:validated'], real)).toBe(0);
+      expect(captured.lines.at(-1)).toBe('Local issue #1: Serve the domain from the UI [type:infra, spec:validated]');
       expect(await readFile(join(root, 'github', 'issues', '1.md'), 'utf8')).toContain('## Acceptance criteria\n1. The production values declare the route.');
 
       await writeFile(join(root, 'spec.md'), SPEC_FILE.replace('## Out of scope\n- DNS records.\n', ''));

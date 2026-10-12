@@ -12,7 +12,7 @@ import {
   CHECK_KIND_LABELS,
   EFFORT_LABELS,
   ISSUE_STATE_LABELS,
-  ISSUE_TYPE_LABELS,
+  issueTypeLabel,
 } from '../../i18n/labels.ts';
 import { paths, VIEW_PATHS } from '../../model/routes.ts';
 import { issueMark } from '../../model/status.ts';
@@ -90,7 +90,7 @@ export function IssueDetail({ issue, snapshot }: { readonly issue: IssueView; re
           <>
             <StatusMark mark={issueMark(issue.state)} />
             <span>{ISSUE_STATE_LABELS[issue.state]}</span>
-            <Badge>{ISSUE_TYPE_LABELS[issue.type]}</Badge>
+            <Badge>{issueTypeLabel(issue.type)}</Badge>
             {issue.paused ? <Badge tone="idle">en pause</Badge> : null}
             <span className="num">#{issue.number}</span>
           </>

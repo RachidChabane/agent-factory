@@ -1,4 +1,4 @@
-import { FACTORY_LABEL } from '@agent-factory/domain';
+import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import type { EventStore, GitHubGateway } from '../ports.ts';
 import { loadAudit } from './audit-projection.ts';
 import { AuditIssueNotDraftedError, AuditNotFoundError } from './errors.ts';
@@ -10,22 +10,23 @@ import {
   type AuditResolvedPayload,
 } from './events.ts';
 
-export const AUDIT_LABEL = 'audit';
-export const AUDIT_ISSUE_LABELS: readonly string[] = [AUDIT_LABEL, FACTORY_LABEL];
-
 export interface PublishAuditIssueDependencies {
   readonly events: EventStore;
   readonly github: GitHubGateway;
 }
 
-export async function publishAuditIssue(dependencies: PublishAuditIssueDependencies, auditId: string): Promise<number> {
+export function auditIssueLabels(conventions: ProjectConventions): readonly string[] {
+  return [conventions.labels.audit, conventions.labels.factory];
+}
+
+export async function publishAuditIssue(dependencies: PublishAuditIssueDependencies, conventions: ProjectConventions, auditId: string): Promise<number> {
   const { events, github } = dependencies;
   const audit = await loadAudit(events, auditId);
   if (audit === null) throw new AuditNotFoundError(auditId);
   if (audit.publishedIssueNumber !== null) return audit.publishedIssueNumber;
   if (audit.draft === null) throw new AuditIssueNotDraftedError(auditId);
 
-  const issue = await github.createIssue(audit.draft.title, audit.draft.body, AUDIT_ISSUE_LABELS);
+  const issue = await github.createIssue(audit.draft.title, audit.draft.body, auditIssueLabels(conventions));
   const published: AuditIssuePublishedPayload = { issueNumber: issue.number };
   await events.append(AUDIT_ISSUE_PUBLISHED_EVENT, auditSubject(auditId), published);
   return issue.number;

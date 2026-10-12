@@ -30,7 +30,13 @@ export function projectSnapshot(records: readonly FactoryEventRecord[], context:
   return {
     sequence: index.lastSequence,
     generatedAt,
-    factory: { repository: context.repository, defaultBranch: context.defaultBranch, operator: context.operator, schedulerPaused: pauses.size > 0 },
+    factory: {
+      repository: context.repository,
+      defaultBranch: context.defaultBranch,
+      operator: context.operator,
+      schedulerPaused: pauses.size > 0,
+      issueTypes: context.conventions.typology.definitions.map((type) => ({ id: type.id, label: type.label, proof: type.proof })),
+    },
     requests,
     issues: projectIssues(index, journals, context, requestOfIssue),
     runs: projectRuns(runs, context, pendingQuestions(index, journals)),

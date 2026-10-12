@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { attributionRules, DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import { REASON_NO_PREP_CHECKS } from '@agent-factory/domain';
 import { auditSubject, AUDIT_DETECTED_EVENT } from '../audit/events.ts';
 import { commit, factoryCommit, FakeGitHubGateway, InMemoryEventStore } from '../audit/testing/fakes.ts';
@@ -23,7 +24,7 @@ async function setup(health = HEALTHY) {
   github.openPullRequests = [releasePullRequest('h1')];
   await watchReleases({ events, github }, 'main');
   github.checkRuns = [{ name: 'ci', conclusion: 'success', url: 'https://example.invalid/ci' }];
-  return { events, github, cut: new CutRelease({ events, github, health }) };
+  return { events, github, cut: new CutRelease({ events, github, health, rules: attributionRules(DEFAULT_PROJECT_CONVENTIONS) }) };
 }
 
 describe('cutting a release on operator order', () => {

@@ -1,5 +1,5 @@
 import type { RoleSetting, SubscriptionWindowView, ToolConnection } from '@agent-factory/cockpit';
-import type { CheckRunSummary, ConventionalScopes } from '@agent-factory/application';
+import type { CheckRunSummary, ProjectConventions } from '@agent-factory/application';
 import type { DeploymentEnvironment, IssueSpec, PauseAbovePressureLevel, ResourceSnapshot, TokenUsage } from '@agent-factory/domain';
 import type { EnvironmentDeployments } from './environment-views.ts';
 
@@ -31,7 +31,7 @@ export interface SnapshotContext {
   readonly defaultBranch: string;
   readonly operator: string;
   readonly links: SnapshotLinks;
-  readonly conventionalScopes: ConventionalScopes;
+  readonly conventions: ProjectConventions;
   readonly roles: readonly RoleSetting[];
   readonly models: readonly string[];
   readonly concurrency: { readonly ceiling: number; readonly maximum: number };

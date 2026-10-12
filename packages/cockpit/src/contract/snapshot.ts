@@ -9,7 +9,7 @@ import {
   BEFORE_PROOF_KINDS,
   EFFORT_LEVELS,
   ISSUE_STATES,
-  ISSUE_TYPES,
+  PROOF_STRATEGIES,
   RELEASE_STATES,
   REQUEST_STATES,
   REVIEW_CATEGORIES,
@@ -22,6 +22,7 @@ import {
   IsoDateSchema,
   IsoDateTimeSchema,
   IssueNumberSchema,
+  IssueTypeIdSchema,
   PercentSchema,
   SubscriptionWindowSchema,
   TokenUsageSchema,
@@ -58,11 +59,16 @@ import {
   WORKFLOW_TRIGGERS,
 } from './vocabulary.ts';
 
+export const IssueTypeInfoSchema = z.object({ id: IssueTypeIdSchema, label: z.string().min(1), proof: z.enum(PROOF_STRATEGIES) });
+export type IssueTypeInfo = z.infer<typeof IssueTypeInfoSchema>;
+
 export const FactoryInfoSchema = z.object({
   repository: z.string().min(1),
   defaultBranch: z.string().min(1),
   operator: z.string().min(1),
   schedulerPaused: z.boolean(),
+  /** The issue types of the project, in its order. */
+  issueTypes: z.array(IssueTypeInfoSchema),
 });
 export type FactoryInfo = z.infer<typeof FactoryInfoSchema>;
 
@@ -87,7 +93,7 @@ export const ProposedSpecSchema = z.object({
   id: z.string().min(1),
   itemIds: z.array(z.string()),
   title: z.string(),
-  type: z.enum(ISSUE_TYPES),
+  type: IssueTypeIdSchema,
   need: z.string(),
   acceptanceCriteria: z.array(z.string()),
   outOfScope: z.array(z.string()),
@@ -167,7 +173,7 @@ export type Escalation = z.infer<typeof EscalationSchema>;
 export const IssueViewSchema = z.object({
   number: IssueNumberSchema,
   title: z.string(),
-  type: z.enum(ISSUE_TYPES),
+  type: IssueTypeIdSchema,
   state: z.enum(ISSUE_STATES),
   resumeTarget: z.enum(ISSUE_STATES).nullable(),
   paused: z.boolean(),
@@ -366,7 +372,7 @@ export const PullRequestViewSchema = z.object({
   number: IssueNumberSchema,
   title: z.string(),
   issueNumber: IssueNumberSchema,
-  type: z.enum(ISSUE_TYPES),
+  type: IssueTypeIdSchema,
   branch: z.string(),
   url: z.string(),
   headSha: z.string(),
@@ -489,7 +495,7 @@ export const AuditViewSchema = z.object({
   state: z.enum(AUDIT_STATES),
   detectedAt: IsoDateTimeSchema,
   changedFiles: z.array(z.string()),
-  suggestedType: z.enum(ISSUE_TYPES).nullable(),
+  suggestedType: IssueTypeIdSchema.nullable(),
   releaseId: z.string().nullable(),
   conclusion: AuditConclusionViewSchema.nullable(),
   failureCount: CountSchema,

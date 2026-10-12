@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router';
 import { useNow } from '../../app/context.tsx';
 import type { IssueView } from '../../contract/index.ts';
 import { relativeTime } from '../../format/format.ts';
-import { ISSUE_STATE_LABELS, ISSUE_TYPE_LABELS } from '../../i18n/labels.ts';
+import { ISSUE_STATE_LABELS, issueTypeLabel } from '../../i18n/labels.ts';
 import { paths } from '../../model/routes.ts';
 import { issueMark } from '../../model/status.ts';
 import { Badge } from '../../ui/components/Badge.tsx';
@@ -29,7 +29,7 @@ export function IssueTable({ issues, all }: { readonly issues: readonly IssueVie
         </span>
       ),
     },
-    { id: 'type', header: 'Type', width: '130px', hideOnMobile: true, cell: (issue) => <Badge>{ISSUE_TYPE_LABELS[issue.type]}</Badge> },
+    { id: 'type', header: 'Type', width: '130px', hideOnMobile: true, cell: (issue) => <Badge>{issueTypeLabel(issue.type)}</Badge> },
     { id: 'state', header: 'État', width: '170px', cell: (issue) => <span className="issues-table__state">{ISSUE_STATE_LABELS[issue.state]}</span> },
     {
       id: 'dependencies',

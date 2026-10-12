@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { buildGitEnvironment, localOnlyGitEnvironment, RehearsalRepositories, type RehearsalLayout } from '@agent-factory/adapters';
 import { parseSpecFile, specFileProblems, withExtraLabels } from '@agent-factory/application';
+import { conventionsFromConfig } from '../../config/conventions-from-config.ts';
 import type { FactoryConfig } from '../../config/factory-config.ts';
 import type { CliContext } from '../cli-context.ts';
 import { EXIT_CODES } from '../output.ts';
@@ -68,7 +69,7 @@ export async function rehearsalResetCommand(sourceClonePath: string, context: Cl
 export async function rehearsalAddIssueCommand(specPath: string, labels: readonly string[], context: CliContext): Promise<number> {
   const config = await rehearsalConfig(context);
   const file = withExtraLabels(parseSpecFile(await readFile(specPath, UTF8)), labels);
-  const problems = specFileProblems(file);
+  const problems = specFileProblems(file, conventionsFromConfig(config));
   if (problems.length > 0) {
     context.output.error(`${specPath} is not a valid spec:\n${problems.map((problem) => `- ${problem.message}`).join('\n')}`);
     return EXIT_CODES.failure;

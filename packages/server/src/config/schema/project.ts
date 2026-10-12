@@ -1,6 +1,23 @@
 import { z } from 'zod';
 import { LOCAL_CHECK_MODES } from '@agent-factory/adapters';
-import { AGENT_ROLES, COMMIT_KINDS, EVIDENCE_KINDS, PROMOTION_POLICIES, PROOF_STRATEGIES, REVIEW_FOCUSES, isProductionLookingName } from '@agent-factory/domain';
+import {
+  DEFAULT_AUDIT_LABEL,
+  DEFAULT_BRANCH_PREFIX,
+  DEFAULT_COMMIT_SCOPE,
+  DEFAULT_FACTORY_LABEL,
+  DEFAULT_KIND_LABEL_PREFIX,
+  DEFAULT_VALIDATED_LABEL,
+} from '@agent-factory/application';
+import {
+  AGENT_ROLES,
+  COMMIT_KINDS,
+  DEFAULT_TYPE_LABEL_PREFIX,
+  EVIDENCE_KINDS,
+  PROMOTION_POLICIES,
+  PROOF_STRATEGIES,
+  REVIEW_FOCUSES,
+  isProductionLookingName,
+} from '@agent-factory/domain';
 import {
   Identifier,
   NamedCommandSchema,
@@ -17,18 +34,11 @@ export const DEFAULT_BASE_BRANCH = 'main';
 export const DEFAULT_CLONE_DIRECTORY = 'clone';
 export const DEFAULT_LOCAL_FORGE_DIRECTORY = 'forge';
 export const DEFAULT_LOCAL_CHECKS = 'none';
-export const DEFAULT_BRANCH_PREFIX = 'factory/';
-export const DEFAULT_FACTORY_LABEL = 'factory';
-export const DEFAULT_VALIDATED_LABEL = 'spec:validated';
-export const DEFAULT_AUDIT_LABEL = 'audit';
-export const DEFAULT_TYPE_LABEL_PREFIX = 'type:';
-export const DEFAULT_KIND_LABEL_PREFIX = 'kind:';
 export const DEFAULT_WORKTREE_POOL_SIZE = 3;
 export const DEFAULT_ISSUE_CONCURRENCY = 1;
 export const DEFAULT_CONCURRENCY_CEILING = 3;
 export const DEFAULT_GATE_TIMEOUT_MINUTES = 30;
 export const DEFAULT_GATE_NICENESS = 10;
-export const DEFAULT_COMMIT_SCOPE = 'repo';
 export const DEFAULT_TAG_PATTERN = 'v*';
 export const DEFAULT_EVIDENCE_MAX_FILE_BYTES = 5_000_000;
 export const DEFAULT_EVIDENCE_MAX_TOTAL_BYTES = 40_000_000;
@@ -134,11 +144,17 @@ const DeliverySchema = z
     });
   });
 
-const AuditIgnoreSchema = z.strictObject({
-  name: NonEmptyString,
-  branches: z.array(NonEmptyString).default([]),
-  authors: z.array(NonEmptyString).default([]),
-});
+const AuditIgnoreSchema = z
+  .strictObject({
+    name: NonEmptyString,
+    /** Globs over the head branch of the change's pull request. */
+    branches: z.array(NonEmptyString).default([]),
+    /** Globs over the login of the change's author. */
+    authors: z.array(NonEmptyString).default([]),
+  })
+  .refine((automation) => automation.branches.length > 0 || automation.authors.length > 0, {
+    message: 'names at least one branch or author glob',
+  });
 
 const AuditsSchema = z
   .strictObject({

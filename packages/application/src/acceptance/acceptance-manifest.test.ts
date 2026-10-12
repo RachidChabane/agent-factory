@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { IssueSpec } from '@agent-factory/domain';
+import type { IssueSpec, IssueTypeDefinition } from '@agent-factory/domain';
+import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import {
   acceptanceCommand,
   checkPaths,
@@ -37,8 +38,12 @@ const MANIFEST = {
   evidence: ['app/test-results/mockup-link/header.png'],
 };
 
+function typeOf(spec: IssueSpec): IssueTypeDefinition {
+  return DEFAULT_PROJECT_CONVENTIONS.typology.get(spec.type);
+}
+
 function read(manifest: unknown, spec: IssueSpec = SPEC): ReturnType<typeof readAcceptanceManifest> {
-  return readAcceptanceManifest(JSON.stringify(manifest), spec);
+  return readAcceptanceManifest(JSON.stringify(manifest), spec, typeOf(spec));
 }
 
 function problems(manifest: unknown, spec: IssueSpec = SPEC): readonly string[] {
@@ -58,8 +63,8 @@ describe('acceptance manifest', () => {
   });
 
   it('reports a missing manifest and invalid JSON', () => {
-    expect(readAcceptanceManifest(null, SPEC)).toEqual({ valid: false, problems: ['.factory/acceptance.json was not written'] });
-    expect(readAcceptanceManifest('{', SPEC).valid).toBe(false);
+    expect(readAcceptanceManifest(null, SPEC, typeOf(SPEC))).toEqual({ valid: false, problems: ['.factory/acceptance.json was not written'] });
+    expect(readAcceptanceManifest('{', SPEC, typeOf(SPEC)).valid).toBe(false);
   });
 
   it('rejects unknown fields and unsafe paths', () => {
@@ -83,18 +88,18 @@ describe('acceptance manifest', () => {
 
   it('requires checks for types whose before proof must fail on base', () => {
     expect(problems({ ...MANIFEST, command: null, checks: [] })).toEqual([
-      'a ui issue needs at least one acceptance check (Playwright journey asserting the new behaviour)',
+      'a ui issue needs at least one acceptance check (an end-to-end journey (for example Playwright) asserting what the criterion says is visible or possible, capturing the screenshots the expected proof names)',
     ]);
   });
 
   it('allows a manifest without checks for types without a before proof', () => {
-    expect(read({ checks: [], command: [], evidence: [] }, { ...SPEC, type: 'doc' }).valid).toBe(true);
+    expect(read({ checks: [], command: [], evidence: [] }, { ...SPEC, type: 'docs' }).valid).toBe(true);
   });
 
-  it('requires a score output for skill-prompt issues', () => {
+  it('requires a score output for issue types scored on a base', () => {
     const scored = { ...MANIFEST, runner: 'eval' };
-    expect(problems(scored, { ...SPEC, type: 'skill-prompt' })).toEqual(['a skill-prompt issue needs a "score" output']);
-    expect(read({ ...scored, score: { path: 'agent/eval/out/score.json' } }, { ...SPEC, type: 'skill-prompt' }).valid).toBe(true);
+    expect(problems(scored, { ...SPEC, type: 'prompt' })).toEqual(['a prompt issue needs a "score" output']);
+    expect(read({ ...scored, score: { path: 'agent/eval/out/score.json' } }, { ...SPEC, type: 'prompt' }).valid).toBe(true);
   });
 
   it('rejects duplicate outputs and outputs that are also checks', () => {
@@ -108,13 +113,13 @@ describe('acceptance manifest', () => {
     expect(problems({ ...MANIFEST, command: [] })).toEqual(['checks are declared but no command runs them']);
   });
 
-  it('requires the runner that runs the checks, eval only for skill-prompt issues', () => {
+  it('requires the runner that runs the checks, eval only for issue types scored on a base', () => {
     expect(problems({ ...MANIFEST, runner: null })).toEqual([
-      'checks are declared but no "runner" says which test runner runs them (pytest, vitest, playwright, eval)',
+      'checks are declared but no "runner" says which test runner runs them (pytest, vitest, playwright, node-test, eval)',
     ]);
-    expect(problems({ ...MANIFEST, runner: 'eval' })).toEqual(['the "eval" runner only proves skill-prompt issues']);
-    expect(problems({ ...MANIFEST, runner: 'vitest', score: { path: 'out/score.json' } }, { ...SPEC, type: 'skill-prompt' })).toEqual([
-      'a skill-prompt issue runs its checks with the "eval" runner',
+    expect(problems({ ...MANIFEST, runner: 'eval' })).toEqual(['the "eval" runner only proves issue types scored on a base, and ui is not one']);
+    expect(problems({ ...MANIFEST, runner: 'vitest', score: { path: 'out/score.json' } }, { ...SPEC, type: 'prompt' })).toEqual([
+      'a prompt issue runs its checks with the "eval" runner',
     ]);
     expect(problems({ ...MANIFEST, runner: 'jest' })[0]).toContain('runner');
   });

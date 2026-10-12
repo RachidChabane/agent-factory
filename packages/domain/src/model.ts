@@ -1,16 +1,5 @@
-export const ISSUE_TYPES = [
-  'ui',
-  'skill-prompt',
-  'engine-api',
-  'security',
-  'infra-ci',
-  'data',
-  'dependencies',
-  'doc',
-  'release',
-  'refactor',
-] as const;
-export type IssueType = (typeof ISSUE_TYPES)[number];
+/** The id of one of the issue types a project declares (see issue-types.ts). */
+export type IssueType = string;
 
 export const ISSUE_STATES = [
   'spec-draft',

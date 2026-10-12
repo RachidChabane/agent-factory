@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import { renderSpecFile, singleLine, slugOf, specFilePath } from './proposed-spec-file.ts';
 
 describe('slugOf', () => {
@@ -32,13 +33,13 @@ describe('renderSpecFile', () => {
   it('reports no problem for a well-formed spec', () => {
     const rendered = renderSpecFile({
       title: 'Add a thing',
-      type: 'doc',
+      type: 'docs',
       need: 'Need.',
       acceptanceCriteria: ['It exists.'],
       outOfScope: ['More.'],
       expectedProof: 'A page.',
-    });
+    }, DEFAULT_PROJECT_CONVENTIONS);
     expect(rendered.problems).toEqual([]);
-    expect(rendered.content.startsWith('Title: Add a thing\nLabels: type:doc\n\n## Need')).toBe(true);
+    expect(rendered.content.startsWith('Title: Add a thing\nLabels: type:docs\n\n## Need')).toBe(true);
   });
 });

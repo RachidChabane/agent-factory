@@ -4,7 +4,7 @@ import { ChevronRight, CircleAlert, ExternalLink, GitBranch, GitMerge, ShieldChe
 import { useNow } from '../../app/context.tsx';
 import type { PullRequestView } from '../../contract/index.ts';
 import { dateTime, duration, plural, relativeTime } from '../../format/format.ts';
-import { CHECK_CONCLUSION_LABELS, ISSUE_TYPE_LABELS, PULL_REQUEST_STATE_LABELS } from '../../i18n/labels.ts';
+import { CHECK_CONCLUSION_LABELS, issueTypeLabel, PULL_REQUEST_STATE_LABELS } from '../../i18n/labels.ts';
 import { MERGE_QUERY_PARAMETER, QUERY_FLAG } from '../../model/query-flags.ts';
 import { paths, VIEW_PATHS } from '../../model/routes.ts';
 import { checksSummaryMark, conclusionMark } from '../../model/status.ts';
@@ -49,7 +49,7 @@ export function PullRequestDetail({ pullRequest }: { readonly pullRequest: PullR
           <>
             <Badge tone={STATE_TONES[pullRequest.state]}>{PULL_REQUEST_STATE_LABELS[pullRequest.state]}</Badge>
             <span className="num">#{pullRequest.number}</span>
-            <span>{ISSUE_TYPE_LABELS[pullRequest.type]}</span>
+            <span>{issueTypeLabel(pullRequest.type)}</span>
             <span>·</span>
             <Link to={paths.issue(pullRequest.issueNumber)} className="link">
               issue #{pullRequest.issueNumber}

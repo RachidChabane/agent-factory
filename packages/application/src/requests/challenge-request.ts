@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { canTransitionRequest, type AgentRole, type EffortLevel } from '@agent-factory/domain';
+import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import type {
   AgentHarness,
   AgentRunRequest,
@@ -13,6 +14,7 @@ import type {
   RolePromptCatalog,
   WorkspaceFiles,
 } from '../ports.ts';
+import { issueTypesValue, ROLE_PROMPT_PLACEHOLDERS } from '../pipeline/role-prompts.ts';
 import { parseChallengeAnswer, type ChallengeAnswer } from './challenge-answer.ts';
 import { renderChallengeReport } from './challenge-report.ts';
 import { RequestChallengeRefusedError, RequestNotFoundError } from './errors.ts';
@@ -61,6 +63,7 @@ export interface ChallengeRequestSettings {
   readonly repository: string;
   readonly requestsDirectory: string;
   readonly profile: ChallengeProfile;
+  readonly conventions: ProjectConventions;
 }
 
 export interface SpecProblemReport {
@@ -133,6 +136,7 @@ export class ChallengeRequest {
       request: request.body,
       images: images.length === 0 ? NO_IMAGES : images.join(LINE_SEPARATOR),
       knowledge: await knowledge.read(),
+      [ROLE_PROMPT_PLACEHOLDERS.issueTypes]: issueTypesValue(this.settings.conventions.typology),
     });
   }
 
@@ -182,7 +186,7 @@ export class ChallengeRequest {
     for (const [index, proposed] of answer.specs.entries()) {
       const number = index + 1;
       const title = singleLine(proposed.title);
-      const rendered = renderSpecFile({ ...proposed, title });
+      const rendered = renderSpecFile({ ...proposed, title }, this.settings.conventions);
       const path = specFilePath(number, title);
       await files.writeText(directory, path, rendered.content);
       specs.push({

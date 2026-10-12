@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { SteppingClock } from '../runs/test-support.ts';
 import { PIPELINE_EVENTS } from './journal-events.ts';
 import { FeedbackRefusedError, PullRequestFeedback } from './pull-request-feedback.ts';
-import { ResumeIssue } from './resume-issue.ts';
 import { ISSUE_NUMBER, PipelineScenario, SETTINGS } from './testing/pipeline-scenario.ts';
 
 const FEEDBACK = 'The link must open in a new tab.\nIt should also carry an icon.';
@@ -58,7 +57,7 @@ describe('external feedback on a factory pull request', () => {
     expect(escalated).toMatchObject({ state: 'needs-human', stateBeforeEscalation: 'implementing' });
     expect(escalated.decisions.some((record) => record.decision.action === 'needs-human')).toBe(false);
 
-    const resumed = await new ResumeIssue(scenario.dependencies(), SETTINGS.implementerEscalation).resume(ISSUE_NUMBER);
+    const resumed = await scenario.resumer(SETTINGS.implementerEscalation).resume(ISSUE_NUMBER);
     expect(resumed).toMatchObject({ resumedAt: 'implementing', feedbackCycleGranted: true });
     expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
     const fresh = scenario.harness.requestsOf('implementer').at(-1);

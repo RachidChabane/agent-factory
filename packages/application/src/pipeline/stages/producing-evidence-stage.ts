@@ -1,9 +1,7 @@
-import { FACTORY_LABEL } from '@agent-factory/domain';
 import type { IssueSpec } from '@agent-factory/domain';
 import { criterionChecksOf, EVIDENCE_DIRECTORY } from '../../acceptance/acceptance-manifest.ts';
 import { targetedScore } from '../../acceptance/score-report.ts';
 import type { PullRequestRef, Worktree } from '../../ports.ts';
-import { typeLabel } from '../../spec/spec-format.ts';
 import { evidenceCommitMessage, implementationCommitMessage, pullRequestTitle } from '../conventional-commit.ts';
 import { acceptanceTestRows, type AcceptanceTestRow } from '../acceptance-test-table.ts';
 import { renderDiffStat } from '../diff-stat.ts';
@@ -87,7 +85,7 @@ export class ProducingEvidenceStage implements PipelineStage {
     const { journal, writer, toolkit } = context;
     const { sourceControl } = toolkit.dependencies;
     if (!(await sourceControl.isClean(worktree))) {
-      await sourceControl.commitAll(worktree, implementationCommitMessage(spec, toolkit.settings.conventionalScopes, await sourceControl.changedFiles(worktree)));
+      await sourceControl.commitAll(worktree, implementationCommitMessage(spec, toolkit.settings.conventions, await sourceControl.changedFiles(worktree)));
     }
     const frozen = new Set(requireFrozen(journal).checks.map((check) => check.path));
     const implementation = (await sourceControl.changedFiles(worktree)).filter((path) => !frozen.has(path) && !path.startsWith(EVIDENCE_PREFIX));
@@ -136,10 +134,10 @@ export class ProducingEvidenceStage implements PipelineStage {
     const branch = requireBranch(journal);
     const existing = await github.findOpenPullRequest(branch);
     if (existing !== null) return existing;
-    const title = pullRequestTitle(spec, toolkit.settings.conventionalScopes, await sourceControl.changedFiles(worktree));
+    const title = pullRequestTitle(spec, toolkit.settings.conventions, await sourceControl.changedFiles(worktree));
     const body = await this.renderBody(context, worktree, spec, evidence);
     await secretScan(context).assertClean({ title, body }, `open a pull request for ${branch}`);
-    return github.openPullRequest({ branch, title, body, labels: [FACTORY_LABEL, typeLabel(spec.type)], closes: [spec.number] });
+    return github.openPullRequest({ branch, title, body, labels: [toolkit.settings.conventions.labels.factory, toolkit.settings.conventions.typology.get(spec.type).label], closes: [spec.number] });
   }
 
   private async renderBody(context: StageContext, worktree: Worktree, spec: IssueSpec, evidence: EvidenceRecord): Promise<string> {

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DETECTED_AUDIT_REASONS, type DetectedAuditReason } from '@agent-factory/domain';
-import { loadAudits } from './audit-projection.ts';
+import { attributionRules, DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
+import { loadAudits, loadSkippedChanges } from './audit-projection.ts';
 import { readCursor, scanNewMerges, seedMergeCursor } from './watch-merges.ts';
 import { FakeGitHubGateway, InMemoryEventStore, commit, factoryCommit } from './testing/fakes.ts';
 
 const BRANCH = 'main';
-const SETTINGS = { branch: BRANCH, startSha: null };
+const RULES = attributionRules(DEFAULT_PROJECT_CONVENTIONS);
+const SETTINGS = { branch: BRANCH, startSha: null, rules: RULES };
 
 function setup() {
   return { events: new InMemoryEventStore(), github: new FakeGitHubGateway() };
@@ -16,7 +18,7 @@ describe('scanNewMerges', () => {
     const dependencies = setup();
     dependencies.github.history.push(factoryCommit('f1', 10));
     const result = await scanNewMerges(dependencies, SETTINGS);
-    expect(result).toEqual({ scanned: 1, detectedAuditIds: [], factoryMerges: [{ sha: 'f1', pullRequestNumber: 10 }], cursor: 'f1' });
+    expect(result).toEqual({ scanned: 1, detectedAuditIds: [], skippedShas: [], factoryMerges: [{ sha: 'f1', pullRequestNumber: 10 }], cursor: 'f1' });
     expect(await loadAudits(dependencies.events)).toEqual([]);
   });
 
@@ -48,7 +50,7 @@ describe('scanNewMerges', () => {
     expect(await readCursor(dependencies.events, BRANCH)).toBe('a1');
 
     const second = await scanNewMerges(dependencies, SETTINGS);
-    expect(second).toEqual({ scanned: 0, detectedAuditIds: [], factoryMerges: [], cursor: 'a1' });
+    expect(second).toEqual({ scanned: 0, detectedAuditIds: [], skippedShas: [], factoryMerges: [], cursor: 'a1' });
     expect(dependencies.events.records).toHaveLength(afterFirst);
   });
 
@@ -75,8 +77,50 @@ describe('scanNewMerges', () => {
   it('starts from the configured sha when no cursor exists', async () => {
     const dependencies = setup();
     dependencies.github.history.push(commit({ sha: 'old' }), commit({ sha: 'new' }));
-    const result = await scanNewMerges(dependencies, { branch: BRANCH, startSha: 'old' });
+    const result = await scanNewMerges(dependencies, { ...SETTINGS, startSha: 'old' });
     expect(result.detectedAuditIds).toEqual(['new']);
+  });
+});
+
+describe('the changes of other automations', () => {
+  const AUTOMATION_SETTINGS = {
+    ...SETTINGS,
+    rules: { ...RULES, automations: [{ name: 'Issue bot', branches: ['bot/issue-*'], authors: [] }] },
+  };
+
+  it('records a change of another automation without auditing it', async () => {
+    const dependencies = setup();
+    dependencies.github.history.push(commit({ sha: 'b1', pullRequestNumber: 7, pullRequestBranch: 'bot/issue-7-typo', pullRequestLabels: [] }));
+    const result = await scanNewMerges(dependencies, AUTOMATION_SETTINGS);
+    expect(result).toMatchObject({ detectedAuditIds: [], skippedShas: ['b1'] });
+    expect(await loadAudits(dependencies.events)).toEqual([]);
+    expect(await loadSkippedChanges(dependencies.events)).toEqual([
+      expect.objectContaining({ commitSha: 'b1', automation: 'Issue bot', pullRequestNumber: 7, pullRequestBranch: 'bot/issue-7-typo' }),
+    ]);
+  });
+
+  it('records a skipped change once, even when its cursor write was lost', async () => {
+    const dependencies = setup();
+    dependencies.github.history.push(commit({ sha: 'b1', pullRequestNumber: 7, pullRequestBranch: 'bot/issue-7-typo', pullRequestLabels: [] }));
+    await scanNewMerges(dependencies, AUTOMATION_SETTINGS);
+    dependencies.events.records.splice(dependencies.events.records.findIndex((r) => r.type === 'audit.cursor.advanced'), 1);
+    expect((await scanNewMerges(dependencies, AUTOMATION_SETTINGS)).skippedShas).toEqual([]);
+    expect(dependencies.events.typesOf('audit/')).toEqual(['audit.skipped']);
+  });
+
+  it('drops a skipped change from the list once the operator has it audited', async () => {
+    const dependencies = setup();
+    dependencies.github.history.push(commit({ sha: 'b1', pullRequestNumber: 7, pullRequestBranch: 'bot/issue-7-typo', pullRequestLabels: [] }));
+    await scanNewMerges(dependencies, AUTOMATION_SETTINGS);
+    await dependencies.events.append('audit.detected', 'audit/b1', {
+      commitSha: 'b1',
+      reason: 'on-demand',
+      commitMessage: 'fix: typo',
+      authorLogin: null,
+      pullRequestNumber: 7,
+    });
+    expect(await loadSkippedChanges(dependencies.events)).toEqual([]);
+    expect(await loadAudits(dependencies.events)).toEqual([expect.objectContaining({ id: 'b1', reason: 'on-demand' })]);
   });
 });
 
@@ -88,7 +132,7 @@ describe('seedMergeCursor', () => {
     expect(await seedMergeCursor({ events, github }, 'main')).toBe('old2');
     github.history.push(commit({ sha: 'new1' }));
     expect(await seedMergeCursor({ events, github }, 'main')).toBe('old2');
-    const result = await scanNewMerges({ events, github }, { branch: 'main', startSha: null });
+    const result = await scanNewMerges({ events, github }, SETTINGS);
     expect(result.detectedAuditIds).toEqual(['new1']);
   });
 });

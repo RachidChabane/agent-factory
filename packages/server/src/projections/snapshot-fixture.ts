@@ -1,5 +1,5 @@
-import type { FactoryEventRecord } from '@agent-factory/application';
-import type { IssueSpec } from '@agent-factory/domain';
+import { DEFAULT_PROJECT_CONVENTIONS, type FactoryEventRecord, type ProjectConventions } from '@agent-factory/application';
+import { IssueTypology, type IssueSpec } from '@agent-factory/domain';
 import type { SnapshotContext } from './snapshot-context.ts';
 
 const START_MS = Date.parse('2026-10-09T08:00:00.000Z');
@@ -13,6 +13,15 @@ const SHA = {
   merge: '1'.repeat(40),
 };
 const CHECK_SHA256 = 'a'.repeat(64);
+const UI_TYPE = 'ui';
+const APP_SCOPE = 'app';
+/** The default conventions, with user-interface issues scoped to the app. */
+const FIXTURE_CONVENTIONS: ProjectConventions = {
+  ...DEFAULT_PROJECT_CONVENTIONS,
+  typology: new IssueTypology(
+    DEFAULT_PROJECT_CONVENTIONS.typology.definitions.map((type) => (type.id === UI_TYPE ? { ...type, commit: { ...type.commit, scope: APP_SCOPE } } : type)),
+  ),
+};
 const ESC = String.fromCharCode(27);
 const GATE_LOG = [
   '$ pnpm lint',
@@ -230,7 +239,7 @@ export function fixtureEvents(): readonly FactoryEventRecord[] {
   add('pipeline.pull-request-opened', issue, { number: 100, url: 'https://github.com/acme/widgets/pull/100', headSha: SHA.evidence });
   transition('producing-evidence', 'pr-open');
   const asking = 'issue/44';
-  const askingSpec = { ...FIXTURE_SPEC, number: 44, title: 'List the release owners', type: 'doc' };
+  const askingSpec = { ...FIXTURE_SPEC, number: 44, title: 'List the release owners', type: 'docs' };
   add('issue.transitioned', asking, { from: null, to: 'spec-draft', reason: 'taken' });
   add('pipeline.spec-captured', asking, { spec: askingSpec, branch: 'factory/44-list-the-release-owners' });
   for (const [from, to] of [['spec-draft', 'spec-validated'], ['spec-validated', 'authoring-checks'], ['authoring-checks', 'checks-frozen'], ['checks-frozen', 'implementing']]) {
@@ -357,7 +366,7 @@ export function fixtureContext(): SnapshotContext {
       evidence: (number, path) => `/api/evidence/${number}/${path}`,
       requestAttachment: (id, path) => `/api/requests/${id}/${path}`,
     },
-    conventionalScopes: { byType: { ui: 'app' }, defaultScope: 'repo' },
+    conventions: FIXTURE_CONVENTIONS,
     roles: [
       { role: 'implementer', model: 'sonnet', effort: 'high', maxBudgetUsd: 8, maxTurns: 120 },
       { role: 'reviewer', model: 'sonnet', effort: 'high', maxBudgetUsd: 2, maxTurns: 40 },

@@ -6,6 +6,7 @@ import { COMMAND_BODY_SCHEMAS, type CommandBody, type CommandName } from '@agent
 import {
   AbandonIssue,
   acceptProposedSpecs,
+  attributionRules,
   AddRequest,
   ChangeSettings,
   checkTool,
@@ -24,6 +25,7 @@ import {
   resolveAudit,
   resumeScheduling,
   ResumeIssue,
+  type RequestDecisionSettings,
   RUN_STARTED_EVENT,
   RunStartedPayloadSchema,
   runSubject,
@@ -36,6 +38,14 @@ import { ISSUE_ESCALATION_STATE, type SettingsChange } from '@agent-factory/doma
 import type { FactoryContainer } from '../composition/factory-container.ts';
 import type { SequenceCursor } from './sequence-cursor.ts';
 import { DECISION_QUESTION_PREFIX } from '../projections/run-views.ts';
+
+function requestDecisionSettings(factory: FactoryContainer): RequestDecisionSettings {
+  return { requestsDirectory: factory.config.directories.requests, conventions: factory.settings.conventions };
+}
+
+function issueResumer(factory: FactoryContainer): ResumeIssue {
+  return new ResumeIssue(factory.dependencies, { conventions: factory.settings.conventions, escalation: factory.settings.implementerEscalation });
+}
 
 export const UNKNOWN_COMMAND = 'unknown-command';
 export const COCKPIT_CHANNEL = 'cockpit';
@@ -142,13 +152,13 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
   ),
   'request.decline': command(COMMAND_BODY_SCHEMAS['request.decline'], (body, { factory }) => declineRequest(factory.dependencies.events, body.requestId, body.reason)),
   'request.update-spec': command(COMMAND_BODY_SCHEMAS['request.update-spec'], (body, { factory }) =>
-    updateProposedSpec(factory.dependencies, factory.config.directories.requests, body.requestId, body.specId, body.spec),
+    updateProposedSpec(factory.dependencies, requestDecisionSettings(factory), body.requestId, body.specId, body.spec),
   ),
   'request.accept': command(COMMAND_BODY_SCHEMAS['request.accept'], (body, { factory }) =>
-    acceptProposedSpecs(factory.dependencies, factory.config.directories.requests, body.requestId, body.specIds),
+    acceptProposedSpecs(factory.dependencies, requestDecisionSettings(factory), body.requestId, body.specIds),
   ),
   'issue.validate-spec': command(COMMAND_BODY_SCHEMAS['issue.validate-spec'], (body, { factory, operator }) =>
-    validateSpec(factory.dependencies, body.issueNumber, operator),
+    validateSpec(factory.dependencies, body.issueNumber, operator, factory.settings.conventions),
   ),
   'issue.start': command(COMMAND_BODY_SCHEMAS['issue.start'], (body, { factory, operator }) =>
     setIssuePaused(factory.dependencies.events, body.issueNumber, false, `started by ${operator}`),
@@ -160,7 +170,7 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
   'issue.resume': command(COMMAND_BODY_SCHEMAS['issue.resume'], async (body, { factory, operator }) => {
     const journal = await loadJournal(factory.dependencies.events, body.issueNumber);
     if (journal.state === ISSUE_ESCALATION_STATE) {
-      await new ResumeIssue(factory.dependencies, factory.settings.implementerEscalation).resume(body.issueNumber);
+      await issueResumer(factory).resume(body.issueNumber);
     }
     await setIssuePaused(factory.dependencies.events, body.issueNumber, false, `resumed by ${operator}`);
   }),
@@ -199,7 +209,7 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
       throw new CommandRefusedError(`question ${body.questionId} does not belong to run ${body.runId}`);
     }
     const { factory } = context;
-    await new ResumeIssue(factory.dependencies, factory.settings.implementerEscalation).resume(Number(subject.id), body.answer);
+    await issueResumer(factory).resume(Number(subject.id), body.answer);
   }),
   'pr.merge': command(COMMAND_BODY_SCHEMAS['pr.merge'], (body, { factory }) =>
     new MergeOnOrder(factory.dependencies).merge({ pullRequestNumber: body.number, expectedHeadSha: body.expectedHeadSha }),
@@ -216,13 +226,13 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
     new RedeployEnvironment(factory.dependencies, deliveryTargets(factory)).redeploy({ environment: body.environment, confirmVersion: body.confirmVersion, operator }),
   ),
   'release.cut': command(COMMAND_BODY_SCHEMAS['release.cut'], (body, { factory, operator }) =>
-    new CutRelease({ events: factory.dependencies.events, github: factory.dependencies.github, health: factory.health }).cut({ releaseId: body.releaseId, operator }),
+    new CutRelease({ events: factory.dependencies.events, github: factory.dependencies.github, health: factory.health, rules: attributionRules(factory.settings.conventions) }).cut({ releaseId: body.releaseId, operator }),
   ),
   'release.evaluate': command(COMMAND_BODY_SCHEMAS['release.evaluate'], async (body, { factory }) => {
     const { events, github } = factory.dependencies;
-    await evaluateRelease({ events, github, health: factory.health }, await detectedRelease(events, body.releaseId));
+    await evaluateRelease({ events, github, health: factory.health, rules: attributionRules(factory.settings.conventions) }, await detectedRelease(events, body.releaseId));
   }),
-  'audit.publish-issue': command(COMMAND_BODY_SCHEMAS['audit.publish-issue'], (body, { factory }) => publishAuditIssue(factory.dependencies, body.auditId)),
+  'audit.publish-issue': command(COMMAND_BODY_SCHEMAS['audit.publish-issue'], (body, { factory }) => publishAuditIssue(factory.dependencies, factory.settings.conventions, body.auditId)),
   'audit.resolve': command(COMMAND_BODY_SCHEMAS['audit.resolve'], (body, { factory }) => resolveAudit(factory.dependencies.events, body.auditId, body.note)),
   'settings.update-role': command(COMMAND_BODY_SCHEMAS['settings.update-role'], (body, context) =>
     changeSettings(context, { kind: 'role', role: body.role, model: body.model, effort: body.effort, maxBudgetUsd: body.maxBudgetUsd, maxTurns: body.maxTurns }),

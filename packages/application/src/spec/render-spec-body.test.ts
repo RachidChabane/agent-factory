@@ -1,11 +1,14 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { COMMIT_KINDS, ISSUE_TYPES } from '@agent-factory/domain';
+import { COMMIT_KINDS, DEFAULT_ISSUE_TYPES } from '@agent-factory/domain';
 import type { IssueSpec } from '@agent-factory/domain';
 import { parseIssueSpec } from './markdown-spec-reader.ts';
 import { renderSpecBody } from './render-spec-body.ts';
 import { SpecRenderError } from './spec-errors.ts';
-import { kindLabel, typeLabel } from './spec-format.ts';
+import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
+import { kindLabel } from './spec-format.ts';
+
+const CONVENTIONS = DEFAULT_PROJECT_CONVENTIONS;
 
 const WORD_CHARACTERS = 'abcdefghijklmnopqrstuvwxyzéèàçABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 const PUNCTUATION = [',', '.', ':', '`', '(', ')', "'", '"', '/', '!', '?'];
@@ -21,7 +24,7 @@ const multiLineText = fc.array(paragraph, { minLength: 1, maxLength: 3 }).map((p
 const issueSpec: fc.Arbitrary<IssueSpec> = fc.record({
   number: fc.integer({ min: 1, max: 100_000 }),
   title: sentence,
-  type: fc.constantFrom(...ISSUE_TYPES),
+  type: fc.constantFrom(...DEFAULT_ISSUE_TYPES.map((type) => type.id)),
   need: multiLineText,
   acceptanceCriteria: fc.array(sentence, { minLength: 1, maxLength: 6 }),
   outOfScope: fc.array(sentence, { minLength: 1, maxLength: 4 }),
@@ -31,14 +34,21 @@ const issueSpec: fc.Arbitrary<IssueSpec> = fc.record({
 });
 
 function parseRendered(spec: IssueSpec, body: string): IssueSpec {
-  return parseIssueSpec({
-    number: spec.number,
-    title: spec.title,
-    body,
-    labels: [typeLabel(spec.type), ...(spec.commitKind === null ? [] : [kindLabel(spec.commitKind)]), 'spec:validated'],
-    state: 'open',
-    blockedBy: spec.dependsOn,
-  });
+  return parseIssueSpec(
+    {
+      number: spec.number,
+      title: spec.title,
+      body,
+      labels: [
+        CONVENTIONS.typology.get(spec.type).label,
+        ...(spec.commitKind === null ? [] : [kindLabel(spec.commitKind, CONVENTIONS.labels.kindPrefix)]),
+        CONVENTIONS.labels.validated,
+      ],
+      state: 'open',
+      blockedBy: spec.dependsOn,
+    },
+    CONVENTIONS,
+  );
 }
 
 describe('renderSpecBody', () => {
@@ -54,7 +64,7 @@ describe('renderSpecBody', () => {
       dependsOn: [],
       commitKind: null,
     };
-    expect(renderSpecBody(spec)).toBe(
+    expect(renderSpecBody(spec, CONVENTIONS)).toBe(
       [
         '## Need',
         '',
@@ -81,7 +91,7 @@ describe('renderSpecBody', () => {
     const base: IssueSpec = {
       number: 9,
       title: 'Broken',
-      type: 'doc',
+      type: 'docs',
       need: 'Need.\n## Sneaky heading',
       acceptanceCriteria: ['One.'],
       outOfScope: ['None.'],
@@ -89,9 +99,9 @@ describe('renderSpecBody', () => {
       dependsOn: [],
       commitKind: null,
     };
-    expect(() => renderSpecBody(base)).toThrow(SpecRenderError);
-    expect(() => renderSpecBody({ ...base, need: 'Fine.', acceptanceCriteria: ['two\nlines'] })).toThrow(SpecRenderError);
-    expect(() => renderSpecBody({ ...base, need: 'Opens a fence\n```' })).toThrow(SpecRenderError);
+    expect(() => renderSpecBody(base, CONVENTIONS)).toThrow(SpecRenderError);
+    expect(() => renderSpecBody({ ...base, need: 'Fine.', acceptanceCriteria: ['two\nlines'] }, CONVENTIONS)).toThrow(SpecRenderError);
+    expect(() => renderSpecBody({ ...base, need: 'Opens a fence\n```' }, CONVENTIONS)).toThrow(SpecRenderError);
   });
 });
 
@@ -99,7 +109,7 @@ describe('spec round trip (property)', () => {
   it('parses a rendered spec back to the same spec', () => {
     fc.assert(
       fc.property(issueSpec, (spec) => {
-        expect(parseRendered(spec, renderSpecBody(spec))).toEqual(spec);
+        expect(parseRendered(spec, renderSpecBody(spec, CONVENTIONS))).toEqual(spec);
       }),
     );
   });
@@ -107,8 +117,8 @@ describe('spec round trip (property)', () => {
   it('is stable when the rendered body is rendered again', () => {
     fc.assert(
       fc.property(issueSpec, (spec) => {
-        const body = renderSpecBody(spec);
-        expect(renderSpecBody(parseRendered(spec, body))).toBe(body);
+        const body = renderSpecBody(spec, CONVENTIONS);
+        expect(renderSpecBody(parseRendered(spec, body), CONVENTIONS)).toBe(body);
       }),
     );
   });

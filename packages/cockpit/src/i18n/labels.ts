@@ -80,18 +80,25 @@ export const BRANCH_TEST_RESULT_LABELS: Readonly<Record<BranchTestResult, string
   'not-run': 'non exécuté',
 };
 
-export const ISSUE_TYPE_LABELS: Readonly<Record<IssueType, string>> = {
+/** Names of the preset issue types; a type a project adds shows its id. */
+export const ISSUE_TYPE_LABELS: Readonly<Record<string, string>> = {
+  feature: 'Fonctionnalité',
+  fix: 'Correctif',
   ui: 'UI',
-  'skill-prompt': 'Skill / prompt',
-  'engine-api': 'Moteur / API',
+  api: 'API',
   security: 'Sécurité',
-  'infra-ci': 'Infra / CI',
+  infra: 'Infra / CI',
   data: 'Données',
   dependencies: 'Dépendances',
-  doc: 'Doc',
-  release: 'Release',
+  docs: 'Doc',
   refactor: 'Refactor',
+  release: 'Release',
+  prompt: 'Prompt',
 };
+
+export function issueTypeLabel(type: string): string {
+  return issueTypeLabel(type) ?? type;
+}
 
 export const ROLE_LABELS: Readonly<Record<AgentRole, string>> = {
   challenger: 'Challengeur',

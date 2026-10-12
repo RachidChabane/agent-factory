@@ -2,6 +2,7 @@ import { OPEN_AUDIT_STATES, UNRESOLVED_VERDICT_STATES } from '@agent-factory/dom
 import type { IssueState } from '@agent-factory/domain';
 import { loadAudit, loadAudits } from '../audit/audit-projection.ts';
 import type { AuditOutcome } from '../audit/audit-merge.ts';
+import { attributionRules, type ProjectConventions } from '../conventions/project-conventions.ts';
 import { scanNewMerges, seedMergeCursor } from '../audit/watch-merges.ts';
 import { BudgetExhaustedError } from '../budget/budget-governor.ts';
 import { NOTICES, type OperatorNotifications } from '../notifications/operator-notifications.ts';
@@ -84,8 +85,8 @@ export interface DaemonSettings {
   readonly concurrency: number;
   readonly poolSize: number;
   readonly baseBranch: string;
-  /** The forge label that marks an issue whose specification the operator validated. */
-  readonly validatedLabel: string;
+  /** The project's labels, branch prefix and other automations. */
+  readonly conventions: ProjectConventions;
   readonly pollIntervalMs: number;
   readonly mergeWatchIntervalMs: number;
   readonly issueRefreshMs: number;
@@ -240,7 +241,7 @@ export class FactoryDaemon {
     const now = clock.now().getTime();
     if (this.lastWatchAt !== null && now - this.lastWatchAt < this.settings.mergeWatchIntervalMs) return;
     this.lastWatchAt = now;
-    const scan = await scanNewMerges({ events, github }, { branch: this.settings.baseBranch, startSha: null });
+    const scan = await scanNewMerges({ events, github }, { branch: this.settings.baseBranch, startSha: null, rules: attributionRules(this.settings.conventions) });
     for (const merge of scan.factoryMerges) {
       const recorded = await recordExternalMerge(this.dependencies, merge.pullRequestNumber, merge.sha);
       if (recorded !== null) log.info(`issue #${recorded.issueNumber} merged through pull request #${recorded.pullRequestNumber}`);
@@ -291,7 +292,7 @@ export class FactoryDaemon {
 
   private async validatedIssues(now: number): Promise<readonly IssueRecord[]> {
     if (this.validated !== null && now - this.validated.at < this.settings.issueRefreshMs) return this.validated.issues;
-    const issues = await this.dependencies.github.listIssues(this.settings.validatedLabel);
+    const issues = await this.dependencies.github.listIssues(this.settings.conventions.labels.validated);
     this.validated = { at: now, issues };
     return issues;
   }

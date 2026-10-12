@@ -17,7 +17,7 @@ import { accessOf, describeOutcome, EXIT_CODE_SUCCESS, tailLines } from '../shel
 import { measureBeforeProof } from './before-proof-measurement.ts';
 import { requireSpec, leasedWorktree } from './journal-facts.ts';
 import { ADVANCED, type PipelineStage, type StageContext, type StageResult } from './stage.ts';
-import { assertOnlyChecksChanged, profileOf } from './stage-support.ts';
+import { assertOnlyChecksChanged, issueTypeOfSpec, profileOf } from './stage-support.ts';
 
 export const MANIFEST_CORRECTIONS = 1;
 export const BEFORE_PROOF_CORRECTIONS = 1;
@@ -99,8 +99,9 @@ export class AuthoringChecksStage implements PipelineStage {
     const pending = context.journal.pendingBeforeProofCorrection;
     if (pending !== null) return { prompt: beforeProofCorrectionPrompt(pending.reason), resumeSessionId: pending.sessionId };
     const { dependencies, settings } = context.toolkit;
-    const rendered = dependencies.roles.render('acceptance-author', acceptanceAuthorValues(settings.repository, spec));
-    return { prompt: withAddendum(rendered, scoreOutputAddendum(spec)), resumeSessionId: null };
+    const type = issueTypeOfSpec(context, spec);
+    const rendered = dependencies.roles.render('acceptance-author', acceptanceAuthorValues(settings.repository, spec, type));
+    return { prompt: withAddendum(rendered, scoreOutputAddendum(type)), resumeSessionId: null };
   }
 
   private async requestCorrection(context: StageContext, reason: string): Promise<void> {
@@ -152,7 +153,7 @@ export class AuthoringChecksStage implements PipelineStage {
     const { files } = context.toolkit.dependencies;
     const text = await files.readText(worktree.path, ACCEPTANCE_MANIFEST_PATH);
     if (text === null) return { kind: 'missing' };
-    const reading = readAcceptanceManifest(text, spec);
+    const reading = readAcceptanceManifest(text, spec, issueTypeOfSpec(context, spec));
     if (!reading.valid) return { kind: 'invalid', problems: reading.problems };
     const presence = await Promise.all(
       checkPaths(reading.manifest).map(async (path) => ({ path, present: await files.exists(worktree.path, path) })),
@@ -174,7 +175,7 @@ export class AuthoringChecksStage implements PipelineStage {
     const checks = await sourceControl.hashFiles(worktree, paths);
     let commitSha: string | null = null;
     if (paths.length > 0) {
-      if (!(await sourceControl.isClean(worktree))) await sourceControl.commitAll(worktree, checksCommitMessage(spec, toolkit.settings.conventionalScopes));
+      if (!(await sourceControl.isClean(worktree))) await sourceControl.commitAll(worktree, checksCommitMessage(spec, toolkit.settings.conventions));
       commitSha = await sourceControl.headSha(worktree);
     }
     await writer.record(PIPELINE_EVENTS.checksFrozen, { checks, commitSha });

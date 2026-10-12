@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { BASE_EXPECTATIONS, BEFORE_PROOF_EXPECTATIONS, SCORED_TEST_RUNNER, TEST_RUNNERS, isStructuredRunner } from '@agent-factory/domain';
-import type { BaseExpectation, CriterionChecks, IssueSpec } from '@agent-factory/domain';
+import { BASE_EXPECTATIONS, SCORED_TEST_RUNNER, TEST_RUNNERS, isStructuredRunner, proofExpectation } from '@agent-factory/domain';
+import type { BaseExpectation, CriterionChecks, IssueSpec, IssueTypeDefinition } from '@agent-factory/domain';
 import { shellCommandLine } from './shell-quote.ts';
 
 export const FACTORY_WORK_DIRECTORY = '.factory';
@@ -66,16 +66,16 @@ export function acceptanceCommand(manifest: AcceptanceManifest): string | null {
   return manifest.command === null || manifest.command.length === 0 ? null : shellCommandLine(manifest.command);
 }
 
-export function usesBaseScore(spec: IssueSpec): boolean {
-  return BEFORE_PROOF_EXPECTATIONS[spec.type].kind === 'base-score';
+export function usesBaseScore(type: IssueTypeDefinition): boolean {
+  return proofExpectation(type.proof).kind === 'base-score';
 }
 
-export function scoreOutputPath(manifest: AcceptanceManifest, spec: IssueSpec): string | null {
-  return usesBaseScore(spec) ? (manifest.score?.path ?? null) : null;
+export function scoreOutputPath(manifest: AcceptanceManifest, type: IssueTypeDefinition): string | null {
+  return usesBaseScore(type) ? (manifest.score?.path ?? null) : null;
 }
 
-export function declaredOutputPaths(manifest: AcceptanceManifest, spec: IssueSpec): readonly string[] {
-  const score = scoreOutputPath(manifest, spec);
+export function declaredOutputPaths(manifest: AcceptanceManifest, type: IssueTypeDefinition): readonly string[] {
+  const score = scoreOutputPath(manifest, type);
   return [...manifest.evidence, ...(score === null ? [] : [score])];
 }
 
@@ -96,18 +96,18 @@ export function criterionChecksOf(manifest: AcceptanceManifest | null): readonly
   return manifest === null ? [] : criterionChecks(manifest);
 }
 
-function runnerProblems(manifest: AcceptanceManifest, spec: IssueSpec, paths: readonly string[]): readonly string[] {
+function runnerProblems(manifest: AcceptanceManifest, type: IssueTypeDefinition, paths: readonly string[]): readonly string[] {
   if (paths.length === 0) return [];
   if (manifest.runner === null) return [`checks are declared but no "runner" says which test runner runs them (${TEST_RUNNERS.join(', ')})`];
-  if (usesBaseScore(spec) && manifest.runner !== SCORED_TEST_RUNNER) return [`a ${spec.type} issue runs its checks with the "${SCORED_TEST_RUNNER}" runner`];
-  if (!usesBaseScore(spec) && manifest.runner === SCORED_TEST_RUNNER) return [`the "${SCORED_TEST_RUNNER}" runner only proves skill-prompt issues`];
+  if (usesBaseScore(type) && manifest.runner !== SCORED_TEST_RUNNER) return [`a ${type.id} issue runs its checks with the "${SCORED_TEST_RUNNER}" runner`];
+  if (!usesBaseScore(type) && manifest.runner === SCORED_TEST_RUNNER) return [`the "${SCORED_TEST_RUNNER}" runner only proves issue types scored on a base, and ${type.id} is not one`];
   return [];
 }
 
-function baseExpectationProblems(manifest: AcceptanceManifest, spec: IssueSpec, paths: readonly string[]): readonly string[] {
+function baseExpectationProblems(manifest: AcceptanceManifest, type: IssueTypeDefinition, paths: readonly string[]): readonly string[] {
   if (paths.length === 0 || manifest.runner === null || !isStructuredRunner(manifest.runner)) return [];
   const problems: string[] = [];
-  const expectation = BEFORE_PROOF_EXPECTATIONS[spec.type];
+  const expectation = proofExpectation(type.proof);
   for (const path of paths) {
     const expectations = new Set(manifest.checks.filter((check) => check.paths.includes(path)).map((check) => check.onBase));
     if (expectations.size > 1) problems.push(`${path} is declared both as failing and as passing on base; keep new and kept behaviour in separate files`);
@@ -117,26 +117,26 @@ function baseExpectationProblems(manifest: AcceptanceManifest, spec: IssueSpec, 
     if (expectations.size > 1) problems.push(`criterion ${criterion} is declared both as failing and as passing on base`);
   }
   const failing = manifest.checks.some((check) => check.onBase === 'fails');
-  if (expectation.failingBaseWhenExpressible && !failing) problems.push(`a ${spec.type} issue needs at least one check that fails on base`);
-  if (expectation.kind === 'none' && failing) problems.push(`a ${spec.type} issue keeps today's behaviour, so every check passes on base`);
+  if (expectation.failingBaseWhenExpressible && !failing) problems.push(`a ${type.id} issue needs at least one check that fails on base`);
+  if (expectation.kind === 'none' && failing) problems.push(`a ${type.id} issue keeps today's behaviour, so every check passes on base`);
   return problems;
 }
 
-export function validateManifestForSpec(manifest: AcceptanceManifest, spec: IssueSpec): readonly string[] {
+export function validateManifestForSpec(manifest: AcceptanceManifest, spec: IssueSpec, type: IssueTypeDefinition): readonly string[] {
   const problems: string[] = [];
-  const expectation = BEFORE_PROOF_EXPECTATIONS[spec.type];
+  const expectation = proofExpectation(type.proof);
   const paths = checkPaths(manifest);
-  const outputs = declaredOutputPaths(manifest, spec);
+  const outputs = declaredOutputPaths(manifest, type);
   const criteriaCount = spec.acceptanceCriteria.length;
   const hasCommand = acceptanceCommand(manifest) !== null;
 
   if (paths.length > 0 && !hasCommand) problems.push('checks are declared but no command runs them');
   if (paths.length === 0 && hasCommand) problems.push('a command is declared but no check file');
   if (paths.length === 0 && (expectation.mandatoryFailingBase || expectation.kind === 'base-score')) {
-    problems.push(`a ${spec.type} issue needs at least one acceptance check (${expectation.frozenCheck})`);
+    problems.push(`a ${type.id} issue needs at least one acceptance check (${type.checks})`);
   }
-  if (usesBaseScore(spec) && manifest.score === null) problems.push(`a ${spec.type} issue needs a "score" output`);
-  problems.push(...runnerProblems(manifest, spec, paths), ...baseExpectationProblems(manifest, spec, paths));
+  if (usesBaseScore(type) && manifest.score === null) problems.push(`a ${type.id} issue needs a "score" output`);
+  problems.push(...runnerProblems(manifest, type, paths), ...baseExpectationProblems(manifest, type, paths));
   for (const path of duplicates(outputs)) problems.push(`output ${path} is declared more than once`);
   for (const path of [...new Set(outputs)].filter((output) => paths.includes(output))) {
     problems.push(`${path} is declared both as a check and as an output`);
@@ -152,7 +152,7 @@ export function validateManifestForSpec(manifest: AcceptanceManifest, spec: Issu
   return problems;
 }
 
-export function readAcceptanceManifest(raw: string | null, spec: IssueSpec): ManifestReading {
+export function readAcceptanceManifest(raw: string | null, spec: IssueSpec, type: IssueTypeDefinition): ManifestReading {
   if (raw === null) return { valid: false, problems: [`${ACCEPTANCE_MANIFEST_PATH} was not written`] };
   let json: unknown;
   try {
@@ -167,6 +167,6 @@ export function readAcceptanceManifest(raw: string | null, spec: IssueSpec): Man
       problems: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'manifest'}: ${issue.message}`),
     };
   }
-  const problems = validateManifestForSpec(parsed.data, spec);
+  const problems = validateManifestForSpec(parsed.data, spec, type);
   return problems.length === 0 ? { valid: true, manifest: parsed.data } : { valid: false, problems };
 }

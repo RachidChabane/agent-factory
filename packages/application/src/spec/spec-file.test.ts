@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import { parseLabelList, parseSpecFile, specFileProblems, SpecFileFormatError, withExtraLabels } from './spec-file.ts';
 
 const SPEC_FILE = [
   'Title: Serve shop.example.com from the storefront in production',
-  'Labels: type:infra-ci',
+  'Labels: type:infra',
   '',
   '## Need',
   'On launch day, shop.example.com reaches the UI.',
@@ -24,22 +25,22 @@ describe('spec files', () => {
   it('reads the title, the labels and the spec body', () => {
     const file = parseSpecFile(SPEC_FILE);
     expect(file.title).toBe('Serve shop.example.com from the storefront in production');
-    expect(file.labels).toEqual(['type:infra-ci']);
+    expect(file.labels).toEqual(['type:infra']);
     expect(file.body.startsWith('## Need\nOn launch day')).toBe(true);
     expect(file.body.endsWith('passes on the branch.\n')).toBe(true);
-    expect(specFileProblems(file)).toEqual([]);
+    expect(specFileProblems(file, DEFAULT_PROJECT_CONVENTIONS)).toEqual([]);
   });
 
   it('merges extra labels without duplicating the ones the file declares', () => {
-    const file = withExtraLabels(parseSpecFile(SPEC_FILE), parseLabelList('type:infra-ci, spec:validated,,'));
-    expect(file.labels).toEqual(['type:infra-ci', 'spec:validated']);
-    expect(specFileProblems(file)).toEqual([]);
+    const file = withExtraLabels(parseSpecFile(SPEC_FILE), parseLabelList('type:infra, spec:validated,,'));
+    expect(file.labels).toEqual(['type:infra', 'spec:validated']);
+    expect(specFileProblems(file, DEFAULT_PROJECT_CONVENTIONS)).toEqual([]);
   });
 
   it('reports the spec problems of the body', () => {
     const file = parseSpecFile(SPEC_FILE.replace('## Out of scope\n- DNS records.\n', ''));
-    expect(specFileProblems(file).map((problem) => problem.code)).toEqual(['missing-section']);
-    expect(specFileProblems(withExtraLabels(file, ['type:ui'])).map((problem) => problem.code)).toEqual([
+    expect(specFileProblems(file, DEFAULT_PROJECT_CONVENTIONS).map((problem) => problem.code)).toEqual(['missing-section']);
+    expect(specFileProblems(withExtraLabels(file, ['type:ui']), DEFAULT_PROJECT_CONVENTIONS).map((problem) => problem.code)).toEqual([
       'missing-section',
       'multiple-type-labels',
     ]);

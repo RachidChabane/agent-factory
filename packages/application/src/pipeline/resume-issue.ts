@@ -1,9 +1,9 @@
 import { isDeepStrictEqual } from 'node:util';
 import { ISSUE_CHECK_REWRITE_STATE, ISSUE_ESCALATION_STATE } from '@agent-factory/domain';
 import type { EscalationProfile, IssueState } from '@agent-factory/domain';
+import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import { reviewFailureSummary } from './failure-summary.ts';
 import { isSpecValidated } from '../spec/markdown-spec-reader.ts';
-import { SPEC_VALIDATED_LABEL } from '../spec/spec-format.ts';
 import { issueBranchName } from './branch-name.ts';
 import { pendingDecisionRequest } from './decision-request.ts';
 import { PIPELINE_EVENTS } from './journal-events.ts';
@@ -40,13 +40,21 @@ export interface ResumeOutcome {
   readonly decisionAnswered: boolean;
 }
 
+export interface ResumeIssueSettings {
+  readonly conventions: ProjectConventions;
+  /** The profile of the fresh session that answers external feedback; without one such a resume is refused. */
+  readonly escalation: EscalationProfile | null;
+}
+
 export class ResumeIssue {
   private readonly dependencies: ResumeIssueDependencies;
+  private readonly conventions: ProjectConventions;
   private readonly escalation: EscalationProfile | null;
 
-  constructor(dependencies: ResumeIssueDependencies, escalation: EscalationProfile | null = null) {
+  constructor(dependencies: ResumeIssueDependencies, settings: ResumeIssueSettings) {
     this.dependencies = dependencies;
-    this.escalation = escalation;
+    this.conventions = settings.conventions;
+    this.escalation = settings.escalation;
   }
 
   async resume(issueNumber: number, answer: string | null = null): Promise<ResumeOutcome> {
@@ -70,11 +78,11 @@ export class ResumeIssue {
     let specChanged = false;
     if (STATES_BEFORE_FROZEN_CHECKS.includes(target)) {
       const issue = await github.getIssue(issueNumber);
-      if (!isSpecValidated(issue)) throw new SpecNotValidatedError(issueNumber, SPEC_VALIDATED_LABEL);
+      if (!isSpecValidated(issue, this.conventions)) throw new SpecNotValidatedError(issueNumber, this.conventions.labels.validated);
       const spec = specReader.read(issue);
       specChanged = !isDeepStrictEqual(spec, journal.spec);
       if (specChanged) {
-        await writer.record(PIPELINE_EVENTS.specCaptured, { spec, branch: journal.branch ?? issueBranchName(spec.number, spec.title) });
+        await writer.record(PIPELINE_EVENTS.specCaptured, { spec, branch: journal.branch ?? issueBranchName(this.conventions.branchPrefix, spec.number, spec.title) });
       }
     }
     const pendingRewrite = journal.checkRewrite;

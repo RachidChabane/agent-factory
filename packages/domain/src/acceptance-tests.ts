@@ -1,7 +1,7 @@
-export const TEST_RUNNERS = ['pytest', 'vitest', 'playwright', 'eval'] as const;
+export const TEST_RUNNERS = ['pytest', 'vitest', 'playwright', 'node-test', 'eval'] as const;
 export type TestRunner = (typeof TEST_RUNNERS)[number];
 
-export const STRUCTURED_TEST_RUNNERS = ['pytest', 'vitest', 'playwright'] as const satisfies readonly TestRunner[];
+export const STRUCTURED_TEST_RUNNERS = ['pytest', 'vitest', 'playwright', 'node-test'] as const satisfies readonly TestRunner[];
 export type StructuredTestRunner = (typeof STRUCTURED_TEST_RUNNERS)[number];
 
 export const SCORED_TEST_RUNNER = 'eval' satisfies TestRunner;

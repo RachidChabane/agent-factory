@@ -1,4 +1,5 @@
 import type { PipelineSettings, RoleProfile } from '@agent-factory/application';
+import { conventionsFromConfig } from './conventions-from-config.ts';
 import type { FactoryConfig, RoleSettings } from './factory-config.ts';
 
 function profile(settings: RoleSettings): RoleProfile {
@@ -41,12 +42,7 @@ export function pipelineSettingsFrom(config: FactoryConfig, source: Readonly<Rec
       environment: checkCommandEnvironment(config, source),
       niceness: config.gate.niceness,
     },
-    conventionalScopes: {
-      byType: config.conventionalCommits.scopes,
-      defaultScope: config.conventionalCommits.defaultScope,
-      kindByType: config.conventionalCommits.types,
-      deploymentPaths: config.conventionalCommits.deploymentPaths,
-    },
+    conventions: conventionsFromConfig(config),
     evidenceCacheDirectory: config.directories.evidence,
     resources: config.resources,
   };

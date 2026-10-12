@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Minus, Plus, RotateCcw } from 'lucide-react';
 import type { IssueView } from '../../contract/index.ts';
-import { ISSUE_STATE_LABELS, ISSUE_TYPE_LABELS } from '../../i18n/labels.ts';
+import { ISSUE_STATE_LABELS, issueTypeLabel } from '../../i18n/labels.ts';
 import { paths } from '../../model/routes.ts';
 import type { StatusMark as StatusMarkKind } from '../../model/status.ts';
 import { issueMark, STATUS_MARKS } from '../../model/status.ts';
@@ -89,7 +89,7 @@ export function IssueGraph({ issues }: { readonly issues: readonly IssueView[] }
                 <text className="issue-node__number" x={14} y={22}>
                   #{issue.number}
                   <tspan className="issue-node__type" dx={8}>
-                    {ISSUE_TYPE_LABELS[issue.type]}
+                    {issueTypeLabel(issue.type)}
                   </tspan>
                 </text>
                 <text className="issue-node__title" x={14} y={40}>

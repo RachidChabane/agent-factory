@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildGitEnvironment, localOnlyGitEnvironment, LocalGitHubGateway, RehearsalRepositories, SpawnCommandRunner } from '@agent-factory/adapters';
-import { renderSpecBody } from '@agent-factory/application';
+import { DEFAULT_PROJECT_CONVENTIONS, renderSpecBody } from '@agent-factory/application';
 import type { IssueSpec } from '@agent-factory/domain';
 import { CONFIG_FILE_NAME, parseFactoryConfig, type FactoryConfig } from '../config/factory-config.ts';
 import { factoryGitEnvironment } from '../composition/github-gateway.ts';
@@ -106,7 +106,7 @@ export async function createRehearsal(options: RehearsalOptions = {}): Promise<R
       const draft: IssueSpec = {
         number: 1,
         title,
-        type: 'doc',
+        type: 'docs',
         need: `Readers need ${title.toLowerCase()}.`,
         acceptanceCriteria: ['The page exists.'],
         outOfScope: ['Translations.'],
@@ -114,7 +114,8 @@ export async function createRehearsal(options: RehearsalOptions = {}): Promise<R
         dependsOn: [],
         commitKind: null,
       };
-      const issue = await github.createIssue(title, renderSpecBody(draft), ['type:doc', 'spec:validated']);
+      const { typology, labels } = DEFAULT_PROJECT_CONVENTIONS;
+      const issue = await github.createIssue(title, renderSpecBody(draft, DEFAULT_PROJECT_CONVENTIONS), [typology.get(draft.type).label, labels.validated]);
       return issue.number;
     },
     pushDirectCommit: (path, content, message) => {

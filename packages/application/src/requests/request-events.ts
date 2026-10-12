@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ISSUE_TYPES } from '@agent-factory/domain';
+import { ISSUE_TYPE_ID_PATTERN } from '@agent-factory/domain';
 import { CHALLENGE_VERDICTS } from './challenge-answer.ts';
 
 export const REQUEST_RECEIVED_EVENT = 'request.received';
@@ -61,7 +61,7 @@ export const ProposedSpecPayloadSchema = z.object({
   id: z.string().min(1),
   itemIds: z.array(z.string()),
   title: z.string().min(1),
-  type: z.enum(ISSUE_TYPES),
+  type: z.string().regex(ISSUE_TYPE_ID_PATTERN),
   need: z.string(),
   acceptanceCriteria: z.array(z.string()),
   outOfScope: z.array(z.string()),

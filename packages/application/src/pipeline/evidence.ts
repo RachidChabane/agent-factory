@@ -1,4 +1,4 @@
-import type { IssueSpec } from '@agent-factory/domain';
+import type { IssueSpec, IssueTypeDefinition } from '@agent-factory/domain';
 import type { AcceptanceManifest } from '../acceptance/acceptance-manifest.ts';
 import { declaredOutputPaths, EVIDENCE_DIRECTORY } from '../acceptance/acceptance-manifest.ts';
 import type { WorkspaceFiles, Worktree } from '../ports.ts';
@@ -54,8 +54,8 @@ export class EvidenceCollector {
     );
   }
 
-  async clearOutputs(worktree: Worktree, manifest: AcceptanceManifest, spec: IssueSpec): Promise<void> {
-    for (const path of declaredOutputPaths(manifest, spec)) await this.files.remove(worktree.path, path);
+  async clearOutputs(worktree: Worktree, manifest: AcceptanceManifest, type: IssueTypeDefinition): Promise<void> {
+    for (const path of declaredOutputPaths(manifest, type)) await this.files.remove(worktree.path, path);
   }
 
   async writeBundle(worktree: Worktree, issueNumber: number, input: EvidenceBundleInput): Promise<EvidenceBundle> {

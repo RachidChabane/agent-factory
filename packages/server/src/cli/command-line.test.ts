@@ -31,9 +31,9 @@ describe('parseCommandLine', () => {
       ok: true,
       command: { kind: 'rehearsal-init', sourceClonePath: '../storefront' },
     });
-    expect(parseCommandLine(['rehearsal', 'add-issue', 'spec.md', '--labels', 'type:infra-ci, spec:validated'])).toEqual({
+    expect(parseCommandLine(['rehearsal', 'add-issue', 'spec.md', '--labels', 'type:infra, spec:validated'])).toEqual({
       ok: true,
-      command: { kind: 'rehearsal-add-issue', specPath: 'spec.md', labels: ['type:infra-ci', 'spec:validated'] },
+      command: { kind: 'rehearsal-add-issue', specPath: 'spec.md', labels: ['type:infra', 'spec:validated'] },
     });
     expect(parseCommandLine(['rehearsal', 'add-issue', '--labels=a', 'spec.md'])).toEqual({
       ok: true,

@@ -1,14 +1,12 @@
-import { COMMIT_KINDS, ISSUE_TYPES } from '@agent-factory/domain';
+import { COMMIT_KINDS } from '@agent-factory/domain';
 import type { CommitKind, IssueSpec, IssueType } from '@agent-factory/domain';
+import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import type { IssueRecord, SpecReader } from '../ports.ts';
 import { blockText, isBlank, parseList, splitLevelTwoSections, type ListKind, type MarkdownSection } from './markdown-blocks.ts';
 import { SpecFormatError, type SpecProblem } from './spec-errors.ts';
 import {
   SPEC_SECTION_HEADINGS,
   SPEC_SECTION_KEYS,
-  KIND_LABEL_PREFIX,
-  SPEC_VALIDATED_LABEL,
-  TYPE_LABEL_PREFIX,
   sectionKeyOf,
   type SpecSectionKey,
 } from './spec-format.ts';
@@ -79,35 +77,30 @@ function readSection(key: SpecSectionKey, section: MarkdownSection | undefined, 
   }
 }
 
-function readType(labels: readonly string[], problems: SpecProblem[]): IssueType | null {
-  const typeLabels = labels.filter((label) => label.startsWith(TYPE_LABEL_PREFIX));
-  const [only] = typeLabels;
+function readType(labels: readonly string[], conventions: ProjectConventions, problems: SpecProblem[]): IssueType | null {
+  const types = conventions.typology.definitions.filter((definition) => labels.includes(definition.label));
+  const [only] = types;
   if (only === undefined) {
-    problems.push(problem('missing-type-label', null, `the issue has no "${TYPE_LABEL_PREFIX}<type>" label`));
+    const known = conventions.typology.definitions.map((definition) => definition.label).join(', ');
+    problems.push(problem('missing-type-label', null, `the issue carries none of the type labels of this project (${known})`));
     return null;
   }
-  if (typeLabels.length > 1) {
-    problems.push(problem('multiple-type-labels', null, `the issue has several type labels: ${typeLabels.join(', ')}`));
+  if (types.length > 1) {
+    problems.push(problem('multiple-type-labels', null, `the issue has several type labels: ${types.map((definition) => definition.label).join(', ')}`));
     return null;
   }
-  const value = only.slice(TYPE_LABEL_PREFIX.length);
-  const type = ISSUE_TYPES.find((candidate) => candidate === value);
-  if (type === undefined) {
-    problems.push(problem('unknown-type-label', null, `label "${only}" names no known type (${ISSUE_TYPES.join(', ')})`));
-    return null;
-  }
-  return type;
+  return only.id;
 }
 
-function readKind(labels: readonly string[], problems: SpecProblem[]): CommitKind | null {
-  const kindLabels = labels.filter((label) => label.startsWith(KIND_LABEL_PREFIX));
+function readKind(labels: readonly string[], kindPrefix: string, problems: SpecProblem[]): CommitKind | null {
+  const kindLabels = labels.filter((label) => label.startsWith(kindPrefix));
   const [only] = kindLabels;
   if (only === undefined) return null;
   if (kindLabels.length > 1) {
     problems.push(problem('multiple-kind-labels', null, `the issue has several kind labels: ${kindLabels.join(', ')}`));
     return null;
   }
-  const value = only.slice(KIND_LABEL_PREFIX.length);
+  const value = only.slice(kindPrefix.length);
   const kind = COMMIT_KINDS.find((candidate) => candidate === value);
   if (kind === undefined) {
     problems.push(problem('unknown-kind-label', null, `label "${only}" names no conventional commit type (${COMMIT_KINDS.join(', ')})`));
@@ -116,7 +109,7 @@ function readKind(labels: readonly string[], problems: SpecProblem[]): CommitKin
   return kind;
 }
 
-export function parseIssueSpec(issue: IssueRecord): IssueSpec {
+export function parseIssueSpec(issue: IssueRecord, conventions: ProjectConventions): IssueSpec {
   const problems: SpecProblem[] = [];
   const title = issue.title.trim();
   if (title === '') problems.push(problem('empty-title', null, 'the issue title is empty'));
@@ -127,8 +120,8 @@ export function parseIssueSpec(issue: IssueRecord): IssueSpec {
   const found = collectSections(document.sections, problems);
   const contents: SectionContents = { text: {}, lists: {} };
   for (const key of SPEC_SECTION_KEYS) readSection(key, found.get(key), problems, contents);
-  const type = readType(issue.labels, problems);
-  const commitKind = readKind(issue.labels, problems);
+  const type = readType(issue.labels, conventions, problems);
+  const commitKind = readKind(issue.labels, conventions.labels.kindPrefix, problems);
   const { need, expectedProof } = contents.text;
   const { acceptanceCriteria, outOfScope } = contents.lists;
   if (
@@ -154,12 +147,18 @@ export function parseIssueSpec(issue: IssueRecord): IssueSpec {
   };
 }
 
-export function isSpecValidated(issue: IssueRecord): boolean {
-  return issue.labels.includes(SPEC_VALIDATED_LABEL);
+export function isSpecValidated(issue: IssueRecord, conventions: ProjectConventions): boolean {
+  return issue.labels.includes(conventions.labels.validated);
 }
 
 export class MarkdownSpecReader implements SpecReader {
+  private readonly conventions: ProjectConventions;
+
+  constructor(conventions: ProjectConventions) {
+    this.conventions = conventions;
+  }
+
   read(issue: IssueRecord): IssueSpec {
-    return parseIssueSpec(issue);
+    return parseIssueSpec(issue, this.conventions);
   }
 }

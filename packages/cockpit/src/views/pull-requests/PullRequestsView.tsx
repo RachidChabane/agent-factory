@@ -6,7 +6,7 @@ import { useNow } from '../../app/context.tsx';
 import { useSnapshot } from '../../app/hooks.ts';
 import type { PullRequestView } from '../../contract/index.ts';
 import { relativeTime, toEpoch } from '../../format/format.ts';
-import { ISSUE_TYPE_LABELS } from '../../i18n/labels.ts';
+import { issueTypeLabel } from '../../i18n/labels.ts';
 import { paths, VIEW_TITLES } from '../../model/routes.ts';
 import { checksSummaryMark } from '../../model/status.ts';
 import { EmptyState } from '../../ui/components/EmptyState.tsx';
@@ -65,7 +65,7 @@ export function PullRequestsView() {
                     <span className="pr-list__number num">#{pullRequest.number}</span> {pullRequest.title}
                   </span>
                   <span className="list-item__meta">
-                    <span>{ISSUE_TYPE_LABELS[pullRequest.type]}</span>
+                    <span>{issueTypeLabel(pullRequest.type)}</span>
                     <span className="dot-separator" />
                     <span className="mono truncate">{pullRequest.branch}</span>
                   </span>

@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Pencil } from 'lucide-react';
-import { ISSUE_TYPES } from '@agent-factory/domain';
-import { useCommand } from '../../app/hooks.ts';
+import { useCommand, useSnapshot } from '../../app/hooks.ts';
 import type { ProposedSpec } from '../../contract/index.ts';
-import { ISSUE_TYPE_LABELS } from '../../i18n/labels.ts';
 import { paths } from '../../model/routes.ts';
 import { Badge } from '../../ui/components/Badge.tsx';
 import { Button } from '../../ui/components/Button.tsx';
@@ -19,10 +17,6 @@ function lines(text: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-function isIssueType(value: string): value is ProposedSpec['type'] {
-  return ISSUE_TYPES.some((type) => type === value);
-}
-
 interface SpecCardProps {
   readonly requestId: string;
   readonly spec: ProposedSpec;
@@ -33,6 +27,7 @@ interface SpecCardProps {
 
 export function SpecCard({ requestId, spec, selected, selectable, onToggle }: SpecCardProps) {
   const command = useCommand();
+  const issueTypes = useSnapshot()?.factory.issueTypes ?? [];
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({
     title: spec.title,
@@ -85,14 +80,11 @@ export function SpecCard({ requestId, spec, selected, selectable, onToggle }: Sp
               <Select
                 id={id}
                 value={draft.type}
-                onChange={(event) => {
-                  const value = event.currentTarget.value;
-                  if (isIssueType(value)) setDraft({ ...draft, type: value });
-                }}
+                onChange={(event) => setDraft({ ...draft, type: event.currentTarget.value })}
               >
-                {ISSUE_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {ISSUE_TYPE_LABELS[type]}
+                {issueTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.id}
                   </option>
                 ))}
               </Select>
@@ -131,7 +123,7 @@ export function SpecCard({ requestId, spec, selected, selectable, onToggle }: Sp
           <input type="checkbox" className="spec-card__check" checked={selected} onChange={() => onToggle(spec.id)} aria-label={`Retenir la spec ${spec.title}`} />
         ) : null}
         <h4 className="spec-card__title">{spec.title}</h4>
-        <Badge>{ISSUE_TYPE_LABELS[spec.type]}</Badge>
+        <Badge>{spec.type}</Badge>
         {spec.issueNumber === null ? null : (
           <Link to={paths.issue(spec.issueNumber)} className="spec-card__issue">
             <Badge tone="success">issue #{spec.issueNumber}</Badge>

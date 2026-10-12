@@ -10,6 +10,8 @@ export const AUDIT_CONCLUDED_EVENT = 'audit.concluded';
 export const AUDIT_ISSUE_DRAFTED_EVENT = 'audit.issue.drafted';
 export const AUDIT_ISSUE_PUBLISHED_EVENT = 'audit.issue.published';
 export const AUDIT_RESOLVED_EVENT = 'audit.resolved';
+/** A change of another automation of the repository: recorded, never audited. */
+export const AUDIT_SKIPPED_EVENT = 'audit.skipped';
 
 export const AUDIT_SUBJECT_PREFIX = 'audit/';
 export const WATCHER_SUBJECT_PREFIX = 'watcher/';
@@ -33,6 +35,16 @@ export const AuditDetectedPayloadSchema = z.object({
   pullRequestNumber: z.number().int().nullable(),
 });
 export type AuditDetectedPayload = z.infer<typeof AuditDetectedPayloadSchema>;
+
+export const AuditSkippedPayloadSchema = z.object({
+  commitSha: z.string(),
+  automation: z.string(),
+  commitMessage: z.string(),
+  authorLogin: z.string().nullable(),
+  pullRequestNumber: z.number().int().nullable(),
+  pullRequestBranch: z.string().nullable(),
+});
+export type AuditSkippedPayload = z.infer<typeof AuditSkippedPayloadSchema>;
 
 export const AuditStartedPayloadSchema = z.object({ runId: z.string() });
 export type AuditStartedPayload = z.infer<typeof AuditStartedPayloadSchema>;

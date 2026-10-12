@@ -1,4 +1,5 @@
-import type { CommitKind, EffortLevel, EscalationProfile, IssueType, ResourceAdmissionPolicy } from '@agent-factory/domain';
+import type { EffortLevel, EscalationProfile, ResourceAdmissionPolicy } from '@agent-factory/domain';
+import type { ProjectConventions } from '../conventions/project-conventions.ts';
 
 export const PIPELINE_ROLES = ['acceptance-author', 'implementer', 'reviewer'] as const;
 export type PipelineRole = (typeof PIPELINE_ROLES)[number];
@@ -29,12 +30,6 @@ export interface GateSettings {
   readonly niceness: number | null;
 }
 
-export interface ConventionalScopes {
-  readonly byType: Readonly<Partial<Record<IssueType, string>>>;
-  readonly defaultScope: string;
-  readonly kindByType?: Readonly<Partial<Record<IssueType, CommitKind>>>;
-  readonly deploymentPaths?: readonly string[];
-}
 
 export interface RepositoryCoordinates {
   readonly owner: string;
@@ -47,7 +42,7 @@ export interface PipelineSettings {
   readonly roles: Readonly<Record<PipelineRole, RoleProfile>>;
   readonly implementerEscalation: EscalationProfile;
   readonly gate: GateSettings;
-  readonly conventionalScopes: ConventionalScopes;
+  readonly conventions: ProjectConventions;
   readonly evidenceCacheDirectory: string;
   readonly resources: ResourceAdmissionPolicy;
 }

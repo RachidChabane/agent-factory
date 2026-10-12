@@ -165,7 +165,7 @@ export function buildRequests(clock: FixtureClock): RequestView[] {
             id: 'spec-csv',
             itemIds: ['item-3'],
             title: 'Export order metadata as CSV',
-            type: 'engine-api',
+            type: 'api',
             need: 'Customers track their purchases in spreadsheets.',
             acceptanceCriteria: [
               'GET /api/orders/export returns a CSV with order number, date, status, total and discount.',

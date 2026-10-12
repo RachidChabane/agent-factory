@@ -1,7 +1,7 @@
 import { assertRequestTransition } from '@agent-factory/domain';
+import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import type { EventStore, GitHubGateway, IssueRecord, WorkspaceFiles } from '../ports.ts';
 import { parseSpecFile, specFileProblems, type SpecFile } from '../spec/spec-file.ts';
-import { SPEC_VALIDATED_LABEL, TYPE_LABEL_PREFIX } from '../spec/spec-format.ts';
 import { RequestNotFoundError } from './errors.ts';
 import { renderSpecFile, type ProposedSpecDraft } from './proposed-spec-file.ts';
 import {
@@ -60,17 +60,22 @@ export async function declineRequest(events: EventStore, requestId: string, reas
   return (await events.append(REQUEST_DECLINED_EVENT, requestSubject(requestId), { reason })).sequence;
 }
 
+export interface RequestDecisionSettings {
+  readonly requestsDirectory: string;
+  readonly conventions: ProjectConventions;
+}
+
 export async function updateProposedSpec(
   dependencies: { readonly events: EventStore; readonly files: WorkspaceFiles },
-  requestsDirectory: string,
+  settings: RequestDecisionSettings,
   requestId: string,
   specId: string,
   draft: ProposedSpecDraft,
 ): Promise<number> {
   const request = await requireRequest(dependencies.events, requestId);
   const current = requireSpec(request, specId);
-  const rendered = renderSpecFile(draft);
-  await dependencies.files.writeText(`${requestsDirectory}${FILE_PATH_SEPARATOR}${requestId}`, current.path, rendered.content);
+  const rendered = renderSpecFile(draft, settings.conventions);
+  await dependencies.files.writeText(`${settings.requestsDirectory}${FILE_PATH_SEPARATOR}${requestId}`, current.path, rendered.content);
   const spec: ProposedSpecPayload = {
     ...current,
     title: draft.title,
@@ -94,13 +99,13 @@ export async function specOriginOf(events: EventStore, requestsDirectory: string
   return request === undefined || spec === undefined ? null : { requestId: request.id, specId: spec.id };
 }
 
-export function planIssueCreation(text: string, origin: SpecOrigin | null): IssueCreationPlan {
+export function planIssueCreation(text: string, origin: SpecOrigin | null, conventions: ProjectConventions): IssueCreationPlan {
   const file: SpecFile = parseSpecFile(text);
-  if (file.labels.includes(SPEC_VALIDATED_LABEL)) {
-    throw new SpecFileRefusedError(`it carries ${SPEC_VALIDATED_LABEL}; only the operator adds that label, on the created issue`);
+  const { validated } = conventions.labels;
+  if (file.labels.includes(validated)) {
+    throw new SpecFileRefusedError(`it carries ${validated}; only the operator adds that label, on the created issue`);
   }
-  if (!file.labels.some((label) => label.startsWith(TYPE_LABEL_PREFIX))) throw new SpecFileRefusedError(`it has no ${TYPE_LABEL_PREFIX}<type> label`);
-  const problems = specFileProblems(file);
+  const problems = specFileProblems(file, conventions);
   if (problems.length > 0) throw new SpecFileRefusedError(problems.map((problem) => problem.message).join('; '));
   return { title: file.title, labels: file.labels, body: file.body, origin };
 }
@@ -121,19 +126,19 @@ export async function createIssueFromPlan(
 
 export async function acceptProposedSpecs(
   dependencies: { readonly events: EventStore; readonly github: GitHubGateway; readonly files: WorkspaceFiles },
-  requestsDirectory: string,
+  settings: RequestDecisionSettings,
   requestId: string,
   specIds: readonly string[],
 ): Promise<readonly IssueRecord[]> {
   const request = await requireRequest(dependencies.events, requestId);
-  const root = `${requestsDirectory}${FILE_PATH_SEPARATOR}${requestId}`;
+  const root = `${settings.requestsDirectory}${FILE_PATH_SEPARATOR}${requestId}`;
   const created: IssueRecord[] = [];
   for (const specId of specIds) {
     if (request.createdIssues[specId] !== undefined) continue;
     const spec = requireSpec(request, specId);
     const text = await dependencies.files.readText(root, spec.path);
     if (text === null) throw new SpecFileRefusedError(`${spec.path} no longer exists`);
-    created.push(await createIssueFromPlan(dependencies, planIssueCreation(text, { requestId, specId })));
+    created.push(await createIssueFromPlan(dependencies, planIssueCreation(text, { requestId, specId }, settings.conventions)));
   }
   return created;
 }

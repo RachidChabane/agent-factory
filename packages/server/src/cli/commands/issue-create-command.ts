@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createIssueFromPlan, planIssueCreation, specOriginOf, type SpecOrigin } from '@agent-factory/application';
+import { conventionsFromConfig } from '../../config/conventions-from-config.ts';
 import type { FactoryConfig } from '../../config/factory-config.ts';
 import type { CliContext } from '../cli-context.ts';
 import { EXIT_CODES } from '../output.ts';
@@ -21,7 +22,7 @@ async function originOf(context: CliContext, config: FactoryConfig, specPath: st
 export async function issueCreateCommand(specPath: string, confirmed: boolean, context: CliContext): Promise<number> {
   const config = await context.loadConfig();
   const text = await readFile(specPath, UTF8);
-  const plan = planIssueCreation(text, await originOf(context, config, specPath));
+  const plan = planIssueCreation(text, await originOf(context, config, specPath), conventionsFromConfig(config));
   const target = `${config.target.owner}/${config.target.name}`;
   if (config.github.mode === REMOTE_MODE && !confirmed) {
     context.output.line(`This creates an issue on GitHub in ${target}:`);

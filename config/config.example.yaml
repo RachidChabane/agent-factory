@@ -63,17 +63,17 @@ gate:
       MISE_TASK_RUN_AUTO_INSTALL: "false"
 
 # Commit type: a "kind:<type>" label on the issue wins; otherwise "types" below, otherwise
-# feat for ui, engine-api, skill-prompt and data, fix for security, build for dependencies,
-# docs for doc, chore for release, refactor for refactor, and for infra-ci feat when the change
+# feat for feature, ui, api, data and prompt, fix for fix and security, build for dependencies,
+# docs for docs, chore for release, refactor for refactor, and for infra feat when the change
 # touches one of deploymentPaths, ci otherwise.
 conventionalCommits:
   defaultScope: repo
   scopes:
     ui: app
-    engine-api: agent
-    skill-prompt: agent
-    infra-ci: ci
-    doc: docs
+    api: api
+    prompt: agent
+    infra: ci
+    docs: docs
     dependencies: deps
   types: {}
   deploymentPaths: [infrastructure/**, environments/**]

@@ -7,7 +7,7 @@ import { useCommand } from '../../app/hooks.ts';
 import type { AuditFindingLevel, AuditView, CockpitSnapshot } from '../../contract/index.ts';
 import { AUDIT_FINDING_LEVELS } from '../../contract/index.ts';
 import { dateTime, plural, shortSha } from '../../format/format.ts';
-import { AUDIT_FINDING_LEVEL_LABELS, AUDIT_REASON_LABELS, AUDIT_STATE_LABELS, ISSUE_TYPE_LABELS } from '../../i18n/labels.ts';
+import { AUDIT_FINDING_LEVEL_LABELS, AUDIT_REASON_LABELS, AUDIT_STATE_LABELS, issueTypeLabel } from '../../i18n/labels.ts';
 import { paths, VIEW_PATHS } from '../../model/routes.ts';
 import { auditMark } from '../../model/status.ts';
 import { Badge } from '../../ui/components/Badge.tsx';
@@ -221,7 +221,7 @@ export function AuditDetail({ audit, snapshot }: { readonly audit: AuditView; re
       )}
 
       <div className="audit-detail__grid">
-        <Section title="Fichiers modifiés" description={audit.suggestedType === null ? undefined : `Type déduit : ${ISSUE_TYPE_LABELS[audit.suggestedType]}`}>
+        <Section title="Fichiers modifiés" description={audit.suggestedType === null ? undefined : `Type déduit : ${issueTypeLabel(audit.suggestedType)}`}>
           <ul className="audit-files">
             {audit.changedFiles.map((file) => (
               <li key={file} className="audit-file mono">

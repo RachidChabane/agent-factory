@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testsuite name="cart total" time="0.001103" disabled="0" errors="0" tests="4" failures="0" skipped="1" hostname="ci-runner">
+		<testcase name="adds two items" time="0.000227" classname="test" file="/work/shop/test/cart.test.js"/>
+		<testcase name="applies a discount above twenty" time="0.000041" classname="test" file="/work/shop/test/cart.test.js"/>
+		<testcase name="renders the receipt" time="0.000059" classname="test" file="/work/shop/test/cart.test.js"/>
+		<testcase name="prints the receipt" time="0.000030" classname="test" file="/work/shop/test/cart.test.js">
+			<skipped type="skipped" message="true"/>
+		</testcase>
+	</testsuite>
+	<testsuite name="refunds" time="0.000370" disabled="0" errors="0" tests="1" failures="0" skipped="0" hostname="ci-runner">
+		<testcase name="restores the stock" time="0.000318" classname="test" file="/work/shop/test/cart.test.js"/>
+	</testsuite>
+	<!-- tests 5 -->
+	<!-- suites 2 -->
+	<!-- pass 4 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 1 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 59.307542 -->
+</testsuites>

@@ -4,7 +4,6 @@ import { SteppingClock } from '../runs/test-support.ts';
 import { IssueTransitionedPayloadSchema, PIPELINE_EVENTS } from './journal-events.ts';
 import { MergeOnOrder } from './merge-on-order.ts';
 import { CheckRewriteRefusedError, OrderCheckRewrite } from './order-check-rewrite.ts';
-import { ResumeIssue } from './resume-issue.ts';
 import { BASE_WORKSPACES_ROOT } from './testing/pipeline-fakes.ts';
 import { CHECK_PATH, IMPLEMENTED, ISSUE_NUMBER, MANIFEST, PipelineScenario, PRODUCT_PATH, SETTINGS, SETUP_COMMAND } from './testing/pipeline-scenario.ts';
 
@@ -83,7 +82,7 @@ describe('rewriting a frozen check on operator order', () => {
     const scenario = new PipelineScenario();
     scenario.lintFailuresLeft = 4;
     expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('needs-human');
-    await expect(new ResumeIssue(scenario.dependencies(), SETTINGS.implementerEscalation).resume(ISSUE_NUMBER)).rejects.toThrow('retry budget is spent');
+    await expect(scenario.resumer(SETTINGS.implementerEscalation).resume(ISSUE_NUMBER)).rejects.toThrow('retry budget is spent');
     scriptRewrite(scenario);
     await order(scenario);
     expect(await scenario.pipeline().runIssue(ISSUE_NUMBER)).toMatchObject({ kind: 'pr-open' });
@@ -134,7 +133,7 @@ describe('rewriting a frozen check on operator order', () => {
         scenario.acceptancePassesOnBase = false;
       },
     });
-    expect(await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).toMatchObject({ resumedAt: 'rewriting-check' });
+    expect(await scenario.resumer().resume(ISSUE_NUMBER)).toMatchObject({ resumedAt: 'rewriting-check' });
     expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
     expect((await scenario.journal()).checkRewrites).toHaveLength(1);
   });

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ISSUE_TYPES } from './issue-type-presets.ts';
-import { InvalidTypologyError, IssueTypology, proofExpectation, PROOF_STRATEGIES, typeLabel, UnknownIssueTypeError, type IssueTypeDefinition } from './issue-types.ts';
+import {
+  InvalidTypologyError,
+  IssueTypology,
+  proofExpectation,
+  PROOF_STRATEGIES,
+  suggestTypeForPaths,
+  typeLabel,
+  UnknownIssueTypeError,
+  type IssueTypeDefinition,
+} from './issue-types.ts';
 
 function definition(id: string, overrides: Partial<IssueTypeDefinition> = {}): IssueTypeDefinition {
   return {
@@ -57,5 +66,15 @@ describe('DEFAULT_ISSUE_TYPES', () => {
     expect(typology.get('security').review).toEqual(['security']);
     expect(typology.get('prompt').proof).toBe('base-score');
     expect(typology.get('dependencies').commit).toEqual({ type: 'build', scope: 'deps', whenChanged: [] });
+  });
+});
+
+describe('suggestTypeForPaths', () => {
+  it('suggests the first type whose paths an outside change touches', () => {
+    const typology = new IssueTypology(DEFAULT_ISSUE_TYPES);
+    expect(suggestTypeForPaths(typology, ['src/cart.ts', 'package.json'])?.id).toBe('dependencies');
+    expect(suggestTypeForPaths(typology, ['docs/setup.md'])?.id).toBe('docs');
+    expect(suggestTypeForPaths(typology, ['.github/workflows/ci.yml'])?.id).toBe('infra');
+    expect(suggestTypeForPaths(typology, ['src/cart.ts'])).toBeNull();
   });
 });

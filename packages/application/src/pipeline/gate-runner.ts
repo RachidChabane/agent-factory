@@ -1,5 +1,5 @@
 import { evaluateBranchRun, evaluateSkillEval, isStructuredRunner } from '@agent-factory/domain';
-import type { AcceptanceTestOnBase, AcceptanceTestOnBranch, FrozenCheck, GateResult, GateStepResult, IssueSpec, StructuredTestRunner } from '@agent-factory/domain';
+import type { AcceptanceTestOnBase, AcceptanceTestOnBranch, FrozenCheck, GateResult, GateStepResult, IssueTypeDefinition, StructuredTestRunner } from '@agent-factory/domain';
 import { acceptanceCommand, scoreOutputPath, type AcceptanceManifest } from '../acceptance/acceptance-manifest.ts';
 import { shellCommandLine, shellQuote } from '../acceptance/shell-quote.ts';
 import { readScoreReport, skillEvalCases, type ScoreReport } from '../acceptance/score-report.ts';
@@ -139,7 +139,7 @@ export class OrchestratorGate {
     return [...missing, ...modified].sort((a, b) => a.path.localeCompare(b.path));
   }
 
-  async run(worktree: Worktree, frozen: readonly FrozenCheck[], manifest: AcceptanceManifest, spec: IssueSpec, base: BaseResults): Promise<GateRun> {
+  async run(worktree: Worktree, frozen: readonly FrozenCheck[], manifest: AcceptanceManifest, type: IssueTypeDefinition, base: BaseResults): Promise<GateRun> {
     const commands = [...this.setupCommands, ...gateCommands(this.settings, manifest)];
     const violations = await this.verifyFrozenChecks(worktree, frozen);
     if (violations.length > 0) {
@@ -165,7 +165,7 @@ export class OrchestratorGate {
       if (execution.tests.length > 0) tests = execution.tests;
       failure = execution.step.outcome === 'failed';
     }
-    const scorePath = scoreOutputPath(manifest, spec);
+    const scorePath = scoreOutputPath(manifest, type);
     const scoreReport = scorePath === null ? null : await this.scoreStep(worktree, scorePath, base.scoreReport, failure, steps);
     return { result: resultOf(steps), violations, log: log.join(LOG_SEPARATOR), scoreReport, tests };
   }

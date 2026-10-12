@@ -1,4 +1,5 @@
 import type { StructuredTestRunner, TestRunReport } from '@agent-factory/domain';
+import { parseNodeTestJunitReport } from './node-test-junit-report.ts';
 import { parsePlaywrightJsonReport } from './playwright-json-report.ts';
 import { parsePytestJunitReport } from './pytest-junit-report.ts';
 import { parseVitestJsonReport } from './vitest-json-report.ts';
@@ -30,6 +31,15 @@ export const RUNNER_REPORTING: Readonly<Record<StructuredTestRunner, RunnerRepor
     arguments: () => ['--reporter=list,json'],
     environment: (reportPath) => ({ PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath, PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath }),
     parse: parsePlaywrightJsonReport,
+  },
+  'node-test': {
+    reportFile: 'node-test.xml',
+    arguments: () => [],
+    // The Node.js runner takes its reporters before the test files, so they travel in NODE_OPTIONS.
+    environment: (reportPath) => ({
+      NODE_OPTIONS: `--test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination="${reportPath}"`,
+    }),
+    parse: parseNodeTestJunitReport,
   },
 };
 

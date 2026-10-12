@@ -1,3 +1,4 @@
+import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import { splitLines } from './markdown-blocks.ts';
 import { parseIssueSpec } from './markdown-spec-reader.ts';
 import { SpecFormatError, type SpecProblem } from './spec-errors.ts';
@@ -56,16 +57,19 @@ export function withExtraLabels(file: SpecFile, extra: readonly string[]): SpecF
   return { ...file, labels: [...new Set([...file.labels, ...extra])] };
 }
 
-export function specFileProblems(file: SpecFile): readonly SpecProblem[] {
+export function specFileProblems(file: SpecFile, conventions: ProjectConventions): readonly SpecProblem[] {
   try {
-    parseIssueSpec({
+    parseIssueSpec(
+      {
       number: DRAFT_ISSUE_NUMBER,
       title: file.title,
       body: file.body,
       labels: file.labels,
-      state: DRAFT_ISSUE_STATE,
-      blockedBy: [],
-    });
+        state: DRAFT_ISSUE_STATE,
+        blockedBy: [],
+      },
+      conventions,
+    );
     return [];
   } catch (error) {
     if (error instanceof SpecFormatError) return error.problems;

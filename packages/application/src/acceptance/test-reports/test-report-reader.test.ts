@@ -6,7 +6,7 @@ import { RUNNER_REPORTING, readTestReport } from './test-report-reader.ts';
 import { parseXml, XmlFormatError } from './xml-document.ts';
 
 const WORKTREE = '/work/shop';
-const EXTENSIONS: Readonly<Record<StructuredTestRunner, string>> = { pytest: 'xml', vitest: 'json', playwright: 'json' };
+const EXTENSIONS: Readonly<Record<StructuredTestRunner, string>> = { pytest: 'xml', vitest: 'json', playwright: 'json', 'node-test': 'xml' };
 
 function fixture(runner: StructuredTestRunner, name: string): string {
   return readFileSync(new URL(`./fixtures/${runner}-${name}.${EXTENSIONS[runner]}`, import.meta.url), 'utf8');
@@ -49,6 +49,45 @@ describe('pytest junit report', () => {
       '-o',
       'junit_family=xunit1',
     ]);
+  });
+});
+
+describe('node test junit report', () => {
+  it('reads nested describe blocks and tells assertions from module errors', () => {
+    const report = read('node-test', 'base');
+    expect(report.collectionErrors).toEqual([]);
+    expect(report.cases.map((test) => [test.id, test.outcome, test.failureKind])).toEqual([
+      ['test/cart.test.js > cart total > adds two items', 'passed', null],
+      ['test/cart.test.js > cart total > applies a discount above twenty', 'failed', 'assertion'],
+      ['test/cart.test.js > cart total > renders the receipt', 'failed', 'error'],
+      ['test/cart.test.js > cart total > prints the receipt', 'skipped', null],
+      ['test/cart.test.js > refunds > restores the stock', 'failed', 'assertion'],
+    ]);
+    expect(report.cases[2]?.failureMessage).toBe("Cannot find module '/work/shop/src/receipt.js' imported from /work/shop/test/cart.test.js");
+  });
+
+  it('reads a passing branch run with the same ids', () => {
+    const report = read('node-test', 'branch');
+    expect(report.cases.map((test) => [test.id, test.outcome])).toEqual([
+      ['test/cart.test.js > cart total > adds two items', 'passed'],
+      ['test/cart.test.js > cart total > applies a discount above twenty', 'passed'],
+      ['test/cart.test.js > cart total > renders the receipt', 'passed'],
+      ['test/cart.test.js > cart total > prints the receipt', 'skipped'],
+      ['test/cart.test.js > refunds > restores the stock', 'passed'],
+    ]);
+  });
+
+  it('reads a test file that fails to load as a collection error', () => {
+    const report = read('node-test', 'collection-error');
+    expect(report.cases).toEqual([]);
+    expect(report.collectionErrors.map((error) => error.file)).toEqual(['test/coupons.test.js']);
+  });
+
+  it('asks the runner for its junit report through NODE_OPTIONS, which it reads before the test files', () => {
+    expect(RUNNER_REPORTING['node-test'].arguments('/work/shop/.factory/reports/node-test.xml')).toEqual([]);
+    expect(RUNNER_REPORTING['node-test'].environment('/work/shop/.factory/reports/node-test.xml')).toEqual({
+      NODE_OPTIONS: '--test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination="/work/shop/.factory/reports/node-test.xml"',
+    });
   });
 });
 

@@ -158,7 +158,7 @@ export async function openFactory(config: FactoryConfig, environment: SourceEnvi
     const recorded = new RecordingHarness(overrides.harness ?? baseHarness(config, environment), eventLog.events, clock, runLogs);
     const dependencies: PipelineDependencies = {
       github,
-      specReader: new MarkdownSpecReader(),
+      specReader: new MarkdownSpecReader(settings.conventions),
       pool: new GitWorktreePool(runner, {
         targetClonePath: config.target.clonePath,
         poolDirectory: config.worktreePool.directory,

@@ -8,7 +8,6 @@ import {
   issueJournalsOf,
   latestToolChecks,
   parseIssueSpec,
-  SPEC_VALIDATED_LABEL,
   DEPLOYMENT_HISTORY_LIMIT,
   type CheckRunSummary,
   type RunLogLine,
@@ -128,7 +127,7 @@ export class SnapshotSource {
         evidence: (number, path) => `/api/evidence/${number}/${path}`,
         requestAttachment: (id, path) => `/api/requests/${encodeURIComponent(id)}/${path}`,
       },
-      conventionalScopes: this.factory.settings.conventionalScopes,
+      conventions: this.factory.settings.conventions,
       roles: this.roleSettings(),
       models: this.models(),
       concurrency: { ceiling: config.concurrency.issues, maximum: config.concurrency.ceiling },
@@ -226,10 +225,11 @@ export class SnapshotSource {
     if (this.pending !== null && now - this.pending.at < GITHUB_CACHE_MS) return this.pending.value;
     let value: readonly IssueSpec[] = this.pending?.value ?? [];
     try {
-      const issues = await this.factory.dependencies.github.listIssues(SPEC_VALIDATED_LABEL);
+      const { conventions } = this.factory.settings;
+      const issues = await this.factory.dependencies.github.listIssues(conventions.labels.validated);
       value = issues.flatMap((issue) => {
         try {
-          return [parseIssueSpec(issue)];
+          return [parseIssueSpec(issue, conventions)];
         } catch {
           return [];
         }

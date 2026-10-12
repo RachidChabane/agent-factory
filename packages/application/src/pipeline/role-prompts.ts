@@ -1,4 +1,4 @@
-import type { IssueSpec } from '@agent-factory/domain';
+import { TEST_RUNNERS, type IssueSpec, type IssueTypeDefinition, type IssueTypology, type TestRunner } from '@agent-factory/domain';
 import { ACCEPTANCE_MANIFEST_PATH, usesBaseScore } from '../acceptance/acceptance-manifest.ts';
 import { DECISION_REQUEST_PATH } from './decision-request.ts';
 import { formatSpecSections } from '../spec/render-spec-body.ts';
@@ -15,10 +15,23 @@ export type RolePromptValues = Readonly<Record<string, string>>;
 export const ROLE_PROMPT_PLACEHOLDERS = {
   repository: 'repository',
   spec: 'spec',
+  checkGuidance: 'checkGuidance',
+  runners: 'runners',
   checks: 'checks',
   diff: 'diff',
   decisionRequest: 'decisionRequest',
+  issueTypes: 'issueTypes',
 } as const;
+
+const RUNNER_DESCRIPTIONS: Readonly<Record<TestRunner, string>> = {
+  pytest: '`pytest`',
+  vitest: '`vitest`',
+  playwright: '`playwright`',
+  'node-test': '`node-test` for the Node.js test runner (`node --test`)',
+  eval: '`eval` for evaluation cases scored against a rubric',
+};
+const LIST_SEPARATOR = ', ';
+const LAST_SEPARATOR = ' or ';
 
 export interface CheckContent {
   readonly path: string;
@@ -40,8 +53,23 @@ export function checksValue(checks: readonly CheckContent[]): string {
   return checks.map((check) => `## ${inlineCode(check.path)}${PARAGRAPH}${fenced(check.content)}`).join(PARAGRAPH);
 }
 
-export function acceptanceAuthorValues(repository: RepositoryCoordinates, spec: IssueSpec): RolePromptValues {
-  return { [ROLE_PROMPT_PLACEHOLDERS.repository]: repositoryValue(repository), [ROLE_PROMPT_PLACEHOLDERS.spec]: specValue(spec) };
+export function runnersValue(): string {
+  const descriptions = TEST_RUNNERS.map((runner) => RUNNER_DESCRIPTIONS[runner]);
+  return `${descriptions.slice(0, -1).join(LIST_SEPARATOR)}${LAST_SEPARATOR}${descriptions.at(-1) ?? ''}`;
+}
+
+/** The issue type ids a challenger may propose, in the project's order. */
+export function issueTypesValue(typology: IssueTypology): string {
+  return typology.ids().join(LIST_SEPARATOR);
+}
+
+export function acceptanceAuthorValues(repository: RepositoryCoordinates, spec: IssueSpec, type: IssueTypeDefinition): RolePromptValues {
+  return {
+    [ROLE_PROMPT_PLACEHOLDERS.repository]: repositoryValue(repository),
+    [ROLE_PROMPT_PLACEHOLDERS.spec]: specValue(spec),
+    [ROLE_PROMPT_PLACEHOLDERS.checkGuidance]: type.checks,
+    [ROLE_PROMPT_PLACEHOLDERS.runners]: runnersValue(),
+  };
 }
 
 export function implementerValues(
@@ -50,7 +78,8 @@ export function implementerValues(
   checks: readonly CheckContent[],
 ): RolePromptValues {
   return {
-    ...acceptanceAuthorValues(repository, spec),
+    [ROLE_PROMPT_PLACEHOLDERS.repository]: repositoryValue(repository),
+    [ROLE_PROMPT_PLACEHOLDERS.spec]: specValue(spec),
     [ROLE_PROMPT_PLACEHOLDERS.checks]: checksValue(checks),
     [ROLE_PROMPT_PLACEHOLDERS.decisionRequest]: inlineCode(DECISION_REQUEST_PATH),
   };
@@ -65,8 +94,8 @@ export function reviewerValues(
   return { ...implementerValues(repository, spec, checks), [ROLE_PROMPT_PLACEHOLDERS.diff]: diff };
 }
 
-export function scoreOutputAddendum(spec: IssueSpec): string | null {
-  if (!usesBaseScore(spec)) return null;
+export function scoreOutputAddendum(type: IssueTypeDefinition): string | null {
+  if (!usesBaseScore(type)) return null;
   return [
     `This issue is scored. Add to ${inlineCode(ACCEPTANCE_MANIFEST_PATH)} the entry ${inlineCode('"score": { "path": "<file>" }')} naming the file the command writes in this format:`,
     fenced(JSON.stringify(SCORE_REPORT_EXAMPLE, null, JSON_INDENT), JSON_INFO),

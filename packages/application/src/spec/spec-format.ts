@@ -1,4 +1,4 @@
-import type { CommitKind, IssueType } from '@agent-factory/domain';
+import type { CommitKind } from '@agent-factory/domain';
 
 export const SPEC_SECTION_KEYS = ['need', 'acceptanceCriteria', 'outOfScope', 'expectedProof'] as const;
 export type SpecSectionKey = (typeof SPEC_SECTION_KEYS)[number];
@@ -13,16 +13,8 @@ export const SPEC_SECTION_HEADINGS: Readonly<Record<SpecSectionKey, string>> = {
 export const SPEC_SECTION_HEADING_MARKER = '##';
 export const NUMBERED_ITEM_SUFFIX = '.';
 export const BULLET_MARKER = '-';
-export const TYPE_LABEL_PREFIX = 'type:';
-export const SPEC_VALIDATED_LABEL = 'spec:validated';
-export const KIND_LABEL_PREFIX = 'kind:';
-
-export function kindLabel(kind: CommitKind): string {
-  return `${KIND_LABEL_PREFIX}${kind}`;
-}
-
-export function typeLabel(type: IssueType): string {
-  return `${TYPE_LABEL_PREFIX}${type}`;
+export function kindLabel(kind: CommitKind, prefix: string): string {
+  return `${prefix}${kind}`;
 }
 
 export function normaliseHeading(heading: string): string {

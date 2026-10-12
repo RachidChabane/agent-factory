@@ -1,3 +1,4 @@
+import type { IssueSpec, IssueTypeDefinition } from '@agent-factory/domain';
 import { checkPaths, EVIDENCE_DIRECTORY, type AcceptanceManifest } from '../../acceptance/acceptance-manifest.ts';
 import type { Worktree } from '../../ports.ts';
 import { diffStat, type DiffStatEntry } from '../diff-stat.ts';
@@ -33,6 +34,10 @@ export async function readCheckContents(context: StageContext, worktree: Worktre
 
 export function changeStat(diff: string): readonly DiffStatEntry[] {
   return diffStat(diff).filter((entry) => !entry.path.startsWith(EVIDENCE_PREFIX));
+}
+
+export function issueTypeOfSpec(context: StageContext, spec: IssueSpec): IssueTypeDefinition {
+  return context.toolkit.settings.conventions.typology.get(spec.type);
 }
 
 export function profileOf(context: StageContext, role: PipelineRole): RoleProfile {

@@ -5,7 +5,10 @@ import { EXIT_CODES } from '../output.ts';
 export async function resumeCommand(issueNumber: number, answer: string | null, context: CliContext): Promise<number> {
   const factory = await context.openFactory(await context.loadConfig());
   try {
-    const outcome = await new ResumeIssue(factory.dependencies, factory.settings.implementerEscalation).resume(issueNumber, answer);
+    const outcome = await new ResumeIssue(factory.dependencies, { conventions: factory.settings.conventions, escalation: factory.settings.implementerEscalation }).resume(
+      issueNumber,
+      answer,
+    );
     const spec = outcome.specChanged ? 'the clarified spec was recorded' : 'the spec is unchanged';
     const checks = outcome.checksReauthored ? '; the acceptance checks will be written again from the base' : '';
     const decision = outcome.decisionAnswered ? '; the implementer will continue with the answer to its decision request' : '';

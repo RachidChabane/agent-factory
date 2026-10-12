@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { AGENT_ROLES, EFFORT_LEVELS, ISSUE_TYPES } from '@agent-factory/domain';
-import { AmountSchema, CountSchema, IssueNumberSchema, PercentSchema } from './primitives.ts';
+import { AGENT_ROLES, EFFORT_LEVELS } from '@agent-factory/domain';
+import { AmountSchema, CountSchema, IssueNumberSchema, IssueTypeIdSchema, PercentSchema } from './primitives.ts';
 import { CostCapsSchema } from './snapshot.ts';
 import { MEMORY_PRESSURES, TOOL_NAMES } from './vocabulary.ts';
 
@@ -19,7 +19,7 @@ export type PastedAttachment = z.infer<typeof PastedAttachmentSchema>;
 
 export const SpecDraftSchema = z.object({
   title: z.string().min(1),
-  type: z.enum(ISSUE_TYPES),
+  type: IssueTypeIdSchema,
   need: z.string().min(1),
   acceptanceCriteria: z.array(z.string().min(1)).min(1),
   outOfScope: z.array(z.string()),

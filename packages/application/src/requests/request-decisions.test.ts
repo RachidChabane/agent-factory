@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FakeGitHubGateway, InMemoryEventStore } from '../audit/testing/fakes.ts';
+import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import { InMemoryWorkspace } from '../pipeline/testing/pipeline-fakes.ts';
 import { renderSpecFile } from './proposed-spec-file.ts';
 import {
@@ -15,6 +16,8 @@ import { REQUEST_CHALLENGED_EVENT, REQUEST_CHALLENGE_STARTED_EVENT, REQUEST_RECE
 import { loadRequest } from './request-projection.ts';
 
 const REQUESTS = '/factory/requests';
+const CONVENTIONS = DEFAULT_PROJECT_CONVENTIONS;
+const SETTINGS = { requestsDirectory: REQUESTS, conventions: CONVENTIONS };
 const SPEC_PATH = 'specs/1-link-the-conversation.md';
 const DRAFT = {
   title: 'Link the conversation',
@@ -47,18 +50,24 @@ async function challenged(events: InMemoryEventStore, workspace: InMemoryWorkspa
     reportPath: 'report.md',
     replyPath: 'reply.md',
   });
-  workspace.write(`${REQUESTS}/req-1`, SPEC_PATH, renderSpecFile(DRAFT).content);
+  workspace.write(`${REQUESTS}/req-1`, SPEC_PATH, renderSpecFile(DRAFT, CONVENTIONS).content);
 }
 
 describe('request decisions', () => {
+  it('reports a proposed spec of a type the project does not know instead of labelling it', () => {
+    const rendered = renderSpecFile({ ...DRAFT, type: 'widget' }, CONVENTIONS);
+    expect(rendered.content.split('\n').slice(0, 2)).toEqual(['Title: Link the conversation', 'Labels:']);
+    expect(rendered.problems).toEqual([expect.stringContaining('issue type "widget" is not one of this project\'s types')]);
+  });
+
   it('creates the issues of accepted specs once, typed but never validated, and accepts the request', async () => {
     const events = new InMemoryEventStore();
     const workspace = new InMemoryWorkspace();
     const github = new FakeGitHubGateway();
     await challenged(events, workspace);
-    const created = await acceptProposedSpecs({ events, github, files: workspace }, REQUESTS, 'req-1', ['spec-1']);
+    const created = await acceptProposedSpecs({ events, github, files: workspace }, SETTINGS, 'req-1', ['spec-1']);
     expect(created.map((issue) => issue.labels)).toEqual([['type:ui']]);
-    expect(await acceptProposedSpecs({ events, github, files: workspace }, REQUESTS, 'req-1', ['spec-1'])).toEqual([]);
+    expect(await acceptProposedSpecs({ events, github, files: workspace }, SETTINGS, 'req-1', ['spec-1'])).toEqual([]);
     expect(await loadRequest(events, 'req-1')).toMatchObject({ state: 'accepted', issueNumbers: [created[0]?.number] });
   });
 
@@ -66,7 +75,7 @@ describe('request decisions', () => {
     const events = new InMemoryEventStore();
     const workspace = new InMemoryWorkspace();
     await challenged(events, workspace);
-    await updateProposedSpec({ events, files: workspace }, REQUESTS, 'req-1', 'spec-1', { ...DRAFT, title: 'Link the source conversation' });
+    await updateProposedSpec({ events, files: workspace }, SETTINGS, 'req-1', 'spec-1', { ...DRAFT, title: 'Link the source conversation' });
     expect(workspace.read(`${REQUESTS}/req-1`, SPEC_PATH)?.split('\n')[0]).toBe('Title: Link the source conversation');
     expect((await loadRequest(events, 'req-1'))?.challenge?.specs[0]?.title).toBe('Link the source conversation');
   });
@@ -83,11 +92,11 @@ describe('request decisions', () => {
     await challenged(events, new InMemoryWorkspace());
     expect(await specOriginOf(events, REQUESTS, `${REQUESTS}/req-1/${SPEC_PATH}`)).toEqual({ requestId: 'req-1', specId: 'spec-1' });
     expect(await specOriginOf(events, REQUESTS, '/elsewhere/spec.md')).toBeNull();
-    const text = renderSpecFile(DRAFT).content;
-    expect(() => planIssueCreation(text.replace('Labels: type:ui', 'Labels: type:ui, spec:validated'), null)).toThrow(SpecFileRefusedError);
-    expect(() => planIssueCreation(text.replace('Labels: type:ui', 'Labels: bug'), null)).toThrow('no type:<type> label');
+    const text = renderSpecFile(DRAFT, CONVENTIONS).content;
+    expect(() => planIssueCreation(text.replace('Labels: type:ui', 'Labels: type:ui, spec:validated'), null, CONVENTIONS)).toThrow(SpecFileRefusedError);
+    expect(() => planIssueCreation(text.replace('Labels: type:ui', 'Labels: bug'), null, CONVENTIONS)).toThrow('none of the type labels of this project');
     const github = new FakeGitHubGateway();
-    const issue = await createIssueFromPlan({ events, github }, planIssueCreation(text, null));
+    const issue = await createIssueFromPlan({ events, github }, planIssueCreation(text, null, CONVENTIONS));
     expect(github.createdIssues).toEqual([{ title: 'Link the conversation', body: issue.body, labels: ['type:ui'] }]);
   });
 });

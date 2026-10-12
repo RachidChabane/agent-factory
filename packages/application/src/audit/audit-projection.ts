@@ -8,6 +8,7 @@ import {
   AUDIT_ISSUE_DRAFTED_EVENT,
   AUDIT_ISSUE_PUBLISHED_EVENT,
   AUDIT_RESOLVED_EVENT,
+  AUDIT_SKIPPED_EVENT,
   AUDIT_STARTED_EVENT,
   AUDIT_SUBJECT_PREFIX,
   AuditConcludedPayloadSchema,
@@ -15,6 +16,7 @@ import {
   AuditFailedPayloadSchema,
   AuditIssueDraftedPayloadSchema,
   AuditIssuePublishedPayloadSchema,
+  AuditSkippedPayloadSchema,
   auditSubject,
 } from './events.ts';
 
@@ -102,6 +104,32 @@ export function foldAuditEvents(events: readonly FactoryEventRecord[]): readonly
     }
   }
   return [...records.values()];
+}
+
+/** A change of another automation, recorded without an audit. */
+export interface SkippedChange {
+  readonly commitSha: string;
+  readonly automation: string;
+  readonly commitMessage: string;
+  readonly authorLogin: string | null;
+  readonly pullRequestNumber: number | null;
+  readonly pullRequestBranch: string | null;
+  readonly recordedAt: Date;
+}
+
+/** The skipped changes the operator has not since asked to audit. */
+export function foldSkippedChanges(events: readonly FactoryEventRecord[]): readonly SkippedChange[] {
+  const audited = new Set(events.filter((event) => event.type === AUDIT_DETECTED_EVENT).map((event) => event.subject));
+  const skipped = new Map<string, SkippedChange>();
+  for (const event of events) {
+    if (event.type !== AUDIT_SKIPPED_EVENT || audited.has(event.subject) || skipped.has(event.subject)) continue;
+    skipped.set(event.subject, { ...AuditSkippedPayloadSchema.parse(event.payload), recordedAt: event.occurredAt });
+  }
+  return [...skipped.values()];
+}
+
+export async function loadSkippedChanges(events: EventStore): Promise<readonly SkippedChange[]> {
+  return foldSkippedChanges(await events.read(AUDIT_SUBJECT_PREFIX, FIRST_SEQUENCE));
 }
 
 export async function loadAudits(events: EventStore): Promise<readonly AuditRecord[]> {

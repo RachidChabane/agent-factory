@@ -254,7 +254,7 @@ export function buildAudits(clock: FixtureClock): AuditView[] {
       state: 'challenge',
       detectedAt: clock.hoursAgo(26.2),
       changedFiles: ['assistant/skills/product-brief/SKILL.md'],
-      suggestedType: 'skill-prompt',
+      suggestedType: 'prompt',
       releaseId: 'storefront-v2.3.1',
       conclusion: {
         runId: 'run_e7d4a1',
@@ -313,7 +313,7 @@ export function buildAudits(clock: FixtureClock): AuditView[] {
       state: 'keep',
       detectedAt: clock.hoursAgo(41),
       changedFiles: ['docs/development/local-setup.md'],
-      suggestedType: 'doc',
+      suggestedType: 'docs',
       releaseId: 'storefront-v2.3.1',
       conclusion: {
         runId: 'run_e7d4a0',

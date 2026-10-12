@@ -1,5 +1,6 @@
 import {
   attributeCommit,
+  type AttributionRules,
   evaluateReleaseGate,
   UNRESOLVED_VERDICT_STATES,
   type MergedPullRequestEvidence,
@@ -33,6 +34,7 @@ export interface EvaluateReleaseDependencies {
   readonly events: EventStore;
   readonly github: GitHubGateway;
   readonly health: HealthProbe;
+  readonly rules: AttributionRules;
 }
 
 export interface ReleaseEvaluation {
@@ -56,12 +58,12 @@ async function recordedEvidence(events: EventStore): Promise<ReadonlyMap<number,
   return byNumber;
 }
 
-function toChange(commit: CommitSummary): ReleaseChange {
+function toChange(commit: CommitSummary, rules: AttributionRules): ReleaseChange {
   return {
     sha: commit.sha,
     message: commit.message,
     pullRequestNumber: commit.pullRequestNumber,
-    attribution: attributeCommit(commit),
+    attribution: attributeCommit(commit, rules),
   };
 }
 
@@ -85,7 +87,7 @@ export async function evaluateRelease(
 ): Promise<ReleaseEvaluation> {
   const { events, github, health } = dependencies;
   const commits = await github.commitsSince(release.branch, release.baseSha);
-  const changes = commits.map(toChange);
+  const changes = commits.map((commit) => toChange(commit, dependencies.rules));
   const commitShas = commits.map((commit) => commit.sha);
   const inRelease = new Set(commitShas);
 

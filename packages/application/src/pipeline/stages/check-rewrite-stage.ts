@@ -12,7 +12,7 @@ import { accessOf, describeOutcome, EXIT_CODE_SUCCESS, tailLines } from '../shel
 import { measureBeforeProof } from './before-proof-measurement.ts';
 import { leasedWorktree, requireFrozen, requireManifest, requireSpec } from './journal-facts.ts';
 import { ADVANCED, type PipelineStage, type StageContext, type StageResult } from './stage.ts';
-import { profileOf } from './stage-support.ts';
+import { issueTypeOfSpec, profileOf } from './stage-support.ts';
 
 export const REWRITE_WORKSPACE_PREFIX = 'rewrite-issue-';
 const SHA256 = 'sha256';
@@ -104,7 +104,7 @@ export class CheckRewriteStage implements PipelineStage {
     const path = rewrite.order.path;
     const profile = profileOf(context, 'acceptance-author');
     const current = (await dependencies.files.readText(worktree.path, path)) ?? '';
-    const rendered = dependencies.roles.render('acceptance-author', acceptanceAuthorValues(settings.repository, spec));
+    const rendered = dependencies.roles.render('acceptance-author', acceptanceAuthorValues(settings.repository, spec, issueTypeOfSpec(context, spec)));
     const result = await toolkit.agents.run(writer, {
       role: 'acceptance-author',
       profile,
@@ -164,7 +164,7 @@ export class CheckRewriteStage implements PipelineStage {
     const previous = frozen.checks.find((check) => check.path === path);
     const rewritten = checks.find((check) => check.path === path);
     if (previous === undefined || rewritten === undefined) throw new MissingJournalFactError(journal.issueNumber, `frozen check ${path}`);
-    const commitSha = await sourceControl.commitPaths(worktree, [path], checkRewriteCommitMessage(requireSpec(journal), toolkit.settings.conventionalScopes, path));
+    const commitSha = await sourceControl.commitPaths(worktree, [path], checkRewriteCommitMessage(requireSpec(journal), toolkit.settings.conventions, path));
     await writer.record(PIPELINE_EVENTS.checkRewritten, {
       path,
       instruction: rewrite.order.instruction,

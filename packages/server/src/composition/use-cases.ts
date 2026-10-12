@@ -1,5 +1,6 @@
 import { SpawnCommandRunner } from '@agent-factory/adapters';
 import {
+  attributionRules,
   auditMerge,
   ChallengeRequest,
   DEFAULT_RETRY_DELAY_MS,
@@ -7,7 +8,6 @@ import {
   FactoryDaemon,
   IssuePipeline,
   MachineSchedulingPauses,
-  SPEC_VALIDATED_LABEL,
   MarkdownAuditIssueRenderer,
   type AuditRunner,
   type IssueDriver,
@@ -62,6 +62,7 @@ export function requestChallenger(factory: FactoryContainer): ChallengeRequest {
       repository: repositorySlug(factory),
       requestsDirectory: factory.config.directories.requests,
       profile: { model: role.model, effort: role.effort, maxBudgetUsd: role.maxBudgetUsd, maxTurns: role.maxTurns, timeoutMs: role.timeoutMs },
+      conventions: factory.settings.conventions,
     },
   );
 }
@@ -106,7 +107,7 @@ export function auditRunner(factory: FactoryContainer): AuditRunner | null {
 
 export function releaseEvaluator(factory: FactoryContainer): ReleaseEvaluator {
   const { events, github } = factory.dependencies;
-  return { evaluate: (release) => evaluateRelease({ events, github, health: factory.health }, release) };
+  return { evaluate: (release) => evaluateRelease({ events, github, health: factory.health, rules: attributionRules(factory.settings.conventions) }, release) };
 }
 
 function optionalChallenger(factory: FactoryContainer): RequestChallenger | null {
@@ -137,7 +138,7 @@ export function createDaemon(factory: FactoryContainer): FactoryDaemon {
       concurrency: config.concurrency.issues,
       poolSize: config.worktreePool.size,
       baseBranch: config.target.baseBranch,
-      validatedLabel: SPEC_VALIDATED_LABEL,
+      conventions: factory.settings.conventions,
       pollIntervalMs: config.daemon.pollIntervalMs,
       mergeWatchIntervalMs: config.daemon.mergeWatchIntervalMs,
       issueRefreshMs: config.daemon.issueRefreshMs,

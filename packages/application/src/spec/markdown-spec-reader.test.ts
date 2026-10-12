@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { IssueTypology, DEFAULT_ISSUE_TYPES } from '@agent-factory/domain';
+import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import type { IssueRecord } from '../ports.ts';
 import { isSpecValidated, MarkdownSpecReader } from './markdown-spec-reader.ts';
 import { SpecFormatError, type SpecProblemCode } from './spec-errors.ts';
@@ -30,6 +32,8 @@ const VALID_BODY = [
   '',
 ].join('\r\n');
 
+const READER = new MarkdownSpecReader(DEFAULT_PROJECT_CONVENTIONS);
+
 function issue(overrides: Partial<IssueRecord> = {}): IssueRecord {
   return {
     number: 42,
@@ -44,7 +48,7 @@ function issue(overrides: Partial<IssueRecord> = {}): IssueRecord {
 
 function problemCodes(record: IssueRecord): readonly SpecProblemCode[] {
   try {
-    new MarkdownSpecReader().read(record);
+    READER.read(record);
   } catch (error) {
     if (error instanceof SpecFormatError) return error.problems.map((problem) => problem.code);
     throw error;
@@ -54,7 +58,7 @@ function problemCodes(record: IssueRecord): readonly SpecProblemCode[] {
 
 describe('MarkdownSpecReader', () => {
   it('parses every section, the type label and the blocked-by dependencies', () => {
-    expect(new MarkdownSpecReader().read(issue())).toEqual({
+    expect(READER.read(issue())).toEqual({
       number: 42,
       title: 'Link mockups to their conversation',
       type: 'ui',
@@ -74,7 +78,7 @@ describe('MarkdownSpecReader', () => {
     const body = '## Need\n\nSomething.\n';
     let caught: unknown;
     try {
-      new MarkdownSpecReader().read(issue({ body }));
+      READER.read(issue({ body }));
     } catch (error) {
       caught = error;
     }
@@ -111,17 +115,24 @@ describe('MarkdownSpecReader', () => {
 
   it('accepts level-three headings inside a section as content', () => {
     const body = VALID_BODY.replace('## Expected proof\r\n\r\n', '## Expected proof\r\n\r\n### Screens\r\n\r\n');
-    expect(new MarkdownSpecReader().read(issue({ body })).expectedProof.startsWith('### Screens')).toBe(true);
+    expect(READER.read(issue({ body })).expectedProof.startsWith('### Screens')).toBe(true);
   });
 
-  it('requires exactly one known type label', () => {
+  it('requires exactly one type label of the project', () => {
     expect(problemCodes(issue({ labels: ['spec:validated'] }))).toEqual(['missing-type-label']);
-    expect(problemCodes(issue({ labels: ['type:ui', 'type:doc'] }))).toEqual(['multiple-type-labels']);
-    expect(problemCodes(issue({ labels: ['type:feature'] }))).toEqual(['unknown-type-label']);
+    expect(problemCodes(issue({ labels: ['type:widget'] }))).toEqual(['missing-type-label']);
+    expect(problemCodes(issue({ labels: ['type:ui', 'type:docs'] }))).toEqual(['multiple-type-labels']);
+  });
+
+  it('reads the type from the labels the project gave its types', () => {
+    const story = { ...DEFAULT_ISSUE_TYPES[0], id: 'story', label: 'story' } as (typeof DEFAULT_ISSUE_TYPES)[number];
+    const reader = new MarkdownSpecReader({ ...DEFAULT_PROJECT_CONVENTIONS, typology: new IssueTypology([story]) });
+    expect(reader.read(issue({ labels: ['story', 'spec:validated'] })).type).toBe('story');
+    expect(() => reader.read(issue())).toThrow(SpecFormatError);
   });
 
   it('reads an optional kind label as the conventional commit type', () => {
-    expect(new MarkdownSpecReader().read(issue({ labels: ['type:ui', 'kind:perf', 'spec:validated'] })).commitKind).toBe('perf');
+    expect(READER.read(issue({ labels: ['type:ui', 'kind:perf', 'spec:validated'] })).commitKind).toBe('perf');
     expect(problemCodes(issue({ labels: ['type:ui', 'kind:feat', 'kind:fix'] }))).toEqual(['multiple-kind-labels']);
     expect(problemCodes(issue({ labels: ['type:ui', 'kind:feature'] }))).toEqual(['unknown-kind-label']);
   });
@@ -131,7 +142,9 @@ describe('MarkdownSpecReader', () => {
   });
 
   it('recognises the validated marker label only', () => {
-    expect(isSpecValidated(issue())).toBe(true);
-    expect(isSpecValidated(issue({ labels: ['type:ui', 'spec:draft'] }))).toBe(false);
+    expect(isSpecValidated(issue(), DEFAULT_PROJECT_CONVENTIONS)).toBe(true);
+    expect(isSpecValidated(issue({ labels: ['type:ui', 'spec:draft'] }), DEFAULT_PROJECT_CONVENTIONS)).toBe(false);
+    const ready = { ...DEFAULT_PROJECT_CONVENTIONS, labels: { ...DEFAULT_PROJECT_CONVENTIONS.labels, validated: 'ready' } };
+    expect(isSpecValidated(issue({ labels: ['type:ui', 'ready'] }), ready)).toBe(true);
   });
 });

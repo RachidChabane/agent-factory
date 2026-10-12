@@ -6,6 +6,7 @@ import { currentAttempt, gateRecord } from '../pipeline-journal.ts';
 import { settleFailure } from '../retry.ts';
 import { leasedWorktree, requireBeforeProof, requireFrozen, requireManifest, requireSpec } from './journal-facts.ts';
 import { ADVANCED, type PipelineStage, type StageContext, type StageResult } from './stage.ts';
+import { issueTypeOfSpec } from './stage-support.ts';
 
 export const GATE_LOG_PREFIX = 'gate-attempt-';
 export const LOG_SUFFIX = '.log';
@@ -40,11 +41,12 @@ export class GatingStage implements PipelineStage {
     const manifest = requireManifest(journal);
     const worktree = await leasedWorktree(context);
     const beforeProof = requireBeforeProof(journal);
-    const run = await toolkit.gate.run(worktree, requireFrozen(journal).checks, manifest, spec, { scoreReport: beforeProof.scoreReport, tests: beforeProof.tests });
+    const type = issueTypeOfSpec(context, spec);
+    const run = await toolkit.gate.run(worktree, requireFrozen(journal).checks, manifest, type, { scoreReport: beforeProof.scoreReport, tests: beforeProof.tests });
     const logName = gateLogName(attempt);
     await toolkit.dependencies.logs.write(journal.issueNumber, logName, run.log);
     const evidence = run.result.passed ? await toolkit.evidence.capture(worktree, journal.issueNumber, 'after', manifest) : [];
-    await toolkit.evidence.clearOutputs(worktree, manifest, spec);
+    await toolkit.evidence.clearOutputs(worktree, manifest, type);
     await writer.record(PIPELINE_EVENTS.gateCompleted, {
       attempt,
       result: run.result,

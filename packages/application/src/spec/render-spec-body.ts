@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { IssueSpec } from '@agent-factory/domain';
+import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import { parseIssueSpec } from './markdown-spec-reader.ts';
 import { SpecFormatError, SpecRenderError } from './spec-errors.ts';
 import {
@@ -8,7 +9,6 @@ import {
   SPEC_SECTION_HEADING_MARKER,
   SPEC_SECTION_HEADINGS,
   kindLabel,
-  typeLabel,
   type SpecSectionKey,
 } from './spec-format.ts';
 
@@ -42,23 +42,27 @@ export function formatSpecSections(spec: IssueSpec): string {
   return `${body}${NEWLINE}`;
 }
 
-export function renderSpecBody(spec: IssueSpec): string {
+export function renderSpecBody(spec: IssueSpec, conventions: ProjectConventions): string {
   const body = formatSpecSections(spec);
-  assertRoundTrips(spec, body);
+  assertRoundTrips(spec, body, conventions);
   return body;
 }
 
-function assertRoundTrips(spec: IssueSpec, body: string): void {
+function assertRoundTrips(spec: IssueSpec, body: string, conventions: ProjectConventions): void {
   let parsed: IssueSpec;
   try {
-    parsed = parseIssueSpec({
-      number: spec.number,
-      title: spec.title,
-      body,
-      labels: [typeLabel(spec.type), ...(spec.commitKind === null ? [] : [kindLabel(spec.commitKind)])],
-      state: ROUND_TRIP_OPEN_STATE,
-      blockedBy: spec.dependsOn,
-    });
+    const typeLabel = conventions.typology.get(spec.type).label;
+    parsed = parseIssueSpec(
+      {
+        number: spec.number,
+        title: spec.title,
+        body,
+        labels: [typeLabel, ...(spec.commitKind === null ? [] : [kindLabel(spec.commitKind, conventions.labels.kindPrefix)])],
+        state: ROUND_TRIP_OPEN_STATE,
+        blockedBy: spec.dependsOn,
+      },
+      conventions,
+    );
   } catch (error) {
     if (error instanceof SpecFormatError) throw new SpecRenderError(spec.number, error.message);
     throw error;

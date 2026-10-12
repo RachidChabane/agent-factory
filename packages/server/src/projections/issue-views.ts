@@ -1,13 +1,13 @@
 import type { AcceptanceCheck, Attempt, IssueView } from '@agent-factory/cockpit';
 import {
-  beforeProofKind,
+  proofExpectation,
   reportedFileMatches,
   ISSUE_ESCALATION_STATE,
   ISSUE_SUBJECT_PREFIX,
   ISSUE_TRANSITIONED_EVENT,
   issueSubject,
 } from '@agent-factory/domain';
-import type { BaseExpectation, IssueSpec, IssueType } from '@agent-factory/domain';
+import type { BaseExpectation, BeforeProofKind, IssueSpec, TestRunner } from '@agent-factory/domain';
 import {
   checkPaths,
   ISSUE_PAUSED_EVENT,
@@ -30,18 +30,20 @@ type CheckKind = AcceptanceCheck['kind'];
 type AttemptKind = Attempt['kind'];
 type AttemptOutcome = Attempt['outcome'];
 
-export const CHECK_KIND_BY_TYPE: Readonly<Record<IssueType, CheckKind>> = {
-  ui: 'playwright',
-  'skill-prompt': 'evaluation',
-  'engine-api': 'unit',
-  security: 'integration',
-  'infra-ci': 'policy',
-  data: 'migration',
-  dependencies: 'unit',
-  doc: 'unit',
-  release: 'unit',
-  refactor: 'unit',
+export const CHECK_KIND_BY_RUNNER: Readonly<Record<TestRunner, CheckKind>> = {
+  playwright: 'playwright',
+  eval: 'evaluation',
+  pytest: 'unit',
+  vitest: 'unit',
+  'node-test': 'unit',
 };
+const UNKNOWN_RUNNER_KIND: CheckKind = 'unit';
+const NO_BEFORE_PROOF: BeforeProofKind = 'none';
+
+function expectedProofKind(spec: IssueSpec, context: SnapshotContext): BeforeProofKind {
+  const { typology } = context.conventions;
+  return typology.has(spec.type) ? proofExpectation(typology.get(spec.type).proof).kind : NO_BEFORE_PROOF;
+}
 
 const ATTEMPT_KIND_BY_MODE: Readonly<Record<ImplementerAttemptRecord['mode'], AttemptKind>> = {
   initial: 'session',
@@ -103,7 +105,8 @@ function checksOf(journal: PipelineJournal, spec: IssueSpec, context: SnapshotCo
   const before = beforeResult(journal);
   const screenshot = journal.beforeProof?.evidence.find((entry) => entry.cachedPath !== null && isImage(entry.path));
   const withScreenshot = { ...before, screenshotUrl: screenshot === undefined ? null : context.links.evidence(spec.number, screenshot.cachedPath ?? screenshot.path) };
-  const kind = CHECK_KIND_BY_TYPE[spec.type];
+  const runner = journal.manifest?.runner ?? null;
+  const kind = runner === null ? UNKNOWN_RUNNER_KIND : CHECK_KIND_BY_RUNNER[runner];
   if (journal.frozen !== null) {
     return journal.frozen.checks.map((check) => ({
       path: check.path,
@@ -202,7 +205,7 @@ function issueView(
     requestId: requestOfIssue.get(number) ?? null,
     branch: journal?.branch ?? null,
     pullRequestNumber: journal?.pullRequest?.number ?? null,
-    beforeProofKind: proof !== undefined && proof.valid ? proof.kind : beforeProofKind(spec.type),
+    beforeProofKind: proof !== undefined && proof.valid ? proof.kind : expectedProofKind(spec, context),
     checks: journal === null ? [] : checksOf(journal, spec, context),
     checksFrozenAt: frozenAt === null ? null : iso(frozenAt.occurredAt),
     attempts: journal === null ? [] : attemptsOf(journal, records),

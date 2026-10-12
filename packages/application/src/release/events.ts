@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MERGE_ATTRIBUTION_KINDS } from '@agent-factory/domain';
 
 export const PULL_REQUEST_OPENED_EVENT = 'pr.opened';
 export const RELEASE_EVALUATED_EVENT = 'release.evaluated';
@@ -22,7 +23,7 @@ export const PullRequestOpenedPayloadSchema = z.object({
 });
 export type PullRequestOpenedPayload = z.infer<typeof PullRequestOpenedPayloadSchema>;
 
-export const RELEASE_COMMIT_ATTRIBUTIONS = ['factory-merge', 'audit'] as const;
+export const RELEASE_COMMIT_ATTRIBUTIONS = MERGE_ATTRIBUTION_KINDS;
 
 export const ReleaseCommitPayloadSchema = z.object({
   sha: z.string(),

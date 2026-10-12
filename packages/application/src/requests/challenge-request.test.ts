@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import { InMemoryEventStore, ScriptedHarness, StubPromptCatalog, runResult } from '../audit/testing/fakes.ts';
 import { InMemoryWorkspace, SequentialIds } from '../pipeline/testing/pipeline-fakes.ts';
 import { SteppingClock } from '../runs/test-support.ts';
@@ -42,7 +43,7 @@ async function setup(script: ConstructorParameters<typeof ScriptedHarness>[0], i
       clock,
       ids: new SequentialIds(),
     },
-    { repository: REPOSITORY, requestsDirectory: REQUESTS_DIRECTORY, profile: PROFILE },
+    { repository: REPOSITORY, requestsDirectory: REQUESTS_DIRECTORY, profile: PROFILE, conventions: DEFAULT_PROJECT_CONVENTIONS },
   );
   return { events, workspace, harness, checkouts, challenge };
 }
@@ -146,7 +147,7 @@ describe('ChallengeRequest', () => {
     expect(text.startsWith('Title: Show the cost on the run page\nLabels: type:ui\n\n## Need')).toBe(true);
     const file = parseSpecFile(text);
     expect(file).toMatchObject({ title: 'Show the cost on the run page', labels: ['type:ui'] });
-    expect(specFileProblems(file)).toEqual([]);
+    expect(specFileProblems(file, DEFAULT_PROJECT_CONVENTIONS)).toEqual([]);
   });
 
   it('still writes a spec whose body cannot render losslessly and records the problem', async () => {
@@ -161,6 +162,24 @@ describe('ChallengeRequest', () => {
     expect(specs[0]?.problems).toEqual([]);
     expect(specs[1]?.problems[0]).toContain('cannot be rendered losslessly');
     expect(workspace.read(REQUEST_DIRECTORY, 'report.md')).toContain('specs/2-lossy-spec.md: Lossy spec (problems:');
+  });
+
+  it('keeps a spec of a type the project does not know and records the problem', async () => {
+    const unknown = answerSpec({ title: 'Widget spec', type: 'widget' });
+    const { workspace, events, challenge } = await setup([succeeded(challengeAnswer({ specs: [answerSpec(), unknown] }))]);
+
+    const outcome = await challenge.challenge('req-1');
+
+    expect(workspace.read(REQUEST_DIRECTORY, 'specs/2-widget-spec.md')?.split('\n')[1]).toBe('Labels:');
+    expect(outcome.status === 'challenged' && outcome.problems.map((entry) => entry.specId)).toEqual(['spec-2']);
+    const specs = (await loadRequest(events, 'req-1'))?.challenge?.specs ?? [];
+    expect(specs[1]).toMatchObject({ type: 'widget', problems: [expect.stringContaining('issue type "widget" is not one of')] });
+  });
+
+  it('lists the project issue types in the challenger prompt', async () => {
+    const { harness, challenge } = await setup([succeeded(challengeAnswer())]);
+    await challenge.challenge('req-1');
+    expect(harness.requests[0]?.prompt).toContain(`issueTypes=${DEFAULT_PROJECT_CONVENTIONS.typology.ids().join(', ')}`);
   });
 
   it('derives the item ids of a spec from its item numbers', async () => {
@@ -242,7 +261,7 @@ describe('ChallengeRequest checkout lifecycle', () => {
     const failingKnowledge = { read: () => Promise.reject(new Error('knowledge unreadable')) };
     const challenge = new ChallengeRequest(
       { events, harness: new ScriptedHarness([]), roles: new StubPromptCatalog(), files: workspace, checkouts, knowledge: failingKnowledge, clock, ids: new SequentialIds() },
-      { repository: REPOSITORY, requestsDirectory: REQUESTS_DIRECTORY, profile: PROFILE },
+      { repository: REPOSITORY, requestsDirectory: REQUESTS_DIRECTORY, profile: PROFILE, conventions: DEFAULT_PROJECT_CONVENTIONS },
     );
 
     await expect(challenge.challenge('req-1')).rejects.toThrow('knowledge unreadable');

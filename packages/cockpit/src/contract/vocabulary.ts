@@ -54,7 +54,7 @@ export type WorkflowTrigger = (typeof WORKFLOW_TRIGGERS)[number];
 export const WORKFLOW_STATUSES = ['queued', 'in_progress', 'completed'] as const;
 export type WorkflowStatus = (typeof WORKFLOW_STATUSES)[number];
 
-export const COMMIT_ATTRIBUTIONS = ['factory-merge', 'audit'] as const;
+export const COMMIT_ATTRIBUTIONS = ['factory-merge', 'automation', 'audit'] as const;
 export type CommitAttribution = (typeof COMMIT_ATTRIBUTIONS)[number];
 
 export const AUDIT_FINDING_LEVELS = ['intent', 'idea', 'method'] as const;

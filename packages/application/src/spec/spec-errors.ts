@@ -10,7 +10,6 @@ export const SPEC_PROBLEM_CODES = [
   'empty-list-item',
   'missing-type-label',
   'multiple-type-labels',
-  'unknown-type-label',
   'multiple-kind-labels',
   'unknown-kind-label',
 ] as const;

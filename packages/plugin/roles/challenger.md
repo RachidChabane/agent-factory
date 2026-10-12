@@ -28,7 +28,7 @@ Before writing that something stays unchanged after a change (figures, counters,
 
 Where the request contradicts itself or the reference design, say so and state which source should prevail and why.
 
-For every item kept or adjusted, write an issue specification with exactly these sections: Title, type (one of ui, skill-prompt, engine-api, security, infra-ci, data, dependencies, doc, refactor), Need, Acceptance criteria (numbered, each observable from outside the code), Out of scope, Expected proof. A specification answers one or several items, numbered from 1 in the order they appear in your items list.
+For every item kept or adjusted, write an issue specification with exactly these sections: Title, type (one of {{issueTypes}}), Need, Acceptance criteria (numbered, each observable from outside the code), Out of scope, Expected proof. A specification answers one or several items, numbered from 1 in the order they appear in your items list.
 
 Cite every statement about the product with a source: a file and line, or a document. Each source has a short label and a reference.
 
@@ -54,7 +54,7 @@ End your answer with exactly one fenced JSON block:
   "specs": [
     {
       "title": "",
-      "type": "ui",
+      "type": "",
       "items": [1],
       "need": "",
       "acceptanceCriteria": [""],

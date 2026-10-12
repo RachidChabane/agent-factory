@@ -1,19 +1,8 @@
 import { z } from 'zod';
+import { ISSUE_TYPE_ID_PATTERN } from '@agent-factory/domain';
 
 export const CHALLENGE_VERDICTS = ['keep', 'adjust', 'split', 'ask', 'decline'] as const;
 export type ChallengeVerdict = (typeof CHALLENGE_VERDICTS)[number];
-
-export const CHALLENGE_SPEC_TYPES = [
-  'ui',
-  'skill-prompt',
-  'engine-api',
-  'security',
-  'infra-ci',
-  'data',
-  'dependencies',
-  'doc',
-  'refactor',
-] as const;
 
 export const ChallengeAnswerSourceSchema = z.object({ label: z.string(), reference: z.string() });
 
@@ -32,7 +21,8 @@ export type ChallengeAnswerItem = z.infer<typeof ChallengeAnswerItemSchema>;
 
 export const ChallengeAnswerSpecSchema = z.object({
   title: z.string().trim().min(1),
-  type: z.enum(CHALLENGE_SPEC_TYPES),
+  /** An issue type id; one the project does not declare becomes a problem of the proposed spec. */
+  type: z.string().trim().regex(ISSUE_TYPE_ID_PATTERN, 'must be an issue type id: lowercase words joined by dashes'),
   items: z.array(z.number().int().positive()).default([]),
   need: z.string(),
   acceptanceCriteria: z.array(z.string()),

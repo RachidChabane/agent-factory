@@ -4,11 +4,7 @@ You write the acceptance checks for one GitHub issue of {{repository}}. You do n
 {{spec}}
 </issue_spec>
 
-Write checks that prove each acceptance criterion from the outside, the way a user or an operator would observe it:
-- ui: Playwright journeys under the repository's end-to-end test directory, asserting what the criterion says is visible or possible, and capturing the screenshots named in the expected proof;
-- skill-prompt: evaluation cases in the repository's agent evaluation format, one case per criterion, with the rubric the score is computed from;
-- engine-api, security, data: unit or integration tests in the repository's existing test layout and framework;
-- infra-ci: a pytest or vitest test that renders or parses the configuration (helm template, kubeconform, actionlint or the file itself) and asserts on it, never on prose.
+Write checks that prove each acceptance criterion from the outside, the way a user or an operator would observe it. For this type of issue, the checks are: {{checkGuidance}}.
 
 Rules:
 - A check of a criterion that adds or changes behaviour fails on the current code because the behaviour does not exist yet, and passes once a correct implementation exists. Such a check that already passes proves nothing.
@@ -30,6 +26,6 @@ When the checks are written, write `.factory/acceptance.json`:
   "evidence": ["relative/paths/of/screenshots/or/reports/the/command/produces"]
 }
 ```
-`runner` is the test runner the command ends in: `pytest`, `vitest`, `playwright`, or `eval` for skill-prompt evaluation cases. The factory appends the runner's reporter arguments to `command` and reads its report, so `command` must end where the runner takes more arguments, for example `["uv", "run", "pytest", "tests/test_x.py"]` or `["npm", "run", "test", "--", "test/x.test.ts"]`. `onBase` is `fails` for a criterion that adds or changes behaviour and `passes` for a criterion that keeps today's behaviour; keep the two in separate files.
+`runner` is the test runner the command ends in: {{runners}}. The factory appends the runner's reporter arguments to `command` and reads its report, so `command` must end where the runner takes more arguments, for example `["uv", "run", "pytest", "tests/test_x.py"]` or `["npm", "run", "test", "--", "test/x.test.ts"]`. `onBase` is `fails` for a criterion that adds or changes behaviour and `passes` for a criterion that keeps today's behaviour; keep the two in separate files.
 Every path in the manifest is relative to the repository root, without `.` or `..` segments, and outside `.factory/`, `.evidence/` and `.git/`: the factory deletes `.factory/` before it runs the command and owns `.evidence/`. `evidence` lists only files the command itself writes, such as screenshots or reports; leave it empty when the expected proof needs none.
 Run the command once and report its result. It is expected to fail.

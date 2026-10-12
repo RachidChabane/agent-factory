@@ -31,6 +31,7 @@ import { decideScheduling } from './issue-scheduling.ts';
 import { issueStates } from '../pipeline/pipeline-capacity.ts';
 import { pauseScheduling } from './pause-state.ts';
 import { MachineSchedulingPauses } from './scheduling-pauses.ts';
+import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 
 const START = new Date('2026-10-10T08:00:00.000Z');
 const MINUTE_MS = 60_000;
@@ -38,7 +39,7 @@ const SETTINGS: DaemonSettings = {
   concurrency: 1,
   poolSize: 3,
   baseBranch: 'main',
-  validatedLabel: 'spec:validated',
+  conventions: DEFAULT_PROJECT_CONVENTIONS,
   pollIntervalMs: 1_000,
   mergeWatchIntervalMs: 10 * MINUTE_MS,
   issueRefreshMs: 0,
@@ -110,7 +111,7 @@ class ReleasingPool implements WorktreePool {
 }
 
 function validated(number: number, blockedBy: readonly number[] = []): IssueRecord {
-  return { number, title: `issue ${number}`, body: '', labels: ['type:doc', 'spec:validated'], state: 'open', blockedBy };
+  return { number, title: `issue ${number}`, body: '', labels: ['type:docs', 'spec:validated'], state: 'open', blockedBy };
 }
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, TEST_SLEEP_MS * 2));

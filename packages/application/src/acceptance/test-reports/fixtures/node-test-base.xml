@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testsuite name="cart total" time="0.001886" disabled="0" errors="0" tests="4" failures="2" skipped="1" hostname="ci-runner">
+		<testcase name="adds two items" time="0.000281" classname="test" file="/work/shop/test/cart.test.js"/>
+		<testcase name="applies a discount above twenty" time="0.000366" classname="test" file="/work/shop/test/cart.test.js" failure="Expected values to be strictly equal:&#10;&#10;25 !== 22.5&#10;">
+			<failure type="testCodeFailure" message="Expected values to be strictly equal:&#10;&#10;25 !== 22.5">
+Error [ERR_TEST_FAILURE]: Expected values to be strictly equal:
+
+25 !== 22.5
+
+    at async Promise.all (index 0) {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  25 !== 22.5
+  
+      at TestContext.&lt;anonymous> (file:///work/shop/test/cart.test.js:10:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal)
+      at Suite.processPendingSubtests (node:internal)
+      at Test.postRun (node:internal)
+      at Test.run (node:internal)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal)
+      at async startSubtestAfterBootstrap (node:internal) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 25,
+    expected: 22.5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="renders the receipt" time="0.000698" classname="test" file="/work/shop/test/cart.test.js" failure="Cannot find module '/work/shop/src/receipt.js' imported from /work/shop/test/cart.test.js">
+			<failure type="testCodeFailure" message="Cannot find module '/work/shop/src/receipt.js' imported from /work/shop/test/cart.test.js">
+[Error [ERR_TEST_FAILURE]: Cannot find module '/work/shop/src/receipt.js' imported from /work/shop/test/cart.test.js] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/shop/src/receipt.js' imported from /work/shop/test/cart.test.js
+      at finalizeResolution (node:internal)
+      at moduleResolve (node:internal)
+      at defaultResolve (node:internal)
+      at #cachedDefaultResolve (node:internal)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal)
+      at ModuleLoader.resolveSync (node:internal)
+      at #resolve (node:internal)
+      at ModuleLoader.getOrCreateModuleJob (node:internal)
+      at node:internal
+      at TracingChannel.tracePromise (node:diagnostics_channel:362:14) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file:///work/shop/src/receipt.js'
+  }
+}
+			</failure>
+		</testcase>
+		<testcase name="prints the receipt" time="0.000043" classname="test" file="/work/shop/test/cart.test.js">
+			<skipped type="skipped" message="true"/>
+		</testcase>
+	</testsuite>
+	<testsuite name="refunds" time="0.000674" disabled="0" errors="0" tests="1" failures="1" skipped="0" hostname="ci-runner">
+		<testcase name="restores the stock" time="0.000627" classname="test" file="/work/shop/test/cart.test.js" failure="Expected values to be strictly deep-equal:&#10;+ actual - expected&#10;&#10;  {&#10;+   stock: 1&#10;-   stock: 2&#10;  }&#10;">
+			<failure type="testCodeFailure" message="Expected values to be strictly deep-equal:&#10;+ actual - expected&#10;&#10;  {&#10;+   stock: 1&#10;-   stock: 2&#10;  }">
+Error [ERR_TEST_FAILURE]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   stock: 1
+-   stock: 2
+  }
+
+    at new Promise (&lt;anonymous>)
+    at Array.map (&lt;anonymous>) {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   stock: 1
+  -   stock: 2
+    }
+  
+      at TestContext.&lt;anonymous> (file:///work/shop/test/cart.test.js:21:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal)
+      at Test.start (node:internal)
+      at node:internal
+      at node:internal
+      at new Promise (&lt;anonymous>)
+      at new SafePromise (node:internal)
+      at node:internal
+      at Array.map (&lt;anonymous>) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { stock: 1 },
+    expected: { stock: 2 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+	</testsuite>
+	<!-- tests 5 -->
+	<!-- suites 2 -->
+	<!-- pass 1 -->
+	<!-- fail 3 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 1 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 53.761542 -->
+</testsuites>

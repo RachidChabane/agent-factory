@@ -190,7 +190,7 @@ export function projectPullRequests(
     const blockers = journal.mergeSha === null ? mergeBlockers(journal, checks, evidenceComplete) : ['already merged'];
     views.push({
       number: pullRequest.number,
-      title: context.pullRequestTitles.get(pullRequest.number) ?? pullRequestTitle(spec, context.conventionalScopes, journal.evidence?.changes.map((change) => change.path)),
+      title: context.pullRequestTitles.get(pullRequest.number) ?? pullRequestTitle(spec, context.conventions, journal.evidence?.changes.map((change) => change.path)),
       issueNumber: journal.issueNumber,
       type: spec.type,
       branch: journal.branch,

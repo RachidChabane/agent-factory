@@ -1,4 +1,5 @@
-import type { IssueSpec } from '@agent-factory/domain';
+import { DEFAULT_ISSUE_TYPES, IssueTypology, type EscalationProfile, type IssueSpec } from '@agent-factory/domain';
+import { DEFAULT_PROJECT_CONVENTIONS, type ProjectConventions } from '../../conventions/project-conventions.ts';
 import { StubPromptCatalog } from '../../audit/testing/fakes.ts';
 import { RUNNER_REPORTING } from '../../acceptance/test-reports/test-report-reader.ts';
 import { ACCEPTANCE_REPORT_DIRECTORY } from '../../acceptance/structured-command.ts';
@@ -6,6 +7,7 @@ import type { AgentRunRequest, IssueRecord, Worktree } from '../../ports.ts';
 import { MarkdownSpecReader } from '../../spec/markdown-spec-reader.ts';
 import { renderSpecBody } from '../../spec/render-spec-body.ts';
 import { MergeOnOrder } from '../merge-on-order.ts';
+import { ResumeIssue } from '../resume-issue.ts';
 import type { PipelineDependencies } from '../pipeline-dependencies.ts';
 import { loadJournal, type PipelineJournal } from '../pipeline-journal.ts';
 import type { PipelineSettings } from '../pipeline-settings.ts';
@@ -28,6 +30,8 @@ import {
 } from './pipeline-fakes.ts';
 
 export const ISSUE_NUMBER = 42;
+export const UI_TYPE = 'ui';
+export const APP_SCOPE = 'app';
 export const CHECK_PATH = 'app/e2e/link.spec.ts';
 export const CHECK_CONTENT = "test('the header links the conversation', async () => {});\n";
 export const PRODUCT_PATH = 'app/pages/mockup.vue';
@@ -77,6 +81,14 @@ export const MANIFEST = {
   evidence: [EVIDENCE_PATH],
 };
 
+/** The default conventions, with the user-interface issues of this repository scoped to its app. */
+export const SCENARIO_CONVENTIONS: ProjectConventions = {
+  ...DEFAULT_PROJECT_CONVENTIONS,
+  typology: new IssueTypology(
+    DEFAULT_ISSUE_TYPES.map((type) => (type.id === UI_TYPE ? { ...type, commit: { ...type.commit, scope: APP_SCOPE } } : type)),
+  ),
+};
+
 export const SETTINGS: PipelineSettings = {
   repository: { owner: 'acme', name: 'widgets' },
   setupCommands: [{ name: 'install', run: SETUP_COMMAND, network: { reason: 'downloads the dependencies from the registry' } }],
@@ -93,7 +105,7 @@ export const SETTINGS: PipelineSettings = {
     environment: { PATH: '/usr/bin:/bin', HOME: '/home/factory' },
     niceness: 10,
   },
-  conventionalScopes: { byType: { ui: 'app' }, defaultScope: 'repo' },
+  conventions: SCENARIO_CONVENTIONS,
   evidenceCacheDirectory: '/factory/evidence',
   resources: { minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' },
 };
@@ -102,7 +114,7 @@ export function issueRecord(overrides: Partial<IssueRecord> = {}): IssueRecord {
   return {
     number: ISSUE_NUMBER,
     title: SPEC.title,
-    body: renderSpecBody(SPEC),
+    body: renderSpecBody(SPEC, SCENARIO_CONVENTIONS),
     labels: ['type:ui', 'spec:validated'],
     state: 'open',
     blockedBy: [],
@@ -154,7 +166,7 @@ export class PipelineScenario {
   dependencies(): PipelineDependencies {
     return {
       github: this.github,
-      specReader: new MarkdownSpecReader(),
+      specReader: new MarkdownSpecReader(this.settings.conventions),
       pool: this.pool,
       sourceControl: this.sourceControl,
       harness: this.harness,
@@ -174,6 +186,11 @@ export class PipelineScenario {
 
   pipeline(options: IssuePipelineOptions = {}): IssuePipeline {
     return new IssuePipeline(this.dependencies(), this.settings, options);
+  }
+
+  /** Resumes issues of this scenario; external feedback gets a fresh session only with an escalation profile. */
+  resumer(escalation: EscalationProfile | null = null): ResumeIssue {
+    return new ResumeIssue(this.dependencies(), { conventions: this.settings.conventions, escalation });
   }
 
   mergeOnOrder(): MergeOnOrder {

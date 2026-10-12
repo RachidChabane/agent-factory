@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { attributionRules, DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import { loadAudit } from './audit-projection.ts';
 import { MarkdownAuditIssueRenderer } from './audit-issue-renderer.ts';
 import { auditMerge, auditPendingMerges, AUDITOR_ROLE, type AuditDependencies, type AuditRunSettings } from './audit-merge.ts';
 import { AuditIssueNotDraftedError, AuditNotFoundError } from './errors.ts';
-import { AUDIT_ISSUE_LABELS, publishAuditIssue, resolveAudit } from './publish-audit-issue.ts';
+import { auditIssueLabels, publishAuditIssue, resolveAudit } from './publish-audit-issue.ts';
 import { scanNewMerges } from './watch-merges.ts';
 import {
   FakeGitHubGateway,
@@ -32,7 +33,7 @@ async function setup(script: readonly (AgentRunResult | Error)[], commits = [com
   const events = new InMemoryEventStore();
   const github = new FakeGitHubGateway();
   github.history.push(...commits);
-  await scanNewMerges({ events, github }, { branch: 'main', startSha: null });
+  await scanNewMerges({ events, github }, { branch: 'main', startSha: null, rules: attributionRules(DEFAULT_PROJECT_CONVENTIONS) });
   const harness = new ScriptedHarness(script);
   let runCounter = 0;
   const dependencies: AuditDependencies = {
@@ -148,20 +149,28 @@ describe('publishAuditIssue', () => {
   it('creates the drafted issue once, labelled audit and factory', async () => {
     const { events, github, dependencies } = await setup([runResult({ finalText: verdictAnswer('challenge') })]);
     await auditMerge(dependencies, 'a1');
-    const number = await publishAuditIssue({ events, github }, 'a1');
+    const number = await publishAuditIssue({ events, github }, DEFAULT_PROJECT_CONVENTIONS, 'a1');
     expect(github.createdIssues).toHaveLength(1);
-    expect(github.createdIssues[0]?.labels).toEqual(AUDIT_ISSUE_LABELS);
-    expect(AUDIT_ISSUE_LABELS).toEqual(['audit', 'factory']);
-    expect(await publishAuditIssue({ events, github }, 'a1')).toBe(number);
+    expect(github.createdIssues[0]?.labels).toEqual(['audit', 'factory']);
+    expect(await publishAuditIssue({ events, github }, DEFAULT_PROJECT_CONVENTIONS, 'a1')).toBe(number);
     expect(github.createdIssues).toHaveLength(1);
     expect((await loadAudit(events, 'a1'))?.publishedIssueNumber).toBe(number);
+  });
+
+  it('labels the issue with the labels the project names', async () => {
+    const { events, github, dependencies } = await setup([runResult({ finalText: verdictAnswer('challenge') })]);
+    await auditMerge(dependencies, 'a1');
+    const labels = { ...DEFAULT_PROJECT_CONVENTIONS.labels, audit: 'needs-review', factory: 'bot' };
+    await publishAuditIssue({ events, github }, { ...DEFAULT_PROJECT_CONVENTIONS, labels }, 'a1');
+    expect(github.createdIssues[0]?.labels).toEqual(auditIssueLabels({ ...DEFAULT_PROJECT_CONVENTIONS, labels }));
+    expect(github.createdIssues[0]?.labels).toEqual(['needs-review', 'bot']);
   });
 
   it('refuses when nothing is drafted or the audit is unknown', async () => {
     const { events, github, dependencies } = await setup([runResult({ finalText: verdictAnswer('keep') })]);
     await auditMerge(dependencies, 'a1');
-    await expect(publishAuditIssue({ events, github }, 'a1')).rejects.toBeInstanceOf(AuditIssueNotDraftedError);
-    await expect(publishAuditIssue({ events, github }, 'zz')).rejects.toBeInstanceOf(AuditNotFoundError);
+    await expect(publishAuditIssue({ events, github }, DEFAULT_PROJECT_CONVENTIONS, 'a1')).rejects.toBeInstanceOf(AuditIssueNotDraftedError);
+    await expect(publishAuditIssue({ events, github }, DEFAULT_PROJECT_CONVENTIONS, 'zz')).rejects.toBeInstanceOf(AuditNotFoundError);
   });
 
   it('records an operator resolution once', async () => {

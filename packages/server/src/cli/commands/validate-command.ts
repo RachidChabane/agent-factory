@@ -8,12 +8,13 @@ import {
   NonLocalRemoteError,
   RemoteLocalityGuard,
 } from '@agent-factory/adapters';
-import { AUDIT_LABEL, PIPELINE_ROLES, SPEC_VALIDATED_LABEL, typeLabel, type PreflightStepReport } from '@agent-factory/application';
+import { PIPELINE_ROLES, requiredLabels, type PreflightStepReport } from '@agent-factory/application';
 import type { CommandRunner } from '@agent-factory/application';
-import { admitAgentRun, FACTORY_LABEL, ISSUE_TYPES, TOOL_NAMES, REQUIRED_TOOLS, type ToolName, type ToolProbeResult } from '@agent-factory/domain';
+import { admitAgentRun, TOOL_NAMES, REQUIRED_TOOLS, type ToolName, type ToolProbeResult } from '@agent-factory/domain';
 import { z } from 'zod';
 import type { FactoryConfig } from '../../config/factory-config.ts';
 import { checkCommandEnvironment } from '../../config/pipeline-settings-from-config.ts';
+import { conventionsFromConfig } from '../../config/conventions-from-config.ts';
 import { factoryGitEnvironment, rehearsalRepositories } from '../../composition/github-gateway.ts';
 import { definedEnvironment, gatePreflight, toolProber } from '../../composition/tool-checks.ts';
 import { ROLE_PROMPTS_DIRECTORY } from '../../composition/install-paths.ts';
@@ -36,7 +37,6 @@ const NOT_USED_IN_LOCAL_MODE = 'not used: github.mode is local';
 const LABEL_LIST_LIMIT = '1000';
 const DEFAULT_LOGIN_DETAIL = 'none configured; agent runs use the default Claude login';
 const NOTIFICATIONS_DISABLED = 'disabled: notifications.googleChatWebhookUrl is not configured';
-export const REQUIRED_LABELS: readonly string[] = [FACTORY_LABEL, SPEC_VALIDATED_LABEL, AUDIT_LABEL, ...ISSUE_TYPES.map(typeLabel)];
 const LabelListSchema = z.array(z.object({ name: z.string() }));
 
 async function labelsOutcome(context: CliContext, config: FactoryConfig): Promise<CheckOutcome> {
@@ -54,7 +54,7 @@ async function labelsOutcome(context: CliContext, config: FactoryConfig): Promis
   } catch (error) {
     return { ok: false, detail: `unexpected label list from ${slug}: ${errorText(error)}` };
   }
-  const missing = REQUIRED_LABELS.filter((label) => !names.includes(label));
+  const missing = requiredLabels(conventionsFromConfig(config)).filter((label) => !names.includes(label));
   return missing.length === 0
     ? { ok: true, detail: `${slug} has every factory label` }
     : { ok: false, detail: `${slug} lacks the labels ${missing.join(', ')}; pull requests and specs cannot carry them` };

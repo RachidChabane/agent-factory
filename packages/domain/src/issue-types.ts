@@ -1,3 +1,4 @@
+import { touchesAny } from './glob.ts';
 import type { BeforeProofKind, CommitKind } from './model.ts';
 
 /**
@@ -125,4 +126,9 @@ export class IssueTypology {
     }
     return null;
   }
+}
+
+/** The first type, in the project's order, whose paths an outside change touches; null when none does. */
+export function suggestTypeForPaths(typology: IssueTypology, changedPaths: readonly string[]): IssueTypeDefinition | null {
+  return typology.definitions.find((definition) => definition.paths.length > 0 && touchesAny(changedPaths, definition.paths)) ?? null;
 }

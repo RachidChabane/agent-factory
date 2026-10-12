@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RATE_LIMIT_WINDOWS } from '@agent-factory/domain';
+import { ISSUE_TYPE_ID_PATTERN, RATE_LIMIT_WINDOWS } from '@agent-factory/domain';
 
 export const IsoDateTimeSchema = z.iso.datetime({ offset: true });
 export const IsoDateSchema = z.iso.date();
@@ -23,3 +23,6 @@ export const SubscriptionWindowSchema = z.object({
   resetsAt: IsoDateTimeSchema,
 });
 export type SubscriptionWindowView = z.infer<typeof SubscriptionWindowSchema>;
+
+/** An issue type id of the project's typology. */
+export const IssueTypeIdSchema = z.string().regex(ISSUE_TYPE_ID_PATTERN);

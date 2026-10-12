@@ -172,12 +172,18 @@ server: { port: 8080, publicUrl: https://factory.example.ts.net }
       MISE_TASK_RUN_AUTO_INSTALL: 'false',
     });
     expect(settings.implementerEscalation).toEqual({ model: 'opus', effort: 'xhigh' });
-    expect(settings.conventionalScopes).toEqual({
-      defaultScope: 'repo',
-      byType: { ui: 'app', 'engine-api': 'agent', 'skill-prompt': 'agent', 'infra-ci': 'ci', doc: 'docs', dependencies: 'deps' },
-      kindByType: {},
-      deploymentPaths: ['infrastructure/**', 'environments/**'],
-    });
+    const { typology, defaultScope } = settings.conventions;
+    expect(defaultScope).toBe('repo');
+    expect(['ui', 'api', 'prompt', 'infra', 'docs', 'dependencies', 'fix'].map((type) => typology.get(type).commit.scope)).toEqual([
+      'app',
+      'api',
+      'agent',
+      'ci',
+      'docs',
+      'deps',
+      null,
+    ]);
+    expect(typology.get('infra').commit.whenChanged).toEqual([{ paths: ['infrastructure/**', 'environments/**'], type: 'feat' }]);
   });
 
   it('confines check commands by default and lets the operator widen only what is listed', () => {

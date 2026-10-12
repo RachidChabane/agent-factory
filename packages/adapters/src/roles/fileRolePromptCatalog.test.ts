@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { acceptanceAuthorValues, implementerValues, reviewerValues } from '@agent-factory/application';
+import { acceptanceAuthorValues, DEFAULT_PROJECT_CONVENTIONS, implementerValues, reviewerValues } from '@agent-factory/application';
 import type { IssueSpec } from '@agent-factory/domain';
 import { FileRolePromptCatalog, placeholdersOf, RolePromptMissingError, UnknownPlaceholderError } from './fileRolePromptCatalog.ts';
 
@@ -55,7 +55,7 @@ describe('FileRolePromptCatalog', () => {
     const catalog = await FileRolePromptCatalog.load(PLUGIN_ROLES_DIRECTORY);
     const checks = [{ path: 'app/e2e/link.spec.ts', content: 'test()' }];
     const rendered = [
-      catalog.render('acceptance-author', { ...acceptanceAuthorValues(REPOSITORY, SPEC) }),
+      catalog.render('acceptance-author', { ...acceptanceAuthorValues(REPOSITORY, SPEC, DEFAULT_PROJECT_CONVENTIONS.typology.get('ui')) }),
       catalog.render('implementer', { ...implementerValues(REPOSITORY, SPEC, checks) }),
       catalog.render('reviewer', { ...reviewerValues(REPOSITORY, SPEC, checks, 'diff --git a/x b/x') }),
     ];
@@ -70,7 +70,7 @@ describe('FileRolePromptCatalog', () => {
   it('renders the shipped auditor and challenger templates with their values', async () => {
     const catalog = await FileRolePromptCatalog.load(PLUGIN_ROLES_DIRECTORY);
     const auditor = catalog.render('auditor', { repository: 'acme/widgets', change: 'Commit: abc', diff: 'diff --git a/x b/x' });
-    const challenger = catalog.render('challenger', { repository: 'acme/widgets', request: 'R', images: 'none', knowledge: 'K' });
+    const challenger = catalog.render('challenger', { repository: 'acme/widgets', request: 'R', images: 'none', knowledge: 'K', issueTypes: 'feature, fix' });
     expect(placeholdersOf(auditor)).toEqual([]);
     expect(placeholdersOf(challenger)).toEqual([]);
     expect(auditor).toContain('cited but not recorded');

@@ -1,9 +1,14 @@
 import type { IssueState, IssueType } from '@agent-factory/domain';
-import { beforeProofKind } from '@agent-factory/domain';
+import { DEFAULT_ISSUE_TYPES, proofExpectation, type BeforeProofKind } from '@agent-factory/domain';
 import type { AcceptanceCheck, Attempt, IssueSpecView, IssueView } from '../../contract/index.ts';
 import { historyBeforeImage } from './evidence.ts';
 import type { FixtureClock } from './time.ts';
 import { issueUrl } from './time.ts';
+
+function presetProofKind(type: string): BeforeProofKind {
+  const preset = DEFAULT_ISSUE_TYPES.find((candidate) => candidate.id === type);
+  return proofExpectation(preset?.proof ?? 'none').kind;
+}
 
 interface IssueSeed {
   readonly number: number;
@@ -82,7 +87,7 @@ function seedToIssue(seed: IssueSeed, clock: FixtureClock): IssueView {
     requestId: seed.requestId ?? null,
     branch: hasBranch ? `factory/${seed.number}-${seed.slug}` : null,
     pullRequestNumber: seed.pullRequestNumber ?? null,
-    beforeProofKind: beforeProofKind(seed.type),
+    beforeProofKind: presetProofKind(seed.type),
     checks: [...(seed.checks ?? [])],
     checksFrozenAt: seed.frozenHoursAgo === undefined ? null : clock.hoursAgo(seed.frozenHoursAgo),
     attempts: [...(seed.attempts ?? [])],
@@ -123,7 +128,7 @@ export function buildIssues(clock: FixtureClock): IssueView[] {
     {
       number: 232,
       title: 'Send checkout step latency to the monitoring dashboard',
-      type: 'infra-ci',
+      type: 'infra',
       state: 'spec-draft',
       slug: 'checkout-latency-metrics',
       requestId: 'R-20',
@@ -249,7 +254,7 @@ export function buildIssues(clock: FixtureClock): IssueView[] {
     {
       number: 226,
       title: 'Paginate the order history endpoint with cursors',
-      type: 'engine-api',
+      type: 'api',
       state: 'producing-evidence',
       slug: 'history-cursor-pagination',
       createdHoursAgo: 52,
@@ -321,7 +326,7 @@ export function buildIssues(clock: FixtureClock): IssueView[] {
     {
       number: 224,
       title: 'Expose discount totals on the order history endpoint',
-      type: 'engine-api',
+      type: 'api',
       state: 'ci',
       slug: 'order-discount-totals',
       requestId: 'R-16',
@@ -380,7 +385,7 @@ export function buildIssues(clock: FixtureClock): IssueView[] {
     {
       number: 221,
       title: 'Make the product-brief skill state measurable specifications',
-      type: 'skill-prompt',
+      type: 'prompt',
       state: 'in-dev',
       slug: 'product-brief-specifications',
       pullRequestNumber: 309,
@@ -447,7 +452,7 @@ export function buildIssues(clock: FixtureClock): IssueView[] {
     {
       number: 217,
       title: 'Persist the cart on the server for signed-in customers',
-      type: 'engine-api',
+      type: 'api',
       state: 'closed',
       slug: 'server-side-cart',
       createdHoursAgo: 220,

@@ -1,5 +1,3 @@
-import { FACTORY_BRANCH_PREFIX } from '@agent-factory/domain';
-
 export const MAX_SLUG_LENGTH = 40;
 export const FALLBACK_SLUG = 'issue';
 
@@ -20,6 +18,6 @@ export function slugify(title: string): string {
   return bounded === '' ? FALLBACK_SLUG : bounded;
 }
 
-export function issueBranchName(issueNumber: number, title: string): string {
-  return `${FACTORY_BRANCH_PREFIX}${issueNumber}${DASH}${slugify(title)}`;
+export function issueBranchName(branchPrefix: string, issueNumber: number, title: string): string {
+  return `${branchPrefix}${issueNumber}${DASH}${slugify(title)}`;
 }

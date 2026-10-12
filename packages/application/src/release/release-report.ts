@@ -38,8 +38,14 @@ const short = (sha: string): string => sha.slice(0, SHORT_SHA_LENGTH);
 const firstLine = (text: string): string => text.trim().split('\n')[0] ?? '';
 
 function origin(change: ReleaseChange): string {
-  if (change.attribution.kind === 'factory-merge') return 'factory';
-  return `audited (${change.attribution.reason})`;
+  switch (change.attribution.kind) {
+    case 'factory-merge':
+      return 'factory';
+    case 'automation':
+      return `${change.attribution.automation}, not audited`;
+    case 'audit':
+      return `audited (${change.attribution.reason})`;
+  }
 }
 
 function section(title: string, lines: readonly string[]): string {

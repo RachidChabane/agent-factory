@@ -7,7 +7,6 @@ import {
   DEFAULT_SESSION_PAUSE_RATIO,
   DEFAULT_WEEKLY_PAUSE_RATIO,
   EFFORT_LEVELS,
-  ISSUE_TYPES,
   isProductionTarget,
   MAX_PERCENT,
   PAUSE_ABOVE_PRESSURE_LEVELS,
@@ -187,8 +186,8 @@ export const FactoryConfigSchema = z
     }),
     conventionalCommits: z.strictObject({
       defaultScope: NonEmptyString,
-      scopes: z.partialRecord(z.enum(ISSUE_TYPES), NonEmptyString).default({}),
-      types: z.partialRecord(z.enum(ISSUE_TYPES), z.enum(COMMIT_KINDS)).default({}),
+      scopes: z.record(z.string(), NonEmptyString).default({}),
+      types: z.record(z.string(), z.enum(COMMIT_KINDS)).default({}),
       deploymentPaths: z.array(NonEmptyString).default([...DEFAULT_DEPLOYMENT_PATHS]),
     }),
     sandbox: z

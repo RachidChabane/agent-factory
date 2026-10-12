@@ -1,4 +1,4 @@
-import { evaluateBaseRun, evaluateBeforeProof, isStructuredRunner } from '@agent-factory/domain';
+import { evaluateBaseRun, evaluateBeforeProof, isStructuredRunner, proofExpectation } from '@agent-factory/domain';
 import type { BeforeProofEvaluation, IssueSpec, StructuredTestRunner } from '@agent-factory/domain';
 import {
   acceptanceCommand,
@@ -13,7 +13,7 @@ import type { BeforeProofRecord } from '../journal-events.ts';
 import { EscalationRequiredError } from '../pipeline-errors.ts';
 import { describeOutcome, EXIT_CODE_SUCCESS, tailLines } from '../shell-commands.ts';
 import type { StageContext } from './stage.ts';
-import { assertOnlyChecksChanged } from './stage-support.ts';
+import { assertOnlyChecksChanged, issueTypeOfSpec } from './stage-support.ts';
 
 export const BEFORE_PROOF_LOG = 'before-proof.log';
 const NEWLINE = '\n';
@@ -27,11 +27,11 @@ export async function measureBeforeProof(context: StageContext, worktree: Worktr
   const { toolkit, journal } = context;
   const { dependencies } = toolkit;
   await dependencies.files.remove(worktree.path, FACTORY_WORK_DIRECTORY);
-  await toolkit.evidence.clearOutputs(worktree, manifest, spec);
+  await toolkit.evidence.clearOutputs(worktree, manifest, issueTypeOfSpec(context, spec));
   await assertOnlyChecksChanged(context, worktree, manifest, 'the acceptance-author changed files outside its checks');
   const command = acceptanceCommand(manifest);
   if (command === null) {
-    const evaluation = evaluateBeforeProof(spec.type, { checksExpressible: false, checksFailedOnBase: false, baseScore: null });
+    const evaluation = evaluateBeforeProof(proofExpectation(issueTypeOfSpec(context, spec).proof), { checksExpressible: false, checksFailedOnBase: false, baseScore: null });
     return {
       checksExpressible: false,
       exitCode: null,
@@ -57,7 +57,7 @@ export async function measureBeforeProof(context: StageContext, worktree: Worktr
   const scoreReport = await baseScoreReport(context, worktree, manifest, spec);
   const baseScore = scoreReport === null ? null : targetedScore(scoreReport);
   const evidence = await toolkit.evidence.capture(worktree, journal.issueNumber, 'before', manifest);
-  await toolkit.evidence.clearOutputs(worktree, manifest, spec);
+  await toolkit.evidence.clearOutputs(worktree, manifest, issueTypeOfSpec(context, spec));
   await assertOnlyChecksChanged(context, worktree, manifest, 'running the checks on the base left changes outside the checks');
   const checksFailedOnBase = outcome.exitCode !== EXIT_CODE_SUCCESS;
   return {
@@ -67,7 +67,7 @@ export async function measureBeforeProof(context: StageContext, worktree: Worktr
     scoreReport,
     baseScore,
     logName: BEFORE_PROOF_LOG,
-    evaluation: evaluateBeforeProof(spec.type, { checksExpressible: true, checksFailedOnBase, baseScore }),
+    evaluation: evaluateBeforeProof(proofExpectation(issueTypeOfSpec(context, spec).proof), { checksExpressible: true, checksFailedOnBase, baseScore }),
     evidence: [...evidence],
     runner: manifest.runner,
     tests: [],
@@ -91,7 +91,7 @@ async function measureStructured(
     throw new EscalationRequiredError(`the acceptance command could not run on the base (${run.outcome.reason}):\n${tailLines(described)}`);
   }
   const evidence = await toolkit.evidence.capture(worktree, journal.issueNumber, 'before', manifest);
-  await toolkit.evidence.clearOutputs(worktree, manifest, spec);
+  await toolkit.evidence.clearOutputs(worktree, manifest, issueTypeOfSpec(context, spec));
   await assertOnlyChecksChanged(context, worktree, manifest, 'running the checks on the base left changes outside the checks');
   const base = run.report === null ? null : evaluateBaseRun(run.report, criterionChecks(manifest));
   const problems = base === null ? [run.reportProblem ?? `${runner} wrote no report`] : base.problems;
@@ -103,7 +103,7 @@ async function measureStructured(
     scoreReport: null,
     baseScore: null,
     logName: BEFORE_PROOF_LOG,
-    evaluation: problems.length > 0 ? wrongReason(problems) : evaluateBeforeProof(spec.type, { checksExpressible: true, checksFailedOnBase, baseScore: null }),
+    evaluation: problems.length > 0 ? wrongReason(problems) : evaluateBeforeProof(proofExpectation(issueTypeOfSpec(context, spec).proof), { checksExpressible: true, checksFailedOnBase, baseScore: null }),
     evidence: [...evidence],
     runner,
     tests: (base?.tests ?? []).map((test) => ({ ...test, criteria: [...test.criteria] })),
@@ -111,7 +111,7 @@ async function measureStructured(
 }
 
 async function baseScoreReport(context: StageContext, worktree: Worktree, manifest: AcceptanceManifest, spec: IssueSpec): Promise<ScoreReport | null> {
-  const path = scoreOutputPath(manifest, spec);
+  const path = scoreOutputPath(manifest, issueTypeOfSpec(context, spec));
   if (path === null) return null;
   const reading = readScoreReport(path, await context.toolkit.dependencies.files.readText(worktree.path, path));
   if (!reading.valid) throw new EscalationRequiredError(`the base score could not be read: ${reading.problem}`);

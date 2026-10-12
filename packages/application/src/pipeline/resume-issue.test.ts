@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderSpecBody } from '../spec/render-spec-body.ts';
 import { ResumeRefusedError, SpecNotValidatedError } from './pipeline-errors.ts';
 import { DECISION_REQUEST_PATH } from './decision-request.ts';
-import { ResumeIssue } from './resume-issue.ts';
-import { CHECK_PATH, ISSUE_NUMBER, issueRecord, NO_FINDINGS, PipelineScenario, SPEC } from './testing/pipeline-scenario.ts';
+import { CHECK_PATH, ISSUE_NUMBER, issueRecord, NO_FINDINGS, PipelineScenario, SCENARIO_CONVENTIONS, SPEC } from './testing/pipeline-scenario.ts';
 
 const AMBIGUITY = 'Criterion 2 is ambiguous: "opens" may mean a new tab or the same tab. Tell me which reading to use.';
 const CLARIFIED_CRITERION = 'The link opens the conversation in the same tab.';
@@ -41,9 +40,9 @@ describe('ResumeIssue', () => {
     ambiguousAuthor(scenario);
     await scenario.pipeline().runIssue(ISSUE_NUMBER);
     const clarified = { ...SPEC, acceptanceCriteria: [SPEC.acceptanceCriteria[0] ?? '', CLARIFIED_CRITERION] };
-    scenario.github.issues.set(ISSUE_NUMBER, issueRecord({ body: renderSpecBody(clarified) }));
+    scenario.github.issues.set(ISSUE_NUMBER, issueRecord({ body: renderSpecBody(clarified, SCENARIO_CONVENTIONS) }));
 
-    const resumed = await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER);
+    const resumed = await scenario.resumer().resume(ISSUE_NUMBER);
 
     expect(resumed).toEqual({
       issueNumber: ISSUE_NUMBER,
@@ -68,7 +67,7 @@ describe('ResumeIssue', () => {
     const scenario = new PipelineScenario();
     ambiguousAuthor(scenario);
     await scenario.pipeline().runIssue(ISSUE_NUMBER);
-    expect(await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).toMatchObject({ specChanged: false, checksReauthored: true });
+    expect(await scenario.resumer().resume(ISSUE_NUMBER)).toMatchObject({ specChanged: false, checksReauthored: true });
     expect(scenario.events.records.filter((event) => event.type === 'pipeline.spec-captured')).toHaveLength(1);
   });
 
@@ -76,7 +75,7 @@ describe('ResumeIssue', () => {
     const scenario = new PipelineScenario();
     scenario.harness.script('reviewer', { finalText: 'Looks fine to me.' }, { finalText: NO_FINDINGS });
     expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('needs-human');
-    expect(await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).toMatchObject({
+    expect(await scenario.resumer().resume(ISSUE_NUMBER)).toMatchObject({
       issueNumber: ISSUE_NUMBER,
       resumedAt: 'reviewing',
       specChanged: false,
@@ -91,14 +90,14 @@ describe('ResumeIssue', () => {
     const spent = new PipelineScenario();
     spent.lintFailuresLeft = 4;
     await spent.pipeline().runIssue(ISSUE_NUMBER);
-    await expect(new ResumeIssue(spent.dependencies()).resume(ISSUE_NUMBER)).rejects.toThrow('the implementer retry budget is spent');
+    await expect(spent.resumer().resume(ISSUE_NUMBER)).rejects.toThrow('the implementer retry budget is spent');
 
     const tampered = new PipelineScenario();
     tampered.harness.script('implementer', {
       effect: (request) => tampered.workspace.write(request.workingDirectory, CHECK_PATH, "test.skip('weakened', () => {});\n"),
     });
     await tampered.pipeline().runIssue(ISSUE_NUMBER);
-    await expect(new ResumeIssue(tampered.dependencies()).resume(ISSUE_NUMBER)).rejects.toThrow('a frozen acceptance check was modified');
+    await expect(tampered.resumer().resume(ISSUE_NUMBER)).rejects.toThrow('a frozen acceptance check was modified');
     expect((await tampered.journal()).state).toBe('needs-human');
   });
 
@@ -114,7 +113,7 @@ describe('ResumeIssue', () => {
     });
     await scenario.pipeline().runIssue(ISSUE_NUMBER);
 
-    expect(await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER, `  ${OPERATOR_ANSWER}\n`)).toEqual({
+    expect(await scenario.resumer().resume(ISSUE_NUMBER, `  ${OPERATOR_ANSWER}\n`)).toEqual({
       issueNumber: ISSUE_NUMBER,
       resumedAt: 'implementing',
       specChanged: false,
@@ -138,7 +137,7 @@ describe('ResumeIssue', () => {
       effect: (request) => scenario.workspace.write(request.workingDirectory, DECISION_REQUEST_PATH, DECISION_QUESTION),
     });
     await scenario.pipeline().runIssue(ISSUE_NUMBER);
-    await new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER, OPERATOR_ANSWER);
+    await scenario.resumer().resume(ISSUE_NUMBER, OPERATOR_ANSWER);
 
     expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
     const answered = scenario.harness.requestsOf('implementer')[1];
@@ -151,21 +150,21 @@ describe('ResumeIssue', () => {
     const asking = new PipelineScenario();
     decisionAsker(asking);
     await asking.pipeline().runIssue(ISSUE_NUMBER);
-    await expect(new ResumeIssue(asking.dependencies()).resume(ISSUE_NUMBER)).rejects.toThrow("needs the operator's answer");
-    await expect(new ResumeIssue(asking.dependencies()).resume(ISSUE_NUMBER, '  ')).rejects.toThrow("needs the operator's answer");
+    await expect(asking.resumer().resume(ISSUE_NUMBER)).rejects.toThrow("needs the operator's answer");
+    await expect(asking.resumer().resume(ISSUE_NUMBER, '  ')).rejects.toThrow("needs the operator's answer");
     expect((await asking.journal()).state).toBe('needs-human');
 
     const ambiguous = new PipelineScenario();
     ambiguousAuthor(ambiguous);
     await ambiguous.pipeline().runIssue(ISSUE_NUMBER);
-    await expect(new ResumeIssue(ambiguous.dependencies()).resume(ISSUE_NUMBER, OPERATOR_ANSWER)).rejects.toThrow('nothing to answer');
+    await expect(ambiguous.resumer().resume(ISSUE_NUMBER, OPERATOR_ANSWER)).rejects.toThrow('nothing to answer');
   });
 
   it('refuses an issue that is not waiting for a human', async () => {
     const scenario = new PipelineScenario();
-    await expect(new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).rejects.toBeInstanceOf(ResumeRefusedError);
+    await expect(scenario.resumer().resume(ISSUE_NUMBER)).rejects.toBeInstanceOf(ResumeRefusedError);
     await scenario.pipeline().runIssue(ISSUE_NUMBER);
-    await expect(new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).rejects.toThrow('it is pr-open, not needs-human');
+    await expect(scenario.resumer().resume(ISSUE_NUMBER)).rejects.toThrow('it is pr-open, not needs-human');
   });
 
   it('refuses a spec the operator no longer validates', async () => {
@@ -173,7 +172,7 @@ describe('ResumeIssue', () => {
     ambiguousAuthor(scenario);
     await scenario.pipeline().runIssue(ISSUE_NUMBER);
     scenario.github.issues.set(ISSUE_NUMBER, issueRecord({ labels: ['type:ui', 'spec:draft'] }));
-    await expect(new ResumeIssue(scenario.dependencies()).resume(ISSUE_NUMBER)).rejects.toBeInstanceOf(SpecNotValidatedError);
+    await expect(scenario.resumer().resume(ISSUE_NUMBER)).rejects.toBeInstanceOf(SpecNotValidatedError);
     expect((await scenario.journal()).state).toBe('needs-human');
   });
 });

@@ -1,3 +1,4 @@
+import { DEFAULT_ISSUE_TYPES } from '@agent-factory/domain';
 import type { CockpitSnapshot, RunLogLine } from '../../contract/index.ts';
 import { buildAudits, buildEnvironments, buildReleases, buildWorkflows } from './delivery.ts';
 import { buildIssues } from './issues.ts';
@@ -23,7 +24,13 @@ export function buildWorld(now: number): MockWorld {
     snapshot: {
       sequence: INITIAL_SEQUENCE,
       generatedAt: new Date(now).toISOString(),
-      factory: { repository: REPOSITORY, defaultBranch: 'main', operator: 'Alex Morgan', schedulerPaused: false },
+      factory: {
+        repository: REPOSITORY,
+        defaultBranch: 'main',
+        operator: 'Alex Morgan',
+        schedulerPaused: false,
+        issueTypes: DEFAULT_ISSUE_TYPES.map((type) => ({ id: type.id, label: type.label, proof: type.proof })),
+      },
       requests: buildRequests(clock),
       issues: buildIssues(clock),
       runs,
