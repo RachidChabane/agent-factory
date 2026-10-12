@@ -809,6 +809,31 @@ export type ResourcesView = z.infer<typeof ResourcesViewSchema>;
 
 // ---------------------------------------------------------------- projects
 
+/** An issue that keeps a worktree of the project's pool, with the pull request it waits at, if any. */
+export const WorktreeHolderViewSchema = z.object({
+  issueNumber: IssueNumberSchema,
+  state: z.enum(ISSUE_STATES).nullable(),
+  pullRequestNumber: IssueNumberSchema.nullable(),
+});
+export type WorktreeHolderView = z.infer<typeof WorktreeHolderViewSchema>;
+
+/** Validated issues that wait only because every worktree of the project's pool is held. */
+export const WorktreeShortageViewSchema = z.object({
+  /** When the condition began; later changes of who waits or who holds do not move it. */
+  since: IsoDateTimeSchema,
+  poolSize: CountSchema,
+  /** The issues that would start if a worktree were free. */
+  waiting: z.array(IssueNumberSchema),
+  holders: z.array(WorktreeHolderViewSchema),
+});
+export type WorktreeShortageView = z.infer<typeof WorktreeShortageViewSchema>;
+
+/** What the project's scheduler records besides its pauses. */
+export const ProjectSchedulerViewSchema = z.object({
+  worktreeShortage: WorktreeShortageViewSchema.nullable(),
+});
+export type ProjectSchedulerView = z.infer<typeof ProjectSchedulerViewSchema>;
+
 export const ProjectViewSchema = z.object({
   id: ProjectIdSchema,
   name: z.string().min(1),
@@ -817,6 +842,7 @@ export const ProjectViewSchema = z.object({
   baseBranch: z.string().min(1),
   /** The project's own pauses, on top of the installation's. */
   pauses: z.array(PauseViewSchema),
+  scheduler: ProjectSchedulerViewSchema,
   issueTypes: z.array(IssueTypeInfoSchema),
   requests: z.array(RequestViewSchema),
   issues: z.array(IssueViewSchema),

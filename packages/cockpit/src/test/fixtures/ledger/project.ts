@@ -101,6 +101,7 @@ export function buildLedger(clock: FixtureClock, runs: RunWorld): ProjectView {
     forge: { kind: 'local', url: null },
     baseBranch: 'main',
     pauses: pauses(clock),
+    scheduler: { worktreeShortage: null },
     issueTypes: issueTypeInfos(LEDGER_ISSUE_TYPES),
     requests: newestFirst(ledgerRequests(clock, runs), (request) => request.receivedAt),
     issues: oldestFirstByNumber(ledgerIssues(clock, runs)),

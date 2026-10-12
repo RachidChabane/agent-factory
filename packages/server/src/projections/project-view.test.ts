@@ -160,6 +160,36 @@ describe('the view of one project', () => {
     expect(after).toMatchObject({ state: 'promotable', cutAt: at(3).toISOString() });
   });
 
+  describe('the scheduler of a project', () => {
+    const at = (minutes: number): Date => new Date(GENERATED_AT.getTime() - minutes * 60_000);
+    const full = (minutes: number, waiting: readonly number[]) => ({
+      occurredAt: at(minutes),
+      type: 'scheduler.worktrees-full',
+      subject: 'daemon',
+      payload: { poolSize: 2, waiting, holders: [{ issueNumber: 42, state: 'pr-open', pullRequestNumber: 100 }, { issueNumber: 44, state: 'needs-human', pullRequestNumber: null }] },
+    });
+
+    it('records no shortage while room exists', () => {
+      expect(view.scheduler).toEqual({ worktreeShortage: null });
+    });
+
+    it('carries the issues that wait for a worktree and the issues that hold them, since the shortage began', () => {
+      const shortage = viewOf(withProjectEvents(projectHistory(), full(30, [43]), full(10, [43, 45]))).view;
+      expect(ProjectViewSchema.safeParse(shortage).error?.issues ?? []).toEqual([]);
+      expect(shortage.scheduler.worktreeShortage).toEqual({
+        since: at(30).toISOString(),
+        poolSize: 2,
+        waiting: [43, 45],
+        holders: [{ issueNumber: 42, state: 'pr-open', pullRequestNumber: 100 }, { issueNumber: 44, state: 'needs-human', pullRequestNumber: null }],
+      });
+    });
+
+    it('forgets the shortage once room appears', () => {
+      const free = { occurredAt: at(5), type: 'scheduler.worktrees-free', subject: 'daemon', payload: {} };
+      expect(viewOf(withProjectEvents(projectHistory(), full(30, [43]), free)).view.scheduler.worktreeShortage).toBeNull();
+    });
+  });
+
   it('keeps the base sha of the proof once the merge released the worktree', () => {
     const history = projectHistory();
     const acquired = history.project.find((record) => record.type === 'pipeline.worktree-acquired' && record.subject === 'issue/42');
