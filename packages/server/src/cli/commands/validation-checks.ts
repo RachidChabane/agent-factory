@@ -16,6 +16,7 @@ import type { AgentFactoryConfig, NotificationChannelConfig, ProjectConfig } fro
 import { ROLE_PROMPTS_DIRECTORY } from '../../composition/install-paths.ts';
 import type { SourceEnvironment } from '../../composition/installation/installation-context.ts';
 import { builtInTools, definedEnvironment, installationToolProber, projectToolProber, type ToolProberSettings } from '../../composition/installation/tools.ts';
+import { projectEngineSockets } from '../../composition/project/confinement.ts';
 import { projectGitEnvironment, rehearsalRepositories } from '../../composition/project/forge.ts';
 import { projectConventions } from '../../composition/project/project-settings.ts';
 
@@ -27,6 +28,10 @@ const FETCH_DIRECTION = 'fetch';
 const LABEL_LIST_LIMIT = '1000';
 const DEFAULT_LOGIN_DETAIL = 'none configured; agent runs use the default Claude login';
 const NO_CHANNEL_DETAIL = 'no channel configured; notices appear only in the cockpit';
+const FULLY_CONFINED_DETAIL = 'agents and commands stay confined: no container engine, no network domain for agents';
+const ENGINE_CONSEQUENCE =
+  'a container can mount any directory the engine shares and reach any network, so what runs through the engine is not confined';
+const ENGINE_MISSING_DETAIL = 'the container engine is granted but no engine socket was found: start the engine, or set DOCKER_HOST';
 const LabelListSchema = z.array(z.object({ name: z.string() }));
 
 export interface CheckOutcome {
@@ -222,6 +227,16 @@ async function knowledgeOutcome(project: ProjectConfig): Promise<CheckOutcome> {
   return missing.length === 0 ? { ok: true, detail: paths.join(', ') } : { ok: false, detail: `missing: ${missing.join(', ')}` };
 }
 
+/** What confined code of the project may reach beyond its worktree, with the consequence of a container engine grant. */
+export function sandboxOutcome(project: ProjectConfig, engineSockets: readonly string[]): CheckOutcome {
+  const { allowedDomains, docker } = project.sandbox;
+  const domains = allowedDomains.length === 0 ? [] : [`agents reach ${allowedDomains.join(', ')}`];
+  if (!docker) return { ok: true, detail: domains.length === 0 ? FULLY_CONFINED_DETAIL : domains.join('; ') };
+  const [socket] = engineSockets;
+  if (socket === undefined) return { ok: false, detail: ENGINE_MISSING_DETAIL };
+  return { ok: true, detail: [...domains, `container engine granted at ${socket}: ${ENGINE_CONSEQUENCE}`].join('; ') };
+}
+
 /** What one project needs: its clone, its labels, its prompts and knowledge, and its declared tools. */
 export function projectChecks(config: AgentFactoryConfig, project: ProjectConfig, settings: ValidationSettings): readonly ValidationCheck[] {
   const cwd = config.home;
@@ -236,6 +251,7 @@ export function projectChecks(config: AgentFactoryConfig, project: ProjectConfig
     ...(project.forge.kind === 'github' ? [{ name: 'labels', severity: 'required', runsCommands: true, run: () => guarded(() => labelsOutcome(project, settings, cwd)) } satisfies ValidationCheck] : []),
     { name: 'prompts', severity: 'required', runsCommands: false, run: () => guarded(() => promptOverridesOutcome(project)) },
     { name: 'knowledge', severity: 'required', runsCommands: false, run: () => guarded(() => knowledgeOutcome(project)) },
+    { name: 'sandbox', severity: 'optional', runsCommands: false, run: () => guarded(() => Promise.resolve(sandboxOutcome(project, projectEngineSockets(project, settings)()))) },
     ...project.tools.map((tool) => toolCheck(prober, tool.name, 'optional', `tool ${tool.name}`)),
   ];
 }

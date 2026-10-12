@@ -6,6 +6,8 @@ export interface BubblewrapPolicy {
   readonly writableDirectories: readonly string[];
   readonly hiddenDirectories: readonly string[];
   readonly hiddenFiles: readonly string[];
+  /** Container engine sockets bound back in after the hidden paths, so a hidden runtime directory still lets them through. */
+  readonly engineSockets: readonly string[];
   readonly network: boolean;
 }
 
@@ -52,6 +54,7 @@ export function renderBubblewrapArguments(policy: BubblewrapPolicy): readonly st
     ...policy.writableDirectories.flatMap((directory) => writableBind(BIND_IF_PRESENT_OPTION, directory)),
     ...policy.hiddenDirectories.flatMap((directory) => [MEMORY_FILESYSTEM_OPTION, mountPoint(directory)]),
     ...policy.hiddenFiles.flatMap((file) => [READ_ONLY_BIND_OPTION, NULL_DEVICE, mountPoint(file)]),
+    ...policy.engineSockets.flatMap((socket) => [BIND_IF_PRESENT_OPTION, mountPoint(socket), mountPoint(socket)]),
     CHANGE_DIRECTORY_OPTION,
     mountPoint(policy.workingDirectory),
     COMMAND_SEPARATOR,

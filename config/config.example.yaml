@@ -106,6 +106,14 @@ projects:
     environment:
       passthrough: [PATH, HOME, LANG, TERM, TMPDIR, USER]
       set: { CI: "1" }
+    # What confined code may reach beyond its worktree. Agents may always run the setup and gate commands above.
+    sandbox:
+      # Lets the agents look package versions up; registry credentials stay unreadable.
+      shellCommands: ["npm view *"]
+      allowedDomains: [registry.npmjs.org]
+      # true lets agents and gate commands drive the container engine. A container can mount any directory
+      # the engine shares and reach any network: what runs through the engine is not confined.
+      docker: false
     issueTypes:
       - id: feature
         proof: fails-on-base

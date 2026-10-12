@@ -28,6 +28,8 @@ import { RunTranscript } from './stream/run-transcript.ts';
 import type { ResultLine } from './stream/stream-schemas.ts';
 
 const LOG_FILE_MODE = 0o600;
+/** The platform whose sandbox opens either every Unix socket or none. */
+const LINUX_PLATFORM = 'linux';
 export const DEFAULT_CLAUDE_CONFIG_DIRECTORY = '.claude';
 export const SHELL_SNAPSHOTS_DIRECTORY = 'shell-snapshots';
 const EXCLUSIVE_CREATE = 'wx';
@@ -146,6 +148,9 @@ export class ClaudeCodeHarness implements AgentHarness {
       gateRequired,
       gateTimeoutMs: this.#config.gateTimeoutMs,
       sandboxAllowedDomains: this.#config.sandboxAllowedDomains,
+      shellCommands: this.#config.shellCommands,
+      unixSockets: this.#config.engineSockets(),
+      socketsAllOrNothing: this.#config.platform === LINUX_PLATFORM,
       writableDirectories: layout.writableDirectories,
       deniedReadPaths: this.#deniedReadPaths(layout.worktree),
       readablePaths: [join(this.#claudeConfigDirectory(request.account) ?? join(this.#config.home, DEFAULT_CLAUDE_CONFIG_DIRECTORY), SHELL_SNAPSHOTS_DIRECTORY)],

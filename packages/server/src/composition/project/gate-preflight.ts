@@ -23,7 +23,7 @@ export interface PreflightSettings {
 /** Runs a project's setup and gate commands on a clean checkout of its base, confined as the pipeline confines them. */
 export function projectGatePreflight(config: AgentFactoryConfig, project: ProjectConfig, settings: PreflightSettings): GatePreflight {
   const { runner, environment, platform, home } = settings;
-  const sandbox = commandSandbox(config, project, { platform, home, listening: new ListeningPorts(factoryPorts(config.server.port)) });
+  const sandbox = commandSandbox(config, project, { platform, home, environment, listening: new ListeningPorts(factoryPorts(config.server.port)) });
   const shell = new ShellCommands(runner, sandbox, checkEnvironment(project, environment), project.gate.timeoutMs, project.gate.niceness);
   return new GatePreflight(
     { workspaces: baseWorkspaces(project, runner, projectGitEnvironment(project, environment)), shell },

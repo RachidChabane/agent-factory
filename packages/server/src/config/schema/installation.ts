@@ -157,10 +157,21 @@ export const ToolChecksSchema = z
     for (const name of uniqueBy(tools, (tool) => tool.name)) context.addIssue({ code: 'custom', message: `tool ${name} is declared twice` });
   });
 
+/** A host name, or `*.` and a domain for every host under it. */
+export const DOMAIN_PATTERN = /^(\*\.)?[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
+/** A shell command an agent may start, as a permission pattern such as `go test *`. */
+export const SHELL_COMMAND_PATTERN = /^[^()\n]+$/;
+
 export const SandboxSettingsSchema = z.strictObject({
   deniedReadPaths: z.array(PathString).default([]),
   /** Directories confined commands may write besides their worktree; absent means the platform's package caches. */
   writableDirectories: z.array(PathString).optional(),
+  /** Shell commands the writing agents may run besides the built-in ones and the project's setup and gate commands. */
+  shellCommands: z.array(NonEmptyString.regex(SHELL_COMMAND_PATTERN, 'must be one command pattern, without parentheses or line breaks')).default([]),
+  /** Hosts the agents' shell commands may reach, such as a package registry to look versions up. */
+  allowedDomains: z.array(z.string().regex(DOMAIN_PATTERN, 'must be a host name, or *. and a domain')).default([]),
+  /** Lets agents and gate commands drive the machine's container engine; what runs through the engine is not confined. */
+  docker: z.boolean().optional(),
 });
 
 export const CheckEnvironmentSchema = z.strictObject({

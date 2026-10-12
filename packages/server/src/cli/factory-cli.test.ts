@@ -93,8 +93,10 @@ describe('the agent-factory command line', () => {
       'ok   widgets',
       'ok   widgets',
       'ok   widgets',
+      'ok   widgets',
     ]);
-    expect(captured.lines.slice(-4).map((line) => line.split(':')[1]?.trim())).toEqual(['clone', 'labels', 'prompts', 'knowledge']);
+    expect(captured.lines.slice(-5).map((line) => line.split(':')[1]?.trim())).toEqual(['clone', 'labels', 'prompts', 'knowledge', 'sandbox']);
+    expect(captured.lines.at(-1)).toBe('ok   widgets: sandbox: agents and commands stay confined: no container engine, no network domain for agents');
   });
 
   it('checks only what needs no command offline, and says what it left out', async () => {

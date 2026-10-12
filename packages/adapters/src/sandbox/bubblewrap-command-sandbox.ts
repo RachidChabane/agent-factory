@@ -4,13 +4,15 @@ import { BUBBLEWRAP_EXECUTABLE, renderBubblewrapArguments, type BubblewrapPolicy
 import { hiddenPaths } from './bubblewrap-hidden-paths.ts';
 import { canonicalDirectory } from './canonical-directory.ts';
 import type { CommandSandboxSettings } from './command-sandbox-settings.ts';
+import { NO_ENGINE_SOCKETS } from './container-engine-sockets.ts';
 import { LINUX_PRIVATE_RUNTIME_PATHS } from './credential-paths.ts';
 import { parsePathPattern, type PathPattern } from './path-patterns.ts';
 
 /**
  * Confines a command with bubblewrap: read-only root, writable worktree, temporary and configured
  * directories, credential stores and the host's agent and container sockets hidden, and a private
- * network namespace (loopback only) unless the scope grants the network.
+ * network namespace (loopback only) unless the scope grants the network. The container engine sockets
+ * the settings grant are bound back in, whatever hides their directory.
  *
  * A configured or temporary directory that does not exist when the command starts is not bound.
  *
@@ -36,6 +38,7 @@ export class BubblewrapCommandSandbox implements CommandSandbox {
       writableDirectories: [...new Set(shared)].filter((directory) => directory !== worktree),
       hiddenDirectories: hidden.directories,
       hiddenFiles: hidden.files,
+      engineSockets: (this.settings.engineSockets ?? NO_ENGINE_SOCKETS)(),
       network: scope.network,
     };
   }

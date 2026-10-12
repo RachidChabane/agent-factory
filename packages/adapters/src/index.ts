@@ -126,6 +126,15 @@ export type { BlockedPorts, CommandSandboxSettings } from './sandbox/command-san
 export { BUBBLEWRAP_EXECUTABLE, renderBubblewrapArguments, type BubblewrapPolicy } from './sandbox/bubblewrap-arguments.ts';
 export { BubblewrapCommandSandbox } from './sandbox/bubblewrap-command-sandbox.ts';
 export { createCommandSandbox } from './sandbox/command-sandbox-factory.ts';
+export {
+  CONTAINER_ENGINE_SOCKETS,
+  ENGINE_HOST_VARIABLE,
+  NO_ENGINE_SOCKETS,
+  containerEngineSockets,
+  engineSocketsOf,
+  type EngineSocketSources,
+  type EngineSockets,
+} from './sandbox/container-engine-sockets.ts';
 export { defaultWritableCacheDirectories } from './sandbox/writable-cache-directories.ts';
 export { SUPPORTED_PLATFORMS, UnsupportedPlatformError, isSupportedPlatform, type SupportedPlatform } from './platform/supported-platform.ts';
 export {

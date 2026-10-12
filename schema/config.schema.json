@@ -476,13 +476,7 @@
           "type": "object",
           "properties": {
             "acceptance-author": {
-              "default": {
-                "model": "opus",
-                "effort": "medium",
-                "maxBudgetUsd": 8,
-                "maxTurns": 120,
-                "timeoutMinutes": 30
-              },
+              "default": {},
               "type": "object",
               "properties": {
                 "model": {
@@ -537,27 +531,10 @@
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "model",
-                "effort",
-                "maxBudgetUsd",
-                "maxTurns",
-                "timeoutMinutes"
-              ],
               "additionalProperties": false
             },
             "implementer": {
-              "default": {
-                "model": "sonnet",
-                "effort": "medium",
-                "maxBudgetUsd": 10,
-                "maxTurns": 150,
-                "timeoutMinutes": 60,
-                "escalation": {
-                  "model": "opus",
-                  "effort": "high"
-                }
-              },
+              "default": {},
               "type": "object",
               "properties": {
                 "model": {
@@ -612,24 +589,10 @@
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "model",
-                "effort",
-                "maxBudgetUsd",
-                "maxTurns",
-                "timeoutMinutes",
-                "escalation"
-              ],
               "additionalProperties": false
             },
             "reviewer": {
-              "default": {
-                "model": "opus",
-                "effort": "medium",
-                "maxBudgetUsd": 3,
-                "maxTurns": 60,
-                "timeoutMinutes": 20
-              },
+              "default": {},
               "type": "object",
               "properties": {
                 "model": {
@@ -684,23 +647,10 @@
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "model",
-                "effort",
-                "maxBudgetUsd",
-                "maxTurns",
-                "timeoutMinutes"
-              ],
               "additionalProperties": false
             },
             "challenger": {
-              "default": {
-                "model": "opus",
-                "effort": "high",
-                "maxBudgetUsd": 8,
-                "maxTurns": 150,
-                "timeoutMinutes": 40
-              },
+              "default": {},
               "type": "object",
               "properties": {
                 "model": {
@@ -755,23 +705,10 @@
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "model",
-                "effort",
-                "maxBudgetUsd",
-                "maxTurns",
-                "timeoutMinutes"
-              ],
               "additionalProperties": false
             },
             "auditor": {
-              "default": {
-                "model": "opus",
-                "effort": "medium",
-                "maxBudgetUsd": 4,
-                "maxTurns": 80,
-                "timeoutMinutes": 25
-              },
+              "default": {},
               "type": "object",
               "properties": {
                 "model": {
@@ -826,13 +763,6 @@
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "model",
-                "effort",
-                "maxBudgetUsd",
-                "maxTurns",
-                "timeoutMinutes"
-              ],
               "additionalProperties": false
             }
           },
@@ -856,6 +786,26 @@
                 "type": "string",
                 "minLength": 1
               }
+            },
+            "shellCommands": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[^()\\n]+$"
+              }
+            },
+            "allowedDomains": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(\\*\\.)?[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+$"
+              }
+            },
+            "docker": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -950,7 +900,7 @@
                     "type": "string",
                     "enum": [
                       "none",
-                      "success"
+                      "gate"
                     ]
                   }
                 },
@@ -1223,6 +1173,26 @@
                   "type": "string",
                   "minLength": 1
                 }
+              },
+              "shellCommands": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^()\\n]+$"
+                }
+              },
+              "allowedDomains": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^(\\*\\.)?[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+$"
+                }
+              },
+              "docker": {
+                "type": "boolean"
               }
             },
             "additionalProperties": false
@@ -1532,6 +1502,11 @@
                       "kind": {
                         "type": "string",
                         "const": "release-please"
+                      },
+                      "tagPattern": {
+                        "default": "*.*.*",
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "required": [
@@ -1547,7 +1522,7 @@
                         "const": "tags"
                       },
                       "tagPattern": {
-                        "default": "v*",
+                        "default": "*.*.*",
                         "type": "string",
                         "minLength": 1
                       }
@@ -1654,6 +1629,11 @@
                         "additionalProperties": false
                       }
                     },
+                    "wakeUpSeconds": {
+                      "default": 90,
+                      "type": "number",
+                      "minimum": 0
+                    },
                     "redeploy": {
                       "type": "object",
                       "properties": {
@@ -1688,6 +1668,11 @@
                   ],
                   "additionalProperties": false
                 }
+              },
+              "healthIntervalMinutes": {
+                "default": 5,
+                "type": "number",
+                "exclusiveMinimum": 0
               }
             },
             "additionalProperties": false
@@ -1696,10 +1681,6 @@
             "default": {},
             "type": "object",
             "properties": {
-              "enabled": {
-                "default": true,
-                "type": "boolean"
-              },
               "ignore": {
                 "default": [],
                 "type": "array",

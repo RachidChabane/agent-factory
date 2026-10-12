@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import type { AgentRole } from '@agent-factory/domain';
 import { POLICY_ARGUMENT } from '@agent-factory/plugin';
-import { CLAUDE_TOOLS, ROLE_PERMISSIONS, builtInToolsOf } from './role-permissions.ts';
+import { CLAUDE_TOOLS, ROLE_PERMISSIONS, bashRule, builtInToolsOf } from './role-permissions.ts';
 
 export const FROZEN_WRITE_TOOLS_MATCHER = 'Edit|Write|MultiEdit|NotebookEdit';
 export const FROZEN_WRITE_GUARD_TIMEOUT_SECONDS = 30;
@@ -31,6 +31,12 @@ export interface RunSettingsInput {
   readonly writableDirectories: readonly string[];
   readonly deniedReadPaths: readonly string[];
   readonly readablePaths: readonly string[];
+  /** Shell command patterns the project lets its writing roles run, such as `go test *`. */
+  readonly shellCommands: readonly string[];
+  /** The Unix sockets the run's shell may connect to, the container engine's when the project grants it. */
+  readonly unixSockets: readonly string[];
+  /** Whether the platform's sandbox can only open every Unix socket or none, as on Linux. */
+  readonly socketsAllOrNothing: boolean;
 }
 
 export interface CommandHook {
@@ -57,7 +63,11 @@ export interface ClaudeRunSettings {
       readonly allowRead: readonly string[];
       readonly denyWrite: readonly string[];
     };
-    readonly network: { readonly allowedDomains: readonly string[] };
+    readonly network: {
+      readonly allowedDomains: readonly string[];
+      readonly allowUnixSockets?: readonly string[];
+      readonly allowAllUnixSockets?: true;
+    };
   };
   readonly hooks: { readonly PreToolUse?: readonly HookMatcher[]; readonly Stop?: readonly HookMatcher[] };
 }
@@ -70,7 +80,8 @@ export interface RenderedRunSettings {
 
 export function renderRunSettings(input: RunSettingsInput): RenderedRunSettings {
   const rolePermissions = ROLE_PERMISSIONS[input.role];
-  const allowedTools = unique([...rolePermissions.allow, ...input.extraAllowedTools]);
+  const projectCommands = rolePermissions.runsProjectCommands ? input.shellCommands.map(bashRule) : [];
+  const allowedTools = unique([...rolePermissions.allow, ...projectCommands, ...input.extraAllowedTools]);
   const frozenFiles = input.frozenCheckPaths.map((path) => join(input.worktree, path));
   const protectedFiles = [...frozenFiles, ...PROJECT_SETTINGS_FILES.map((path) => join(input.worktree, path))];
   const deny = unique([
@@ -96,15 +107,24 @@ export function renderRunSettings(input: RunSettingsInput): RenderedRunSettings 
         filesystem: {
           allowWrite: input.writableDirectories,
           denyRead: unique([...input.protectedDirectories, ...input.deniedReadPaths]),
-          allowRead: input.readablePaths,
+          allowRead: unique([...input.readablePaths, ...input.unixSockets]),
           denyWrite: unique([...input.protectedDirectories, ...protectedFiles]),
         },
-        network: { allowedDomains: input.sandboxAllowedDomains },
+        network: renderNetwork(input),
       },
       hooks: renderHooks(input),
     },
     availableTools: builtInToolsOf(allowedTools),
     allowedTools,
+  };
+}
+
+function renderNetwork(input: RunSettingsInput): ClaudeRunSettings['sandbox']['network'] {
+  if (input.unixSockets.length === 0) return { allowedDomains: input.sandboxAllowedDomains };
+  return {
+    allowedDomains: input.sandboxAllowedDomains,
+    allowUnixSockets: input.unixSockets,
+    ...(input.socketsAllOrNothing ? { allowAllUnixSockets: true } : {}),
   };
 }
 

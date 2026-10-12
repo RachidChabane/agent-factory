@@ -14,6 +14,7 @@ const POLICY: SeatbeltPolicy = {
   deniedReads: [parsePathPattern('~/.ssh', HOME), parsePathPattern('~/.config/gws*', HOME)],
   writableDirectories: ['/factory/worktrees/slot-1', '/private/tmp'],
   socketDirectories: ['/factory/worktrees/slot-1'],
+  engineSockets: [],
   deniedExecutables: ['/usr/bin/security'],
   deniedServices: ['com.apple.SecurityServer'],
   blockedPorts: [7430, 5199],
@@ -44,6 +45,17 @@ describe('renderSeatbeltProfile', () => {
     const profile = renderSeatbeltProfile({ ...POLICY, network });
     expect(profile).toContain('(deny network-outbound\n  (remote ip "*:7430")\n  (remote ip "*:5199"))');
     expect(profile.indexOf('(remote ip "*:7430")')).toBeGreaterThan(profile.indexOf('(deny network-outbound (require-all'));
+  });
+
+  it('lets a granted engine socket through, readable even inside a denied directory, and nothing else of that directory', () => {
+    const profile = renderSeatbeltProfile({ ...POLICY, deniedReads: [parsePathPattern('~/.docker', HOME)], engineSockets: ['/Users/operator/.docker/run/docker.sock'] });
+    expect(profile).toContain('(deny file-read*\n  (subpath "/Users/operator/.docker"))\n(allow file-read*\n  (literal "/Users/operator/.docker/run/docker.sock"))');
+    expect(profile).toContain('(require-not (require-any (remote unix-socket (subpath "/factory/worktrees/slot-1")) (remote unix-socket (literal "/Users/operator/.docker/run/docker.sock"))))');
+    expect(profile.indexOf('(allow file-read*')).toBeLessThan(profile.indexOf('(deny file-write*)'));
+  });
+
+  it('grants no engine socket unless one is given', () => {
+    expect(renderSeatbeltProfile(POLICY)).not.toContain('(allow file-read*');
   });
 
   it('writes no port rule when no port is blocked', () => {

@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { HOOK_SCRIPTS } from '@agent-factory/plugin';
+import { NO_ENGINE_SOCKETS, type EngineSockets } from '../sandbox/container-engine-sockets.ts';
 import { BUILT_IN_CREDENTIAL_PATHS } from '../sandbox/credential-paths.ts';
 import type { HookScripts } from './run-settings.ts';
 
@@ -33,6 +34,11 @@ export interface ClaudeHarnessConfig {
   readonly gateTimeoutMs: number;
   readonly terminationGraceMs: number;
   readonly sandboxAllowedDomains: readonly string[];
+  /** Shell command patterns the writing roles may run besides the built-in ones. */
+  readonly shellCommands: readonly string[];
+  /** The container engine sockets a run's shell may connect to, read again for every run. */
+  readonly engineSockets: EngineSockets;
+  readonly platform: string;
   readonly hookRuntime: string;
   readonly hookScripts: HookScripts;
   readonly maxLineBytes: number;
@@ -58,6 +64,9 @@ export function claudeHarnessConfig(settings: ClaudeHarnessSettings): ClaudeHarn
     gateTimeoutMs: DEFAULT_GATE_TIMEOUT_MS,
     terminationGraceMs: DEFAULT_TERMINATION_GRACE_MS,
     sandboxAllowedDomains: [],
+    shellCommands: [],
+    engineSockets: NO_ENGINE_SOCKETS,
+    platform: process.platform,
     hookRuntime: process.execPath,
     hookScripts: HOOK_SCRIPTS,
     maxLineBytes: DEFAULT_MAX_LINE_BYTES,

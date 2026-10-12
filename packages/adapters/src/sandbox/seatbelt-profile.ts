@@ -5,6 +5,8 @@ export interface SeatbeltPolicy {
   readonly deniedReads: readonly PathPattern[];
   readonly writableDirectories: readonly string[];
   readonly socketDirectories: readonly string[];
+  /** Container engine sockets the command may connect to, even inside a directory whose reads are denied. */
+  readonly engineSockets: readonly string[];
   readonly deniedExecutables: readonly string[];
   readonly deniedServices: readonly string[];
   readonly blockedPorts: readonly number[];
@@ -65,7 +67,10 @@ export function renderSeatbeltProfile(policy: SeatbeltPolicy): string {
     ...WRITABLE_DEVICES.map((device) => `(literal ${quoted(device)})`),
     ...WRITABLE_DEVICE_PATTERNS.map((pattern) => `(regex #"${pattern}")`),
   ];
-  const sockets = policy.socketDirectories.map((directory) => `(remote unix-socket (subpath ${quoted(directory)}))`);
+  const sockets = [
+    ...policy.socketDirectories.map((directory) => `(remote unix-socket (subpath ${quoted(directory)}))`),
+    ...policy.engineSockets.map((socket) => `(remote unix-socket (literal ${quoted(socket)}))`),
+  ];
   const nameService = policy.network ? [`(remote unix-socket (literal ${quoted(NAME_SERVICE_SOCKET)}))`] : [];
   const reachableSockets = [...sockets, ...nameService];
   const launchdSockets = LAUNCHD_SOCKET_DIRECTORIES.map((prefix) => `(remote unix-socket (regex ${prefixRegex(prefix)}))`);
@@ -73,6 +78,7 @@ export function renderSeatbeltProfile(policy: SeatbeltPolicy): string {
     SEATBELT_VERSION,
     '(allow default)',
     ...rule('deny', 'file-read*', policy.deniedReads.map(pathFilter)),
+    ...rule('allow', 'file-read*', policy.engineSockets.map((socket) => `(literal ${quoted(socket)})`)),
     '(deny file-write*)',
     ...rule('allow', 'file-write*', writable),
     ...rule('deny', 'file-write*', policy.deniedReads.map(pathFilter)),

@@ -8,6 +8,7 @@ const POLICY: BubblewrapPolicy = {
   writableDirectories: ['/tmp', '/home/operator/.npm'],
   hiddenDirectories: ['/home/operator/.ssh', '/run/user'],
   hiddenFiles: ['/home/operator/.netrc'],
+  engineSockets: [],
   network: false,
 };
 
@@ -26,6 +27,7 @@ const UNSAFE_POLICIES: readonly UnsafePolicy[] = [
   { name: 'a line feed', change: { hiddenFiles: ['/tmp/a\nb'] } },
   { name: 'a carriage return', change: { workingDirectory: '/tmp/a\rb' } },
   { name: 'a null character', change: { writableDirectories: ['/tmp/a\u0000b'] } },
+  { name: 'a relative engine socket', change: { engineSockets: ['docker.sock'] } },
 ];
 
 const OPTION_OPERAND_COUNTS: Readonly<Record<string, number>> = {
@@ -107,8 +109,17 @@ describe('renderBubblewrapArguments', () => {
   });
 
   it('writes nothing but the isolation, the root and the working directory for an empty policy', () => {
-    const args = renderBubblewrapArguments({ workingDirectory: '/work', writableDirectories: [], hiddenDirectories: [], hiddenFiles: [], network: true });
+    const args = renderBubblewrapArguments({ workingDirectory: '/work', writableDirectories: [], hiddenDirectories: [], hiddenFiles: [], engineSockets: [], network: true });
     expect(args).toEqual([...ISOLATION, ...ROOT_AND_SYSTEM_FILESYSTEMS, '--bind', '/work', '/work', '--chdir', '/work', '--']);
+  });
+
+  it('binds each granted engine socket back in after the hidden paths, so a hidden runtime directory still lets it through', () => {
+    const args = renderBubblewrapArguments({ ...POLICY, engineSockets: ['/run/user/1000/docker.sock'] });
+    const socket = args.indexOf('/run/user/1000/docker.sock');
+    expect(args.slice(socket - 1, socket + 2)).toEqual(['--bind-try', '/run/user/1000/docker.sock', '/run/user/1000/docker.sock']);
+    expect(socket).toBeGreaterThan(args.indexOf('/run/user'));
+    expect(socket).toBeGreaterThan(args.indexOf('/home/operator/.netrc'));
+    expect(args.slice(-3)).toEqual(['--chdir', '/factory/worktrees/slot-1', COMMAND_SEPARATOR]);
   });
 
   it.each(UNSAFE_POLICIES)('refuses $name, as the macOS profile does', ({ change }) => {
@@ -123,7 +134,7 @@ describe('renderBubblewrapArguments', () => {
   it('puts the read-only root before every mount that overlays it, and every hidden path after every writable one', () => {
     fc.assert(
       fc.property(safePath(), fc.array(safePath()), fc.array(safePath()), fc.array(safePath()), fc.boolean(), (working, writable, directories, files, network) => {
-        const args = renderBubblewrapArguments({ workingDirectory: working, writableDirectories: writable, hiddenDirectories: directories, hiddenFiles: files, network });
+        const args = renderBubblewrapArguments({ workingDirectory: working, writableDirectories: writable, hiddenDirectories: directories, hiddenFiles: files, engineSockets: [], network });
         const binds = [...indexesOf(args, '--bind'), ...indexesOf(args, '--bind-try')];
         const hides = [...indexesOf(args, '--tmpfs'), ...args.flatMap((argument, index) => (argument === '--ro-bind' && args[index + 1] === NULL_DEVICE ? [index] : []))];
         const root = args.indexOf('--ro-bind');
@@ -141,7 +152,7 @@ describe('renderBubblewrapArguments', () => {
   it('mounts every directory it is given on itself and nothing else', () => {
     fc.assert(
       fc.property(safePath(), fc.array(safePath()), (working, writable) => {
-        const args = renderBubblewrapArguments({ workingDirectory: working, writableDirectories: writable, hiddenDirectories: [], hiddenFiles: [], network: true });
+        const args = renderBubblewrapArguments({ workingDirectory: working, writableDirectories: writable, hiddenDirectories: [], hiddenFiles: [], engineSockets: [], network: true });
         const mounts = indexesOf(args, '--bind').concat(indexesOf(args, '--bind-try')).map((index) => args.slice(index + 1, index + 3));
         expect(mounts.every(([source, destination]) => source === destination)).toBe(true);
         expect(mounts.map(([source]) => source).sort()).toEqual([working, ...writable].sort());

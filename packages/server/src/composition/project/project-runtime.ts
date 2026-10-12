@@ -35,7 +35,7 @@ import type { InstallationContext } from '../installation/installation-context.t
 import { FACTORY_INSTALL_DIRECTORY, ROLE_PROMPTS_DIRECTORY } from '../install-paths.ts';
 import { RandomRunIds } from '../system.ts';
 import { baseWorkspaces } from './base-workspaces.ts';
-import { agentDeniedReadPaths, commandSandbox, knownSecretSource } from './confinement.ts';
+import { agentDeniedReadPaths, agentShellCommands, commandSandbox, knownSecretSource, projectEngineSockets } from './confinement.ts';
 import { deliveryEnvironments, monitoredEnvironments, releaseGateHealth } from './delivery.ts';
 import { openForge, projectGitEnvironment } from './forge.ts';
 import { localGateChecks } from './local-checks.ts';
@@ -88,6 +88,10 @@ function baseHarness(installation: InstallationContext, project: ProjectConfig):
       accounts: Object.fromEntries(config.claude.accounts.map((account) => [account.name, account.configDir])),
       deniedReadPaths: agentDeniedReadPaths(config, project),
       home: installation.userHome,
+      shellCommands: agentShellCommands(project),
+      sandboxAllowedDomains: project.sandbox.allowedDomains,
+      engineSockets: projectEngineSockets(project, { platform: installation.platform, home: installation.userHome, environment: installation.environment }),
+      platform: installation.platform,
     }),
   );
 }
@@ -127,7 +131,12 @@ export async function openProject(installation: InstallationContext, initial: Pr
     harness: projectHarness(installation, config),
     roles: await rolePrompts(config),
     runner,
-    sandbox: commandSandbox(installation.config, config, { platform: installation.platform, home: installation.userHome, listening: installation.listeningPorts }),
+    sandbox: commandSandbox(installation.config, config, {
+      platform: installation.platform,
+      home: installation.userHome,
+      environment: installation.environment,
+      listening: installation.listeningPorts,
+    }),
     knownSecrets: knownSecretSource(config, runner, environment, installation.userHome),
     events,
     states: new EventSourcedIssueStateStore(events),

@@ -137,7 +137,13 @@ export interface ProjectConfig {
     readonly niceness: number | null;
   };
   readonly environment: { readonly passthrough: readonly string[]; readonly set: Readonly<Record<string, string>> };
-  readonly sandbox: { readonly deniedReadPaths: readonly string[]; readonly writableDirectories: readonly string[] | null };
+  readonly sandbox: {
+    readonly deniedReadPaths: readonly string[];
+    readonly writableDirectories: readonly string[] | null;
+    readonly shellCommands: readonly string[];
+    readonly allowedDomains: readonly string[];
+    readonly docker: boolean;
+  };
   readonly secretScan: { readonly keychainServices: readonly string[] };
   readonly issueTypes: readonly IssueTypeDefinition[];
   readonly roles: RoleSettingsMap;
@@ -364,6 +370,9 @@ function resolveProject(raw: RawProject, config: RawAgentFactoryConfig, home: st
     sandbox: {
       deniedReadPaths: [...config.defaults.sandbox.deniedReadPaths, ...(raw.sandbox?.deniedReadPaths ?? [])].map((path) => resolvePath(path, home, userHome)),
       writableDirectories: writable === undefined ? null : writable.map((path) => resolvePath(path, home, userHome)),
+      shellCommands: [...new Set([...config.defaults.sandbox.shellCommands, ...(raw.sandbox?.shellCommands ?? [])])],
+      allowedDomains: [...new Set([...config.defaults.sandbox.allowedDomains, ...(raw.sandbox?.allowedDomains ?? [])])],
+      docker: raw.sandbox?.docker ?? config.defaults.sandbox.docker ?? false,
     },
     secretScan: raw.secretScan,
     issueTypes: raw.issueTypes === undefined ? presetTypes(raw.conventions.labels.typePrefix) : raw.issueTypes.map((type) => issueType(type, raw.conventions.labels.typePrefix)),

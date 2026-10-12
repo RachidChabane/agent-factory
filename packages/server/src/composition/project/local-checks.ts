@@ -41,7 +41,12 @@ class ProjectGateRunner implements LocalCheckRunner {
   async run(sha: string, signal: AbortSignal): Promise<LocalCheckRun> {
     const { project, settings } = this;
     const workspaces = baseWorkspaces(project, settings.runner, projectGitEnvironment(project, settings.environment));
-    const sandbox = commandSandbox(this.config, project, { platform: settings.platform, home: settings.home, listening: new ListeningPorts(factoryPorts(this.config.server.port)) });
+    const sandbox = commandSandbox(this.config, project, {
+      platform: settings.platform,
+      home: settings.home,
+      environment: settings.environment,
+      listening: new ListeningPorts(factoryPorts(this.config.server.port)),
+    });
     const shell = new ShellCommands(new SpawnCommandRunner({ abortSignal: signal }), sandbox, checkEnvironment(project, settings.environment), project.gate.timeoutMs, project.gate.niceness);
     const checkout = await workspaces.checkout(`${CHECKOUT_PREFIX}${sha.slice(0, CHECKOUT_SHA_LENGTH)}`, sha);
     const steps: LocalCheckStep[] = [];

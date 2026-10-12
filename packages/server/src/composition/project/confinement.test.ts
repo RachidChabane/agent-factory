@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { COCKPIT_DEV_SERVER_PORT } from '@agent-factory/cockpit';
@@ -7,20 +7,38 @@ import { stringify } from 'yaml';
 import { parseAgentFactoryConfig, projectOf } from '../../config/agent-factory-config.ts';
 import { configBackupsDirectory } from '../../config/config-file.ts';
 import { factoryPorts, ListeningPorts } from '../listening-ports.ts';
-import { agentDeniedReadPaths, commandSandbox, credentialPaths, installationPrivatePaths, otherProjectsDirectories, projectPrivatePaths } from './confinement.ts';
+import {
+  agentDeniedReadPaths,
+  agentShellCommands,
+  commandSandbox,
+  CONTAINER_ENGINE_COMMANDS,
+  credentialPaths,
+  installationPrivatePaths,
+  otherProjectsDirectories,
+  projectEngineSockets,
+  projectPrivatePaths,
+} from './confinement.ts';
 
 const USER_HOME = '/Users/operator';
 const HOME = `${USER_HOME}/.agent-factory`;
 
-function project(id: string, forge: Record<string, unknown>): Record<string, unknown> {
-  return { id, name: id, forge, commitIdentity: { name: 'Bot', email: 'bot@example.invalid' }, sandbox: { deniedReadPaths: ['~/.kube*'] } };
+function project(id: string, forge: Record<string, unknown>, sandbox: Record<string, unknown> = {}): Record<string, unknown> {
+  return { id, name: id, forge, commitIdentity: { name: 'Bot', email: 'bot@example.invalid' }, sandbox: { deniedReadPaths: ['~/.kube*'], ...sandbox } };
 }
 
 function configText(): string {
   return stringify({
     version: 1,
     claude: { writableDirectories: ['cache'], accounts: [{ name: 'primary', configDir: '~/.claude-primary' }] },
-    projects: [project('storefront', { kind: 'github', repository: 'example-org/storefront' }), project('ledger', { kind: 'local', repository: 'example-org/ledger' })],
+    defaults: { sandbox: { allowedDomains: ['registry.npmjs.org'], shellCommands: ['npm view *'] } },
+    projects: [
+      project('storefront', { kind: 'github', repository: 'example-org/storefront' }),
+      {
+        ...project('ledger', { kind: 'local', repository: 'example-org/ledger' }, { docker: true, shellCommands: ['go vet *'], allowedDomains: ['proxy.golang.org'] }),
+        setup: [{ name: 'install', run: 'go mod download', network: 'downloads the modules' }],
+        gate: { afterAcceptance: [{ name: 'test', run: 'go test ./...' }] },
+      },
+    ],
   });
 }
 
@@ -35,7 +53,7 @@ function encloses(directory: string, path: string): boolean {
 }
 
 function sandboxOf(platform: string, listening: ListeningPorts = LISTENING) {
-  return commandSandbox(config, storefront, { platform, home: USER_HOME, listening });
+  return commandSandbox(config, storefront, { platform, home: USER_HOME, environment: {}, listening });
 }
 
 describe('the confinement of a project', () => {
@@ -84,7 +102,7 @@ describe('the confinement of a project', () => {
       const other = projectOf(local, 'ledger');
       const slot = join(own.worktreePool.directory, 'slot-1');
       for (const directory of [slot, other.clonePath, local.directories.state]) await mkdir(directory, { recursive: true });
-      const sandbox = commandSandbox(local, own, { platform: 'linux', home: operator, listening: new ListeningPorts(factoryPorts(local.server.port)) });
+      const sandbox = commandSandbox(local, own, { platform: 'linux', home: operator, environment: {}, listening: new ListeningPorts(factoryPorts(local.server.port)) });
       const command = sandbox.confine(['/bin/sh', '-c', 'npm test'], { workingDirectory: slot, network: false }).join(' ');
       expect(command).toMatch(/^\S*bwrap /);
       expect(command).toContain(`--tmpfs ${other.directory}`);
@@ -112,5 +130,29 @@ describe('the confinement of a project', () => {
     expect(sandbox.confine(['true'], scope)[2]).not.toContain('"*:40123"');
     listening.register(40_123);
     expect(sandbox.confine(['true'], scope)[2]).toContain('(remote ip "*:40123")');
+  });
+
+  it("lets the writing agents run the project's own setup and gate commands and the commands it declares, under the installation's", () => {
+    expect(agentShellCommands(ledger)).toEqual(['go mod download*', 'go test ./...*', 'npm view *', 'go vet *', ...CONTAINER_ENGINE_COMMANDS]);
+    expect(agentShellCommands(storefront)).toEqual(['npm view *']);
+    expect(ledger.sandbox.allowedDomains).toEqual(['registry.npmjs.org', 'proxy.golang.org']);
+  });
+
+  it('grants the container engine only to a project that asks for it, and only the engine sockets present on the machine', async () => {
+    const operator = await realpath(await mkdtemp(join(tmpdir(), 'factory-engine-')));
+    try {
+      const socket = join(operator, 'engine.sock');
+      await writeFile(socket, '');
+      const environment = { DOCKER_HOST: `unix://${socket}`, XDG_RUNTIME_DIR: join(operator, 'runtime') };
+      expect(projectEngineSockets(ledger, { platform: 'darwin', home: operator, environment })()).toContain(socket);
+      expect(projectEngineSockets(storefront, { platform: 'darwin', home: operator, environment })()).toEqual([]);
+      const granted = commandSandbox(config, ledger, { platform: 'darwin', home: operator, environment, listening: LISTENING });
+      const refused = commandSandbox(config, storefront, { platform: 'darwin', home: operator, environment, listening: LISTENING });
+      const scope = { workingDirectory: `${ledger.worktreePool.directory}/slot-1`, network: false };
+      expect(granted.confine(['docker', 'ps'], scope)[2]).toContain(`(remote unix-socket (literal "${socket}"))`);
+      expect(refused.confine(['docker', 'ps'], { ...scope, workingDirectory: SLOT })[2]).not.toContain(socket);
+    } finally {
+      await rm(operator, { recursive: true, force: true });
+    }
   });
 });

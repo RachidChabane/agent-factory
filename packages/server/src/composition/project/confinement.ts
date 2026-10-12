@@ -4,9 +4,12 @@ import {
   concretePaths,
   createCommandSandbox,
   defaultWritableCacheDirectories,
+  engineSocketsOf,
+  NO_ENGINE_SOCKETS,
   OperatorSecretInventory,
   parsePathPattern,
   userTemporaryDirectories,
+  type EngineSockets,
   type PathPattern,
 } from '@agent-factory/adapters';
 import type { CommandRunner, CommandSandbox, KnownSecretSource } from '@agent-factory/application';
@@ -14,6 +17,11 @@ import { resolvePath, type AgentFactoryConfig, type ProjectConfig } from '../../
 import { FACTORY_INSTALL_DIRECTORY } from '../install-paths.ts';
 import type { ListeningPorts } from '../listening-ports.ts';
 import type { SourceEnvironment } from './project-settings.ts';
+
+/** The shell commands an agent of a project granted the container engine may start. */
+export const CONTAINER_ENGINE_COMMANDS: readonly string[] = ['docker *'];
+/** Matches a command as typed, and the same command with arguments. */
+const COMMAND_WITH_ARGUMENTS = '*';
 
 /** The credential stores no agent and no command of the project may read. */
 export function credentialPaths(project: ProjectConfig): readonly string[] {
@@ -77,10 +85,27 @@ export function commandWritableDirectories(config: AgentFactoryConfig, project: 
   return [...config.claude.writableDirectories, ...caches];
 }
 
-export interface ConfinementSettings {
+export interface EngineSettings {
   readonly platform: string;
   readonly home: string;
+  readonly environment: SourceEnvironment;
+}
+
+export interface ConfinementSettings extends EngineSettings {
   readonly listening: ListeningPorts;
+}
+
+/** The container engine sockets the project's agents and commands may reach: none unless the project grants the engine. */
+export function projectEngineSockets(project: ProjectConfig, settings: EngineSettings): EngineSockets {
+  return project.sandbox.docker ? engineSocketsOf(settings) : NO_ENGINE_SOCKETS;
+}
+
+/** What the writing agents of a project may run besides the built-in commands: the project's own commands and what it declares. */
+export function agentShellCommands(project: ProjectConfig): readonly string[] {
+  const projectCommands = [...project.setupCommands, ...project.gate.commandsBeforeAcceptance, ...project.gate.commandsAfterAcceptance].map(
+    (command) => `${command.run}${COMMAND_WITH_ARGUMENTS}`,
+  );
+  return [...new Set([...projectCommands, ...project.sandbox.shellCommands, ...(project.sandbox.docker ? CONTAINER_ENGINE_COMMANDS : [])])];
 }
 
 export function commandSandbox(config: AgentFactoryConfig, project: ProjectConfig, settings: ConfinementSettings): CommandSandbox {
@@ -89,6 +114,7 @@ export function commandSandbox(config: AgentFactoryConfig, project: ProjectConfi
     writableDirectories: commandWritableDirectories(config, project, settings.platform, settings.home),
     temporaryDirectories: userTemporaryDirectories(settings.platform),
     blockedPorts: () => settings.listening.ports(),
+    engineSockets: projectEngineSockets(project, settings),
   });
 }
 

@@ -35,6 +35,9 @@ function input(overrides: Partial<RunSettingsInput> = {}): RunSettingsInput {
     writableDirectories: [],
     deniedReadPaths: [],
     readablePaths: [],
+    shellCommands: [],
+    unixSockets: [],
+    socketsAllOrNothing: false,
     ...overrides,
   };
 }
@@ -173,6 +176,34 @@ describe('credential read denies', () => {
     const snapshots = '/Users/operator/.claude/shell-snapshots';
     const { settings } = renderRunSettings(input({ deniedReadPaths: ['/Users/operator/.claude'], readablePaths: [snapshots] }));
     expect(settings.sandbox.filesystem.allowRead).toEqual([snapshots]);
+  });
+
+  it('lets the writing roles run the shell commands the project declares, and only them', () => {
+    const shellCommands = ['go test *', 'docker *'];
+    for (const role of AGENT_ROLES) {
+      const { allowedTools } = renderRunSettings(input({ role, shellCommands }));
+      const expected = ROLE_PERMISSIONS[role].runsProjectCommands;
+      expect(allowedTools.includes('Bash(go test *)'), role).toBe(expected);
+      expect(allowedTools.includes('Bash(docker *)'), role).toBe(expected);
+    }
+  });
+
+  it('opens no Unix socket unless the project grants one', () => {
+    const { network } = renderRunSettings(input()).settings.sandbox;
+    expect(network).toEqual({ allowedDomains: [] });
+  });
+
+  it('opens the granted engine socket to the shell and lets it through the denied directory that holds it', () => {
+    const socket = '/Users/operator/.docker/run/docker.sock';
+    const { settings } = renderRunSettings(input({ deniedReadPaths: ['/Users/operator/.docker'], unixSockets: [socket], sandboxAllowedDomains: ['registry.example.com'] }));
+    expect(settings.sandbox.network).toEqual({ allowedDomains: ['registry.example.com'], allowUnixSockets: [socket] });
+    expect(settings.sandbox.filesystem.allowRead).toEqual([socket]);
+    expect(settings.sandbox.filesystem.denyRead).toContain('/Users/operator/.docker');
+  });
+
+  it('opens every Unix socket where the sandbox cannot tell one from another', () => {
+    const { network } = renderRunSettings(input({ unixSockets: ['/run/docker.sock'], socketsAllOrNothing: true })).settings.sandbox;
+    expect(network).toEqual({ allowedDomains: [], allowUnixSockets: ['/run/docker.sock'], allowAllUnixSockets: true });
   });
 
   it('denies the keychain command to every role', () => {

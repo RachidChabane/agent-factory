@@ -47,10 +47,12 @@ export const OUTWARD_ACTION_DENY = [
 export interface RolePermissions {
   readonly allow: readonly string[];
   readonly deny: readonly string[];
+  /** Whether the role runs the shell commands the project declares for its agents. */
+  readonly runsProjectCommands: boolean;
 }
 
-const READ_ONLY_ROLE: RolePermissions = { allow: READ_ONLY_TOOLS, deny: OUTWARD_ACTION_DENY };
-const WRITING_ROLE: RolePermissions = { allow: WRITING_ROLE_ALLOW, deny: OUTWARD_ACTION_DENY };
+const READ_ONLY_ROLE: RolePermissions = { allow: READ_ONLY_TOOLS, deny: OUTWARD_ACTION_DENY, runsProjectCommands: false };
+const WRITING_ROLE: RolePermissions = { allow: WRITING_ROLE_ALLOW, deny: OUTWARD_ACTION_DENY, runsProjectCommands: true };
 
 export const ROLE_PERMISSIONS: Readonly<Record<AgentRole, RolePermissions>> = {
   challenger: READ_ONLY_ROLE,
