@@ -11,6 +11,7 @@ import { ConcurrencyForm } from './ConcurrencyForm.tsx';
 import { IssueTypeList } from './IssueTypeList.tsx';
 import { GateCommands, SetupCommands } from './ProjectCommands.tsx';
 import { EnvironmentVariables, ProjectConventions } from './ProjectConventions.tsx';
+import { ReferenceList } from './ReferenceList.tsx';
 import { RoleEditor } from './RoleEditor.tsx';
 
 const SECTION_IDS = {
@@ -22,6 +23,7 @@ const SECTION_IDS = {
   conventions: 'project-settings-conventions',
   automations: 'project-settings-automations',
   issueTypes: 'project-settings-issue-types',
+  references: 'project-settings-references',
   tools: 'project-settings-tools',
 } as const;
 
@@ -57,6 +59,9 @@ export function ProjectSettingsView() {
       </Section>
       <Section title={t('settings.issueTypes.title')} id={SECTION_IDS.issueTypes} description={t('settings.issueTypes.description')}>
         <IssueTypeList types={project.issueTypes} />
+      </Section>
+      <Section title={t('settings.references.title')} id={SECTION_IDS.references} description={t('settings.references.description')}>
+        <ReferenceList references={project.references} />
       </Section>
       <Section title={t('settings.projectTools.title')} id={SECTION_IDS.tools} description={t('settings.projectTools.description')}>
         <ToolList tools={project.tools} project={project.id} />

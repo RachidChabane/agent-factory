@@ -111,6 +111,7 @@ export function buildLedger(clock: FixtureClock, runs: RunWorld): ProjectView {
     audits,
     skippedChanges: [],
     knowledge: knowledge(clock),
+    references: [],
     tools: tools(clock),
     settings: projectSettings({
       overriddenPrompts: [],

@@ -20,6 +20,7 @@ export const STALE_AFTER_MS = {
   resources: 2 * MINUTE,
   tools: 12 * 60 * MINUTE,
   knowledge: 15 * MINUTE,
+  references: 5 * MINUTE,
 } as const;
 
 const RESOURCE_PAUSE_MINUTES_AGO = 25;

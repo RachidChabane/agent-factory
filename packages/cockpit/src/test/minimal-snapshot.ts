@@ -18,7 +18,7 @@ export function emptySnapshot(now: number, sequence = 10): CockpitSnapshot {
       startedAt: at,
       pauses: [],
       runSlots: { limit: 3, running: 0, queued: 0 },
-      staleAfterMs: { forge: 15 * MINUTE_MS, health: 10 * MINUTE_MS, resources: 2 * MINUTE_MS, tools: 12 * HOUR_MS, knowledge: 15 * MINUTE_MS },
+      staleAfterMs: { forge: 15 * MINUTE_MS, health: 10 * MINUTE_MS, resources: 2 * MINUTE_MS, tools: 12 * HOUR_MS, knowledge: 15 * MINUTE_MS, references: 5 * MINUTE_MS },
     },
     projects: [],
     runs: [],

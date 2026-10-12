@@ -329,12 +329,14 @@ describe('the readings of the world', () => {
   const health = snapshot.projects.flatMap((project) => project.environments.flatMap((environment) => environment.health.map((check) => check.latest?.at ?? null)));
   const tools = [...snapshot.tools.map((tool) => tool.checkedAt), ...snapshot.projects.flatMap((project) => project.tools.map((tool) => tool.checkedAt))];
   const knowledge = snapshot.projects.flatMap((project) => project.knowledge.map((source) => source.documents.readAt));
+  const references = snapshot.projects.flatMap((project) => project.references.map((reference) => reference.snapshot.readAt));
 
   it.each([
     ['forge', forge, stale.forge],
     ['health', health, stale.health],
     ['tools', tools, stale.tools],
     ['knowledge', knowledge, stale.knowledge],
+    ['references', references, stale.references],
   ] as const)('mostly fresh and a few stale for the %s', (_kind, readAts, threshold) => {
     const ages = readAts.map(ageOf).filter((age): age is number => age !== null);
     const staleCount = ages.filter((age) => age > threshold).length;
@@ -349,7 +351,7 @@ describe('the readings of the world', () => {
   });
 
   it('use the thresholds the installation announces', () => {
-    expect(stale).toEqual({ forge: 900_000, health: 600_000, resources: 120_000, tools: 43_200_000, knowledge: 900_000 });
+    expect(stale).toEqual({ forge: 900_000, health: 600_000, resources: 120_000, tools: 43_200_000, knowledge: 900_000, references: 300_000 });
   });
 });
 

@@ -26,7 +26,7 @@ describe('ProjectSettingsView page', () => {
   it('lays out the sections of the project in a fixed order', async () => {
     await openProjectSettings();
     const titles = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
-    expect(titles).toEqual(['Agent roles', 'Concurrency', 'Setup commands', 'Gate commands', 'Check environment', 'Conventions', 'Automations', 'Issue types', 'Tools']);
+    expect(titles).toEqual(['Agent roles', 'Concurrency', 'Setup commands', 'Gate commands', 'Check environment', 'Conventions', 'Automations', 'Issue types', 'Reference repositories', 'Tools']);
   });
 
   it('says that the project does not exist for an unknown address', async () => {
@@ -180,7 +180,7 @@ describe('ProjectSettingsView in French', () => {
   it('writes the sections, the commands and the conventions in French', async () => {
     await openProjectSettings(STOREFRONT, { locale: 'fr' });
     const titles = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
-    expect(titles).toEqual(['Rôles des agents', 'Concurrence', 'Commandes de préparation', 'Commandes de la gate', 'Environnement des checks', 'Conventions', 'Automatisations', 'Types d’issue', 'Outils']);
+    expect(titles).toEqual(['Rôles des agents', 'Concurrence', 'Commandes de préparation', 'Commandes de la gate', 'Environnement des checks', 'Conventions', 'Automatisations', 'Types d’issue', 'Dépôts de référence', 'Outils']);
     expect(screen.getByText('Réseau : downloads the packages from the private registry')).toBeInTheDocument();
     expect(screen.getAllByText('Pas de réseau').length).toBeGreaterThan(0);
     expect(screen.getByText('La gate expire au bout de 30 min.')).toBeInTheDocument();

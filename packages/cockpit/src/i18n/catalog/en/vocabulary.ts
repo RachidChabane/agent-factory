@@ -166,6 +166,10 @@ export const enVocabulary = {
   'vocab.toolStatus.missing': 'Missing',
   'vocab.toolStatus.error': 'Error',
 
+  'vocab.referenceSnapshotStatus.ready': 'Snapshot ready',
+  'vocab.referenceSnapshotStatus.missing-ref': 'Ref missing from the source',
+  'vocab.referenceSnapshotStatus.not-built': 'Snapshot not built',
+
   'vocab.toolScope.installation': 'Installation',
   'vocab.toolScope.project': 'Project',
 

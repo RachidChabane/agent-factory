@@ -1,4 +1,4 @@
-import type { KnowledgeSourceView, ProjectView, RequestView, ToolView } from '@agent-factory/cockpit';
+import type { KnowledgeSourceView, ProjectView, ReferenceView, RequestView, ToolView } from '@agent-factory/cockpit';
 import { healthSamplesSince, type FactoryEventRecord } from '@agent-factory/application';
 import type { ProjectConfig } from '../config/agent-factory-config.ts';
 import type { Observed } from '../snapshot/cached-reading.ts';
@@ -22,6 +22,7 @@ export interface ProjectReadingsView {
   readonly workflows: ProjectView['workflows'];
   readonly deployments: (target: string) => Observed<EnvironmentDeployments> | null;
   readonly knowledge: KnowledgeSourceView[];
+  readonly references: ReferenceView[];
   readonly tools: ToolView[];
 }
 
@@ -67,6 +68,7 @@ export function projectView(project: ProjectConfig, records: readonly FactoryEve
     audits: projectAudits(index, releaseOfCommits(index), context),
     skippedChanges: projectSkippedChanges(index, context),
     knowledge: readings.knowledge,
+    references: readings.references,
     tools: readings.tools,
     settings: projectSettingsView(project),
   };

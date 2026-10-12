@@ -14,6 +14,7 @@ import {
   PAUSE_CAUSES,
   PROMOTION_POLICIES,
   PROOF_STRATEGIES,
+  REFERENCE_SNAPSHOT_STATUSES,
   RELEASE_MODEL_KINDS,
   RELEASE_STATES,
   REQUEST_STATES,
@@ -90,7 +91,7 @@ export const InstallationInfoSchema = z.object({
   pauses: z.array(PauseViewSchema),
   runSlots: z.object({ limit: CountSchema, running: CountSchema, queued: CountSchema }),
   /** How old a reading of each kind may be before the cockpit calls it stale, from the intervals the factory reads it at. */
-  staleAfterMs: z.object({ forge: CountSchema, health: CountSchema, resources: CountSchema, tools: CountSchema, knowledge: CountSchema }),
+  staleAfterMs: z.object({ forge: CountSchema, health: CountSchema, resources: CountSchema, tools: CountSchema, knowledge: CountSchema, references: CountSchema }),
 });
 export type InstallationInfo = z.infer<typeof InstallationInfoSchema>;
 
@@ -635,6 +636,25 @@ export const KnowledgeSourceViewSchema = z.object({
 });
 export type KnowledgeSourceView = z.infer<typeof KnowledgeSourceViewSchema>;
 
+// ---------------------------------------------------------------- references
+
+/** Where the snapshot of a reference stands, and the commit it names. */
+export const ReferenceSnapshotSchema = z.object({
+  status: z.enum(REFERENCE_SNAPSHOT_STATUSES),
+  /** The commit of the snapshot when it is ready, the one the source's ref resolves to when it is not built yet, otherwise null. */
+  commit: z.string().min(1).nullable(),
+});
+export type ReferenceSnapshot = z.infer<typeof ReferenceSnapshotSchema>;
+
+/** A repository the project's specifications cite, with its own reading: one unreadable snapshot leaves the others in place. */
+export const ReferenceViewSchema = z.object({
+  name: z.string().min(1),
+  repository: z.string().min(1),
+  ref: z.string().min(1),
+  snapshot: readingOf(ReferenceSnapshotSchema),
+});
+export type ReferenceView = z.infer<typeof ReferenceViewSchema>;
+
 // ---------------------------------------------------------------- tools
 
 /** A tool the installation or a project checks, listed whether or not it was checked yet. */
@@ -828,6 +848,7 @@ export const ProjectViewSchema = z.object({
   audits: z.array(AuditViewSchema),
   skippedChanges: z.array(SkippedChangeViewSchema),
   knowledge: z.array(KnowledgeSourceViewSchema),
+  references: z.array(ReferenceViewSchema),
   tools: z.array(ToolViewSchema),
   settings: ProjectSettingsViewSchema,
 });

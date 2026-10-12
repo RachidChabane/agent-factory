@@ -10,6 +10,7 @@ import { storefrontEnvironments, storefrontWorkflowRuns } from './delivery.ts';
 import { activeIssues } from './issues-active.ts';
 import { deliveredIssues } from './issues-delivered.ts';
 import { storefrontPullRequests } from './pull-requests.ts';
+import { storefrontReferences } from './references.ts';
 import { storefrontReleases } from './releases.ts';
 import { storefrontRequests } from './requests.ts';
 import { DEPENDENCY_BOT_LOGIN, OPERATOR } from '../people.ts';
@@ -138,6 +139,7 @@ export function buildStorefront(clock: FixtureClock, runs: RunWorld): ProjectVie
     audits,
     skippedChanges: newestFirst(storefrontSkippedChanges(clock), (change) => change.recordedAt),
     knowledge: knowledge(clock),
+    references: storefrontReferences(clock),
     tools: tools(clock),
     settings: projectSettings({
       overriddenPrompts: ['implementer', 'challenger'],

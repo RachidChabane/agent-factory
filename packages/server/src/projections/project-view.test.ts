@@ -10,7 +10,7 @@ import { pendingQuestions, projectRuns, recordedRuns } from './run-views.ts';
 import { imageKey, type ProjectSnapshotContext } from './snapshot-context.ts';
 import { COST_SETTINGS, GENERATED_AT, PROJECT, projectContext, projectHistory, type ProjectHistory } from './testing/project-history.ts';
 
-const READINGS: ProjectReadingsView = { forgeUrl: 'https://github.com/acme/widgets', workflows: null, deployments: () => null, knowledge: [], tools: [] };
+const READINGS: ProjectReadingsView = { forgeUrl: 'https://github.com/acme/widgets', workflows: null, deployments: () => null, knowledge: [], references: [], tools: [] };
 
 function viewOf(history: ProjectHistory = projectHistory(), context = projectContext(history)) {
   return projectView(PROJECT, history.project, context, READINGS);
@@ -26,6 +26,20 @@ describe('the view of one project', () => {
 
   it('produces a view the cockpit contract accepts', () => {
     expect(ProjectViewSchema.safeParse(view).error?.issues ?? []).toEqual([]);
+  });
+
+  it('carries the references of the project with the reading of each snapshot, and none when it cites none', () => {
+    const history = projectHistory();
+    const references = [
+      { name: 'design-tokens', repository: 'example-org/design-tokens', ref: 'v1.0.0', snapshot: { value: { status: 'ready' as const, commit: 'c'.repeat(40) }, readAt: '2026-10-10T07:00:00.000Z', error: null } },
+      { name: 'icons', repository: 'example-org/icons', ref: 'v2', snapshot: { value: null, readAt: null, error: 'the snapshot cannot be read' } },
+    ];
+
+    const cited = projectView(PROJECT, history.project, projectContext(history), { ...READINGS, references }).view;
+
+    expect(cited.references).toEqual(references);
+    expect(ProjectViewSchema.safeParse(cited).error?.issues ?? []).toEqual([]);
+    expect(view.references).toEqual([]);
   });
 
   it('carries the state of every work item the project events describe', () => {

@@ -13,6 +13,7 @@ import type {
   PauseCause,
   PromotionPolicy,
   ProofStrategy,
+  ReferenceSnapshotStatus,
   ReleaseModelKind,
   ReleaseState,
   RequestState,
@@ -114,6 +115,7 @@ export interface Vocabulary {
   notificationChannel(value: NotificationChannelKind): string;
   remoteAccess(value: RemoteAccess): string;
   knowledgeSourceKind(value: KnowledgeSourceKind): string;
+  referenceSnapshotStatus(value: ReferenceSnapshotStatus): string;
   /** The name of an issue type: translated for the preset types, the id itself for a type a project adds. */
   issueType(id: string): string;
 }
@@ -173,6 +175,7 @@ export function createVocabulary(i18n: Pick<I18n, 't' | 'has'>): Vocabulary {
     notificationChannel: (value) => t(`vocab.notificationChannel.${value}`),
     remoteAccess: (value) => t(`vocab.remoteAccess.${value}`),
     knowledgeSourceKind: (value) => t(`vocab.knowledgeSourceKind.${value}`),
+    referenceSnapshotStatus: (value) => t(`vocab.referenceSnapshotStatus.${value}`),
     issueType: (id) => {
       const key = `vocab.issueType.${id}`;
       return has(key) ? t(key as MessageKey) : id;

@@ -1,4 +1,4 @@
-import type { AuditState, BaseTestResult, BranchTestResult, IssueState, ReleaseState, RequestState, UsageFreshness } from '@agent-factory/domain';
+import type { AuditState, BaseTestResult, BranchTestResult, IssueState, ReferenceSnapshotStatus, ReleaseState, RequestState, UsageFreshness } from '@agent-factory/domain';
 import { ACTIVE_PIPELINE_STATES, ISSUE_ABANDONED_STATE, MERGED_OR_BEYOND_STATES } from '@agent-factory/domain';
 import type {
   AuditView,
@@ -131,6 +131,13 @@ const TOOL_MARKS: Readonly<Record<ToolStatus, StatusMark>> = {
 /** A tool never checked has no status to show: it is idle, not broken. */
 export function toolMark(status: ToolStatus | null): StatusMark {
   return status === null ? 'idle' : TOOL_MARKS[status];
+}
+
+const REFERENCE_MARKS: Readonly<Record<ReferenceSnapshotStatus, StatusMark>> = { ready: 'success', 'missing-ref': 'blocked', 'not-built': 'waiting' };
+
+/** A snapshot never read has no state to show: it is idle, not broken. */
+export function referenceMark(status: ReferenceSnapshotStatus | null): StatusMark {
+  return status === null ? 'idle' : REFERENCE_MARKS[status];
 }
 
 const FRESHNESS_MARKS: Readonly<Record<UsageFreshness, StatusMark>> = { fresh: 'success', stale: 'waiting', 'window-reset': 'idle' };

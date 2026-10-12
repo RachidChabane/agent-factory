@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localPullRequestPage, type KnowledgeDocument } from '@agent-factory/adapters';
-import type { CockpitSnapshot, KnowledgeSourceView, ProjectView, TelemetrySample } from '@agent-factory/cockpit';
+import type { CockpitSnapshot, KnowledgeSourceView, ProjectView, ReferenceView, TelemetrySample } from '@agent-factory/cockpit';
 import { evidencePath, forgeFilePath, requestAttachmentPath } from '@agent-factory/cockpit';
 import {
   acceptanceCommand,
@@ -12,8 +12,10 @@ import {
   parseIssueSpec,
   parseProjectSubject,
   PENDING_ISSUE_EVENTS,
+  referenceState,
   type CheckRunSummary,
   type FactoryEventRecord,
+  type ReferenceState,
   type RunLogLine,
   type WorkflowRunRecord,
 } from '@agent-factory/application';
@@ -45,12 +47,14 @@ export const FORGE_READ_INTERVAL_MS = 60_000;
 export const PENDING_CHECKS_READ_INTERVAL_MS = 10_000;
 export const RESOURCES_READ_INTERVAL_MS = 10_000;
 export const KNOWLEDGE_READ_INTERVAL_MS = 5 * 60_000;
+/** A reference's snapshot is read from the project's own directory, and from its source clone only while it is not built. */
+export const REFERENCES_READ_INTERVAL_MS = 30_000;
 /** A commit's files never change. */
 export const CHANGED_FILES_READ_INTERVAL_MS = 24 * 60 * 60_000;
 export const ACTIVITY_LIMIT = 100;
 export const WORKFLOW_RUN_LIMIT = 20;
 export const LOG_TAIL_CHARACTERS = 20_000;
-export const STALE_AFTER_MS = { forge: 5 * 60_000, resources: 60_000, tools: 24 * 60 * 60_000, knowledge: 15 * 60_000 } as const;
+export const STALE_AFTER_MS = { forge: 5 * 60_000, resources: 60_000, tools: 24 * 60 * 60_000, knowledge: 15 * 60_000, references: 5 * 60_000 } as const;
 const HEALTH_STALE_FACTOR = 2;
 const DEPLOYMENT_HISTORY_LIMIT = 10;
 const ALL_SUBJECTS = '';
@@ -126,6 +130,7 @@ class ProjectReadings {
   readonly workflows: CachedReading<readonly WorkflowRunRecord[] | null>;
   readonly changedFiles: CachedReadings<string, readonly string[]>;
   readonly knowledge: CachedReadings<number, readonly KnowledgeDocument[]>;
+  readonly references: CachedReadings<string, ReferenceState>;
 
   constructor(project: ProjectRuntime, runtime: InstallationRuntime) {
     const { clock } = runtime;
@@ -168,6 +173,15 @@ class ProjectReadings {
         return source === undefined ? Promise.resolve([]) : project.knowledge.documents(source);
       },
       KNOWLEDGE_READ_INTERVAL_MS,
+      clock,
+    );
+    this.references = new CachedReadings(
+      (name) => {
+        const reference = project.config.references.find((candidate) => candidate.name === name);
+        if (reference === undefined) throw new Error(`the project ${project.id} cites no reference ${name}`);
+        return referenceState(project.references, reference);
+      },
+      REFERENCES_READ_INTERVAL_MS,
       clock,
     );
   }
@@ -333,6 +347,7 @@ export class SnapshotSource {
       workflows: await this.workflowsView(readings),
       deployments: (target) => deployments.get(target) ?? null,
       knowledge: await this.knowledgeViews(project, readings),
+      references: await this.referenceViews(project, readings),
       tools: toolViews(projectTools(config), latestToolChecks(records), latestToolSessions(records), 'project'),
     });
   }
@@ -399,6 +414,17 @@ export class SnapshotSource {
         documents: observedView(await readings.knowledge.get(position), (documents) =>
           documents.map((document) => ({ path: withoutLocalPaths(document.path, [project.config.clonePath, home]), title: document.title, bytes: document.bytes })),
         ),
+      })),
+    );
+  }
+
+  private async referenceViews(project: ProjectRuntime, readings: ProjectReadings): Promise<ReferenceView[]> {
+    return Promise.all(
+      project.config.references.map(async (reference) => ({
+        name: reference.name,
+        repository: reference.repository,
+        ref: reference.ref,
+        snapshot: observedView(await readings.references.get(reference.name), (state) => ({ status: state.status, commit: state.commit })),
       })),
     );
   }

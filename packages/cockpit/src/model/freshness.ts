@@ -2,7 +2,7 @@ import type { InstallationInfo } from '../contract/index.ts';
 import { MINUTE_MS, toEpoch } from '../i18n/formatters.ts';
 
 /** What a reading is about, which decides how old it may be before it is called stale. */
-export const READING_KINDS = ['forge', 'health', 'resources', 'tools', 'knowledge'] as const;
+export const READING_KINDS = ['forge', 'health', 'resources', 'tools', 'knowledge', 'references'] as const;
 export type ReadingKind = (typeof READING_KINDS)[number];
 
 export type StaleThresholds = InstallationInfo['staleAfterMs'];

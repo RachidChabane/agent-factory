@@ -167,6 +167,10 @@ export const frVocabulary = {
   'vocab.toolStatus.missing': 'Absent',
   'vocab.toolStatus.error': 'Erreur',
 
+  'vocab.referenceSnapshotStatus.ready': 'Instantané prêt',
+  'vocab.referenceSnapshotStatus.missing-ref': 'Ref absente de la source',
+  'vocab.referenceSnapshotStatus.not-built': 'Instantané non construit',
+
   'vocab.toolScope.installation': 'Installation',
   'vocab.toolScope.project': 'Projet',
 

@@ -57,6 +57,9 @@ export type MemoryPressure = (typeof MEMORY_PRESSURES)[number];
 export { TOOL_STATUSES } from '@agent-factory/domain';
 export type { ToolName, ToolStatus } from '@agent-factory/domain';
 
+export { REFERENCE_SNAPSHOT_STATUSES } from '@agent-factory/domain';
+export type { ReferenceSnapshotStatus } from '@agent-factory/domain';
+
 /** Live drives real repositories; demo plays fictional projects with the fake CLI; rehearsal uses local forges only. */
 export const INSTALLATION_MODES = ['live', 'demo', 'rehearsal'] as const;
 export type InstallationMode = (typeof INSTALLATION_MODES)[number];

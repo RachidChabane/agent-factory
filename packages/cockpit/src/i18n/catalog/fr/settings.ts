@@ -73,6 +73,15 @@ export const frSettings = {
   'settings.issueTypes.checks': 'Checks d’acceptation',
   'settings.issueTypes.commit': 'Type de commit',
 
+  'settings.references.title': 'Dépôts de référence',
+  'settings.references.description': 'Instantanés en lecture seule des dépôts que citent les specs, à la ref que ce projet nomme. Chaque agent du projet les lit, et les rôles qui écrivent en copient des fichiers.',
+  'settings.references.empty': 'Ce projet ne cite aucun dépôt de référence.',
+  'settings.references.repository': 'Dépôt',
+  'settings.references.commit': 'Commit',
+  'settings.references.unread': 'L’instantané n’a pas encore été relevé.',
+  'settings.references.hint.missing-ref': 'Le clone local d’où vient cette référence ne contient pas cette ref. Lancez git fetch --tags dedans, puis redémarrez l’usine.',
+  'settings.references.hint.not-built': 'L’instantané est construit au démarrage de l’usine, ou par agent-factory validate.',
+
   'settings.projectTools.title': 'Outils',
   'settings.projectTools.description': 'Les outils sur lesquels s’appuient les checks de ce projet.',
 

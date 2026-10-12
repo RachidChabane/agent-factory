@@ -72,6 +72,15 @@ export const enSettings = {
   'settings.issueTypes.checks': 'Acceptance checks',
   'settings.issueTypes.commit': 'Commit type',
 
+  'settings.references.title': 'Reference repositories',
+  'settings.references.description': 'Read-only snapshots of the repositories the specs cite, at the ref this project names. Every agent of the project reads them, and the writing roles copy from them.',
+  'settings.references.empty': 'This project cites no reference repository.',
+  'settings.references.repository': 'Repository',
+  'settings.references.commit': 'Commit',
+  'settings.references.unread': 'The snapshot has not been read yet.',
+  'settings.references.hint.missing-ref': 'The local clone this reference is taken from holds no such ref. Run git fetch --tags in it, then restart the factory.',
+  'settings.references.hint.not-built': 'The snapshot is built when the factory starts, or by agent-factory validate.',
+
   'settings.projectTools.title': 'Tools',
   'settings.projectTools.description': 'The tools the checks of this project rely on.',
 
