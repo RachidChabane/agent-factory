@@ -1,4 +1,4 @@
-import { CommandFilmRecorder, FfmpegTranscoder, SpawnCommandRunner } from '@agent-factory/adapters';
+import { CommandFilmRecorder, CommandMediaUploader, FfmpegTranscoder, Sha256FileFingerprints, SpawnCommandRunner } from '@agent-factory/adapters';
 import {
   attributionRules,
   auditMerge,
@@ -13,8 +13,10 @@ import {
   IssueStacks,
   LoggedAgentRunActivity,
   MarkdownAuditIssueRenderer,
+  MediaPublisher,
   MergeOnOrder,
   ProjectSchedulingPauses,
+  PullRequestReadyWatch,
   RedeployEnvironment,
   ResumeIssue,
   ShellCommands,
@@ -28,6 +30,8 @@ import {
   type RequestDecisionSettings,
   replaysFirstRecording,
   type FilmRunner,
+  type MediaUploadSettings,
+  type PullRequestReadyScanner,
 } from '@agent-factory/application';
 import type { RoleSettings } from '../../config/agent-factory-config.ts';
 import type { InstallationContext } from '../installation/installation-context.ts';
@@ -81,6 +85,40 @@ export function filmBehaviour(project: ProjectRuntime, installation: Installatio
       evidenceCacheDirectory: settings.evidenceCacheDirectory,
       resources: settings.resources,
       replayFile: replaysFirstRecording(films.settings.command) ? films.settings.replayFile : null,
+    },
+  );
+}
+
+/** Uploads the media of a pull request with the operator's command, outside any sandbox; the command stops with the signal. */
+export function mediaPublisher(project: ProjectRuntime, installation: InstallationContext, upload: MediaUploadSettings, signal: AbortSignal): MediaPublisher {
+  const uploader = new CommandMediaUploader(new SpawnCommandRunner({ abortSignal: signal }), {
+    command: upload.command,
+    timeoutMs: upload.timeoutMs,
+    workingDirectory: installation.config.home,
+    operatorEnvironment: installation.environment,
+  });
+  return new MediaPublisher({ uploader, fingerprints: new Sha256FileFingerprints(), cache: installation.mediaLinks, log: project.log });
+}
+
+/** Tells the operator which pull requests of the project became ready, with links to their media when an upload command is declared. */
+export function pullRequestReadyScanner(project: ProjectRuntime, installation: InstallationContext): PullRequestReadyScanner {
+  const { dependencies, settings } = project;
+  const { media } = installation.config.notifications;
+  return new PullRequestReadyWatch(
+    {
+      events: dependencies.events,
+      states: dependencies.states,
+      github: dependencies.github,
+      clock: installation.clock,
+      log: project.log,
+      notifications: project.notifications,
+      publisher: (signal) => (media === null ? null : mediaPublisher(project, installation, media, signal)),
+    },
+    {
+      evidenceCacheDirectory: settings.evidenceCacheDirectory,
+      filming: project.films !== null,
+      checksSettleMs: installation.config.daemon.checksSettleMs,
+      deliveryRetryMs: DEFAULT_RETRY_DELAY_MS,
     },
   );
 }
@@ -206,7 +244,7 @@ export function projectDaemon(project: ProjectRuntime, installation: Installatio
       audits: auditRunner(project),
       challenges: challenger,
       films: filmRunner(project, installation),
-      pullRequestReady: null,
+      pullRequestReady: pullRequestReadyScanner(project, installation),
       releases: releaseEvaluator(project),
       configuration: null,
       reclaimStacks: stackReclaimer(project),

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { createResourceGuard, FileRunLogStore, SpawnCommandRunner, type LocalCheckScheduling, type NotifyFetchFunction } from '@agent-factory/adapters';
+import { createResourceGuard, FileMediaLinkCache, FileRunLogStore, SpawnCommandRunner, type LocalCheckScheduling, type NotifyFetchFunction } from '@agent-factory/adapters';
 import {
   AgentRunAdmission,
   BudgetGovernor,
@@ -160,6 +160,7 @@ export async function openInstallation(config: AgentFactoryConfig, environment: 
       runSlots,
       listeningPorts,
       notifier,
+      mediaLinks: new FileMediaLinkCache(config.directories.state),
       lifetime: lifetime.signal,
       localChecks: overrides.localChecks ?? 'background',
       filmLedger: filmLedgerOf(config, events, clock),

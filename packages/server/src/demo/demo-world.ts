@@ -7,7 +7,7 @@ import { CONFIG_FILE_NAME, parseAgentFactoryConfig, PROJECTS_DIRECTORY, type Age
 import { CONFIG_SCHEMA_ID } from '../config/config-json-schema.ts';
 import type { SourceEnvironment } from '../composition/installation/installation-context.ts';
 import type { DemoHealthEndpoints } from './demo-health.ts';
-import { EXAMPLES_DIRECTORY, FAKE_CLAUDE_MAIN } from './demo-paths.ts';
+import { DEMO_UPLOAD_COMMAND_MAIN, DEMO_UPLOADS_DIRECTORY_NAME, EXAMPLES_DIRECTORY, FAKE_CLAUDE_MAIN } from './demo-paths.ts';
 
 export const DEMO_SERVER_PORT = 7431;
 export const DEMO_BASE_BRANCH = 'main';
@@ -172,6 +172,17 @@ function projectEntry(project: DemoProject, settings: DemoWorldSettings, referen
   };
 }
 
+/** The upload command of the demonstration: it copies a file into the uploads directory of its home and prints the file address of the copy. */
+function demoMedia(home: string): Readonly<Record<string, unknown>> {
+  return { upload: [process.execPath, DEMO_UPLOAD_COMMAND_MAIN, '--to', join(home, DEMO_UPLOADS_DIRECTORY_NAME), '--file', '{file}'] };
+}
+
+/** The notification settings of the demonstration: the installation's own, and the upload command of its media. */
+function demoNotifications(settings: DemoWorldSettings): Readonly<Record<string, unknown>> {
+  const declared = settings.installation['notifications'];
+  return { ...(typeof declared === 'object' && declared !== null ? declared : {}), media: demoMedia(settings.home) };
+}
+
 function configText(settings: DemoWorldSettings, scenarioPath: string, fakeState: string, referenceSources: ReadonlyMap<string, string>): string {
   const document = {
     version: 1,
@@ -181,6 +192,7 @@ function configText(settings: DemoWorldSettings, scenarioPath: string, fakeState
       accounts: [{ name: 'primary', configDir: join(DEMO_DIRECTORY, ACCOUNT_DIRECTORY), billing: 'subscription' }],
     },
     ...settings.installation,
+    notifications: demoNotifications(settings),
     projects: settings.projects.map((project) => projectEntry(project, settings, referenceSources)),
   };
   return `# yaml-language-server: $schema=${CONFIG_SCHEMA_ID}\n${stringify(document, { lineWidth: 0 })}`;
