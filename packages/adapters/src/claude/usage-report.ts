@@ -1,11 +1,15 @@
 import { z } from 'zod';
-import { USAGE_LIMIT_KINDS, utilizationFromPercent, type UsageLimitReading, type UsageReading } from '@agent-factory/domain';
+import { USAGE_LIMIT_KINDS, utilizationFromPercent, type AccountIdentity, type UsageLimitReading, type UsageReading } from '@agent-factory/domain';
 import type { Clock, CommandRunner, UsageReportSource } from '@agent-factory/application';
 
 /** The CLI's own usage command: answered locally, with no model call and no cost. */
 export const USAGE_PROMPT = '/usage';
 export const USAGE_REPORT_ARGUMENTS: readonly string[] = ['-p', USAGE_PROMPT, '--output-format', 'stream-json', '--verbose', '--setting-sources', '', '--strict-mcp-config'];
 export const USAGE_REPORT_TIMEOUT_MS = 60_000;
+/** The CLI's subcommand that names the login, answered locally. */
+export const AUTH_STATUS_ARGUMENTS: readonly string[] = ['auth', 'status'];
+export const AUTH_STATUS_TIMEOUT_MS = 30_000;
+export const REASON_LOGGED_OUT = 'the Claude login is not active; sign in with CLAUDE_CONFIG_DIR=<account directory> claude /login';
 const CLAUDE_CONFIG_DIRECTORY_VARIABLE = 'CLAUDE_CONFIG_DIR';
 const ASSISTANT_LINE = 'assistant';
 const NEWLINE = '\n';
@@ -34,6 +38,27 @@ const UsageReportLineSchema = z.object({
 });
 
 type ReportedLimit = z.infer<typeof LimitSchema>;
+
+const AuthStatusSchema = z.object({
+  loggedIn: z.boolean(),
+  email: z.string().nullable().optional(),
+  orgName: z.string().nullable().optional(),
+  subscriptionType: z.string().nullable().optional(),
+});
+
+/** The login `claude auth status` reports, null when it cannot be read; throws when the CLI says no one is logged in. */
+export function parseAuthStatus(stdout: string): AccountIdentity | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(stdout.trim());
+  } catch {
+    return null;
+  }
+  const parsed = AuthStatusSchema.safeParse(json);
+  if (!parsed.success) return null;
+  if (!parsed.data.loggedIn) throw new UsageReportError(REASON_LOGGED_OUT);
+  return { email: parsed.data.email ?? null, organization: parsed.data.orgName ?? null, plan: parsed.data.subscriptionType ?? null };
+}
 
 function limitOf(reported: ReportedLimit): UsageLimitReading | null {
   const kind = USAGE_LIMIT_KINDS.find((candidate) => candidate === reported.kind);
@@ -91,14 +116,18 @@ export class ClaudeUsageReport implements UsageReportSource {
   async read(account: string, signal: AbortSignal): Promise<UsageReading> {
     const directory = this.settings.accountDirectories[account];
     const environment = directory === undefined ? this.settings.environment : { ...this.settings.environment, [CLAUDE_CONFIG_DIRECTORY_VARIABLE]: directory };
-    const result = await this.runnerFor(signal).run(
-      [...this.settings.command, ...USAGE_REPORT_ARGUMENTS],
-      this.settings.workingDirectory,
-      this.settings.timeoutMs ?? USAGE_REPORT_TIMEOUT_MS,
-      environment,
-    );
+    const runner = this.runnerFor(signal);
+    const identity = await this.identity(runner, environment);
+    const result = await runner.run([...this.settings.command, ...USAGE_REPORT_ARGUMENTS], this.settings.workingDirectory, this.settings.timeoutMs ?? USAGE_REPORT_TIMEOUT_MS, environment);
     if (result.timedOut) throw new UsageReportError('the command timed out, probably waiting for a login');
     if (result.exitCode !== EXIT_CODE_SUCCESS) throw new UsageReportError(`the command exited with ${result.exitCode}: ${result.stderr.trim().split(NEWLINE)[0] ?? ''}`);
-    return { account, source: 'usage-report', readAt: this.clock.now(), limits: parseUsageReport(result.stdout) };
+    return { account, source: 'usage-report', readAt: this.clock.now(), limits: parseUsageReport(result.stdout), identity };
+  }
+
+  /** Who the account is logged in as; a CLI that cannot say leaves it unknown rather than failing the reading. */
+  private async identity(runner: CommandRunner, environment: Readonly<Record<string, string>>): Promise<AccountIdentity | null> {
+    const status = await runner.run([...this.settings.command, ...AUTH_STATUS_ARGUMENTS], this.settings.workingDirectory, AUTH_STATUS_TIMEOUT_MS, environment).catch(() => null);
+    if (status === null || status.timedOut || status.exitCode !== EXIT_CODE_SUCCESS) return null;
+    return parseAuthStatus(status.stdout);
   }
 }

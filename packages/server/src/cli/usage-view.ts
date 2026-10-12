@@ -28,7 +28,8 @@ export function renderUsage(usage: UsageView, now: Date): readonly string[] {
   const lines: string[] = [];
   for (const account of usage.accounts) {
     const read = account.readAt === null ? `never read; run "${PROGRAM_NAME} ${COMMAND_NAMES.usage} ${REFRESH_FLAG}"` : `read ${readingTime(account.readAt, now)}${account.source === null ? '' : ` from the ${SOURCE_NAMES[account.source]}`}`;
-    lines.push(`Account ${account.name} (${account.billing}): ${read}`);
+    const login = account.identity === null ? '' : [account.identity.email, account.identity.plan === null ? null : `${account.identity.plan} plan`].filter((part) => part !== null).map((part) => `, ${part}`).join('');
+    lines.push(`Account ${account.name} (${account.billing}${login}): ${read}`);
     for (const limit of account.limits) lines.push(limitLine(limit));
     if (account.lastFailure !== null) lines.push(`  last read failed ${readingTime(account.lastFailure.at, now)}: ${account.lastFailure.reason}`);
   }

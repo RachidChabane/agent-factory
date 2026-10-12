@@ -16,11 +16,13 @@ import {
   type NumberBounds,
 } from '../json/json-reader.ts';
 import {
+  DEFAULT_ACCOUNT,
   DEFAULT_ROLE_SIGNATURES,
   DEFAULT_SCOPED_RESET_HOURS,
   DEFAULT_USAGE,
   FAKE_ROLES,
   STEP_KINDS,
+  type AccountSettings,
   type Attempt,
   type FakeRole,
   type NonEmptyList,
@@ -36,7 +38,8 @@ import {
   type WriteStep,
 } from './scenario.ts';
 
-const SCENARIO_FIELDS = ['signatures', 'usage', 'entries', 'fallback'] as const;
+const SCENARIO_FIELDS = ['signatures', 'account', 'usage', 'entries', 'fallback'] as const;
+const ACCOUNT_FIELDS = ['email', 'organization', 'subscriptionType'] as const;
 const USAGE_FIELDS = ['session', 'weeklyAll', 'weeklyScoped'] as const;
 const USAGE_WINDOW_FIELDS = ['percent', 'resetsInHours'] as const;
 const SCOPED_WINDOW_FIELDS = ['model', 'percent', 'resetsInHours'] as const;
@@ -55,9 +58,21 @@ export function parseScenario(document: unknown): Scenario {
   const at = fieldsOf(root, ROOT_PATH);
   return {
     signatures: readOptional(at('signatures'), readSignatures) ?? DEFAULT_ROLE_SIGNATURES,
+    account: readOptional(at('account'), readAccount) ?? DEFAULT_ACCOUNT,
     usage: readOptional(at('usage'), readUsage) ?? DEFAULT_USAGE,
     entries: readOptional(at('entries'), readEntries) ?? [],
     fallback: readOptional(at('fallback'), readFallback) ?? {},
+  };
+}
+
+function readAccount(value: unknown, path: JsonPath): AccountSettings {
+  const record = readRecord(value, path);
+  rejectUnknownFields(record, ACCOUNT_FIELDS, path);
+  const at = fieldsOf(record, path);
+  return {
+    email: readOptional(at('email'), readNonEmptyString) ?? DEFAULT_ACCOUNT.email,
+    organization: readOptional(at('organization'), readNonEmptyString) ?? DEFAULT_ACCOUNT.organization,
+    subscriptionType: readOptional(at('subscriptionType'), readNonEmptyString) ?? DEFAULT_ACCOUNT.subscriptionType,
   };
 }
 

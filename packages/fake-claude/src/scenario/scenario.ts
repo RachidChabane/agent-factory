@@ -80,8 +80,18 @@ export const DEFAULT_USAGE: UsageSettings = {
   weeklyScoped: [{ model: DEFAULT_SCOPED_MODEL, percent: DEFAULT_SCOPED_PERCENT, resetsInHours: DEFAULT_SCOPED_RESET_HOURS }],
 };
 
+/** The login `claude auth status` reports. */
+export interface AccountSettings {
+  readonly email: string;
+  readonly organization: string;
+  readonly subscriptionType: string;
+}
+
+export const DEFAULT_ACCOUNT: AccountSettings = { email: 'operator@example.com', organization: 'Example Org', subscriptionType: 'max' };
+
 export interface Scenario {
   readonly signatures: RoleSignatures;
+  readonly account: AccountSettings;
   readonly usage: UsageSettings;
   readonly entries: readonly ScenarioEntry[];
   readonly fallback: Readonly<Partial<Record<FakeRole, Script>>>;

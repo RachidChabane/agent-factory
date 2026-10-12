@@ -15,11 +15,15 @@ export const UsageLimitPayloadSchema = z.object({
   resetsAt: z.iso.datetime({ offset: true }).nullable(),
 });
 
+export const AccountIdentityPayloadSchema = z.object({ email: z.string().nullable(), organization: z.string().nullable(), plan: z.string().nullable() });
+
 export const UsageReadPayloadSchema = z.object({
   account: z.string().min(1),
   source: z.enum(USAGE_SOURCES),
   readAt: z.iso.datetime({ offset: true }),
   limits: z.array(UsageLimitPayloadSchema),
+  /** The login the usage report was read under; agent streams do not name it. */
+  identity: AccountIdentityPayloadSchema.nullable().default(null),
 });
 export type UsageReadPayload = z.infer<typeof UsageReadPayloadSchema>;
 

@@ -30,10 +30,11 @@ function reading(account: string): UsageReading {
 class RecordedUsage implements UsageReportSource {
   readonly reads: string[] = [];
   failure: string | null = null;
+  identity: UsageReading['identity'] = null;
 
   read(account: string): Promise<UsageReading> {
     this.reads.push(account);
-    return this.failure === null ? Promise.resolve(reading(account)) : Promise.reject(new Error(this.failure));
+    return this.failure === null ? Promise.resolve({ ...reading(account), identity: this.identity }) : Promise.reject(new Error(this.failure));
   }
 }
 
@@ -70,6 +71,12 @@ describe('status and usage of the whole installation', () => {
       '  weekly_scoped (claude-opus-5-5): 7% used, pauses at 85%, reset time not reported',
       'Usage is read every 10 min; a reading older than 30 min counts as stale.',
     ]);
+  });
+
+  it('names the login each account reads its usage under', async () => {
+    usage.identity = { email: 'alex.morgan@example.com', organization: 'Example Org', plan: 'max' };
+    expect(await runCli(['usage', '--refresh'], context())).toBe(0);
+    expect(captured.lines[0]).toBe('Account default (subscription, alex.morgan@example.com, max plan): read 2026-10-10T07:55:00.000Z (5 min ago) from the Claude usage report');
   });
 
   it('shows the last reading without reading again, and says when none was ever taken', async () => {

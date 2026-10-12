@@ -45,7 +45,21 @@ export async function runCli(cli: CliEnvironment): Promise<ExitCode> {
   }
 }
 
+const AUTH_STATUS = ['auth', 'status'] as const;
+const AUTH_METHOD = 'claude.ai';
+const API_PROVIDER = 'firstParty';
+
+/** Whether the command line asks for `auth status`, the subcommand that reports the login. */
+function isAuthStatus(argv: readonly string[]): boolean {
+  const start = argv.indexOf(AUTH_STATUS[0]);
+  return start !== -1 && argv[start + 1] === AUTH_STATUS[1];
+}
+
 async function execute(cli: CliEnvironment): Promise<void> {
+  if (isAuthStatus(cli.argv)) {
+    await printAuthStatus(cli, parseCommandLine(cli.argv));
+    return;
+  }
   const invocation = await readInvocation(cli);
   if (isUsageRequest(invocation.prompt)) {
     await printUsageReport(cli, invocation);
@@ -65,6 +79,13 @@ async function readInvocation(cli: CliEnvironment): Promise<Invocation> {
     permissionMode: commandLine.permissionMode ?? DEFAULT_PERMISSION_MODE,
     tools: toolsOf(commandLine.toolList, DEFAULT_TOOLS),
   };
+}
+
+/** What `claude auth status` prints for the scenario's login, as one JSON object. */
+async function printAuthStatus(cli: CliEnvironment, commandLine: CommandLine): Promise<void> {
+  const { account } = await loadScenario(commandLine.scenarioPath, cli.workingDirectory);
+  const status = { loggedIn: true, authMethod: AUTH_METHOD, apiProvider: API_PROVIDER, email: account.email, orgName: account.organization, subscriptionType: account.subscriptionType };
+  await writeText(cli.stdout, `${JSON.stringify(status)}\n`);
 }
 
 async function printUsageReport(cli: CliEnvironment, invocation: Invocation): Promise<void> {

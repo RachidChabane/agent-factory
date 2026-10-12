@@ -53,16 +53,21 @@ export interface ChildEnvironmentOptions {
 
 export type ChildEnvironment = Readonly<Record<string, string>>;
 
-export function buildChildEnvironment(
-  source: Readonly<Record<string, string | undefined>>,
-  options: ChildEnvironmentOptions,
-): ChildEnvironment {
-  const inherited = Object.fromEntries(
+/** The operator variables every Claude CLI process of the factory inherits: no credential and no session marker. */
+export function inheritedEnvironment(source: Readonly<Record<string, string | undefined>>): ChildEnvironment {
+  return Object.fromEntries(
     INHERITED_VARIABLES.flatMap((name) => {
       const value = source[name];
       return value === undefined ? [] : [[name, value]];
     }),
   );
+}
+
+export function buildChildEnvironment(
+  source: Readonly<Record<string, string | undefined>>,
+  options: ChildEnvironmentOptions,
+): ChildEnvironment {
+  const inherited = inheritedEnvironment(source);
   const tools = Object.fromEntries(Object.entries(options.toolEnvironment ?? {}).filter(([name]) => !ROLE_OVERRIDING_VARIABLES.includes(name)));
   return {
     ...inherited,

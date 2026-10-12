@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DocumentError } from './json/json-reader.ts';
 import { parseScenario } from './scenario/scenario-parser.ts';
-import { DEFAULT_ROLE_SIGNATURES, DEFAULT_USAGE } from './scenario/scenario.ts';
+import { DEFAULT_ACCOUNT, DEFAULT_ROLE_SIGNATURES, DEFAULT_USAGE } from './scenario/scenario.ts';
 
 function entryWith(overrides: object): object {
   return { role: 'implementer', when: 'issue 7', attempts: [{ steps: [{ say: 'hello' }], final: 'done' }], ...overrides };
@@ -24,7 +24,7 @@ function messageOf(document: unknown): string {
 
 describe('parseScenario', () => {
   it('fills every section a scenario leaves out with its defaults', () => {
-    assert.deepEqual(parseScenario({}), { signatures: DEFAULT_ROLE_SIGNATURES, usage: DEFAULT_USAGE, entries: [], fallback: {} });
+    assert.deepEqual(parseScenario({}), { signatures: DEFAULT_ROLE_SIGNATURES, account: DEFAULT_ACCOUNT, usage: DEFAULT_USAGE, entries: [], fallback: {} });
   });
 
   it('reads signatures, usage, entries and fallbacks', () => {
@@ -82,7 +82,7 @@ describe('parseScenario', () => {
 describe('parseScenario errors name the bad field', () => {
   const CASES: readonly (readonly [string, unknown, string])[] = [
     ['a document that is not an object', [], 'the document must be an object'],
-    ['a misspelled section', { entires: [] }, 'entires is not a known field (expected signatures, usage, entries, fallback)'],
+    ['a misspelled section', { entires: [] }, 'entires is not a known field (expected signatures, account, usage, entries, fallback)'],
     [
       'an unknown role',
       { entries: [entryWith({ role: 'wizard' })] },

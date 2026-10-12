@@ -711,6 +711,8 @@ export type UsageLimitView = z.infer<typeof UsageLimitViewSchema>;
 export const UsageAccountViewSchema = z.object({
   name: z.string().min(1),
   billing: z.enum(BILLING_MODES),
+  /** Who the account is logged in as, from its last usage report; null until one names it. */
+  identity: z.object({ email: z.string().nullable(), organization: z.string().nullable(), plan: z.string().nullable() }).nullable(),
   limits: z.array(UsageLimitViewSchema),
   source: z.enum(USAGE_SOURCES).nullable(),
   readAt: IsoDateTimeSchema.nullable(),

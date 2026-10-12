@@ -195,6 +195,7 @@ export class BudgetGovernor {
       source: reading.source,
       readAt: reading.readAt.toISOString(),
       limits: reading.limits.map((limit) => ({ ...limit, resetsAt: limit.resetsAt?.toISOString() ?? null })),
+      identity: reading.identity ?? null,
     });
   }
 

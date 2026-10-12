@@ -25,11 +25,20 @@ export interface UsageLimitReading {
   readonly resetsAt: Date | null;
 }
 
+/** Who an account is logged in as, as the CLI reports it; any part it does not report is null. */
+export interface AccountIdentity {
+  readonly email: string | null;
+  readonly organization: string | null;
+  readonly plan: string | null;
+}
+
 export interface UsageReading {
   readonly account: string;
   readonly source: UsageSource;
   readonly readAt: Date;
   readonly limits: readonly UsageLimitReading[];
+  /** The login the reading was made under, when the source names it. */
+  readonly identity?: AccountIdentity | null;
 }
 
 export type UsageThresholds = Readonly<Record<UsageLimitKind, number>>;

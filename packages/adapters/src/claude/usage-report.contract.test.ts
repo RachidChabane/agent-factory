@@ -1,18 +1,21 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import type { CommandResult, CommandRunner } from '@agent-factory/application';
-import { ClaudeUsageReport, parseUsageReport, USAGE_REPORT_ARGUMENTS, UsageReportError } from './usage-report.ts';
+import { AUTH_STATUS_ARGUMENTS, ClaudeUsageReport, parseAuthStatus, parseUsageReport, REASON_LOGGED_OUT, USAGE_REPORT_ARGUMENTS, UsageReportError } from './usage-report.ts';
 
 const FIXTURE = new URL('./fixtures/usage-report-2.1.296.jsonl', import.meta.url);
 const READ_AT = new Date('2026-10-12T09:45:00.000Z');
 
+const LOGGED_IN = JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', email: 'operator@example.com', orgName: 'Example Org', subscriptionType: 'max' });
+
 class ScriptedRunner implements CommandRunner {
   readonly calls: { command: readonly string[]; env: Readonly<Record<string, string>> }[] = [];
   result: CommandResult = { exitCode: 0, stdout: '', stderr: '', durationMs: 1, timedOut: false };
+  status: CommandResult = { exitCode: 0, stdout: LOGGED_IN, stderr: '', durationMs: 1, timedOut: false };
 
   run(command: readonly string[], _cwd: string, _timeoutMs: number, env: Readonly<Record<string, string>>): Promise<CommandResult> {
     this.calls.push({ command, env });
-    return Promise.resolve(this.result);
+    return Promise.resolve(command.includes(AUTH_STATUS_ARGUMENTS[0] ?? '') ? this.status : this.result);
   }
 }
 
@@ -44,9 +47,24 @@ describe('the usage report of the Claude Code CLI', () => {
       workingDirectory: '/tmp',
     });
     const reading = await source.read('primary', new AbortController().signal);
-    expect(runner.calls[0]).toEqual({ command: ['claude', ...USAGE_REPORT_ARGUMENTS], env: { PATH: '/usr/bin', CLAUDE_CONFIG_DIR: '/home/operator/.claude-primary' } });
-    expect(reading).toMatchObject({ account: 'primary', source: 'usage-report', readAt: READ_AT });
+    const env = { PATH: '/usr/bin', CLAUDE_CONFIG_DIR: '/home/operator/.claude-primary' };
+    expect(runner.calls).toEqual([
+      { command: ['claude', ...AUTH_STATUS_ARGUMENTS], env },
+      { command: ['claude', ...USAGE_REPORT_ARGUMENTS], env },
+    ]);
+    expect(reading).toMatchObject({ account: 'primary', source: 'usage-report', readAt: READ_AT, identity: { email: 'operator@example.com', organization: 'Example Org', plan: 'max' } });
     expect(reading.limits).toHaveLength(3);
+  });
+
+  it('names no login when the CLI cannot say, and refuses to read the usage of a logged-out account', async () => {
+    expect(parseAuthStatus('not json')).toBeNull();
+    expect(parseAuthStatus('{"loggedIn":true}')).toEqual({ email: null, organization: null, plan: null });
+    expect(() => parseAuthStatus('{"loggedIn":false}')).toThrow(REASON_LOGGED_OUT);
+    const runner = new ScriptedRunner();
+    runner.status = { ...runner.status, stdout: '{"loggedIn":false,"authMethod":"none"}' };
+    const source = new ClaudeUsageReport(() => runner, { now: () => READ_AT }, { command: ['claude'], accountDirectories: {}, environment: {}, workingDirectory: '/tmp' });
+    await expect(source.read('default', new AbortController().signal)).rejects.toThrow(UsageReportError);
+    expect(runner.calls).toHaveLength(1);
   });
 
   it('reports a timeout as a login to do', async () => {

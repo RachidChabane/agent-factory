@@ -59,11 +59,13 @@ export function pauseViews(records: readonly FactoryEventRecord[], scope: PauseV
 interface AccountReads {
   readonly lastReadAt: Date | null;
   readonly lastFailure: { readonly at: Date; readonly reason: string } | null;
+  readonly identity: UsageAccountView['identity'];
 }
 
 function accountReads(records: readonly FactoryEventRecord[], account: string): AccountReads {
   let lastReadAt: Date | null = null;
   let lastFailure: AccountReads['lastFailure'] = null;
+  let identity: AccountReads['identity'] = null;
   for (const record of records) {
     if (!record.subject.startsWith(USAGE_SUBJECT_PREFIX)) continue;
     if (record.type === USAGE_READ_EVENT) {
@@ -71,13 +73,14 @@ function accountReads(records: readonly FactoryEventRecord[], account: string): 
       if (read.success && read.data.account === account) {
         lastReadAt = new Date(read.data.readAt);
         lastFailure = null;
+        identity = read.data.identity ?? identity;
       }
     } else if (record.type === USAGE_READ_FAILED_EVENT) {
       const failed = UsageReadFailedPayloadSchema.safeParse(record.payload);
       if (failed.success && failed.data.account === account) lastFailure = { at: new Date(failed.data.failedAt), reason: failed.data.reason };
     }
   }
-  return { lastReadAt, lastFailure };
+  return { lastReadAt, lastFailure, identity };
 }
 
 export function usageView(config: AgentFactoryConfig, usage: readonly AccountUsage[], records: readonly FactoryEventRecord[]): UsageView {
@@ -88,6 +91,7 @@ export function usageView(config: AgentFactoryConfig, usage: readonly AccountUsa
     return {
       name: account.account,
       billing: billingOf.get(account.account) ?? SUBSCRIPTION_BILLING,
+      identity: reads.identity,
       limits: account.limits.map((limit) => ({
         kind: limit.kind,
         scope: limit.scope,
@@ -102,7 +106,7 @@ export function usageView(config: AgentFactoryConfig, usage: readonly AccountUsa
     };
   });
   return {
-    accounts: accounts.length === 0 ? [{ name: DEFAULT_ACCOUNT, billing: SUBSCRIPTION_BILLING, limits: [], source: null, readAt: null, lastFailure: null }] : accounts,
+    accounts: accounts.length === 0 ? [{ name: DEFAULT_ACCOUNT, billing: SUBSCRIPTION_BILLING, identity: null, limits: [], source: null, readAt: null, lastFailure: null }] : accounts,
     refreshMinutes: Math.round(config.claude.usage.refreshMs / MILLISECONDS_PER_MINUTE),
     staleAfterMinutes: Math.round(config.claude.usage.staleAfterMs / MILLISECONDS_PER_MINUTE),
   };

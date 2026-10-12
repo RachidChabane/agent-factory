@@ -39,10 +39,11 @@ The prompt is read from standard input, or taken from the argument that follows 
 ## What a run does
 
 1. The scenario is loaded and validated as a whole. An invalid scenario stops the run before anything is printed.
-2. If the trimmed prompt is `/usage`, three lines are printed and the process exits 0: an `init` line, an `assistant` line carrying `usage_report`, and a `result` line (`success`, cost 0, 0 turns). No entry is read and no session is opened.
-3. Otherwise the fake picks the script to play (see [Choosing what to play](#choosing-what-to-play)), opens a session, and prints an `init` line and one `rate_limit_event` line.
-4. It plays the next attempt of the script, runs the `Stop` hooks, and, when one blocks, plays the next attempt in the same session. See [Attempts, sessions and the Stop hook](#attempts-sessions-and-the-stop-hook).
-5. It prints the `result` line.
+2. If the arguments hold the subcommand `auth status`, one JSON object describing the scenario's login is printed (`loggedIn`, `authMethod`, `apiProvider`, `email`, `orgName`, `subscriptionType`) and the process exits 0, without reading a prompt.
+3. If the trimmed prompt is `/usage`, three lines are printed and the process exits 0: an `init` line, an `assistant` line carrying `usage_report`, and a `result` line (`success`, cost 0, 0 turns). No entry is read and no session is opened.
+4. Otherwise the fake picks the script to play (see [Choosing what to play](#choosing-what-to-play)), opens a session, and prints an `init` line and one `rate_limit_event` line.
+5. It plays the next attempt of the script, runs the `Stop` hooks, and, when one blocks, plays the next attempt in the same session. See [Attempts, sessions and the Stop hook](#attempts-sessions-and-the-stop-hook).
+6. It prints the `result` line.
 
 The output is a function of the scenario, the command line, the prompt, the environment, the answers of the hooks and the state directory. Identifiers are derived from the session counter, timings are computed from the work done, and no line carries a timestamp. Only the reset times of the usage limits depend on the clock.
 
@@ -53,6 +54,7 @@ A scenario is one JSON object. Every field is optional except where marked. Unkn
 | Field | Type | Meaning |
 |---|---|---|
 | `signatures` | object | Overrides the text that identifies each role in a prompt. Keys: `acceptance-author`, `implementer`, `reviewer`, `auditor`, `challenger`. Defaults: `You write the acceptance checks`, `You implement one`, `You review one change`, `You audit one change`, `You examine a product request`. Two roles cannot share a signature. |
+| `account` | object | The login `auth status` reports: `email` (default `operator@example.com`), `organization` (default `Example Org`), `subscriptionType` (default `max`). |
 | `usage` | object | The limits `/usage` reports and the figures of the `rate_limit_event` line. |
 | `usage.session` | `{ percent, resetsInHours }` | Default 12 %, 3 h. Feeds the `session` limit and the `five_hour` window. |
 | `usage.weeklyAll` | `{ percent, resetsInHours }` | Default 34 %, 80 h. Feeds the `weekly_all` limit and the `seven_day` window. |
