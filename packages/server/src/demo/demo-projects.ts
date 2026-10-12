@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { DemoHealthEndpoints, DemoEnvironmentHealth } from './demo-health.ts';
 import type { DemoProject } from './demo-world.ts';
 
@@ -5,6 +6,8 @@ const DANA = { name: 'Dana Reyes', email: 'dana.reyes@example.com' };
 const RILEY = { name: 'Riley Chen', email: 'riley.chen@example.com' };
 const FACTORY_IDENTITY = { name: 'Example Factory', email: 'factory@example.com' };
 
+/** The person who runs the factory in the demonstration. */
+export const DEMO_OPERATOR = 'Alex Morgan';
 export const STOREFRONT_ID = 'storefront';
 export const LEDGER_ID = 'ledger';
 
@@ -14,6 +17,22 @@ export const DEMO_ENVIRONMENTS: readonly DemoEnvironmentHealth[] = [
   { path: '/storefront/production/healthz', healthy: true, detail: 'catalogue and cart answering' },
   { path: '/ledger/sandbox/healthz', healthy: false, detail: 'the invoice store is not reachable' },
 ];
+
+const CATALOG_ADMIN = 'catalog-admin';
+const SESSION_KEEP_ALIVE_MINUTES = 5;
+
+/** A tool of the catalogue service whose session is a file: logged out until the operator logs in from the cockpit. */
+function catalogAdmin(sessionsDirectory: string): Readonly<Record<string, unknown>> {
+  const session = join(sessionsDirectory, CATALOG_ADMIN);
+  return {
+    name: CATALOG_ADMIN,
+    description: 'Publishes product changes to the catalogue service',
+    check: ['/bin/sh', '-c', `test -f '${session}'`],
+    fix: `${CATALOG_ADMIN} login`,
+    login: `mkdir -p '${sessionsDirectory}' && date -u > '${session}'`,
+    keepAlive: { command: `test -f '${session}' && touch '${session}'`, everyMinutes: SESSION_KEEP_ALIVE_MINUTES },
+  };
+}
 
 const storefront: DemoProject = {
   id: STOREFRONT_ID,
@@ -54,6 +73,7 @@ const storefront: DemoProject = {
       },
     ],
   }),
+  sessionTools: (sessionsDirectory) => [catalogAdmin(sessionsDirectory)],
 };
 
 const ledger: DemoProject = {

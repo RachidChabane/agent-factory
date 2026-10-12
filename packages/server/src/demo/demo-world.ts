@@ -16,8 +16,11 @@ const DEMO_DIRECTORY = 'demo';
 const SCENARIO_FILE = 'scenario.json';
 const FAKE_STATE_DIRECTORY = 'fake-claude';
 const ACCOUNT_DIRECTORY = 'claude-primary';
+const SESSIONS_DIRECTORY = 'sessions';
 const CLONE_DIRECTORY = 'clone';
 const FORGE_DIRECTORY = 'forge';
+/** Each local forge runs its project's gate on every pull request, as continuous integration would. */
+const LOCAL_CHECKS = 'gate';
 const BARE_SUFFIX = '.git';
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const GIT_TIMEOUT_MS = 60_000;
@@ -42,6 +45,8 @@ export interface DemoProject {
   readonly history: readonly DemoCommit[];
   /** The project's entry in config.yaml, without its id, name and forge. */
   readonly settings: (health: DemoHealthEndpoints) => Readonly<Record<string, unknown>>;
+  /** Tools with a login and a keep-alive, which keep their sessions as files of the given directory. */
+  readonly sessionTools?: (sessionsDirectory: string) => readonly Readonly<Record<string, unknown>>[];
 }
 
 export interface DemoWorldSettings {
@@ -113,6 +118,21 @@ async function createForge(settings: DemoWorldSettings, project: DemoProject, so
   });
 }
 
+function projectEntry(project: DemoProject, settings: DemoWorldSettings): Readonly<Record<string, unknown>> {
+  const entry = project.settings(settings.health);
+  const declared: readonly unknown[] = Array.isArray(entry['tools']) ? entry['tools'] : [];
+  const sessionTools = project.sessionTools?.(join(settings.home, DEMO_DIRECTORY, SESSIONS_DIRECTORY)) ?? [];
+  const tools = [...declared, ...sessionTools];
+  return {
+    id: project.id,
+    name: project.name,
+    forge: { kind: 'local', repository: project.repository, directory: FORGE_DIRECTORY, checks: LOCAL_CHECKS },
+    clone: CLONE_DIRECTORY,
+    ...entry,
+    ...(tools.length === 0 ? {} : { tools }),
+  };
+}
+
 function configText(settings: DemoWorldSettings, scenarioPath: string, fakeState: string): string {
   const document = {
     version: 1,
@@ -122,13 +142,7 @@ function configText(settings: DemoWorldSettings, scenarioPath: string, fakeState
       accounts: [{ name: 'primary', configDir: join(DEMO_DIRECTORY, ACCOUNT_DIRECTORY), billing: 'subscription' }],
     },
     ...settings.installation,
-    projects: settings.projects.map((project) => ({
-      id: project.id,
-      name: project.name,
-      forge: { kind: 'local', repository: project.repository, directory: FORGE_DIRECTORY },
-      clone: CLONE_DIRECTORY,
-      ...project.settings(settings.health),
-    })),
+    projects: settings.projects.map((project) => projectEntry(project, settings)),
   };
   return `# yaml-language-server: $schema=${CONFIG_SCHEMA_ID}\n${stringify(document, { lineWidth: 0 })}`;
 }

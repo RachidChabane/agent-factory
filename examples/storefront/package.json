@@ -1,0 +1,15 @@
+{
+  "name": "storefront",
+  "version": "1.4.0",
+  "private": true,
+  "description": "A small online shop: product catalogue, cart and checkout summary.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "lint": "node scripts/lint.js"
+  }
+}
