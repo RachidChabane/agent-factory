@@ -28,6 +28,7 @@ export const DISCOUNT_ROUNDING: StoryIssue = {
   },
   dependsOn: [],
   validate: true,
+  delegatedValidation: 'The spec states one rule with four criteria, each checked by a unit test, and its scope is one module.',
   checks: nodeTestChecks({
     says: [
       'Reading the specification: five criteria on one function that does not exist yet.',

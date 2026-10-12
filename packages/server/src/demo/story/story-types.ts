@@ -70,6 +70,8 @@ export interface StoryIssue extends StoryWork {
   readonly dependsOn: readonly string[];
   /** Whether the operator validates the spec, so the factory takes the issue; otherwise it stays a draft. */
   readonly validate: boolean;
+  /** The reason the project's orchestrator gives for validating the spec in the operator's place, under the project's autonomy; absent when the operator validates it. */
+  readonly delegatedValidation?: string;
 }
 
 /** The work of a spec that a challenge proposes, played when the operator accepts the spec and validates the issue it becomes. */

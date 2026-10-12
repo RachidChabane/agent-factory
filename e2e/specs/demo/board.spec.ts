@@ -1,5 +1,7 @@
+import { paths } from '../../../packages/cockpit/src/model/routes.ts';
+import { projectOf } from '../../support/api.ts';
 import { card, column, openCockpit } from '../../support/cockpit.ts';
-import { CART_BADGE_TOTAL, CATEGORY_FILTER, DELIVERY_ESTIMATES, DISCOUNT_ROUNDING, ORDER_HISTORY_PAGINATION, PAYMENT_RETRIES, PDF_INVOICES, SAVED_CARTS, TAX_ROUNDING, GIFT_PICKS_TITLE } from '../../support/story.ts';
+import { CART_BADGE_TOTAL, CATEGORY_FILTER, DELIVERY_ESTIMATES, DISCOUNT_ROUNDING, ORDER_HISTORY_PAGINATION, PAYMENT_RETRIES, PDF_INVOICES, SAVED_CARTS, STOREFRONT, TAX_ROUNDING, GIFT_PICKS_TITLE } from '../../support/story.ts';
 import { expect, test } from '../../support/test.ts';
 
 test.describe('the board of the demonstration', () => {
@@ -64,5 +66,19 @@ test.describe('the board of the demonstration', () => {
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toBeHidden();
     expect((await factory.api.state()).sequence).toBe(before);
+  });
+
+  test('lists on the overview of a project what its orchestrator decided in the operator\'s place, with the reason it gave', async ({ page, factory }) => {
+    const state = await factory.api.state();
+    const [decision] = projectOf(state, STOREFRONT).delegatedDecisions;
+    if (decision === undefined) throw new Error('the orchestrator of the storefront decided nothing');
+    expect(decision.reason).toBe(DISCOUNT_ROUNDING.delegatedValidation);
+    await openCockpit(page, factory, paths.project(STOREFRONT));
+    const decisions = page.getByRole('region', { name: 'Delegated decisions', exact: true });
+    await expect(decisions).toContainText('orchestrator may:');
+    const item = decisions.getByRole('list', { name: 'Delegated decisions' }).getByRole('listitem').first();
+    await expect(item).toContainText('Spec validated');
+    await expect(item).toContainText(`Reason: ${decision.reason}`);
+    await expect(item.getByRole('link', { name: `Issue #${decision.target.number}` })).toHaveAttribute('href', paths.issue(STOREFRONT, decision.target.number));
   });
 });

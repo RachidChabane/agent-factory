@@ -97,6 +97,7 @@ const storefront: DemoProject = {
       ],
     },
     audits: { ignore: [{ name: 'Dependency updates', authors: ['dependency-bot[bot]'] }] },
+    autonomy: { validateSpecs: true, resume: true, merge: [{ types: ['fix'], requires: ['films-recorded'] }] },
     evidence: { films: demoFilms() },
     tools: [
       {
