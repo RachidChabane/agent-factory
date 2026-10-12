@@ -159,3 +159,7 @@ export { DeclarativeToolProber, type DeclaredTool, type DeclarativeToolProbeSett
 export { InvalidToolDeclarationError } from './tools/errors.ts';
 export { RoutingToolProber } from './tools/routing-tool-prober.ts';
 export { ClaudeUsageReport, parseUsageReport, USAGE_PROMPT, USAGE_REPORT_ARGUMENTS, USAGE_REPORT_TIMEOUT_MS, UsageReportError, type AbortableRunner, type ClaudeUsageReportSettings } from './claude/usage-report.ts';
+export { CommandFilmRecorder, type CommandFilmRecorderSettings } from './film/commandFilmRecorder.ts';
+export { FfmpegTranscoder, transcodeCommand, EVEN_DIMENSIONS_FILTER, H264_ARGUMENTS } from './film/ffmpegTranscoder.ts';
+export { parseReport, ReportUnreadableError, FILM_STATUSES, type ParsedReport } from './film/filmReportParsing.ts';
+export { largestVideo, selectScreenshots, type MediaFile } from './film/filmMedia.ts';

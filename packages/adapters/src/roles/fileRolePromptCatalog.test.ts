@@ -26,6 +26,7 @@ const SPEC: IssueSpec = {
   expectedProof: 'A Playwright journey.',
   dependsOn: [],
   commitKind: null,
+  films: [],
 };
 
 describe('FileRolePromptCatalog', () => {
@@ -62,7 +63,7 @@ describe('FileRolePromptCatalog', () => {
     const catalog = await FileRolePromptCatalog.load(PLUGIN_ROLES_DIRECTORY);
     const checks = [{ path: 'app/e2e/link.spec.ts', content: 'test()' }];
     const rendered = [
-      catalog.render('acceptance-author', { ...acceptanceAuthorValues(REPOSITORY, SPEC, DEFAULT_PROJECT_CONVENTIONS.typology.get('ui')) }),
+      catalog.render('acceptance-author', { ...acceptanceAuthorValues(REPOSITORY, SPEC, DEFAULT_PROJECT_CONVENTIONS.typology.get('ui'), false) }),
       catalog.render('implementer', { ...implementerValues(REPOSITORY, SPEC, checks, GATE) }),
       catalog.render('reviewer', { ...reviewerValues(REPOSITORY, SPEC, checks, 'diff --git a/x b/x') }),
     ];
@@ -75,6 +76,18 @@ describe('FileRolePromptCatalog', () => {
     expect(rendered[1]).toContain(
       'runs the repository\'s gate in a sandbox of its own: `npm run lint`, the frozen acceptance checks, `npm run check:schemas` (with network access: downloads the schemas it validates against).',
     );
+  });
+
+  it('tells the acceptance author about films only when the project films, without a stray line otherwise', async () => {
+    const catalog = await FileRolePromptCatalog.load(PLUGIN_ROLES_DIRECTORY);
+    const type = DEFAULT_PROJECT_CONVENTIONS.typology.get('ui');
+    const without = catalog.render('acceptance-author', { ...acceptanceAuthorValues(REPOSITORY, SPEC, type, false) });
+    const filming = catalog.render('acceptance-author', { ...acceptanceAuthorValues(REPOSITORY, SPEC, type, true) });
+    expect(without).not.toContain('Films:');
+    expect(without).toContain('Do not choose one.\n\nWhen the checks are written');
+    expect(filming).toContain('- A film that the spec declares in its `Films:` header');
+    expect(filming).toContain('never write a check for what only a film can show.\n\nWhen the checks are written');
+    expect(placeholdersOf(filming)).toEqual([]);
   });
 
   it('renders the shipped auditor and challenger templates with their values', async () => {
