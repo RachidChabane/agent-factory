@@ -7,9 +7,12 @@ export const MAX_FILE_BYTES = 32 * 1024 * 1024;
 export const MAX_DIFF_BYTES = 32 * 1024 * 1024;
 /** The patch of one file is cut past this size, and says so. */
 export const MAX_FILE_PATCH_CHARACTERS = 512 * 1024;
+/** A range lists at most this many commits, the newest ones. */
+export const MAX_RANGE_COMMITS = 50;
 
 const GIT_EXECUTABLE = 'git';
 const OBJECT_NAME = /^[0-9a-f]{7,64}$/;
+const REF_NAME = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 const UNSAFE_PATH_SEGMENTS: readonly string[] = ['', '.', '..'];
 const PATH_SEPARATOR = '/';
 const NUL = '\0';
@@ -23,6 +26,10 @@ const RENAME_TO = 'rename to ';
 const QUOTE = '"';
 const NEWLINE = '\n';
 const MISSING_OBJECT_EXIT_CODE = 128;
+const COMMIT_FIELD_SEPARATOR = '\u001f';
+const COMMIT_RECORD_SEPARATOR = '\u001e';
+const COMMIT_FIELDS = ['%H', '%an', '%cI', '%B'] as const;
+const COMMIT_FORMAT = `${COMMIT_FIELDS.join('%x1f')}%x1e`;
 
 /** One file's part of a diff. */
 export interface FilePatch {
@@ -30,6 +37,25 @@ export interface FilePatch {
   readonly patch: string;
   /** Whether the patch was cut at MAX_FILE_PATCH_CHARACTERS. */
   readonly truncated: boolean;
+}
+
+/** A commit as the repository records it: who made it, when, and what it says. */
+export interface RepositoryCommit {
+  readonly sha: string;
+  readonly message: string;
+  readonly authorName: string;
+  readonly committedAt: Date;
+}
+
+function parseCommits(output: string): readonly RepositoryCommit[] {
+  return output
+    .split(COMMIT_RECORD_SEPARATOR)
+    .map((record) => record.replace(/^\n/, ''))
+    .filter((record) => record !== '')
+    .map((record) => {
+      const [sha = '', authorName = '', committedAt = '', ...message] = record.split(COMMIT_FIELD_SEPARATOR);
+      return { sha, authorName, committedAt: new Date(committedAt), message: message.join(COMMIT_FIELD_SEPARATOR).trim() };
+    });
 }
 
 export class UnsafeObjectRequestError extends Error {
@@ -123,6 +149,28 @@ export class GitObjects {
     const output = await this.git(['diff', '--no-color', '--no-ext-diff', '--find-renames', base, head], MAX_DIFF_BYTES);
     if (output.exitCode !== 0) throw new Error(`git diff ${base} ${head} failed in ${this.repository}: ${output.stderr.trim()}`);
     return filePatches(output.stdout.toString('utf8'));
+  }
+
+  /**
+   * The commits that `head` has and `base` does not, along the first parents, oldest first and at most
+   * MAX_RANGE_COMMITS of the newest. Null when the repository holds neither commit: nothing is known of the range.
+   */
+  async commitsBetween(base: string, head: string): Promise<readonly RepositoryCommit[] | null> {
+    for (const sha of [base, head]) if (!OBJECT_NAME.test(sha)) throw new UnsafeObjectRequestError(sha);
+    const output = await this.git(
+      ['log', '--first-parent', '--reverse', `--max-count=${MAX_RANGE_COMMITS}`, `--format=${COMMIT_FORMAT}`, `${base}..${head}`],
+      MAX_DIFF_BYTES,
+    );
+    if (output.exitCode === MISSING_OBJECT_EXIT_CODE) return null;
+    if (output.exitCode !== 0) throw new Error(`git log ${base}..${head} failed in ${this.repository}: ${output.stderr.trim()}`);
+    return parseCommits(output.stdout.toString('utf8'));
+  }
+
+  /** The commit a branch or a remote branch points at, or null when the repository has no such ref. */
+  async resolve(ref: string): Promise<string | null> {
+    if (!REF_NAME.test(ref)) throw new UnsafeObjectRequestError(ref);
+    const output = await this.git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], MAX_FILE_BYTES);
+    return output.exitCode === 0 ? output.stdout.toString('utf8').trim() : null;
   }
 
   private git(args: readonly string[], maxBytes: number): Promise<GitOutput> {
