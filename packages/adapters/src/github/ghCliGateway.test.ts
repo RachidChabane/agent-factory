@@ -26,7 +26,7 @@ describe('GhCliGateway', () => {
     fake = undefined;
   });
 
-  async function gatewayWith(rules: readonly FakeGhRule[]): Promise<{ gateway: GhCliGateway; gh: FakeGh }> {
+  async function gatewayWith(rules: readonly FakeGhRule[], mergeWithBypass = false): Promise<{ gateway: GhCliGateway; gh: FakeGh }> {
     const gh = await FakeGh.create(rules);
     fake = gh;
     const gateway = new GhCliGateway(new SpawnCommandRunner(), {
@@ -36,6 +36,7 @@ describe('GhCliGateway', () => {
       environment: gh.environment,
       ghExecutable: gh.executable,
       retry: QUICK_RETRIES,
+      mergeWithBypass,
     });
     return { gateway, gh };
   }
@@ -210,6 +211,20 @@ describe('GhCliGateway', () => {
       expect(await gateway.squashMerge(300, 'abc123')).toBe('merged456');
       const merge = (await gh.commandLines()).find((line) => line.startsWith('pr merge'));
       expect(merge).toBe(`pr merge 300 --repo ${OWNER}/${REPOSITORY} --squash --match-head-commit abc123`);
+    });
+
+    it('merges with the administrator bypass when the project allows it', async () => {
+      const { gateway, gh } = await gatewayWith(
+        [
+          { contains: ['pr', 'view', '--json headRefOid'], stdout: JSON.stringify({ headRefOid: 'abc123' }) },
+          { contains: ['pr merge'] },
+          { contains: ['pr', 'view', '--json mergeCommit'], stdout: JSON.stringify({ mergeCommit: { oid: 'merged456' } }) },
+        ],
+        true,
+      );
+      expect(await gateway.squashMerge(300, 'abc123')).toBe('merged456');
+      const merge = (await gh.commandLines()).find((line) => line.startsWith('pr merge'));
+      expect(merge).toBe(`pr merge 300 --repo ${OWNER}/${REPOSITORY} --squash --admin --match-head-commit abc123`);
     });
 
     it('refuses to merge when the head moved', async () => {

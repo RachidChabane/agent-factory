@@ -237,6 +237,15 @@ export function sandboxOutcome(project: ProjectConfig, engineSockets: readonly s
   return { ok: true, detail: [...domains, `container engine granted at ${socket}: ${ENGINE_CONSEQUENCE}`].join('; ') };
 }
 
+/** How a GitHub project merges: with the administrator bypass, the merge needs a login the base branch's rules let bypass the review. */
+export function mergeOutcome(project: ProjectConfig): CheckOutcome {
+  const slug = `${project.repository.owner}/${project.repository.name}`;
+  return {
+    ok: true,
+    detail: `squash merges with the administrator bypass (gh pr merge --admin): GitHub refuses it unless your login may bypass the review rule of ${slug}@${project.baseBranch}`,
+  };
+}
+
 /** What one project needs: its clone, its labels, its prompts and knowledge, and its declared tools. */
 export function projectChecks(config: AgentFactoryConfig, project: ProjectConfig, settings: ValidationSettings): readonly ValidationCheck[] {
   const cwd = config.home;
@@ -249,6 +258,9 @@ export function projectChecks(config: AgentFactoryConfig, project: ProjectConfig
       run: () => guarded(() => (project.forge.kind === 'local' ? localCloneOutcome(project, settings) : githubCloneOutcome(project, settings, cwd))),
     },
     ...(project.forge.kind === 'github' ? [{ name: 'labels', severity: 'required', runsCommands: true, run: () => guarded(() => labelsOutcome(project, settings, cwd)) } satisfies ValidationCheck] : []),
+    ...(project.forge.kind === 'github' && project.forge.mergeWithBypass
+      ? [{ name: 'merge', severity: 'optional', runsCommands: false, run: () => Promise.resolve(mergeOutcome(project)) } satisfies ValidationCheck]
+      : []),
     { name: 'prompts', severity: 'required', runsCommands: false, run: () => guarded(() => promptOverridesOutcome(project)) },
     { name: 'knowledge', severity: 'required', runsCommands: false, run: () => guarded(() => knowledgeOutcome(project)) },
     { name: 'sandbox', severity: 'optional', runsCommands: false, run: () => guarded(() => Promise.resolve(sandboxOutcome(project, projectEngineSockets(project, settings)()))) },

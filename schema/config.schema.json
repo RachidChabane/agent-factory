@@ -903,6 +903,10 @@
                   "repository": {
                     "type": "string",
                     "pattern": "^[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+$"
+                  },
+                  "mergeWithBypass": {
+                    "default": false,
+                    "type": "boolean"
                   }
                 },
                 "required": [

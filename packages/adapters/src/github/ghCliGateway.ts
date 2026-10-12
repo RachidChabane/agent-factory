@@ -75,6 +75,7 @@ const DEPLOYMENT_STATE_OF: Readonly<Record<string, DeploymentState>> = {
 const NO_STATUS_STATE: DeploymentState = 'in-progress';
 const READ_METHOD = 'GET';
 const RECENT_ITEMS = 20;
+const ADMINISTRATOR_BYPASS_FLAG = '--admin';
 
 export interface GhCliGatewaySettings {
   readonly owner: string;
@@ -85,6 +86,8 @@ export interface GhCliGatewaySettings {
   readonly workingDirectory?: string;
   /** How calls that fail for a transient reason are tried again; reads always, writes only where a duplicate cannot happen. */
   readonly retry?: RetrySettings;
+  /** Merge with the administrator bypass, for an operator the base branch's rules let bypass the required review. */
+  readonly mergeWithBypass?: boolean;
 }
 
 type FieldValue = string | number | readonly string[];
@@ -322,7 +325,18 @@ export class GhCliGateway implements GitHubGateway {
     const mergeCommit = () =>
       this.ghJson(['pr', 'view', String(number), '--repo', this.repositorySlug, '--json', 'mergeCommit'], PullRequestMergeViewSchema, `merge commit of pull request #${number}`);
     await this.retrying(
-      () => this.ghOnce(['pr', 'merge', String(number), '--repo', this.repositorySlug, '--squash', '--match-head-commit', expectedHeadSha]),
+      () =>
+        this.ghOnce([
+          'pr',
+          'merge',
+          String(number),
+          '--repo',
+          this.repositorySlug,
+          '--squash',
+          ...(this.settings.mergeWithBypass === true ? [ADMINISTRATOR_BYPASS_FLAG] : []),
+          '--match-head-commit',
+          expectedHeadSha,
+        ]),
       async () => ((await mergeCommit()).mergeCommit === null ? null : ''),
     );
     const merged = await mergeCommit();

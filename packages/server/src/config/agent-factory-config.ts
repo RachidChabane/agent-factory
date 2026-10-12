@@ -95,7 +95,7 @@ export type NotificationChannelConfig =
 export type RemoteAccessConfig = { readonly kind: 'none' } | { readonly kind: 'tailscale'; readonly allowedLogins: readonly string[] };
 
 export type ForgeConfig =
-  | { readonly kind: 'github' }
+  | { readonly kind: 'github'; readonly mergeWithBypass: boolean }
   | { readonly kind: 'local'; readonly directory: string; readonly bareRepositoryPath: string; readonly checks: LocalCheckMode };
 
 export type ReleaseModelConfig = { readonly kind: 'release-please'; readonly tagPattern: string } | { readonly kind: 'tags'; readonly tagPattern: string } | { readonly kind: 'none' };
@@ -361,7 +361,7 @@ function resolveProject(raw: RawProject, config: RawAgentFactoryConfig, home: st
   const repository = repositoryOf(raw.forge.repository);
   const forge: ForgeConfig =
     raw.forge.kind === 'github'
-      ? { kind: 'github' }
+      ? { kind: 'github', mergeWithBypass: raw.forge.mergeWithBypass }
       : { kind: 'local', directory: at(raw.forge.directory), bareRepositoryPath: join(at(raw.forge.directory), `${repository.name}${BARE_REPOSITORY_SUFFIX}`), checks: raw.forge.checks };
   const environment = raw.environment ?? config.defaults.environment;
   const writable = raw.sandbox?.writableDirectories ?? config.defaults.sandbox.writableDirectories;

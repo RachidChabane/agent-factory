@@ -58,7 +58,7 @@ applies at the next tick, and the cockpit lists what waits for a restart.
 |---|---|---|
 | `id` | required | lowercase letters, digits and dashes; used in paths, subjects and links |
 | `name` | required | the name the cockpit shows |
-| `forge` | required | `{ kind: github, repository: owner/name }` or `{ kind: local, repository, directory: forge, checks: none \| gate }`; see [Forges](#forges) |
+| `forge` | required | `{ kind: github, repository: owner/name, mergeWithBypass: false }` or `{ kind: local, repository, directory: forge, checks: none \| gate }`; see [Forges](#forges) |
 | `baseBranch` | `main` | the branch work starts from and merges into |
 | `clone` | `clone` | where the factory keeps its clone, in the project's directory |
 | `commitIdentity` | required | `name` and `email` of the factory's commits |
@@ -91,7 +91,10 @@ with none.
 
 - `github`: the repository on GitHub, read and written through `gh` with the
   operator's login. Issues, pull requests, checks, deployments and tags come from
-  there.
+  there. `mergeWithBypass: true` merges with the administrator bypass
+  (`gh pr merge --admin`), for an operator the base branch's rules let bypass the
+  required review; the merge still happens only on the operator's order and only at the
+  head they reviewed.
 - `local`: a bare repository and plain files in the project's directory, for a
   rehearsal that never reaches a remote. `agent-factory rehearsal init <clone>`
   creates it from an existing clone. With `checks: gate`, the forge runs the project's

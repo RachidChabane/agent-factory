@@ -120,6 +120,12 @@ describe('the configuration of a project', () => {
     expect(project.repository).toEqual({ owner: 'example-org', name: 'storefront' });
   });
 
+  it('merges on GitHub without the administrator bypass unless the project asks for it', () => {
+    expect(projectOf(parse(document()), 'storefront').forge).toEqual({ kind: 'github', mergeWithBypass: false });
+    const bypassing = minimalProject({ forge: { kind: 'github', repository: 'example-org/storefront', mergeWithBypass: true } });
+    expect(projectOf(parse(document({}, [bypassing])), 'storefront').forge).toEqual({ kind: 'github', mergeWithBypass: true });
+  });
+
   it('locates the bare repository of a local forge inside the project', () => {
     const project = projectOf(parse(document({}, [minimalProject({ forge: { kind: 'local', repository: 'example-org/storefront' } })])), 'storefront');
     expect(project.forge).toEqual({ kind: 'local', directory: `${HOME}/projects/storefront/forge`, bareRepositoryPath: `${HOME}/projects/storefront/forge/storefront.git`, checks: 'none' });

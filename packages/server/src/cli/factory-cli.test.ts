@@ -100,6 +100,14 @@ describe('the agent-factory command line', () => {
     expect(captured.lines.at(-1)).toBe('ok   widgets: sandbox: agents and commands stay confined: no container engine, no network domain for agents');
   });
 
+  it('says that a project merges with the administrator bypass, and what GitHub requires for it', async () => {
+    config = parseConfig(configText().replace('forge: { kind: github, repository: acme/widgets }', 'forge: { kind: github, repository: acme/widgets, mergeWithBypass: true }'), home);
+    expect(await runCli(['validate'], context())).toBe(0);
+    expect(captured.lines.find((line) => line.startsWith('ok   widgets: merge'))).toBe(
+      'ok   widgets: merge: squash merges with the administrator bypass (gh pr merge --admin): GitHub refuses it unless your login may bypass the review rule of acme/widgets@main',
+    );
+  });
+
   it('checks only what needs no command offline, and says what it left out', async () => {
     const runner = healthyRunner(home);
     expect(await runCli(['validate', '--offline'], context({ runner }))).toBe(0);

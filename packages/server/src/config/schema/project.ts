@@ -59,7 +59,12 @@ export const REPOSITORY_SLUG = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const RepositorySlug = z.string().regex(REPOSITORY_SLUG, 'must be owner/name');
 
 const ForgeSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('github'), repository: RepositorySlug }),
+  z.strictObject({
+    kind: z.literal('github'),
+    repository: RepositorySlug,
+    /** Merge with `gh pr merge --admin`, for an operator the base branch's rules let bypass the required review. */
+    mergeWithBypass: z.boolean().default(false),
+  }),
   z.strictObject({
     kind: z.literal('local'),
     /** The name the rehearsal forge shows; nothing is sent to a remote forge. */

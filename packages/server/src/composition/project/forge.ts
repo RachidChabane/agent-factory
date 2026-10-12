@@ -65,6 +65,7 @@ export async function openForge(project: ProjectConfig, runner: CommandRunner, e
         repository: project.repository.name,
         baseBranch: project.baseBranch,
         environment: buildGhEnvironment(environment),
+        mergeWithBypass: forge.mergeWithBypass,
       });
     case 'local': {
       const gitEnvironment = projectGitEnvironment(project, environment);

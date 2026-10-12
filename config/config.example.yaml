@@ -96,6 +96,9 @@ projects:
     forge:
       kind: github
       repository: example-org/storefront
+      # Merge with the administrator bypass (gh pr merge --admin), for an operator the base
+      # branch's rules let bypass the required review.
+      mergeWithBypass: false
     baseBranch: main
     clone: clone
     commitIdentity: { name: Example Factory, email: factory@example.invalid }
