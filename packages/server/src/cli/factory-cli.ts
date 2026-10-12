@@ -17,6 +17,7 @@ import { stopCommand } from './commands/stop-command.ts';
 import { toolCommand } from './commands/tool-command.ts';
 import { usageCommand } from './commands/usage-command.ts';
 import { validateCommand } from './commands/validate-command.ts';
+import { watchCommand } from './commands/watch-command.ts';
 import { EXIT_CODES } from './output.ts';
 
 /** The demonstration and its fictional projects load only when asked for. */
@@ -42,6 +43,8 @@ async function dispatch({ project, command }: CommandLine, context: CliContext):
       return statusCommand(command.issueNumber, project, context);
     case 'usage':
       return usageCommand(command.refresh, context);
+    case 'watch':
+      return watchCommand(command, context);
     case 'stop':
       return stopCommand(command.now, context);
     case 'run-issue':

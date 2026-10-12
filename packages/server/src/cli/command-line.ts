@@ -1,5 +1,6 @@
 import { parseLabelList } from '@agent-factory/application';
 import { FORGE_KINDS, type ForgeKind } from '../config/schema/project.ts';
+import { DEFAULT_WATCH_INTERVAL_SECONDS } from '../watch/watch-settings.ts';
 
 export const PROGRAM_NAME = 'agent-factory';
 
@@ -10,6 +11,7 @@ export const COMMAND_NAMES = {
   start: 'start',
   status: 'status',
   usage: 'usage',
+  watch: 'watch',
   stop: 'stop',
   runIssue: 'run-issue',
   resume: 'resume',
@@ -28,6 +30,18 @@ export const ISSUE_SUBCOMMANDS = { create: 'create', abandon: 'abandon' } as con
 export const PR_SUBCOMMANDS = { feedback: 'feedback' } as const;
 export const REHEARSAL_SUBCOMMANDS = { init: 'init', reset: 'reset', addIssue: 'add-issue' } as const;
 export const TOOL_SUBCOMMANDS = { check: 'check', login: 'login' } as const;
+
+/** Every verb of the command line. */
+export const COMMAND_VERBS: readonly string[] = Object.values(COMMAND_NAMES);
+
+/** The subcommands of the verbs that have some. */
+export const COMMAND_SUBCOMMANDS: Readonly<Record<string, readonly string[]>> = {
+  [COMMAND_NAMES.request]: Object.values(REQUEST_SUBCOMMANDS),
+  [COMMAND_NAMES.issue]: Object.values(ISSUE_SUBCOMMANDS),
+  [COMMAND_NAMES.pr]: Object.values(PR_SUBCOMMANDS),
+  [COMMAND_NAMES.rehearsal]: Object.values(REHEARSAL_SUBCOMMANDS),
+  [COMMAND_NAMES.tool]: Object.values(TOOL_SUBCOMMANDS),
+};
 
 export const PROJECT_OPTION = '--project';
 export const IMAGES_OPTION = '--images';
@@ -49,6 +63,9 @@ export const ID_OPTION = '--id';
 export const FORGE_OPTION = '--forge';
 export const NAME_OPTION = '--name';
 export const PORT_OPTION = '--port';
+export const INTERVAL_OPTION = '--interval';
+export const ONCE_FLAG = '--once';
+export const JSON_FLAG = '--json';
 const MAX_PORT = 65_535;
 export const DEFAULT_REQUESTER = 'unknown';
 const OPTION_VALUE_SEPARATOR = '=';
@@ -72,6 +89,9 @@ export const USAGE = [
   '  start [--demo] [--port <port>]               run the factory and serve the cockpit; --demo plays fictional projects with no account',
   '  status [<issue>]                             the installation at a glance, or the state of one issue',
   '  usage [--refresh]                            subscription usage by account and limit; --refresh reads it now',
+  '  watch [--interval <seconds>] [--once] [--json] [--port <port>]',
+  '                                               poll the running factory (every 20 s by default) and print one line for each blocker that appears or clears;',
+  '                                               --once prints the blockers present now and exits 1 when there are any; --json prints one JSON object per line',
   '  tool check <name>                            check a connected tool now, as validate does',
   '  tool login <name>                            start the login the tool declares (no terminal needed), then check it',
   '  stop [--now]                                 stop the running factory once its running work finishes; --now stops its agents too',
@@ -100,6 +120,7 @@ export type CliCommand =
   | { readonly kind: 'start'; readonly demo: boolean; readonly port: number | null }
   | { readonly kind: 'status'; readonly issueNumber: number | null }
   | { readonly kind: 'usage'; readonly refresh: boolean }
+  | { readonly kind: 'watch'; readonly intervalSeconds: number; readonly once: boolean; readonly json: boolean; readonly port: number | null }
   | { readonly kind: 'stop'; readonly now: boolean }
   | { readonly kind: 'run-issue'; readonly issueNumber: number }
   | { readonly kind: 'resume'; readonly issueNumber: number; readonly answer: string | null }
@@ -205,14 +226,30 @@ function parseInit(rest: readonly string[]): ParsedCommand {
   });
 }
 
+/** The port a command line names, null when it names none, or the reason it is refused. */
+function portOf(values: ReadonlyMap<string, string>): number | null | string {
+  const requested = values.get(PORT_OPTION);
+  if (requested === undefined) return null;
+  const port = positiveInteger(requested, 'port');
+  return typeof port === 'string' || port > MAX_PORT ? `${PORT_OPTION} must be a port number from 1 to ${MAX_PORT}, got "${requested}"` : port;
+}
+
 function parseStart(rest: readonly string[]): ParsedCommand {
   return withOptions(rest, [PORT_OPTION], [DEMO_FLAG], ({ positional, values, flags }) => {
     if (positional.length > 0) return failure(`unexpected arguments: ${positional.join(' ')}`);
-    const requested = values.get(PORT_OPTION);
-    if (requested === undefined) return done({ kind: 'start', demo: flags.has(DEMO_FLAG), port: null });
-    const port = positiveInteger(requested, 'port');
-    if (typeof port === 'string' || port > MAX_PORT) return failure(`${PORT_OPTION} must be a port number from 1 to ${MAX_PORT}, got "${requested}"`);
-    return done({ kind: 'start', demo: flags.has(DEMO_FLAG), port });
+    const port = portOf(values);
+    return typeof port === 'string' ? failure(port) : done({ kind: 'start', demo: flags.has(DEMO_FLAG), port });
+  });
+}
+
+function parseWatch(rest: readonly string[]): ParsedCommand {
+  return withOptions(rest, [INTERVAL_OPTION, PORT_OPTION], [ONCE_FLAG, JSON_FLAG], ({ positional, values, flags }) => {
+    if (positional.length > 0) return failure(`unexpected arguments: ${positional.join(' ')}`);
+    const requested = values.get(INTERVAL_OPTION);
+    const interval = requested === undefined ? DEFAULT_WATCH_INTERVAL_SECONDS : positiveInteger(requested, 'interval');
+    if (typeof interval === 'string') return failure(`${INTERVAL_OPTION} must be a whole number of seconds, 1 or more, got "${requested}"`);
+    const port = portOf(values);
+    return typeof port === 'string' ? failure(port) : done({ kind: 'watch', intervalSeconds: interval, once: flags.has(ONCE_FLAG), json: flags.has(JSON_FLAG), port });
   });
 }
 
@@ -362,6 +399,8 @@ function parseCommand(name: string, rest: readonly string[]): ParsedCommand {
       return parseStatus(rest);
     case COMMAND_NAMES.stop:
       return withOptions(rest, [], [NOW_FLAG], ({ positional, flags }) => (positional.length > 0 ? failure(`unexpected arguments: ${positional.join(' ')}`) : done({ kind: 'stop', now: flags.has(NOW_FLAG) })));
+    case COMMAND_NAMES.watch:
+      return parseWatch(rest);
     case COMMAND_NAMES.usage:
       return withOptions(rest, [], [REFRESH_FLAG], ({ positional, flags }) => (positional.length > 0 ? failure(`unexpected arguments: ${positional.join(' ')}`) : done({ kind: 'usage', refresh: flags.has(REFRESH_FLAG) })));
     case COMMAND_NAMES.runIssue:
