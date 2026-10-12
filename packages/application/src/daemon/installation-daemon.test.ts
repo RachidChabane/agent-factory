@@ -9,7 +9,6 @@ import { InstallationDaemon, type InstallationReload, type ProjectScheduler } fr
 import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 
 const START = new Date('2026-03-02T09:00:00.000Z');
-const SILENT_LOG = { info: () => undefined, warn: () => undefined };
 
 class RecordingProject implements ProjectScheduler {
   readonly projectId: string;
