@@ -28,7 +28,9 @@ import type {
   PullRequestDraft,
   PullRequestRef,
   ResourceGuard,
+  RunningProcess,
   SandboxScope,
+  ServiceProcesses,
   SourceControl,
   WorkspaceFiles,
   Worktree,
@@ -613,3 +615,54 @@ export class StaticSecrets implements KnownSecretSource {
     return Promise.resolve(this.secrets);
   }
 }
+
+/** One process a scripted stack started: what it ran, whether it still runs, and what it printed. */
+export class ScriptedProcess implements RunningProcess {
+  readonly name: string;
+  readonly command: readonly string[];
+  readonly pid: number;
+  readonly startedAt: string;
+  alive = true;
+  printed: string;
+
+  constructor(name: string, command: readonly string[], pid: number, printed: string) {
+    this.name = name;
+    this.command = command;
+    this.pid = pid;
+    this.startedAt = `started ${pid}`;
+    this.printed = printed;
+  }
+
+  running(): Promise<boolean> {
+    return Promise.resolve(this.alive);
+  }
+
+  output(): Promise<string> {
+    return Promise.resolve(this.printed);
+  }
+
+  stop(): Promise<void> {
+    this.alive = false;
+    return Promise.resolve();
+  }
+}
+
+/** Services that start at once and print one line, with what was started, stopped and reclaimed. */
+export class ScriptedServiceProcesses implements ServiceProcesses {
+  readonly started: ScriptedProcess[] = [];
+  readonly reclaimed: { readonly pid: number; readonly startedAt: string }[] = [];
+  private nextPid = 4_100;
+
+  start(name: string, command: readonly string[]): Promise<RunningProcess> {
+    const process = new ScriptedProcess(name, command, this.nextPid, `${name} listening`);
+    this.nextPid += 1;
+    this.started.push(process);
+    return Promise.resolve(process);
+  }
+
+  reclaim(pid: number, startedAt: string): Promise<boolean> {
+    this.reclaimed.push({ pid, startedAt });
+    return Promise.resolve(true);
+  }
+}
+

@@ -4,6 +4,7 @@ import { acceptanceCommand, scoreOutputPath, type AcceptanceManifest } from '../
 import { shellCommandLine, shellQuote } from '../acceptance/shell-quote.ts';
 import { readScoreReport, skillEvalCases, type ScoreReport } from '../acceptance/score-report.ts';
 import type { CommandSandbox, SourceControl, WorkspaceFiles, Worktree } from '../ports.ts';
+import { StackStartError, type StackScope } from './issue-stack.ts';
 import type { FrozenCheckViolation } from './journal-events.ts';
 import type { GateSettings, NamedCommand } from './pipeline-settings.ts';
 import { accessOf, describeOutcome, EXIT_CODE_SUCCESS, shellInvocation, tailLines, type ShellCommands } from './shell-commands.ts';
@@ -11,9 +12,15 @@ import { StructuredAcceptance } from './structured-acceptance.ts';
 
 export const GATE_STEP_NAMES = {
   frozenChecks: 'frozen-checks',
+  stack: 'stack',
   acceptance: 'acceptance',
   skillEval: 'skill-eval',
 } as const;
+
+/** Runs work inside the issue's stack, or as is when its checks need none. */
+export type StackAround = <T>(work: (scope: StackScope | null) => Promise<T>) => Promise<T>;
+
+export const NO_STACK: StackAround = (work) => work(null);
 
 const STEP_PASSED = 'passed';
 const SKIPPED_AFTER_FAILURE = 'skipped because an earlier step failed';
@@ -59,16 +66,23 @@ export function gateCommands(settings: GateSettings, manifest: AcceptanceManifes
   return [...settings.commandsBeforeAcceptance, ...acceptance, ...settings.commandsAfterAcceptance];
 }
 
-export function composeGateCommand(settings: GateSettings, manifest: AcceptanceManifest, sandbox: CommandSandbox, worktreePath: string): string | null {
+/** The gate the agent's Stop hook runs: inside a stack, with its variables and the host's loopback. */
+export function composeGateCommand(
+  settings: GateSettings,
+  manifest: AcceptanceManifest,
+  sandbox: CommandSandbox,
+  worktreePath: string,
+  stack: StackScope | null = null,
+): string | null {
   const commands = gateCommands(settings, manifest);
   if (commands.length === 0) return null;
   const chain = commands
     .map((command) => {
-      const confined = sandbox.confine(shellInvocation(command.run), { workingDirectory: worktreePath, network: accessOf(command).network });
-      return `(${shellCommandLine(confined)})`;
+      const scope = { workingDirectory: worktreePath, network: accessOf(command).network, hostLoopback: stack !== null };
+      return `(${shellCommandLine(sandbox.confine(shellInvocation(command.run), scope))})`;
     })
     .join(COMMAND_JOINER);
-  const exports = exportStatement(settings.environment);
+  const exports = exportStatement({ ...settings.environment, ...(stack?.environment ?? {}) });
   return exports === null ? chain : `${exports}${STATEMENT_SEPARATOR}${chain}`;
 }
 
@@ -98,6 +112,29 @@ interface StepExecution {
   readonly step: GateStepResult;
   readonly log: string;
   readonly tests: readonly AcceptanceTestOnBranch[];
+}
+
+/** The steps of one gate run as they are recorded: their results, their logs and the tests of the acceptance step. */
+class GateProgress {
+  readonly steps: GateStepResult[];
+  readonly log: string[] = [];
+  tests: readonly AcceptanceTestOnBranch[] = [];
+  failed = false;
+
+  constructor(steps: readonly GateStepResult[]) {
+    this.steps = [...steps];
+  }
+
+  record(execution: StepExecution): void {
+    this.log.push(execution.log);
+    this.steps.push(execution.step);
+    if (execution.tests.length > 0) this.tests = execution.tests;
+    this.failed = this.failed || execution.step.outcome === 'failed';
+  }
+
+  skip(commands: readonly NamedCommand[]): void {
+    for (const command of commands) this.steps.push(skipped(command.name));
+  }
 }
 
 function structuredRunnerOf(manifest: AcceptanceManifest, base: BaseResults): StructuredTestRunner | null {
@@ -139,39 +176,74 @@ export class OrchestratorGate {
     return [...missing, ...modified].sort((a, b) => a.path.localeCompare(b.path));
   }
 
-  async run(worktree: Worktree, frozen: readonly FrozenCheck[], manifest: AcceptanceManifest, type: IssueTypeDefinition, base: BaseResults): Promise<GateRun> {
-    const commands = [...this.setupCommands, ...gateCommands(this.settings, manifest)];
+  /** Runs the setup, then the gate commands inside the issue's stack when its checks need one. */
+  async run(
+    worktree: Worktree,
+    frozen: readonly FrozenCheck[],
+    manifest: AcceptanceManifest,
+    type: IssueTypeDefinition,
+    base: BaseResults,
+    stack: StackAround = NO_STACK,
+  ): Promise<GateRun> {
+    const inside = gateCommands(this.settings, manifest);
+    const commands = [...this.setupCommands, ...inside];
     const violations = await this.verifyFrozenChecks(worktree, frozen);
     if (violations.length > 0) {
       const steps = [failed(GATE_STEP_NAMES.frozenChecks, describeViolations(violations)), ...commands.map((command) => skipped(command.name))];
       return { result: resultOf(steps), violations, log: describeViolations(violations), scoreReport: null, tests: [] };
     }
-    const steps: GateStepResult[] = [passed(GATE_STEP_NAMES.frozenChecks)];
-    const log: string[] = [];
-    let tests: readonly AcceptanceTestOnBranch[] = [];
-    let failure = false;
+    const progress = new GateProgress([passed(GATE_STEP_NAMES.frozenChecks)]);
     const runner = structuredRunnerOf(manifest, base);
-    for (const command of commands) {
-      if (failure) {
-        steps.push(skipped(command.name));
-        continue;
-      }
-      const execution =
-        command.name === GATE_STEP_NAMES.acceptance && runner !== null
-          ? await this.structuredAcceptanceStep(worktree, manifest, runner, base.tests)
-          : await this.commandStep(worktree, command);
-      log.push(execution.log);
-      steps.push(execution.step);
-      if (execution.tests.length > 0) tests = execution.tests;
-      failure = execution.step.outcome === 'failed';
-    }
+    await this.runSteps(progress, worktree, this.setupCommands, manifest, runner, base, this.shell);
+    if (progress.failed) progress.skip(inside);
+    else await this.runInsideStack(progress, worktree, inside, manifest, runner, base, stack);
     const scorePath = scoreOutputPath(manifest, type);
-    const scoreReport = scorePath === null ? null : await this.scoreStep(worktree, scorePath, base.scoreReport, failure, steps);
-    return { result: resultOf(steps), violations, log: log.join(LOG_SEPARATOR), scoreReport, tests };
+    const scoreReport = scorePath === null ? null : await this.scoreStep(worktree, scorePath, base.scoreReport, progress.failed, progress.steps);
+    return { result: resultOf(progress.steps), violations, log: progress.log.join(LOG_SEPARATOR), scoreReport, tests: progress.tests };
   }
 
-  private async commandStep(worktree: Worktree, command: NamedCommand): Promise<StepExecution> {
-    const outcome = await this.shell.execute(command.run, worktree.path, accessOf(command));
+  private async runInsideStack(
+    progress: GateProgress,
+    worktree: Worktree,
+    commands: readonly NamedCommand[],
+    manifest: AcceptanceManifest,
+    runner: StructuredTestRunner | null,
+    base: BaseResults,
+    stack: StackAround,
+  ): Promise<void> {
+    try {
+      await stack((scope) => this.runSteps(progress, worktree, commands, manifest, runner, base, scope?.shell ?? this.shell));
+    } catch (error) {
+      if (!(error instanceof StackStartError)) throw error;
+      progress.record({ step: failed(GATE_STEP_NAMES.stack, error.reason), log: error.reason, tests: [] });
+      progress.skip(commands);
+    }
+  }
+
+  private async runSteps(
+    progress: GateProgress,
+    worktree: Worktree,
+    commands: readonly NamedCommand[],
+    manifest: AcceptanceManifest,
+    runner: StructuredTestRunner | null,
+    base: BaseResults,
+    shell: ShellCommands,
+  ): Promise<void> {
+    for (const command of commands) {
+      if (progress.failed) {
+        progress.skip([command]);
+        continue;
+      }
+      progress.record(
+        command.name === GATE_STEP_NAMES.acceptance && runner !== null
+          ? await this.structuredAcceptanceStep(worktree, manifest, runner, base.tests, shell)
+          : await this.commandStep(worktree, command, shell),
+      );
+    }
+  }
+
+  private async commandStep(worktree: Worktree, command: NamedCommand, shell: ShellCommands): Promise<StepExecution> {
+    const outcome = await shell.execute(command.run, worktree.path, accessOf(command));
     const described = describeOutcome(command.run, outcome);
     const succeeded = outcome.kind === 'completed' && outcome.exitCode === EXIT_CODE_SUCCESS;
     return {
@@ -186,9 +258,10 @@ export class OrchestratorGate {
     manifest: AcceptanceManifest,
     runner: StructuredTestRunner,
     baseTests: readonly AcceptanceTestOnBase[],
+    shell: ShellCommands,
   ): Promise<StepExecution> {
     const name = GATE_STEP_NAMES.acceptance;
-    const run = await this.acceptance.run(worktree, manifest, runner);
+    const run = await this.acceptance.run(worktree, manifest, runner, shell);
     if (run === null) return { step: passed(name), log: '', tests: [] };
     const described = describeOutcome(run.command, run.outcome);
     if (run.report === null) {

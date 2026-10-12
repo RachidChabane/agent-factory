@@ -79,6 +79,8 @@ export interface DaemonDependencies {
   readonly challenges: RequestChallenger | null;
   readonly releases: ReleaseEvaluator;
   readonly configuration: ConfigurationSource | null;
+  /** Stops the stacks an earlier factory left running; says how many it stopped. */
+  readonly reclaimStacks: () => Promise<number>;
 }
 
 export interface DaemonSettings {
@@ -203,7 +205,9 @@ export class FactoryDaemon {
 
   /** Seeds the merge watcher and records the start; an installation calls it once per project. */
   async start(): Promise<void> {
-    const { events, github } = this.dependencies;
+    const { events, github, log } = this.dependencies;
+    const reclaimed = await this.dependencies.reclaimStacks();
+    if (reclaimed > 0) log.warn(`stopped ${reclaimed} stack(s) an earlier factory left running`);
     await seedMergeCursor({ events, github }, this.settings.baseBranch);
     await events.append(DAEMON_STARTED_EVENT, DAEMON_SUBJECT, { concurrency: this.concurrency, poolSize: this.settings.poolSize });
   }

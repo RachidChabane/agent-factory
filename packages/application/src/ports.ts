@@ -275,10 +275,32 @@ export interface CommandRunner {
 export interface SandboxScope {
   readonly workingDirectory: string;
   readonly network: boolean;
+  /** Whether the command shares the host's loopback with the services of a stack, where the sandbox would give it its own. */
+  readonly hostLoopback?: boolean;
 }
 
 export interface CommandSandbox {
   confine(command: readonly string[], scope: SandboxScope): readonly string[];
+}
+
+/** A process the factory started and owns until it stops it. */
+export interface RunningProcess {
+  readonly pid: number;
+  /** When the system says the process started, which tells it from a later process given the same id; null when unread. */
+  readonly startedAt: string | null;
+  /** Whether the process is still running. */
+  running(): Promise<boolean>;
+  /** The last lines the process printed. */
+  output(): Promise<string>;
+  /** Asks the process and its children to stop, then kills what is left after the grace period. */
+  stop(graceMs: number): Promise<void>;
+}
+
+/** Starts the long-running processes of a stack, each in a process group of its own with its output kept. */
+export interface ServiceProcesses {
+  start(name: string, command: readonly string[], cwd: string, environment: Readonly<Record<string, string>>): Promise<RunningProcess>;
+  /** Stops a process an earlier factory left running, when it is still that process; says whether it stopped one. */
+  reclaim(pid: number, startedAt: string, graceMs: number): Promise<boolean>;
 }
 
 export interface KnownSecretSource {

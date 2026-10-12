@@ -7,11 +7,14 @@ import {
   DEFAULT_RETRY_DELAY_MS,
   evaluateRelease,
   FactoryDaemon,
+  IssueJournalWriter,
   IssuePipeline,
+  IssueStacks,
   MarkdownAuditIssueRenderer,
   ProjectSchedulingPauses,
   RedeployEnvironment,
   ResumeIssue,
+  ShellCommands,
   type AuditRunner,
   type EvaluateReleaseDependencies,
   type IssueDriver,
@@ -117,6 +120,15 @@ export function requestDecisionSettings(project: ProjectRuntime): RequestDecisio
   return { requestsDirectory: project.config.directories.requests, conventions: project.conventions };
 }
 
+/** Stops the stacks of the project that an earlier factory started and never stopped. */
+function stackReclaimer(project: ProjectRuntime): () => Promise<number> {
+  const { dependencies, settings } = project;
+  const { gate } = settings;
+  const shell = new ShellCommands(dependencies.runner, dependencies.sandbox, gate.environment, gate.commandTimeoutMs, gate.niceness);
+  const stacks = new IssueStacks({ services: dependencies.services, logs: dependencies.logs, slots: dependencies.stackSlots }, settings.stack, shell);
+  return () => stacks.reclaim(dependencies.events, (issueNumber) => new IssueJournalWriter(dependencies.events, dependencies.states, issueNumber));
+}
+
 /** The daemon of one project, driven by the installation's daemon, obeying the installation's pauses and its own. */
 export function projectDaemon(project: ProjectRuntime, installation: InstallationContext, installationPauses: () => PauseSet): FactoryDaemon {
   const { dependencies, config } = project;
@@ -137,6 +149,7 @@ export function projectDaemon(project: ProjectRuntime, installation: Installatio
       challenges: challenger,
       releases: releaseEvaluator(project),
       configuration: null,
+      reclaimStacks: stackReclaimer(project),
     },
     {
       concurrency: config.concurrency.issues,

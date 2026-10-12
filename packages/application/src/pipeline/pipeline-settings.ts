@@ -22,6 +22,25 @@ export interface NamedCommand {
   readonly network?: NetworkGrant;
 }
 
+/** A long-running process of a stack, and the command that succeeds once it answers. */
+export interface StackService {
+  readonly name: string;
+  readonly run: string;
+  readonly ready: { readonly run: string; readonly timeoutMs: number };
+  readonly network?: NetworkGrant;
+}
+
+/** What acceptance checks need running around them: services the factory starts in the workspace under test, then stops. */
+export interface StackSettings {
+  readonly setup: readonly NamedCommand[];
+  readonly services: readonly StackService[];
+  readonly teardown: readonly NamedCommand[];
+  readonly environment: Readonly<Record<string, string>>;
+  /** The issue types whose checks need the stack; every type when empty. */
+  readonly issueTypes: readonly string[];
+  readonly stopGraceMs: number;
+}
+
 export interface GateSettings {
   readonly commandsBeforeAcceptance: readonly NamedCommand[];
   readonly commandsAfterAcceptance: readonly NamedCommand[];
@@ -53,4 +72,5 @@ export interface PipelineSettings {
   readonly conventions: ProjectConventions;
   readonly evidenceCacheDirectory: string;
   readonly resources: ResourceAdmissionPolicy;
+  readonly stack: StackSettings | null;
 }

@@ -122,13 +122,13 @@ describe('runIssue', () => {
     await scenario.pipeline().runIssue(ISSUE_NUMBER);
     const worktree = scenario.worktree().path;
     expect(scenario.sandbox.scopes).toEqual([
-      { workingDirectory: worktree, network: true },
-      { workingDirectory: worktree, network: false },
-      { workingDirectory: worktree, network: false },
-      { workingDirectory: worktree, network: false },
-      { workingDirectory: worktree, network: true },
-      { workingDirectory: worktree, network: false },
-      { workingDirectory: worktree, network: false },
+      { workingDirectory: worktree, network: true, hostLoopback: false },
+      { workingDirectory: worktree, network: false, hostLoopback: false },
+      { workingDirectory: worktree, network: false, hostLoopback: false },
+      { workingDirectory: worktree, network: false, hostLoopback: false },
+      { workingDirectory: worktree, network: true, hostLoopback: false },
+      { workingDirectory: worktree, network: false, hostLoopback: false },
+      { workingDirectory: worktree, network: false, hostLoopback: false },
     ]);
     expect(scenario.runner.executed.every((entry) => entry.argv[3] === 'sandbox')).toBe(true);
   });

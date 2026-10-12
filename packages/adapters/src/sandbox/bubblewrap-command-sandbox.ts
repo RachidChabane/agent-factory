@@ -11,7 +11,8 @@ import { parsePathPattern, type PathPattern } from './path-patterns.ts';
 /**
  * Confines a command with bubblewrap: read-only root, writable worktree, temporary and configured
  * directories, credential stores and the host's agent and container sockets hidden, and a private
- * network namespace (loopback only) unless the scope grants the network. The container engine sockets
+ * network namespace (loopback only) unless the scope grants the network or shares the host's loopback with
+ * the services of a stack, which on Linux means sharing the host's network. The container engine sockets
  * the settings grant are bound back in, whatever hides their directory.
  *
  * A configured or temporary directory that does not exist when the command starts is not bound.
@@ -39,7 +40,7 @@ export class BubblewrapCommandSandbox implements CommandSandbox {
       hiddenDirectories: hidden.directories,
       hiddenFiles: hidden.files,
       engineSockets: (this.settings.engineSockets ?? NO_ENGINE_SOCKETS)(),
-      network: scope.network,
+      network: scope.network || scope.hostLoopback === true,
     };
   }
 

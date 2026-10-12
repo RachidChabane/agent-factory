@@ -2,6 +2,7 @@ export * from './store/sqlite-database.ts';
 export * from './store/sqlite-event-store.ts';
 export * from './store/sqlite-issue-state-store.ts';
 export { SpawnCommandRunner, type SpawnCommandRunnerOptions } from './process/spawnCommandRunner.ts';
+export { processStartTime, SpawnServiceProcesses } from './process/spawnServiceProcesses.ts';
 export { CommandAbortedError, CommandSpawnError, EmptyCommandError } from './process/errors.ts';
 export { GitWorktreePool, type GitWorktreePoolSettings } from './git/gitWorktreePool.ts';
 export { GitSourceControl, type GitIdentity, type GitSourceControlSettings } from './git/gitSourceControl.ts';

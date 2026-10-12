@@ -3,6 +3,7 @@ import type { PipelineDependencies } from '../pipeline-dependencies.ts';
 import type { AgentRuns } from '../agent-runs.ts';
 import type { EvidenceCollector } from '../evidence.ts';
 import type { OrchestratorGate } from '../gate-runner.ts';
+import type { IssueStacks } from '../issue-stack.ts';
 import type { IssueJournalWriter } from '../journal-writer.ts';
 import type { PipelineJournal } from '../pipeline-journal.ts';
 import type { PipelineSettings } from '../pipeline-settings.ts';
@@ -20,6 +21,7 @@ export interface PipelineToolkit {
   readonly acceptance: StructuredAcceptance;
   readonly evidence: EvidenceCollector;
   readonly bodies: PullRequestBodyRenderer;
+  readonly stacks: IssueStacks;
 }
 
 export interface StageContext {

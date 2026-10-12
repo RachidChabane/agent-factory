@@ -13,6 +13,7 @@ import { loadJournal, type PipelineJournal } from '../pipeline-journal.ts';
 import type { PipelineSettings } from '../pipeline-settings.ts';
 import { IssuePipeline, type IssuePipelineOptions } from '../run-issue.ts';
 import { webForgeFileLinks } from './file-links.ts';
+import { StackSlots } from '../issue-stack.ts';
 import {
   AdjustableResources,
   EventSourcedIssueStates,
@@ -24,6 +25,7 @@ import {
   InMemoryWorkspace,
   InMemoryWorktreePool,
   ScriptedCommandRunner,
+  ScriptedServiceProcesses,
   RecordingSandbox,
   ScriptedRoleHarness,
   SequentialIds,
@@ -93,6 +95,7 @@ export const SCENARIO_CONVENTIONS: ProjectConventions = {
 export const SETTINGS: PipelineSettings = {
   repository: { owner: 'acme', name: 'widgets' },
   fileLinks: webForgeFileLinks('https://github.com', 'acme', 'widgets'),
+  stack: null,
   setupCommands: [{ name: 'install', run: SETUP_COMMAND, network: { reason: 'downloads the dependencies from the registry' } }],
   roles: {
     'acceptance-author': { model: 'sonnet', effort: 'medium', maxBudgetUsd: 2, maxTurns: 40, timeoutMs: 600_000 },
@@ -149,6 +152,8 @@ export class PipelineScenario {
   readonly sandbox = new RecordingSandbox();
   readonly secrets = new StaticSecrets();
   readonly baseWorkspaces = new InMemoryBaseWorkspaces(this.sourceControl, this.workspace);
+  readonly services = new ScriptedServiceProcesses();
+  readonly stackSlots = new StackSlots();
   readonly settings: PipelineSettings;
   lintFailuresLeft = 0;
   setupFailuresLeft = 0;
@@ -185,6 +190,8 @@ export class PipelineScenario {
       resources: this.resources,
       ids: this.ids,
       baseWorkspaces: this.baseWorkspaces,
+      services: this.services,
+      stackSlots: this.stackSlots,
     };
   }
 

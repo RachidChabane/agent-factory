@@ -1188,6 +1188,123 @@
             },
             "additionalProperties": false
           },
+          "stack": {
+            "type": "object",
+            "properties": {
+              "setup": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "run": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "network": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "run"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "services": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "run": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "ready": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "readyTimeoutSeconds": {
+                      "default": 120,
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "network": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "run",
+                    "ready"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "teardown": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "run": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "network": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "run"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "environment": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "issueTypes": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                }
+              },
+              "stopGraceSeconds": {
+                "default": 10,
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
           "sandbox": {
             "type": "object",
             "properties": {

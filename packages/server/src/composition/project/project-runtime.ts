@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import {
   ClaudeCodeHarness,
   claudeHarnessConfig,
@@ -11,6 +12,7 @@ import {
   LayeredRolePromptCatalog,
   NodeWorkspaceFiles,
   SourcesKnowledgePack,
+  SpawnServiceProcesses,
 } from '@agent-factory/adapters';
 import {
   GovernedHarness,
@@ -20,6 +22,7 @@ import {
   ProjectEventStore,
   RecordingHarness,
   SlottedHarness,
+  StackSlots,
   type AgentHarness,
   type BaseCheckouts,
   type DeliveryEnvironment,
@@ -44,6 +47,8 @@ import { localGateChecks } from './local-checks.ts';
 import { pipelineSettings } from './project-settings.ts';
 
 export const PROJECT_LINK_SEGMENT = 'projects';
+/** Where the services of a project's stacks write their output, under the project's logs. */
+const STACK_LOG_DIRECTORY = 'stacks';
 
 /** One project of the installation, with everything its use cases need and its settings kept current. */
 export interface ProjectRuntime {
@@ -149,6 +154,8 @@ export async function openProject(installation: InstallationContext, initial: Pr
     resources: installation.resources,
     ids: new RandomRunIds(),
     baseWorkspaces: baseWorkspaces(config, runner, gitEnvironment),
+    services: new SpawnServiceProcesses(join(config.directories.logs, STACK_LOG_DIRECTORY)),
+    stackSlots: new StackSlots(),
   };
   const log = projectLog(installation.log, config.id);
   return {

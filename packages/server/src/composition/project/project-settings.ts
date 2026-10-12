@@ -51,6 +51,7 @@ export function pipelineSettings(config: AgentFactoryConfig, project: ProjectCon
     },
     conventions: projectConventions(project),
     evidenceCacheDirectory: project.directories.evidence,
+    stack: project.stack,
     resources: { minimumFreeMemoryPercent: config.resources.minimumFreeMemoryPercent, pauseAbovePressure: config.resources.pauseAbovePressure },
   };
 }

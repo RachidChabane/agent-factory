@@ -117,9 +117,10 @@ export class AuthoringChecksStage implements PipelineStage {
     const { toolkit, writer } = context;
     const profile = profileOf(context, 'acceptance-author');
     let { prompt, resumeSessionId } = opening;
+    const type = issueTypeOfSpec(context, spec);
     for (let correction = 0; ; correction += 1) {
-      const result = await toolkit.agents.run(writer, {
-        role: 'acceptance-author',
+      const request = {
+        role: 'acceptance-author' as const,
         profile,
         model: profile.model,
         effort: profile.effort,
@@ -131,7 +132,8 @@ export class AuthoringChecksStage implements PipelineStage {
         attempt: context.journal.beforeProofCorrections.length + correction,
         branch: context.journal.branch,
         decisionRequestPath: null,
-      });
+      };
+      const result = await toolkit.stacks.around(writer, context.journal.issueNumber, type.id, worktree.path, () => toolkit.agents.run(writer, request));
       if (result.outcome !== 'success') {
         throw new EscalationRequiredError(agentFailureSummary('acceptance-author', result.outcome, result.finalText));
       }

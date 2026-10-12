@@ -17,7 +17,7 @@ import { checkRewriteImplementerAddendum, earlierAttemptsAddendum, implementerCo
 import { tailLines } from '../shell-commands.ts';
 import { leasedWorktree, requireFrozen, requireManifest, requireSpec } from './journal-facts.ts';
 import { ADVANCED, type PipelineStage, type StageContext, type StageResult } from './stage.ts';
-import { profileOf, readCheckContents } from './stage-support.ts';
+import { issueTypeOfSpec, profileOf, readCheckContents } from './stage-support.ts';
 
 interface AnsweredDecision {
   readonly request: ImplementerAttemptRecord;
@@ -86,20 +86,23 @@ export class ImplementingStage implements PipelineStage {
     const profile = profileOf(context, 'implementer');
     const plan = answered === null ? planAttempt(journal, attempt, profile) : answeredPlan(attempt, answered);
     await files.remove(worktree.path, DECISION_REQUEST_PATH);
-    const result = await toolkit.agents.run(writer, {
-      role: 'implementer',
-      profile,
-      model: plan.model,
-      effort: plan.effort,
-      workingDirectory: worktree.path,
-      prompt: await this.promptFor(context, plan, spec, worktree, frozen, answered),
-      resumeSessionId: plan.resumeSessionId,
-      frozenChecks: frozen.checks,
-      gateCommand: composeGateCommand(toolkit.settings.gate, manifest, toolkit.dependencies.sandbox, worktree.path),
-      attempt,
-      branch: journal.branch,
-      decisionRequestPath: DECISION_REQUEST_PATH,
-    });
+    const prompt = await this.promptFor(context, plan, spec, worktree, frozen, answered);
+    const result = await toolkit.stacks.around(writer, journal.issueNumber, issueTypeOfSpec(context, spec).id, worktree.path, (stack) =>
+      toolkit.agents.run(writer, {
+        role: 'implementer',
+        profile,
+        model: plan.model,
+        effort: plan.effort,
+        workingDirectory: worktree.path,
+        prompt,
+        resumeSessionId: plan.resumeSessionId,
+        frozenChecks: frozen.checks,
+        gateCommand: composeGateCommand(toolkit.settings.gate, manifest, toolkit.dependencies.sandbox, worktree.path, stack),
+        attempt,
+        branch: journal.branch,
+        decisionRequestPath: DECISION_REQUEST_PATH,
+      }),
+    );
     await writer.record(PIPELINE_EVENTS.implementerAttemptFinished, {
       attempt,
       mode: plan.mode,

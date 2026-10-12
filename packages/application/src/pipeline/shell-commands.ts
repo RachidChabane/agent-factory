@@ -22,6 +22,13 @@ export interface CommandAccess {
   readonly network: boolean;
 }
 
+export interface ShellCommandsSettings {
+  /** Whether every command shares the host's loopback, as the commands inside a stack do. */
+  readonly hostLoopback: boolean;
+}
+
+const OWN_LOOPBACK: ShellCommandsSettings = { hostLoopback: false };
+
 export const OFFLINE: CommandAccess = { network: false };
 
 export function accessOf(command: NamedCommand): CommandAccess {
@@ -68,7 +75,9 @@ export class ShellCommands {
   private readonly sandbox: CommandSandbox;
   private readonly environment: Readonly<Record<string, string>>;
   private readonly timeoutMs: number;
+  private readonly niceness: number | null;
   private readonly prefix: readonly string[];
+  private readonly settings: ShellCommandsSettings;
 
   constructor(
     runner: CommandRunner,
@@ -76,18 +85,35 @@ export class ShellCommands {
     environment: Readonly<Record<string, string>>,
     timeoutMs: number,
     niceness: number | null,
+    settings: ShellCommandsSettings = OWN_LOOPBACK,
   ) {
     this.runner = runner;
     this.sandbox = sandbox;
     this.environment = environment;
     this.timeoutMs = timeoutMs;
+    this.niceness = niceness;
     this.prefix = niceness === null ? [] : [NICE_EXECUTABLE, NICE_ADJUSTMENT_FLAG, String(niceness)];
+    this.settings = settings;
+  }
+
+  /** The same commands with more variables, sharing the host's loopback: the commands that run inside a stack. */
+  insideStack(environment: Readonly<Record<string, string>>): ShellCommands {
+    return new ShellCommands(this.runner, this.sandbox, { ...this.environment, ...environment }, this.timeoutMs, this.niceness, { hostLoopback: true });
+  }
+
+  /** The variables every command gets. */
+  get variables(): Readonly<Record<string, string>> {
+    return this.environment;
+  }
+
+  /** The argument list that runs a shell line confined, as `run` starts it. */
+  confined(command: string, cwd: string, access: CommandAccess = OFFLINE): readonly string[] {
+    return [...this.prefix, ...this.sandbox.confine(shellInvocation(command), { workingDirectory: cwd, network: access.network, hostLoopback: this.settings.hostLoopback })];
   }
 
   async run(command: string, cwd: string, access: CommandAccess = OFFLINE, timeoutMs: number = this.timeoutMs): Promise<ShellRun> {
-    const confined = this.sandbox.confine(shellInvocation(command), { workingDirectory: cwd, network: access.network });
     const started = await this.runner
-      .run([...this.prefix, ...confined], cwd, timeoutMs, this.environment)
+      .run(this.confined(command, cwd, access), cwd, timeoutMs, this.environment)
       .then((value) => ({ ok: true as const, value }))
       .catch((error: unknown) => ({ ok: false as const, error }));
     if (!started.ok) {

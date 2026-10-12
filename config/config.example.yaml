@@ -114,6 +114,15 @@ projects:
     environment:
       passthrough: [PATH, HOME, LANG, TERM, TMPDIR, USER]
       set: { CI: "1" }
+    # What the checks of user-interface issues need running: the factory starts it in the workspace under test
+    # before their checks and the agents' runs, waits until each service answers, and stops it afterwards.
+    # Every command in it gets AGENT_FACTORY_SLOT (0, 1, ...) to keep the stacks of issues running at once apart.
+    stack:
+      issueTypes: [ui]
+      services:
+        - name: web
+          run: PORT=$((3000 + AGENT_FACTORY_SLOT)) npm run dev
+          ready: curl -fsS "http://127.0.0.1:$((3000 + AGENT_FACTORY_SLOT))/healthz"
     # What confined code may reach beyond its worktree. Agents may always run the setup and gate commands above.
     sandbox:
       # Lets the agents look package versions up; registry credentials stay unreadable.

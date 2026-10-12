@@ -11,11 +11,13 @@ import type {
   LogArchive,
   ResourceGuard,
   RolePromptCatalog,
+  ServiceProcesses,
   SourceControl,
   SpecReader,
   WorkspaceFiles,
   WorktreePool,
 } from '../ports.ts';
+import type { StackSlots } from './issue-stack.ts';
 
 export interface PipelineDependencies {
   readonly github: GitHubGateway;
@@ -34,4 +36,8 @@ export interface PipelineDependencies {
   readonly resources: ResourceGuard;
   readonly ids: IdGenerator;
   readonly baseWorkspaces: BaseCheckouts;
+  /** The long-running processes of the project's stack. */
+  readonly services: ServiceProcesses;
+  /** The stack slots of the project, shared by the issues it runs at once. */
+  readonly stackSlots: StackSlots;
 }

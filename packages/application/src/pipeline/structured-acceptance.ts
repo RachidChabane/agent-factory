@@ -22,13 +22,14 @@ export class StructuredAcceptance {
     this.files = files;
   }
 
-  async run(worktree: Worktree, manifest: AcceptanceManifest, runner: StructuredTestRunner): Promise<StructuredAcceptanceRun | null> {
+  /** Runs the checks with `shell`, the shell of a stack when the checks need one. */
+  async run(worktree: Worktree, manifest: AcceptanceManifest, runner: StructuredTestRunner, shell: ShellCommands = this.shell): Promise<StructuredAcceptanceRun | null> {
     const plan = structuredAcceptanceCommand(manifest, runner, worktree.path);
     if (plan === null) return null;
     await this.files.remove(worktree.path, ACCEPTANCE_REPORT_DIRECTORY);
     await this.files.makeDirectory(worktree.path, ACCEPTANCE_REPORT_DIRECTORY);
     try {
-      const outcome = await this.shell.execute(plan.command, worktree.path, OFFLINE);
+      const outcome = await shell.execute(plan.command, worktree.path, OFFLINE);
       const text = await this.files.readText(worktree.path, plan.reportPath);
       if (text === null) {
         return {

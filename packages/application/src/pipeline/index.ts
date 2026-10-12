@@ -29,3 +29,4 @@ export * from './outbound-secret-scan.ts';
 export * from './acceptance-test-table.ts';
 export * from './abandon-issue.ts';
 export * from './order-check-rewrite.ts';
+export * from './issue-stack.ts';

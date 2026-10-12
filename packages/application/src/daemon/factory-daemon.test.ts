@@ -175,6 +175,7 @@ function setup(
       challenges: null,
       releases,
       configuration: overrides.configuration ?? null,
+      reclaimStacks: () => Promise.resolve(0),
     },
     { ...SETTINGS, ...overrides.settings },
   );

@@ -104,21 +104,24 @@ export class CheckRewriteStage implements PipelineStage {
     const path = rewrite.order.path;
     const profile = profileOf(context, 'acceptance-author');
     const current = (await dependencies.files.readText(worktree.path, path)) ?? '';
-    const rendered = dependencies.roles.render('acceptance-author', acceptanceAuthorValues(settings.repository, spec, issueTypeOfSpec(context, spec)));
-    const result = await toolkit.agents.run(writer, {
-      role: 'acceptance-author',
-      profile,
-      model: profile.model,
-      effort: profile.effort,
-      workingDirectory: worktree.path,
-      prompt: withAddendum(rendered, checkRewriteAddendum(path, rewrite.order.instruction, current)),
-      resumeSessionId: null,
-      frozenChecks: frozen.checks.filter((check) => check.path !== path),
-      gateCommand: null,
-      attempt: journal.checkRewrites.length,
-      branch: journal.branch,
-      decisionRequestPath: null,
-    });
+    const type = issueTypeOfSpec(context, spec);
+    const rendered = dependencies.roles.render('acceptance-author', acceptanceAuthorValues(settings.repository, spec, type));
+    const result = await toolkit.stacks.around(writer, journal.issueNumber, type.id, worktree.path, () =>
+      toolkit.agents.run(writer, {
+        role: 'acceptance-author',
+        profile,
+        model: profile.model,
+        effort: profile.effort,
+        workingDirectory: worktree.path,
+        prompt: withAddendum(rendered, checkRewriteAddendum(path, rewrite.order.instruction, current)),
+        resumeSessionId: null,
+        frozenChecks: frozen.checks.filter((check) => check.path !== path),
+        gateCommand: null,
+        attempt: journal.checkRewrites.length,
+        branch: journal.branch,
+        decisionRequestPath: null,
+      }),
+    );
     await dependencies.files.remove(worktree.path, FACTORY_WORK_DIRECTORY);
     await writer.record(PIPELINE_EVENTS.checkRewriteAuthored, { path, runId: result.runId, sessionId: result.sessionId, outcome: result.outcome });
   }

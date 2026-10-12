@@ -11,6 +11,7 @@ import {
 import {
   AGENT_ROLES,
   COMMIT_KINDS,
+  DEFAULT_ISSUE_TYPES,
   DEFAULT_TYPE_LABEL_PREFIX,
   EVIDENCE_KINDS,
   PROMOTION_POLICIES,
@@ -19,12 +20,14 @@ import {
   isProductionLookingName,
 } from '@agent-factory/domain';
 import {
+  EnvironmentSetSchema,
   Identifier,
   NamedCommandSchema,
   Niceness,
   NonEmptyString,
   PathString,
   PositiveMinutes,
+  PositiveSeconds,
   RoleOverrideSchema,
   uniqueBy,
 } from './common.ts';
@@ -44,6 +47,8 @@ export const DEFAULT_TAG_PATTERN = '*.*.*';
 export const DEFAULT_HEALTH_INTERVAL_MINUTES = 5;
 /** Scale-to-zero environments answer once awake; a release gate waits this long for them. */
 export const DEFAULT_WAKE_UP_SECONDS = 90;
+export const DEFAULT_STACK_READY_TIMEOUT_SECONDS = 120;
+export const DEFAULT_STACK_STOP_GRACE_SECONDS = 10;
 export const DEFAULT_EVIDENCE_MAX_FILE_BYTES = 5_000_000;
 export const DEFAULT_EVIDENCE_MAX_TOTAL_BYTES = 40_000_000;
 export const FORGE_KINDS = ['github', 'local'] as const;
@@ -172,6 +177,33 @@ const AuditsSchema = z
   })
   .prefault({});
 
+const StackServiceSchema = z.strictObject({
+  name: Identifier,
+  /** The long-running command, started in the workspace under test and stopped with its whole process group. */
+  run: NonEmptyString,
+  /** A command that succeeds once the service answers, such as a request to its health endpoint. */
+  ready: NonEmptyString,
+  readyTimeoutSeconds: PositiveSeconds.default(DEFAULT_STACK_READY_TIMEOUT_SECONDS),
+  /** Why the service needs the network; without it the service has none beyond the host's loopback. */
+  network: NonEmptyString.optional(),
+});
+
+const StackSchema = z
+  .strictObject({
+    /** Commands that bring what the services need up, then return, such as starting a database container. */
+    setup: z.array(NamedCommandSchema).default([]),
+    services: z.array(StackServiceSchema).default([]),
+    /** Commands that bring the setup down again; they run whatever happened, and again for a stack a stopped factory left. */
+    teardown: z.array(NamedCommandSchema).default([]),
+    environment: EnvironmentSetSchema.default({}),
+    /** The issue types whose checks need the stack; every type when empty. */
+    issueTypes: z.array(Identifier).default([]),
+    stopGraceSeconds: PositiveSeconds.default(DEFAULT_STACK_STOP_GRACE_SECONDS),
+  })
+  .superRefine((stack, context) => {
+    for (const name of uniqueBy(stack.services, (service) => service.name)) context.addIssue({ code: 'custom', path: ['services'], message: `service ${name} is declared twice` });
+  });
+
 const KnowledgeSourceSchema = z.union([z.strictObject({ path: PathString }), z.strictObject({ repository: PathString })]);
 
 const RoleKey = z.enum(AGENT_ROLES);
@@ -202,6 +234,8 @@ export const ProjectSchema = z
       })
       .prefault({}),
     environment: CheckEnvironmentSchema.optional(),
+    /** What the acceptance checks need running around them, owned by the factory. */
+    stack: StackSchema.optional(),
     sandbox: SandboxSettingsSchema.optional(),
     secretScan: z.strictObject({ keychainServices: z.array(NonEmptyString).default([]) }).prefault({}),
     issueTypes: z.array(IssueTypeSchema).min(1).optional(),
@@ -229,5 +263,9 @@ export const ProjectSchema = z
     for (const id of uniqueBy(types, (type) => type.id)) context.addIssue({ code: 'custom', path: ['issueTypes'], message: `issue type ${id} is declared twice` });
     const labels = types.map((type) => type.label ?? `${project.conventions.labels.typePrefix}${type.id}`);
     for (const label of uniqueBy(labels, (label) => label)) context.addIssue({ code: 'custom', path: ['issueTypes'], message: `label ${label} marks two issue types` });
+    const typeIds = new Set(project.issueTypes?.map((type) => type.id) ?? DEFAULT_ISSUE_TYPES.map((type) => type.id));
+    for (const id of project.stack?.issueTypes ?? []) {
+      if (!typeIds.has(id)) context.addIssue({ code: 'custom', path: ['stack', 'issueTypes'], message: `issue type ${id} is not an issue type of the project` });
+    }
   });
 export type RawProject = z.infer<typeof ProjectSchema>;

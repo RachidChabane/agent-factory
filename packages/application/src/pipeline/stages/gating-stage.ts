@@ -42,7 +42,10 @@ export class GatingStage implements PipelineStage {
     const worktree = await leasedWorktree(context);
     const beforeProof = requireBeforeProof(journal);
     const type = issueTypeOfSpec(context, spec);
-    const run = await toolkit.gate.run(worktree, requireFrozen(journal).checks, manifest, type, { scoreReport: beforeProof.scoreReport, tests: beforeProof.tests });
+    const base = { scoreReport: beforeProof.scoreReport, tests: beforeProof.tests };
+    const run = await toolkit.gate.run(worktree, requireFrozen(journal).checks, manifest, type, base, (work) =>
+      toolkit.stacks.around(writer, journal.issueNumber, type.id, worktree.path, work),
+    );
     const logName = gateLogName(attempt);
     await toolkit.dependencies.logs.write(journal.issueNumber, logName, run.log);
     const evidence = run.result.passed ? await toolkit.evidence.capture(worktree, journal.issueNumber, 'after', manifest) : [];

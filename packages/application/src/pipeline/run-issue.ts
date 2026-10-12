@@ -4,6 +4,7 @@ import { AgentRunAdmission } from '../resources/agent-run-admission.ts';
 import { AgentRuns, type AgentEventListener } from './agent-runs.ts';
 import { EvidenceCollector } from './evidence.ts';
 import { OrchestratorGate } from './gate-runner.ts';
+import { IssueStacks } from './issue-stack.ts';
 import { IssueJournalWriter } from './journal-writer.ts';
 import type { PipelineDependencies } from './pipeline-dependencies.ts';
 import { EscalationRequiredError, PipelineStalledError } from './pipeline-errors.ts';
@@ -90,6 +91,7 @@ export class IssuePipeline {
       gate: new OrchestratorGate(dependencies.sourceControl, dependencies.files, shell, settings.gate, settings.setupCommands),
       evidence: new EvidenceCollector(dependencies.files, settings.evidenceCacheDirectory),
       bodies: new PullRequestBodyRenderer(),
+      stacks: new IssueStacks({ services: dependencies.services, logs: dependencies.logs, slots: dependencies.stackSlots }, settings.stack, shell),
     };
   }
 

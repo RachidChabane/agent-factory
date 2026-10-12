@@ -11,7 +11,7 @@ import { readScoreReport, targetedScore, type ScoreReport } from '../../acceptan
 import type { Worktree } from '../../ports.ts';
 import type { BeforeProofRecord } from '../journal-events.ts';
 import { EscalationRequiredError } from '../pipeline-errors.ts';
-import { describeOutcome, EXIT_CODE_SUCCESS, tailLines } from '../shell-commands.ts';
+import { describeOutcome, EXIT_CODE_SUCCESS, tailLines, type ShellCommands } from '../shell-commands.ts';
 import type { StageContext } from './stage.ts';
 import { assertOnlyChecksChanged, issueTypeOfSpec } from './stage-support.ts';
 
@@ -45,9 +45,25 @@ export async function measureBeforeProof(context: StageContext, worktree: Worktr
       tests: [],
     };
   }
+  const type = issueTypeOfSpec(context, spec);
+  return toolkit.stacks.around(context.writer, journal.issueNumber, type.id, worktree.path, (stack) =>
+    measureWith(context, worktree, spec, manifest, command, stack?.shell ?? toolkit.shell),
+  );
+}
+
+async function measureWith(
+  context: StageContext,
+  worktree: Worktree,
+  spec: IssueSpec,
+  manifest: AcceptanceManifest,
+  command: string,
+  shell: ShellCommands,
+): Promise<BeforeProofRecord> {
+  const { toolkit, journal } = context;
+  const { dependencies } = toolkit;
   const runner = manifest.runner;
-  if (runner !== null && isStructuredRunner(runner)) return measureStructured(context, worktree, spec, manifest, runner);
-  const outcome = await toolkit.shell.execute(command, worktree.path);
+  if (runner !== null && isStructuredRunner(runner)) return measureStructured(context, worktree, spec, manifest, runner, shell);
+  const outcome = await shell.execute(command, worktree.path);
   await dependencies.logs.write(journal.issueNumber, BEFORE_PROOF_LOG, describeOutcome(command, outcome));
   if (outcome.kind === 'not-runnable') {
     throw new EscalationRequiredError(
@@ -80,10 +96,11 @@ async function measureStructured(
   spec: IssueSpec,
   manifest: AcceptanceManifest,
   runner: StructuredTestRunner,
+  shell: ShellCommands,
 ): Promise<BeforeProofRecord> {
   const { toolkit, journal } = context;
   const { dependencies } = toolkit;
-  const run = await toolkit.acceptance.run(worktree, manifest, runner);
+  const run = await toolkit.acceptance.run(worktree, manifest, runner, shell);
   if (run === null) throw new EscalationRequiredError('the acceptance manifest declares a runner but no command');
   const described = describeOutcome(run.command, run.outcome);
   await dependencies.logs.write(journal.issueNumber, BEFORE_PROOF_LOG, described);

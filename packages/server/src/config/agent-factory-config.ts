@@ -4,7 +4,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import { BARE_REPOSITORY_SUFFIX, type LocalCheckMode } from '@agent-factory/adapters';
-import type { NamedCommand } from '@agent-factory/application';
+import type { NamedCommand, StackSettings } from '@agent-factory/application';
 import {
   DEFAULT_ISSUE_TYPES,
   NO_DAILY_CAP,
@@ -139,6 +139,7 @@ export interface ProjectConfig {
     readonly niceness: number | null;
   };
   readonly environment: { readonly passthrough: readonly string[]; readonly set: Readonly<Record<string, string>> };
+  readonly stack: StackSettings | null;
   readonly sandbox: {
     readonly deniedReadPaths: readonly string[];
     readonly writableDirectories: readonly string[] | null;
@@ -228,6 +229,22 @@ function seconds(value: number): number {
 
 function namedCommand(command: RawNamedCommand): NamedCommand {
   return command.network === undefined ? { name: command.name, run: command.run } : { name: command.name, run: command.run, network: { reason: command.network } };
+}
+
+function stackSettings(raw: NonNullable<RawProject['stack']>): StackSettings {
+  return {
+    setup: raw.setup.map(namedCommand),
+    services: raw.services.map((service) => ({
+      name: service.name,
+      run: service.run,
+      ready: { run: service.ready, timeoutMs: seconds(service.readyTimeoutSeconds) },
+      ...(service.network === undefined ? {} : { network: { reason: service.network } }),
+    })),
+    teardown: raw.teardown.map(namedCommand),
+    environment: raw.environment,
+    issueTypes: raw.issueTypes,
+    stopGraceMs: seconds(raw.stopGraceSeconds),
+  };
 }
 
 function roleSettings(raw: RawRole): RoleSettings {
@@ -371,6 +388,7 @@ function resolveProject(raw: RawProject, config: RawAgentFactoryConfig, home: st
       passthrough: environment.passthrough,
       set: Object.fromEntries(Object.entries(environment.set).map(([name, value]) => [name, value.startsWith(HOME_PREFIX) ? resolvePath(value, home, userHome) : value])),
     },
+    stack: raw.stack === undefined ? null : stackSettings(raw.stack),
     sandbox: {
       deniedReadPaths: [...config.defaults.sandbox.deniedReadPaths, ...(raw.sandbox?.deniedReadPaths ?? [])].map((path) => resolvePath(path, home, userHome)),
       writableDirectories: writable === undefined ? null : writable.map((path) => resolvePath(path, home, userHome)),

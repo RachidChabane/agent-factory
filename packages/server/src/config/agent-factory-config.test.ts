@@ -197,4 +197,28 @@ describe('the configuration of a project', () => {
   it('names the known projects when an unknown one is asked for', () => {
     expect(() => projectOf(parse(document()), 'billing')).toThrow(new UnknownProjectError('billing', ['storefront']));
   });
+
+  it('reads the stack the checks of a project need, with its defaults', () => {
+    const stack = {
+      setup: [{ name: 'database', run: 'docker compose up -d --wait db', network: 'pulls the database image' }],
+      services: [{ name: 'web', run: 'npm run dev', ready: 'curl -fsS http://127.0.0.1:3000/healthz' }],
+      teardown: [{ name: 'database', run: 'docker compose down --volumes' }],
+      issueTypes: ['ui'],
+    };
+    expect(projectOf(parse(document({}, [minimalProject({ stack })])), 'storefront').stack).toEqual({
+      setup: [{ name: 'database', run: 'docker compose up -d --wait db', network: { reason: 'pulls the database image' } }],
+      services: [{ name: 'web', run: 'npm run dev', ready: { run: 'curl -fsS http://127.0.0.1:3000/healthz', timeoutMs: 120_000 } }],
+      teardown: [{ name: 'database', run: 'docker compose down --volumes' }],
+      environment: {},
+      issueTypes: ['ui'],
+      stopGraceMs: 10_000,
+    });
+    expect(projectOf(parse(document()), 'storefront').stack).toBeNull();
+  });
+
+  it('refuses a stack for an issue type the project does not have, or two services of one name', () => {
+    const service = { name: 'web', run: 'npm run dev', ready: 'true' };
+    expect(configProblems(document({}, [minimalProject({ stack: { issueTypes: ['mobile'] } })]))).toContain('projects.0.stack.issueTypes: issue type mobile is not an issue type of the project');
+    expect(configProblems(document({}, [minimalProject({ stack: { services: [service, service] } })]))).toContain('projects.0.stack.services: service web is declared twice');
+  });
 });

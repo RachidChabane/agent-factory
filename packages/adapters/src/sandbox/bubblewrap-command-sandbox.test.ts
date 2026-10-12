@@ -76,6 +76,11 @@ describe('BubblewrapCommandSandbox', () => {
     );
   });
 
+  it('shares the host network with a command inside a stack, since its services listen on the host loopback', () => {
+    expect(sandbox().confine(['true'], { workingDirectory: worktree, network: false })).toContain('--unshare-net');
+    expect(sandbox().confine(['true'], { workingDirectory: worktree, network: false, hostLoopback: true })).not.toContain('--unshare-net');
+  });
+
   it('works in the canonical worktree, whatever name the scope gives it', () => {
     const args = sandbox().confine(['true'], { workingDirectory: worktreeLink, network: false });
     expect(sequence(args, '--bind', worktree, worktree)).toBe(true);
