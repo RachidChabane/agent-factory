@@ -49,7 +49,7 @@ async function isDirectory(path: string): Promise<boolean> {
 
 function assertSafe(reference: ReferenceRepository): void {
   const problems = referenceProblems(reference);
-  if (problems.length > 0) throw new InvalidReferenceError(reference, problems);
+  if (problems.length > 0) throw new InvalidReferenceError(problems);
 }
 
 /**
@@ -90,14 +90,14 @@ export class GitReferenceSnapshots implements ReferenceSnapshots {
 
   async resolve(reference: ReferenceSource): Promise<string | null> {
     assertSafe(reference);
-    if (!(await isDirectory(reference.source))) throw new ReferenceSourceUnreadableError(reference, reference.source, 'the path is not a directory');
+    if (!(await isDirectory(reference.source))) throw new ReferenceSourceUnreadableError(reference.source, 'the path is not a directory');
     try {
       const commit = await this.git.runTrimmed(reference.source, ['rev-parse', '--verify', '--quiet', `${reference.ref}${REVISION_COMMIT_SUFFIX}`]);
       return COMMIT_ID_PATTERN.test(commit) ? commit : null;
     } catch (error) {
       if (!(error instanceof GitCommandError)) throw error;
       if (await this.isRepository(reference.source)) return null;
-      throw new ReferenceSourceUnreadableError(reference, reference.source, error.stderr.trim() || error.message);
+      throw new ReferenceSourceUnreadableError(reference.source, error.stderr.trim() || error.message);
     }
   }
 

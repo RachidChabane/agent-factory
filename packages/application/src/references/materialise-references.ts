@@ -18,10 +18,15 @@ export async function materialiseReferences(snapshots: ReferenceSnapshots, refer
   return outcomes;
 }
 
+/** What went wrong with a reference, naming it. */
+export function referenceFailure(reference: ReferenceSource, message: string): string {
+  return `reference ${reference.name}: ${message}`;
+}
+
 /** Every snapshot, or a refusal that lists every reference that could not be materialised. */
 export async function requireReferences(snapshots: ReferenceSnapshots, references: readonly ReferenceSource[]): Promise<readonly ReferenceSnapshot[]> {
   const outcomes = await materialiseReferences(snapshots, references);
-  const problems = outcomes.flatMap((outcome) => (outcome.ok ? [] : [outcome.message]));
+  const problems = outcomes.flatMap((outcome) => (outcome.ok ? [] : [referenceFailure(outcome.reference, outcome.message)]));
   if (problems.length > 0) throw new ReferencesNotReadyError(problems);
   return outcomes.flatMap((outcome) => (outcome.ok ? [outcome.snapshot] : []));
 }

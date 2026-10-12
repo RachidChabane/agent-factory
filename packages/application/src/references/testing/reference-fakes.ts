@@ -26,7 +26,7 @@ export class FakeReferenceSnapshots implements ReferenceSnapshots {
   }
 
   resolve(reference: ReferenceSource): Promise<string | null> {
-    if (this.unreadableSources.has(reference.name)) return Promise.reject(new ReferenceSourceUnreadableError(reference, reference.source, 'not a repository'));
+    if (this.unreadableSources.has(reference.name)) return Promise.reject(new ReferenceSourceUnreadableError(reference.source, 'not a repository'));
     return Promise.resolve(this.sourcesWithoutRef.has(reference.name) ? null : this.commit);
   }
 

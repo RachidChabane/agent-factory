@@ -50,5 +50,6 @@ describe('requireReferences', () => {
     expect(failure.message).toContain('reference repositories are not ready:');
     expect(failure.message).toContain('- reference design-tokens:');
     expect(failure.message).toContain('- reference icons:');
+    expect(failure.problems[0]).toBe('reference design-tokens: /clones/design-tokens has no v1.0.0 for example-org/design-tokens; update the clone with git -C /clones/design-tokens fetch --tags');
   });
 });
