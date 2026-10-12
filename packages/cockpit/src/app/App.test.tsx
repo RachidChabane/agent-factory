@@ -20,8 +20,8 @@ function mountApp(path: string, locale: 'en' | 'fr' = 'en') {
 }
 
 describe('App', () => {
-  it('draws the shell and the board at the root address, in a browser router', async () => {
-    mountApp('/');
+  it('draws the shell and the board at its address, in a browser router', async () => {
+    mountApp('/board');
     expect(await screen.findByRole('region', { name: 'Implementation' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
   });
@@ -32,13 +32,13 @@ describe('App', () => {
   });
 
   it('starts in the language it is given', async () => {
-    mountApp('/', 'fr');
+    mountApp('/board', 'fr');
     expect(await screen.findByRole('region', { name: 'Implémentation' })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('fr');
   });
 
   it('starts the cockpit services and stops them when it goes away', async () => {
-    const { transport, unmount } = mountApp('/');
+    const { transport, unmount } = mountApp('/board');
     await screen.findByRole('region', { name: 'Implementation' });
     expect(transport.snapshotLoads).toBe(1);
     expect(transport.handlers).not.toBeNull();

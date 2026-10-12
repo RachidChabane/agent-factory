@@ -33,7 +33,7 @@ async function showHeading(page: Page, text: string | RegExp): Promise<void> {
 export const SCREENSHOTS: readonly Screenshot[] = [
   {
     file: 'board.png',
-    path: () => '/',
+    path: () => '/board',
     compose: async (page) => {
       await page.getByRole('region', { name: 'Delivered', exact: true }).getByRole('article').first().waitFor();
     },

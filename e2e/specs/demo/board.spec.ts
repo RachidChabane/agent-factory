@@ -1,10 +1,11 @@
+import { paths } from '../../../packages/cockpit/src/model/routes.ts';
 import { card, column, openCockpit } from '../../support/cockpit.ts';
 import { CART_BADGE_TOTAL, CATEGORY_FILTER, DELIVERY_ESTIMATES, DISCOUNT_ROUNDING, ORDER_HISTORY_PAGINATION, PAYMENT_RETRIES, PDF_INVOICES, SAVED_CARTS, TAX_ROUNDING, GIFT_PICKS_TITLE } from '../../support/story.ts';
 import { expect, test } from '../../support/test.ts';
 
 test.describe('the board of the demonstration', () => {
   test.beforeEach(async ({ page, factory }) => {
-    await openCockpit(page, factory, '/');
+    await openCockpit(page, factory, paths.board());
     await expect(page.getByRole('heading', { level: 1, name: /^Board/ })).toBeVisible();
   });
 

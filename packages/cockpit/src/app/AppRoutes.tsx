@@ -6,6 +6,7 @@ import { PageFallback } from './PageFallback.tsx';
 import { ProjectRoute } from './ProjectRoute.tsx';
 import { ViewErrorBoundary } from './ViewErrorBoundary.tsx';
 
+const ChangesView = lazy(() => import('../views/changes/ChangesView.tsx').then((module) => ({ default: module.ChangesView })));
 const BoardView = lazy(() => import('../views/board/BoardView.tsx').then((module) => ({ default: module.BoardView })));
 const ProjectOverview = lazy(() => import('../views/overview/ProjectOverview.tsx').then((module) => ({ default: module.ProjectOverview })));
 const RequestsView = lazy(() => import('../views/requests/RequestsView.tsx').then((module) => ({ default: module.RequestsView })));
@@ -28,6 +29,7 @@ export function AppRoutes() {
     <ViewErrorBoundary resetKey={pathname}>
       <Suspense fallback={<PageFallback />}>
         <Routes>
+          <Route path={ROUTE_PATTERNS.changes} element={<ChangesView />} />
           <Route path={ROUTE_PATTERNS.board} element={<BoardView />} />
           <Route path={ROUTE_PATTERNS.project} element={<ProjectRoute />}>
             <Route index element={<ProjectOverview />} />

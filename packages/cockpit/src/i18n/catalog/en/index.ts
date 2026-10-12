@@ -4,6 +4,7 @@ import { enReadings } from './readings.ts';
 import { enWidgets } from './widgets.ts';
 import { enShell } from './shell.ts';
 import { enBoard } from './board.ts';
+import { enChanges } from './changes.ts';
 import { enCommands } from './commands.ts';
 import { enRequests } from './requests.ts';
 import { enIssues } from './issues.ts';
@@ -24,6 +25,7 @@ export const enFragments = {
   widgets: enWidgets,
   shell: enShell,
   board: enBoard,
+  changes: enChanges,
   commands: enCommands,
   requests: enRequests,
   issues: enIssues,
@@ -45,6 +47,7 @@ export const en = {
   ...enWidgets,
   ...enShell,
   ...enBoard,
+  ...enChanges,
   ...enCommands,
   ...enRequests,
   ...enIssues,

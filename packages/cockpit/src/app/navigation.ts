@@ -4,6 +4,7 @@ import {
   CircleDot,
   Coins,
   GitPullRequest,
+  History,
   Inbox,
   LayoutDashboard,
   LayoutGrid,
@@ -41,6 +42,7 @@ export type ProjectNavigationItem = NavigationItemBase<string>;
 export type NavigationAppearance = Pick<NavigationItemBase<never>, 'icon' | 'label' | 'count' | 'countTone'>;
 
 export const WORKSPACE_NAVIGATION: readonly NavigationItem[] = [
+  { id: 'changes', icon: History, shortcut: 'c', label: 'nav.changes', href: (project) => paths.changes(project) },
   { id: 'board', icon: LayoutGrid, shortcut: 'b', label: 'nav.board', count: (counts) => counts.attention, countTone: 'attention', href: (project) => paths.board(project) },
   { id: 'runs', icon: SquareTerminal, shortcut: 'r', label: 'nav.runs', count: (counts) => counts.liveRuns, countTone: 'live', href: (project) => paths.runs(project) },
 ];

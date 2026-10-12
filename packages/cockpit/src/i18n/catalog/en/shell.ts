@@ -6,6 +6,7 @@ export const enShell = {
   'nav.open': 'Open the navigation',
   'nav.close': 'Close the navigation',
   'nav.board': 'Board',
+  'nav.changes': 'Changes',
   'nav.runs': 'Runs',
   'nav.usage': 'Usage and costs',
   'nav.settings': 'Settings',

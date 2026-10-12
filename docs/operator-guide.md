@@ -28,6 +28,7 @@ and runs each project's setup and gate commands on a clean checkout of its base
 
 | Page | What it is for |
 |---|---|
+| Changes | the landing page: what changed since you last looked, project by project (the pull requests that moved, the deployments of each environment with the commits they delivered, the commits still waiting for an environment), and what waits for you |
 | Board | every project's work by state, from request to delivery, with the runs in progress |
 | Requests | product requests, their challenge (intent, idea, method), the specs it proposes, the reply to the requester |
 | Issues | each issue's spec, attempts, gate results, review rounds, costs and dependencies, as a list or a graph |
@@ -41,6 +42,13 @@ and runs each project's setup and gate commands on a clean checkout of its base
 
 Every value shows when it was read; an unknown value says so. Every button sends one
 command and shows the factory's answer, or the reason it refused.
+
+The Changes page counts from a moment you can choose (24 hours, 3 days, 7 days, or any
+date; the address keeps it as `?since=`). **Mark as seen** remembers the current moment in
+this browser, and the page starts from it the next time. A deployment lists the commits it
+delivered, read from the project's clone, and an environment that not every merge reaches
+lists the commits of the base branch still waiting for it. A commit the clone does not hold is
+shown as unknown, never as empty.
 
 ## From a request to an issue
 

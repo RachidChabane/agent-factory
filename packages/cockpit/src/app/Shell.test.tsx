@@ -110,10 +110,24 @@ describe('Shell sidebar', () => {
     expect(within(sidebar).getByRole('button', { name: /^Stop after running work/ })).toBeDisabled();
   });
 
+  it('lands on the changes, which come first in the navigation, with the board one click away', async () => {
+    const view = await renderShell(emptySnapshot(TEST_NOW));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Changes' })).toBeInTheDocument();
+    const links = within(screen.getByRole('navigation', { name: 'Main navigation' })).getAllByRole('link');
+    expect(links[0]).toHaveTextContent('Changes');
+    expect(links[0]).toHaveAttribute('aria-current', 'page');
+    expect(links[1]).toHaveTextContent('Board');
+    expect(links[1]).not.toHaveAttribute('aria-current');
+    await view.user.click(links[1] as HTMLElement);
+    await view.expectLocation('/board');
+    expect(await screen.findByRole('region', { name: 'Implementation' })).toBeInTheDocument();
+  });
+
   it('links to the pages of the workspace and of the factory', async () => {
     await renderShell(emptySnapshot(TEST_NOW));
     const sidebar = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(within(sidebar).getByRole('link', { name: 'Board' })).toHaveAttribute('href', '/');
+    expect(within(sidebar).getByRole('link', { name: 'Changes' })).toHaveAttribute('href', '/');
+    expect(within(sidebar).getByRole('link', { name: 'Board' })).toHaveAttribute('href', '/board');
     expect(within(sidebar).getByRole('link', { name: 'Runs' })).toHaveAttribute('href', '/runs');
     expect(within(sidebar).getByRole('link', { name: 'Usage and costs' })).toHaveAttribute('href', '/usage');
     expect(within(sidebar).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
@@ -155,7 +169,7 @@ describe('Shell routes', () => {
   it('shows a not-found page for an address that matches nothing', async () => {
     await renderShell(emptySnapshot(TEST_NOW), '/nowhere');
     expect(await screen.findByText('Page not found')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Back to the board' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Back to the board' })).toHaveAttribute('href', '/board');
   });
 
   it('shows a not-found page for a project the installation does not drive', async () => {

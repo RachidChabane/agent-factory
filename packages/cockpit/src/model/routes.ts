@@ -10,7 +10,8 @@ export const QUERY_FLAG = '1';
 
 /** The route patterns of the router, the single place where the URL space of the cockpit is declared. */
 export const ROUTE_PATTERNS = {
-  board: '/',
+  changes: '/',
+  board: '/board',
   project: '/projects/:project',
   requests: 'requests',
   request: 'requests/:requestId',
@@ -31,6 +32,7 @@ export const ROUTE_PATTERNS = {
   settings: '/settings',
 } as const;
 
+const BOARD_PATH = '/board';
 const encode = encodeURIComponent;
 
 function projectPath(project: string): string {
@@ -47,7 +49,9 @@ function withQuery(path: string, name: string, value: string): string {
 
 /** Every address the cockpit links to. Notification links rely on the project sub-paths below. */
 export const paths = {
-  board: (project?: string | null): string => (project == null ? '/' : withQuery('/', PROJECT_QUERY_PARAMETER, project)),
+  /** The landing page: what changed since the operator last looked. */
+  changes: (project?: string | null): string => (project == null ? '/' : withQuery('/', PROJECT_QUERY_PARAMETER, project)),
+  board: (project?: string | null): string => (project == null ? BOARD_PATH : withQuery(BOARD_PATH, PROJECT_QUERY_PARAMETER, project)),
   runs: (project?: string | null): string => (project == null ? '/runs' : withQuery('/runs', PROJECT_QUERY_PARAMETER, project)),
   run: (runId: string): string => `/runs/${encode(runId)}`,
   usage: (): string => '/usage',

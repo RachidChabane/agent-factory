@@ -7,6 +7,7 @@ export const frShell = {
   'nav.open': 'Ouvrir la navigation',
   'nav.close': 'Fermer la navigation',
   'nav.board': 'Tableau',
+  'nav.changes': 'Changements',
   'nav.runs': 'Runs',
   'nav.usage': 'Usage et coûts',
   'nav.settings': 'Réglages',

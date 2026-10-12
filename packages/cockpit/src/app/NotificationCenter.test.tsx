@@ -78,6 +78,6 @@ describe('NotificationCenter', () => {
     await view.user.click(screen.getByRole('button', { name: 'Notifications : 15 éléments vous concernent' }));
     const popover = await screen.findByRole('dialog', { name: 'Vous concerne' });
     expect(within(popover).getAllByText(/Votre décision est attendue/).length).toBeGreaterThan(0);
-    expect(within(popover).getByRole('link', { name: 'Ouvrir le tableau' })).toHaveAttribute('href', '/');
+    expect(within(popover).getByRole('link', { name: 'Ouvrir le tableau' })).toHaveAttribute('href', '/board');
   });
 });

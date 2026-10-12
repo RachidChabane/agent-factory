@@ -6,6 +6,7 @@ const AUDIT = 'bfd32d775ee4a53d323db1e3a778b905cf3aa923';
 
 const PAGES = [
   '/',
+  '/board',
   '/projects/storefront',
   '/projects/storefront/requests',
   '/projects/storefront/requests/R-15',

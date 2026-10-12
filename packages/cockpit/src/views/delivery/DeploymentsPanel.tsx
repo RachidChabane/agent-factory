@@ -29,6 +29,7 @@ function Outcome({ deployment }: { readonly deployment: Deployment }) {
 
 function CurrentDeployment({ deployment }: { readonly deployment: Deployment }) {
   const { t, rich } = useI18n();
+  const project = useProject();
   return (
     <div className="deployment-current">
       <p className="small-caps">{t('delivery.deployments.current')}</p>
@@ -50,7 +51,7 @@ function CurrentDeployment({ deployment }: { readonly deployment: Deployment }) 
       )}
       <div className="deployment-current__commits">
         <p className="small-caps">{t('delivery.commits.delivered')}</p>
-        <DeliveredCommits commits={deployment.changes} />
+        <DeliveredCommits project={project.id} commits={deployment.changes} />
       </div>
     </div>
   );
@@ -70,7 +71,7 @@ function PendingCommits({ pending }: { readonly pending: DeploymentHistory['pend
       ) : (
         <>
           <p className="subtle">{t('delivery.commits.pending.count', { count: pending.length, branch: project.baseBranch })}</p>
-          <DeliveredCommits commits={pending} />
+          <DeliveredCommits project={project.id} commits={pending} />
         </>
       )}
     </div>
@@ -79,6 +80,7 @@ function PendingCommits({ pending }: { readonly pending: DeploymentHistory['pend
 
 function DeploymentHistoryTable({ environment, history }: { readonly environment: string; readonly history: DeploymentHistory }) {
   const { t } = useI18n();
+  const project = useProject();
   const columns: readonly TableColumn<Deployment>[] = [
     {
       id: 'version',
@@ -93,7 +95,7 @@ function DeploymentHistoryTable({ environment, history }: { readonly environment
     { id: 'ref', header: t('delivery.deployments.column.ref'), hideOnMobile: true, cell: (deployment) => <span className="mono">{deployment.ref}</span> },
     { id: 'commit', header: t('delivery.deployments.column.commit'), hideOnMobile: true, cell: (deployment) => <span className="mono">{shortSha(deployment.sha)}</span> },
     { id: 'outcome', header: t('delivery.deployments.column.outcome'), cell: (deployment) => <Outcome deployment={deployment} /> },
-    { id: 'commits', header: t('delivery.deployments.column.commits'), hideOnMobile: true, cell: (deployment) => <DeliveredCommits commits={deployment.changes} folded /> },
+    { id: 'commits', header: t('delivery.deployments.column.commits'), hideOnMobile: true, cell: (deployment) => <DeliveredCommits project={project.id} commits={deployment.changes} folded /> },
     { id: 'deployed', header: t('delivery.deployments.column.deployed'), cell: (deployment) => <Time iso={deployment.deployedAt} className="num" /> },
     { id: 'actor', header: t('delivery.deployments.column.actor'), hideOnMobile: true, cell: (deployment) => deployment.actor ?? <span className="subtle">{t('delivery.deployments.actorUnknown')}</span> },
     {
