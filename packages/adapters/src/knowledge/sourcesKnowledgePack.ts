@@ -41,6 +41,14 @@ function isDirectoryError(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === DIRECTORY_CODE;
 }
 
+/** Why a repository source cannot be read, for the errors that mean the source is wrong rather than the machine. */
+function repositoryUnavailableReason(error: unknown): string | null {
+  if (error instanceof PathOutsideWorktreeError) return SOURCE_UNAVAILABLE_REASONS.outsideRepository;
+  return isDirectoryError(error) ? SOURCE_UNAVAILABLE_REASONS.directoryInRepository : null;
+}
+
+type RepositoryRead = { readonly content: string } | { readonly unavailable: string };
+
 /** One document of a knowledge source, as the cockpit lists it. */
 export interface KnowledgeDocument {
   readonly path: string;
@@ -77,11 +85,7 @@ export class SourcesKnowledgePack implements KnowledgePack {
 
   /** The documents of one source; a source that cannot be read throws with the reason. */
   async documents(source: KnowledgeSource): Promise<readonly KnowledgeDocument[]> {
-    if (source.kind === 'repository') {
-      const content = await this.files.readText(this.repositoryRoot, source.path);
-      if (content === null) throw new Error(SOURCE_UNAVAILABLE_REASONS.notFound);
-      return [{ path: source.path, title: titleOf(source.path, content), bytes: Buffer.byteLength(content, UTF8) }];
-    }
+    if (source.kind === 'repository') return this.repositoryDocuments(source.path);
     switch (await kindOf(source.path)) {
       case 'file':
         return [await documentOf(source.path)];
@@ -122,13 +126,25 @@ export class SourcesKnowledgePack implements KnowledgePack {
 
   private async repositorySections(path: string): Promise<readonly string[]> {
     const heading = `${path}${REPOSITORY_HEADING_SUFFIX}`;
+    const read = await this.readRepositorySource(path);
+    return ['content' in read ? markdownSection(heading, read.content) : unavailable(heading, read.unavailable)];
+  }
+
+  private async repositoryDocuments(path: string): Promise<readonly KnowledgeDocument[]> {
+    const read = await this.readRepositorySource(path);
+    if (!('content' in read)) throw new Error(read.unavailable);
+    return [{ path, title: titleOf(path, read.content), bytes: Buffer.byteLength(read.content, UTF8) }];
+  }
+
+  /** The text of a file of the clone, or why the source cannot be read; only an error of the machine throws. */
+  private async readRepositorySource(path: string): Promise<RepositoryRead> {
     try {
       const content = await this.files.readText(this.repositoryRoot, path);
-      return [content === null ? unavailable(heading, SOURCE_UNAVAILABLE_REASONS.notFound) : markdownSection(heading, content)];
+      return content === null ? { unavailable: SOURCE_UNAVAILABLE_REASONS.notFound } : { content };
     } catch (error) {
-      if (error instanceof PathOutsideWorktreeError) return [unavailable(heading, SOURCE_UNAVAILABLE_REASONS.outsideRepository)];
-      if (isDirectoryError(error)) return [unavailable(heading, SOURCE_UNAVAILABLE_REASONS.directoryInRepository)];
-      throw error;
+      const unavailableReason = repositoryUnavailableReason(error);
+      if (unavailableReason === null) throw error;
+      return { unavailable: unavailableReason };
     }
   }
 }

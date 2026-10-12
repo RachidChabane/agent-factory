@@ -167,19 +167,52 @@ describe('SourcesKnowledgePack', () => {
 });
 
 describe('the documents of a knowledge source', () => {
+  let root: string;
+  let repository: string;
+
+  beforeEach(async () => {
+    root = await realpath(await mkdtemp(join(tmpdir(), 'knowledge-documents-')));
+    repository = join(root, 'repository');
+    await mkdir(join(repository, 'docs'), { recursive: true });
+    await writeFile(join(root, 'outside.md'), OUTSIDE_SECRET);
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
   it('lists the Markdown documents of a directory with their first heading as title', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'knowledge-documents-'));
-    try {
-      await writeFile(join(root, 'checkout.md'), '# Checkout flow\n\nThe cart becomes an order.\n');
-      await writeFile(join(root, 'notes.md'), 'No heading here.\n');
-      const pack = new SourcesKnowledgePack([{ kind: 'path', path: root }], root);
-      expect(await pack.documents({ kind: 'path', path: root })).toEqual([
-        { path: join(root, 'checkout.md'), title: 'Checkout flow', bytes: 44 },
-        { path: join(root, 'notes.md'), title: 'notes.md', bytes: 17 },
-      ]);
-      await expect(pack.documents({ kind: 'path', path: join(root, 'missing') })).rejects.toThrow('no such file or directory');
-    } finally {
-      await rm(root, { recursive: true, force: true });
+    await writeFile(join(root, 'checkout.md'), '# Checkout flow\n\nThe cart becomes an order.\n');
+    await writeFile(join(root, 'notes.md'), 'No heading here.\n');
+    const pack = new SourcesKnowledgePack([{ kind: 'path', path: root }], root);
+    expect(await pack.documents({ kind: 'path', path: root })).toEqual([
+      { path: join(root, 'checkout.md'), title: 'Checkout flow', bytes: 44 },
+      { path: join(root, 'notes.md'), title: 'notes.md', bytes: 17 },
+      { path: join(root, 'outside.md'), title: 'outside.md', bytes: Buffer.byteLength(OUTSIDE_SECRET) },
+    ]);
+    await expect(pack.documents({ kind: 'path', path: join(root, 'missing') })).rejects.toThrow(SOURCE_UNAVAILABLE_REASONS.notFound);
+  });
+
+  it('lists the file a repository source names, from the clone', async () => {
+    const context = '# Context\n\nWhy.\n';
+    await writeFile(join(repository, 'docs', 'context.md'), context);
+    const source: KnowledgeSource = { kind: 'repository', path: 'docs/context.md' };
+    expect(await new SourcesKnowledgePack([source], repository).documents(source)).toEqual([{ path: 'docs/context.md', title: 'Context', bytes: Buffer.byteLength(context) }]);
+  });
+
+  it('says why a repository source cannot be listed, in the words the knowledge text uses', async () => {
+    const reasons: readonly (readonly [KnowledgeSource, string])[] = [
+      [{ kind: 'repository', path: 'docs' }, SOURCE_UNAVAILABLE_REASONS.directoryInRepository],
+      [{ kind: 'repository', path: 'docs/absent.md' }, SOURCE_UNAVAILABLE_REASONS.notFound],
+      [{ kind: 'repository', path: '../outside.md' }, SOURCE_UNAVAILABLE_REASONS.outsideRepository],
+    ];
+    for (const [source, reason] of reasons) {
+      await expect(new SourcesKnowledgePack([source], repository).documents(source)).rejects.toThrow(new Error(reason));
     }
+  });
+
+  it('does not list the text of a file outside the clone', async () => {
+    const source: KnowledgeSource = { kind: 'repository', path: join(root, 'outside.md') };
+    await expect(new SourcesKnowledgePack([source], repository).documents(source)).rejects.toThrow(SOURCE_UNAVAILABLE_REASONS.outsideRepository);
   });
 });
