@@ -283,6 +283,35 @@ describe('GhCliGateway', () => {
     });
   });
 
+  describe('checks of a commit checked several times', () => {
+    it('keeps only the most recent run of each check, as the forge does', async () => {
+      const runs = [
+        { id: 10, name: 'Validate PR Title', status: 'completed', conclusion: 'failure', html_url: null },
+        { id: 30, name: 'Validate PR Title', status: 'completed', conclusion: 'success', html_url: null },
+        { id: 20, name: 'Validate PR Title', status: 'completed', conclusion: 'failure', html_url: null },
+        { id: 15, name: 'Check', status: 'completed', conclusion: 'success', html_url: null },
+      ];
+      const { gateway } = await gatewayWith([
+        { contains: ['check-runs'], stdout: JSON.stringify([{ check_runs: runs }]) },
+        { contains: ['/status'], stdout: JSON.stringify([{ statuses: [] }]) },
+      ]);
+      const checks = await gateway.checks('ref');
+      expect(checks.map((check) => `${check.name}:${check.conclusion}`).sort()).toEqual(['Check:success', 'Validate PR Title:success']);
+    });
+
+    it('judges a check once even when the forge sends no run identifier', async () => {
+      const runs = [
+        { name: 'build', status: 'completed', conclusion: 'failure', html_url: null },
+        { name: 'build', status: 'completed', conclusion: 'success', html_url: null },
+      ];
+      const { gateway } = await gatewayWith([
+        { contains: ['check-runs'], stdout: JSON.stringify([{ check_runs: runs }]) },
+        { contains: ['/status'], stdout: JSON.stringify([{ statuses: [] }]) },
+      ]);
+      expect((await gateway.checks('ref')).map((check) => check.name)).toEqual(['build']);
+    });
+  });
+
   describe('commitsSince', () => {
     async function commitRules(labelled: boolean): Promise<{ rules: FakeGhRule[]; shas: string[] }> {
       const commits = await readFixture('commits.json');

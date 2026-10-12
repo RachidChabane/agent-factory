@@ -36,6 +36,7 @@ export const CheckRunsPagesSchema = z.array(
   z.object({
     check_runs: z.array(
       z.object({
+        id: z.number().optional(),
         name: z.string(),
         status: z.string(),
         conclusion: z.string().nullable(),
