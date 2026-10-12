@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { argv, env, exit, stdin, stdout, stderr } from 'node:process';
+import { keepAliveWhileParentLives } from './keep-alive.ts';
 import {
   FAKE_FAILURE_EXIT_CODE,
   FAKE_FAILURE_MESSAGE,
@@ -8,6 +9,7 @@ import {
   FAKE_FLOOD_LINE_COUNT,
   FAKE_GRANDCHILD_TYPE,
   FAKE_INVOCATION_TYPE,
+  FAKE_LOGGED_IN_STATUS,
   FAKE_MODE_FLAG,
   FAKE_MODES,
   FAKE_OVERSIZED_LINE_CHARACTERS,
@@ -19,9 +21,9 @@ import {
 const SETTINGS_FLAG = '--settings';
 const PRINT_FLAG = '-p';
 const USAGE_PROMPT = '/usage';
+const AUTH_STATUS_ARGUMENTS: readonly string[] = ['auth', 'status'];
 const USAGE_RESET_IN_MS = 3_600_000;
 const INTERRUPTED_EXIT_CODE = 130;
-const KEEP_ALIVE_MS = 1_000;
 const GRANDCHILD_SLEEP_SECONDS = '120';
 const INIT_LINE = { type: 'system', subtype: 'init', session_id: FAKE_SESSION_ID, model: 'fake-model' };
 
@@ -42,10 +44,6 @@ async function readPrompt(): Promise<string> {
   return prompt;
 }
 
-function keepAlive(): void {
-  setInterval(() => undefined, KEEP_ALIVE_MS);
-}
-
 const behaviours: Readonly<Record<FakeMode, () => Promise<void>>> = {
   replay: async () => {
     const fixture = valueAfter(FAKE_FIXTURE_FLAG);
@@ -64,16 +62,16 @@ const behaviours: Readonly<Record<FakeMode, () => Promise<void>>> = {
     exit(FAKE_FAILURE_EXIT_CODE);
   },
   hang: async () => {
-    emit(INIT_LINE);
+    keepAliveWhileParentLives();
     process.once('SIGINT', () => exit(INTERRUPTED_EXIT_CODE));
-    keepAlive();
+    emit(INIT_LINE);
   },
   stubborn: async () => {
+    keepAliveWhileParentLives();
     process.on('SIGINT', () => undefined);
     process.on('SIGTERM', () => undefined);
     const grandchild = spawn('sleep', [GRANDCHILD_SLEEP_SECONDS], { stdio: 'ignore' });
     emit({ type: FAKE_GRANDCHILD_TYPE, pid: grandchild.pid });
-    keepAlive();
   },
   flood: async () => {
     emit(INIT_LINE);
@@ -97,6 +95,15 @@ function isFakeMode(value: string | undefined): value is FakeMode {
   return FAKE_MODES.some((mode) => mode === value);
 }
 
+/** What the real CLI prints locally for `auth status`, whatever its agents would do. */
+function authStatus(): void {
+  emit(FAKE_LOGGED_IN_STATUS);
+}
+
+function asksForAuthStatus(): boolean {
+  return AUTH_STATUS_ARGUMENTS.every((word, index) => argv.at(index - AUTH_STATUS_ARGUMENTS.length) === word);
+}
+
 /** The usage report the real CLI answers locally, whatever its agents would do. */
 function usageReport(): void {
   const resetsAt = new Date(Date.now() + USAGE_RESET_IN_MS).toISOString();
@@ -114,4 +121,5 @@ if (!isFakeMode(mode)) {
   throw new Error(`unknown fake mode ${String(mode)}`);
 }
 if (valueAfter(PRINT_FLAG) === USAGE_PROMPT) usageReport();
+else if (asksForAuthStatus()) authStatus();
 else await behaviours[mode]();

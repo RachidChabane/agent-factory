@@ -7,6 +7,8 @@ export const FAKE_MODES = ['replay', 'echo', 'fail', 'hang', 'stubborn', 'flood'
 export type FakeMode = (typeof FAKE_MODES)[number];
 
 export const FAKE_SESSION_ID = 'fake-session';
+/** What `claude auth status` prints for the fake's login. */
+export const FAKE_LOGGED_IN_STATUS = { loggedIn: true, authMethod: 'claude.ai', email: 'operator@example.com', orgName: 'Example Org', subscriptionType: 'max' } as const;
 export const FAKE_FAILURE_MESSAGE = 'fatal: fake claude could not start';
 export const FAKE_FAILURE_EXIT_CODE = 3;
 export const FAKE_FLOOD_LINE_COUNT = 5_000;
