@@ -39,6 +39,8 @@ export const RunSubjectPayloadSchema = z.object({ kind: z.enum(RUN_SUBJECT_KINDS
 
 export const RunStartedPayloadSchema = z.object({
   id: z.string().min(1),
+  /** The project the run works for; null for installation work. */
+  project: z.string().min(1).nullable().default(null),
   role: z.enum(AGENT_ROLES),
   model: z.string().min(1),
   effort: z.enum(EFFORT_LEVELS),

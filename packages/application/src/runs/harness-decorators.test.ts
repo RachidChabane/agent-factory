@@ -78,6 +78,15 @@ describe('recording and governing agent runs', () => {
     expect((await logs.read('run-1', 1)).lines.map((line) => line.index)).toEqual([2]);
   });
 
+  it('stamps every run with the project it works for', async () => {
+    const events = new InMemoryEventStore();
+    const clock = new SteppingClock(START);
+    const harness = new RecordingHarness(new EventfulHarness(), events, clock, new InMemoryRunLogStore(clock), 'storefront');
+    await harness.run(agentRunRequest(), () => undefined, SIGNAL);
+    const started = events.records.find((record) => record.type === RUN_STARTED_EVENT);
+    expect(RunStartedPayloadSchema.parse(started?.payload).project).toBe('storefront');
+  });
+
   it('records a crashed run as failed and rethrows', async () => {
     const { events, base, harness } = setup();
     base.result = new Error('spawn claude ENOENT');

@@ -15,9 +15,10 @@ export const ZERO_USAGE: TokenUsage = { inputTokens: 0, outputTokens: 0, cacheRe
 const RUNNING_STATUS = 'running';
 const FAILED_STATUS = 'failed';
 
-export function startedPayload(request: AgentRunRequest, startedAt: Date): RunStartedPayload {
+export function startedPayload(request: AgentRunRequest, startedAt: Date, project: string | null = null): RunStartedPayload {
   return {
     id: request.runId,
+    project,
     role: request.role,
     model: request.model,
     effort: request.effort,
@@ -77,17 +78,20 @@ export class RecordingHarness implements AgentHarness {
   private readonly events: EventStore;
   private readonly clock: Clock;
   private readonly runLogs: RunLogStore;
+  private readonly project: string | null;
 
-  constructor(inner: AgentHarness, events: EventStore, clock: Clock, runLogs: RunLogStore) {
+  /** Records every run in the installation's log, stamped with the project it works for. */
+  constructor(inner: AgentHarness, events: EventStore, clock: Clock, runLogs: RunLogStore, project: string | null = null) {
     this.inner = inner;
     this.events = events;
     this.clock = clock;
     this.runLogs = runLogs;
+    this.project = project;
   }
 
   async run(request: AgentRunRequest, onEvent: (event: AgentRunEvent) => void, signal: AbortSignal): Promise<AgentRunResult> {
     const startedAt = this.clock.now();
-    await this.events.append(RUN_STARTED_EVENT, runSubject(request.runId), startedPayload(request, startedAt));
+    await this.events.append(RUN_STARTED_EVENT, runSubject(request.runId), startedPayload(request, startedAt, this.project));
     let logged: Promise<unknown> = Promise.resolve();
     const record = (event: AgentRunEvent): void => {
       logged = logged.then(() => this.runLogs.append(request.runId, event));
