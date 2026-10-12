@@ -1,3 +1,4 @@
+import './commit-list.css';
 import { Link } from 'react-router';
 import type { DeliveredCommit } from '../../contract/index.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
@@ -46,11 +47,23 @@ interface DeliveredCommitsProps {
   readonly folded?: boolean | undefined;
 }
 
+/** That nothing is known of the commits, in full, or in a word with the full statement as its title where a table row has no room for it. */
+function UnknownCommits({ folded }: { readonly folded: boolean }) {
+  const { t } = useI18n();
+  const statement = t('delivery.commits.unknown');
+  if (!folded) return <span className="subtle">{statement}</span>;
+  return (
+    <span className="subtle commit-note" title={statement}>
+      {t('delivery.commits.unknown.short')}
+    </span>
+  );
+}
+
 /** What a deployment brought: its commits, the statement that it brought none, or that nothing is known of them. */
 export function DeliveredCommits({ project, commits, folded = false }: DeliveredCommitsProps) {
   const { t } = useI18n();
-  if (commits === null) return <span className="subtle">{t('delivery.commits.unknown')}</span>;
-  if (commits.length === 0) return <span className="subtle">{t('delivery.commits.none')}</span>;
+  if (commits === null) return <UnknownCommits folded={folded} />;
+  if (commits.length === 0) return <span className="subtle commit-note">{t('delivery.commits.none')}</span>;
   if (!folded) return <CommitList project={project} commits={commits} />;
   return (
     <details className="commit-disclosure">

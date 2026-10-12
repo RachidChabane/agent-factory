@@ -65,7 +65,9 @@ describe('DeliveryView delivered commits', () => {
     expect(within(table).getAllByText('2 commits').length).toBeGreaterThan(0);
     expect(within(table).getAllByText('1 commit').length).toBeGreaterThan(0);
     expect(within(table).getAllByText('No new commit').length).toBeGreaterThan(0);
-    expect(within(table).getAllByText(/The commits are unknown/).length).toBeGreaterThan(0);
+    const unknown = within(table).getAllByText('Commits unknown');
+    expect(unknown.length).toBeGreaterThan(0);
+    expect(unknown[0]).toHaveAttribute('title', expect.stringMatching(/the clone of the project does not hold this deployment/));
   });
 
   it('lists the commits that wait for the environment, with the base branch they come from', async () => {

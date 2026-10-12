@@ -38,6 +38,7 @@ export const enDelivery = {
   'delivery.commits.count': { one: '{count} commit', other: '{count} commits' },
   'delivery.commits.none': 'No new commit',
   'delivery.commits.unknown': 'The commits are unknown: the clone of the project does not hold this deployment or the one before it',
+  'delivery.commits.unknown.short': 'Commits unknown',
   'delivery.commits.issue': 'Issue #{number}',
   'delivery.commits.pending.title': 'Waiting for this environment',
   'delivery.commits.pending.count': { one: '{count} commit of {branch} is not deployed here yet', other: '{count} commits of {branch} are not deployed here yet' },

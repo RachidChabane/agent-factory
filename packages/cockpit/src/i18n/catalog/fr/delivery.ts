@@ -39,6 +39,7 @@ export const frDelivery = {
   'delivery.commits.count': { one: '{count} commit', other: '{count} commits' },
   'delivery.commits.none': 'Aucun nouveau commit',
   'delivery.commits.unknown': 'Les commits sont inconnus : le clone du projet ne contient pas ce déploiement ni le précédent',
+  'delivery.commits.unknown.short': 'Commits inconnus',
   'delivery.commits.issue': 'Issue n° {number}',
   'delivery.commits.pending.title': 'En attente pour cet environnement',
   'delivery.commits.pending.count': { one: '{count} commit de {branch} n’est pas encore déployé ici', other: '{count} commits de {branch} ne sont pas encore déployés ici' },
