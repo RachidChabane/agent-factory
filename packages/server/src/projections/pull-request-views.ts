@@ -9,6 +9,7 @@ import {
   commandSection,
   criterionChecksOf,
   stripAnsi,
+  failingOnBase,
   MERGEABLE_STATES,
   PIPELINE_EVENTS,
   pullRequestTitle,
@@ -161,13 +162,13 @@ function feedbackOf(journal: PipelineJournal): ExternalFeedback[] {
   }));
 }
 
-function mergeBlockers(journal: PipelineJournal, checks: Observed<readonly CheckRunSummary[]>, evidenceComplete: boolean): string[] {
+function mergeBlockers(journal: PipelineJournal, checks: Observed<readonly CheckRunSummary[]>, preExisting: ReadonlySet<string>, evidenceComplete: boolean): string[] {
   const blockers: string[] = [];
   if (journal.state === null || !MERGEABLE_STATES.includes(journal.state)) blockers.push(`the issue is ${journal.state ?? 'unknown'}`);
   if (!evidenceComplete) blockers.push('evidence is missing');
   if (checks.value === null) blockers.push('the checks of the head commit were not read yet');
   for (const check of checks.value ?? []) {
-    if (FAILING_CONCLUSIONS.includes(check.conclusion)) blockers.push(`check ${check.name} failed`);
+    if (FAILING_CONCLUSIONS.includes(check.conclusion) && !preExisting.has(check.name)) blockers.push(`check ${check.name} failed`);
     if (check.conclusion === PENDING_CONCLUSION) blockers.push(`check ${check.name} is still running`);
   }
   return blockers;
@@ -187,9 +188,10 @@ export function projectPullRequests(
     const opened = firstOf(records, PIPELINE_EVENTS.pullRequestOpened);
     const merged = firstOf(records, PIPELINE_EVENTS.pullRequestMerged);
     const checks = context.pullRequestChecks.get(pullRequest.number) ?? NEVER_READ;
+    const preExisting = failingOnBase(checks.value ?? [], context.baseChecks.value ?? []);
     const missing = journal.evidence?.bundle.missing.map((entry) => `${entry.sourcePath} (${entry.phase})`) ?? [];
     const evidenceComplete = journal.evidence !== null && missing.length === 0;
-    const blockers = journal.mergeSha === null ? mergeBlockers(journal, checks, evidenceComplete) : ['already merged'];
+    const blockers = journal.mergeSha === null ? mergeBlockers(journal, checks, preExisting, evidenceComplete) : ['already merged'];
     views.push({
       number: pullRequest.number,
       title: context.pullRequestTitles.get(pullRequest.number) ?? pullRequestTitle(spec, context.conventions, journal.evidence?.changes.map((change) => change.path)),
@@ -201,7 +203,7 @@ export function projectPullRequests(
       state: journal.mergeSha === null ? 'open' : 'merged',
       openedAt: iso(opened?.occurredAt ?? context.generatedAt),
       mergedAt: merged === null ? null : iso(merged.occurredAt),
-      checks: observedView(checks, (runs) => runs.map((check) => ({ name: check.name, conclusion: check.conclusion, url: check.url, durationMs: null }))),
+      checks: observedView(checks, (runs) => runs.map((check) => ({ name: check.name, conclusion: check.conclusion, url: context.links.forge(check.url), durationMs: null, failsOnBase: preExisting.has(check.name) }))),
       evidenceComplete,
       missingEvidence: missing,
       evidence: evidenceOf(journal, context, records),

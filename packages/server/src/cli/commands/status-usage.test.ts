@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventSourcedIssueStateStore } from '@agent-factory/adapters';
 import { ProjectEventStore, type UsageReportSource } from '@agent-factory/application';
-import type { UsageReading } from '@agent-factory/domain';
+import type { AccountIdentity, UsageReading } from '@agent-factory/domain';
 import type { AgentFactoryConfig } from '../../config/agent-factory-config.ts';
 import { openEventLog } from '../../composition/installation/event-log.ts';
 import { openInstallation, type InstallationOverrides } from '../../composition/installation/installation-runtime.ts';
@@ -30,7 +30,7 @@ function reading(account: string): UsageReading {
 class RecordedUsage implements UsageReportSource {
   readonly reads: string[] = [];
   failure: string | null = null;
-  identity: UsageReading['identity'] = null;
+  identity: AccountIdentity | null = null;
 
   read(account: string): Promise<UsageReading> {
     this.reads.push(account);

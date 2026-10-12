@@ -16,9 +16,9 @@ export const PULL_REQUEST_BODY_EXTENSION = '.md';
 export const COMMENTS_FILE_EXTENSION = '.json';
 export const BARE_REPOSITORY_SUFFIX = '.git';
 
-export const LOCAL_CHECK_MODES = ['none', 'success'] as const;
+/** none: pull requests carry no check; gate: each commit's checks are the project's own gate, run by the local forge. */
+export const LOCAL_CHECK_MODES = ['none', 'gate'] as const;
 export type LocalCheckMode = (typeof LOCAL_CHECK_MODES)[number];
-export const LOCAL_CHECK_NAME = 'local-rehearsal';
 
 export const FIRST_NUMBER = 1;
 export const RECENT_COMMIT_LIMIT = 100;

@@ -38,6 +38,7 @@ import { baseWorkspaces } from './base-workspaces.ts';
 import { agentDeniedReadPaths, commandSandbox, knownSecretSource } from './confinement.ts';
 import { deliveryEnvironments, monitoredEnvironments, releaseGateHealth } from './delivery.ts';
 import { openForge, projectGitEnvironment } from './forge.ts';
+import { localGateChecks } from './local-checks.ts';
 import { pipelineSettings } from './project-settings.ts';
 
 export const PROJECT_LINK_SEGMENT = 'projects';
@@ -107,7 +108,8 @@ export async function openProject(installation: InstallationContext, initial: Pr
   let settings = pipelineSettings(installation.config, config, environment);
   const gitEnvironment = projectGitEnvironment(config, environment);
   const events = new ProjectEventStore(installation.events, config.id);
-  const forge = await openForge(config, runner, environment, clock);
+  const gateChecks = localGateChecks(installation.config, config, { runner, environment, platform: installation.platform, home: installation.userHome, clock, lifetime: installation.lifetime });
+  const forge = await openForge(config, runner, environment, clock, gateChecks);
   const files = new NodeWorkspaceFiles();
   const specReader: SpecReader = { read: (issue) => parseIssueSpec(issue, settings.conventions) };
   const dependencies: PipelineDependencies = {

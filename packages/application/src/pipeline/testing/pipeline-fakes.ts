@@ -342,6 +342,7 @@ export class InMemoryGitHub implements GitHubGateway {
   readonly merges: { number: number; headSha: string }[] = [];
   readonly bodyUpdates: { number: number; body: string }[] = [];
   checkRuns: readonly CheckRunSummary[] = [];
+  baseCheckRuns: readonly CheckRunSummary[] = [];
   failNextOpenAfterCreation = false;
   private readonly sourceControl: InMemorySourceControl;
   private nextPullRequestNumber = 100;
@@ -378,6 +379,11 @@ export class InMemoryGitHub implements GitHubGateway {
 
   checks(): Promise<readonly CheckRunSummary[]> {
     return Promise.resolve(this.checkRuns);
+  }
+
+  /** The checks of the base branch's head; empty unless a test says what fails there. */
+  baseBranchChecks(): Promise<readonly CheckRunSummary[]> {
+    return Promise.resolve(this.baseCheckRuns);
   }
 
   squashMerge(number: number, expectedHeadSha: string): Promise<string> {

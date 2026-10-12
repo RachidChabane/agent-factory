@@ -82,7 +82,7 @@ export class CutRelease {
     if (pullRequest.headSha !== detection.headSha) await redetectPullRequestRelease(events, detection, pullRequest.headSha);
     const evaluation = await evaluateRelease(this.dependencies, { releaseId, branch: detection.ref, baseSha: detection.baseSha });
     if (!evaluation.promotable) throw new ReleaseCutRefusedError(releaseId, evaluation.blockingReasons);
-    const blocking = checksBlockingMerge(await github.checks(pullRequest.headSha));
+    const blocking = checksBlockingMerge(await github.checks(pullRequest.headSha), await github.baseBranchChecks());
     if (blocking !== null) throw new ReleaseCutRefusedError(releaseId, [blocking]);
     const mergeSha = await github.squashMerge(pullRequest.number, pullRequest.headSha);
     const payload: ReleaseCutPayload = { releaseId, pullRequestNumber: pullRequest.number, headSha: pullRequest.headSha, mergeSha, operator: order.operator };

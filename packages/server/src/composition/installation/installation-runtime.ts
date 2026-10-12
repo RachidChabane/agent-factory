@@ -96,6 +96,7 @@ export async function openInstallation(config: AgentFactoryConfig, environment: 
   const userHome = overrides.userHome ?? homedir();
   const runner = new SpawnCommandRunner();
   const eventLog = openEventLog(config.directories.state);
+  const lifetime = new AbortController();
   try {
     const live = new LiveInstallation(config, configurationLoader(config, userHome));
     const events = eventLog.events;
@@ -136,6 +137,7 @@ export async function openInstallation(config: AgentFactoryConfig, environment: 
       runSlots,
       listeningPorts,
       notifier,
+      lifetime: lifetime.signal,
       harnessFor: overrides.harnessFor ?? null,
     };
     const projects: ProjectRuntime[] = [];
@@ -167,9 +169,13 @@ export async function openInstallation(config: AgentFactoryConfig, environment: 
       },
       projectTools: (id) => projectToolProber(projectOf(live.config, id), toolSettings),
       changeSettings: (change, operator) => new ChangeSettings({ events, document: settingsDocument }).change(change, operator),
-      close: eventLog.close,
+      close: () => {
+        lifetime.abort();
+        eventLog.close();
+      },
     };
   } catch (error) {
+    lifetime.abort();
     eventLog.close();
     throw error;
   }

@@ -91,6 +91,23 @@ describe('the view of one project', () => {
     expect(viewOf(kept).view.issues[0]?.checks[0]?.before.result).toBe('passed');
   });
 
+  it('marks a failing check that fails the same way on the base branch, and lets it not block the merge', () => {
+    const history = projectHistory();
+    const at = new Date('2026-10-09T11:59:00.000Z');
+    const context = projectContext(history, {
+      pullRequestChecks: new Map([[100, { value: [{ name: 'ci', conclusion: 'success', url: 'https://github.com/acme/widgets/actions/runs/1' }, { name: 'pr-title', conclusion: 'failure', url: 'https://github.com/acme/widgets/actions/runs/2' }], readAt: at, error: null }]]),
+      baseChecks: { value: [{ name: 'pr-title', conclusion: 'failure', url: 'https://github.com/acme/widgets/actions/runs/0' }], readAt: at, error: null },
+    });
+    const pullRequest = viewOf(history, context).view.pullRequests[0];
+    expect(pullRequest?.checks.value?.map((check) => [check.name, check.conclusion, check.failsOnBase])).toEqual([
+      ['ci', 'success', false],
+      ['pr-title', 'failure', true],
+    ]);
+    expect(pullRequest?.mergeable).toBe(true);
+    const caused = viewOf(history, projectContext(history, { ...context, baseChecks: { value: [], readAt: at, error: null } })).view.pullRequests[0];
+    expect(caused?.mergeable).toBe(false);
+  });
+
   it('titles a pull request as the forge records it', () => {
     const titled = viewOf(projectHistory(), projectContext(projectHistory(), { pullRequestTitles: new Map([[100, 'feat(app): link mockups to their conversation page']]) }));
     expect(titled.view.pullRequests[0]?.title).toBe('feat(app): link mockups to their conversation page');

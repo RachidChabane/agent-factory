@@ -80,6 +80,7 @@ export class FakeGitHubGateway implements GitHubGateway {
   readonly branchHeads = new Map<string, string>();
   readonly merges: { readonly number: number; readonly headSha: string }[] = [];
   checkRuns: readonly CheckRunSummary[] = [];
+  baseCheckRuns: readonly CheckRunSummary[] = [];
   simulatedDispatches = false;
   private nextIssueNumber = 500;
 
@@ -168,6 +169,11 @@ export class FakeGitHubGateway implements GitHubGateway {
   }
   checks(): Promise<readonly CheckRunSummary[]> {
     return Promise.resolve(this.checkRuns);
+  }
+
+  /** The checks of the base branch's head; empty unless a test says what fails there. */
+  baseBranchChecks(): Promise<readonly CheckRunSummary[]> {
+    return Promise.resolve(this.baseCheckRuns);
   }
   squashMerge(number: number, expectedHeadSha: string): Promise<string> {
     const open = this.openPullRequests.find((pullRequest) => pullRequest.number === number);

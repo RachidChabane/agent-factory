@@ -237,6 +237,8 @@ export interface GitHubGateway {
   findOpenPullRequest(branch: string): Promise<PullRequestRef | null>;
   updatePullRequestBody(number: number, body: string): Promise<void>;
   checks(ref: string): Promise<readonly CheckRunSummary[]>;
+  /** The checks of the head of the base branch, against which a pull request's failing checks are told apart from failures it did not cause. */
+  baseBranchChecks(): Promise<readonly CheckRunSummary[]>;
   squashMerge(number: number, expectedHeadSha: string): Promise<string>;
   commitsSince(branch: string, sinceSha: string | null): Promise<readonly CommitSummary[]>;
   commit(sha: string): Promise<CommitSummary>;

@@ -39,6 +39,8 @@ export interface ProjectSnapshotContext {
   /** Open issues of the factory it has not taken yet, drafts and validated ones, as last read from the forge. */
   readonly pendingIssues: readonly PendingIssue[];
   readonly pullRequestChecks: ReadonlyMap<number, Observed<readonly CheckRunSummary[]>>;
+  /** The checks of the base branch's head, against which failures a change did not cause are told apart. */
+  readonly baseChecks: Observed<readonly CheckRunSummary[]>;
   readonly pullRequestTitles: ReadonlyMap<number, string>;
   readonly logs: ReadonlyMap<string, string>;
   readonly productionWorkflowUrl: string | null;

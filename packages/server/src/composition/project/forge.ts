@@ -1,4 +1,5 @@
 import {
+  type LocalGateChecks,
   buildGhEnvironment,
   buildGitEnvironment,
   GhCliGateway,
@@ -28,7 +29,7 @@ export function forgeUrl(project: ProjectConfig): string | null {
   return project.forge.kind === 'github' ? `${GITHUB_WEB_ORIGIN}/${project.repository.owner}/${project.repository.name}` : null;
 }
 
-export async function openForge(project: ProjectConfig, runner: CommandRunner, environment: SourceEnvironment, clock: Clock): Promise<GitHubGateway> {
+export async function openForge(project: ProjectConfig, runner: CommandRunner, environment: SourceEnvironment, clock: Clock, gateChecks: LocalGateChecks | null = null): Promise<GitHubGateway> {
   const { forge } = project;
   switch (forge.kind) {
     case 'github':
@@ -50,6 +51,7 @@ export async function openForge(project: ProjectConfig, runner: CommandRunner, e
           checks: forge.checks,
           identity: project.commitIdentity,
           environment: gitEnvironment,
+          gateChecks,
         },
         clock,
       );

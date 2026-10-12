@@ -19,7 +19,8 @@ import type {
 import type { GitIdentity } from '../git/gitSourceControl.ts';
 import { PullRequestHeadMovedError } from '../github/errors.ts';
 import { withClosingLines } from '../github/pullRequestConventions.ts';
-import { LOCAL_CHECK_NAME, type LocalCheckMode } from './constants.ts';
+import type { LocalCheckMode } from './constants.ts';
+import type { LocalGateChecks } from './localGateChecks.ts';
 import { LocalMergeConflictError, LocalPullRequestRefusedError, LocalRecordNotFoundError } from './errors.ts';
 import { LocalBareRepository, type LocalCommit } from './localBareRepository.ts';
 import { LocalGitHubFiles, type IssueDraft, type LocalIssue } from './localGitHubFiles.ts';
@@ -31,7 +32,6 @@ const ISSUE_OR_PULL_REQUEST_KIND = 'issue or pull request';
 const OPEN_STATE = 'open';
 const CLOSED_STATE = 'closed';
 const MERGED_STATE = 'merged';
-const NO_CHECK_URL = '';
 const PARAGRAPH = '\n\n';
 const SQUASH_LIST_MARKER = '* ';
 
@@ -40,6 +40,8 @@ export interface LocalGitHubGatewaySettings {
   readonly bareRepositoryPath: string;
   readonly baseBranch: string;
   readonly checks: LocalCheckMode;
+  /** Runs the gate a `gate` check mode reports; without one, pull requests carry no check. */
+  readonly gateChecks?: LocalGateChecks | null;
   readonly identity: GitIdentity;
   readonly environment: Readonly<Record<string, string>>;
 }
@@ -227,10 +229,14 @@ export class LocalGitHubGateway implements GitHubGateway {
     await this.files.writePullRequestBody(number, body);
   }
 
-  checks(): Promise<readonly CheckRunSummary[]> {
-    const summaries: readonly CheckRunSummary[] =
-      this.settings.checks === 'success' ? [{ name: LOCAL_CHECK_NAME, conclusion: 'success', url: NO_CHECK_URL }] : [];
-    return Promise.resolve(summaries);
+  async checks(ref: string): Promise<readonly CheckRunSummary[]> {
+    const gate = this.settings.gateChecks ?? null;
+    if (this.settings.checks !== 'gate' || gate === null) return [];
+    return gate.of((await this.repository.commit(ref)).sha);
+  }
+
+  baseBranchChecks(): Promise<readonly CheckRunSummary[]> {
+    return this.checks(this.settings.baseBranch);
   }
 
   async squashMerge(number: number, expectedHeadSha: string): Promise<string> {

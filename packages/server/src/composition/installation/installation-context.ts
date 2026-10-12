@@ -39,6 +39,8 @@ export interface InstallationContext {
   readonly listeningPorts: ListeningPorts;
   /** Delivers notices to the configured channels, without duplicates. */
   readonly notifier: Notifier;
+  /** Aborted when the installation closes: work the installation started in the background stops with it. */
+  readonly lifetime: AbortSignal;
   /** The agent that runs instead of the Claude CLI, in tests and in the demonstration. */
   readonly harnessFor: ((project: ProjectConfig) => AgentHarness) | null;
 }

@@ -82,6 +82,7 @@ export {
   type RemoteUrl,
 } from './git/remoteLocality.ts';
 export { LocalGitHubGateway, type LocalGitHubGatewaySettings } from './github-local/localGitHubGateway.ts';
+export { CHECKS_DIRECTORY, LocalGateChecks, type LocalCheckRun, type LocalCheckRunner, type LocalCheckStep } from './github-local/localGateChecks.ts';
 export { RehearsalRepositories, type RehearsalLayout, type RehearsalSetup } from './github-local/rehearsalRepositories.ts';
 export { BARE_REPOSITORY_SUFFIX, LOCAL_CHECK_MODES, type LocalCheckMode } from './github-local/constants.ts';
 export {

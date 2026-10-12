@@ -400,6 +400,8 @@ export const CheckRunViewSchema = z.object({
   conclusion: z.enum(CHECK_CONCLUSIONS),
   url: z.string(),
   durationMs: CountSchema.nullable(),
+  /** A failing check that fails the same way on the base branch: the change did not cause it, and it does not block the merge. */
+  failsOnBase: z.boolean(),
 });
 export type CheckRunView = z.infer<typeof CheckRunViewSchema>;
 

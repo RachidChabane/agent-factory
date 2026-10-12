@@ -34,7 +34,7 @@ import { proofLogExcerpt } from '../projections/pull-request-views.ts';
 import { projectRuns, recordedRuns, type RecordedRun } from '../projections/run-views.ts';
 import { logKey, type PendingIssue, type ProjectSnapshotContext, type RunLogSummary } from '../projections/snapshot-context.ts';
 import { projectView, type ProjectViewProjection } from '../projections/project-view.ts';
-import { CachedReading, CachedReadings, observedView, type Observed } from './cached-reading.ts';
+import { CachedReading, CachedReadings, NEVER_READ, observedView, type Observed } from './cached-reading.ts';
 
 export const FORGE_READ_INTERVAL_MS = 60_000;
 export const RESOURCES_READ_INTERVAL_MS = 10_000;
@@ -108,6 +108,7 @@ function splitByProject(records: readonly FactoryEventRecord[]): SplitRecords {
 class ProjectReadings {
   readonly pendingIssues: CachedReading<readonly PendingIssue[]>;
   readonly checks: CachedReadings<string, readonly CheckRunSummary[]>;
+  readonly baseChecks: CachedReading<readonly CheckRunSummary[]>;
   readonly titles: CachedReadings<number, string>;
   readonly deployments: CachedReadings<string, EnvironmentDeployments>;
   readonly workflows: CachedReading<readonly WorkflowRunRecord[] | null>;
@@ -133,6 +134,7 @@ class ProjectReadings {
       clock,
     );
     this.checks = new CachedReadings((head) => forge.checks(head), FORGE_READ_INTERVAL_MS, clock);
+    this.baseChecks = new CachedReading(() => forge.baseBranchChecks(), FORGE_READ_INTERVAL_MS, clock);
     this.titles = new CachedReadings(async (number) => (await forge.pullRequestDetails(number)).title, FORGE_READ_INTERVAL_MS, clock);
     this.deployments = new CachedReadings(
       async (target) => ({ records: await forge.deployments(target, DEPLOYMENT_HISTORY_LIMIT), tags: new Set((await forge.listTags()).map((tag) => tag.name)) }),
@@ -292,6 +294,7 @@ export class SnapshotSource {
       },
       pendingIssues: pending.value ?? [],
       pullRequestChecks: checks,
+      baseChecks: checks.size === 0 ? NEVER_READ : await readings.baseChecks.get(),
       pullRequestTitles: titles,
       logs: await this.logTails(project, journals),
       productionWorkflowUrl: productionWorkflowUrl(project.config),

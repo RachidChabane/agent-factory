@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { checksBlockingMerge, failingOnBase } from './merge-on-order.ts';
 import { MergeRefusedError, PullRequestNotFromFactoryError } from './pipeline-errors.ts';
 import { ISSUE_NUMBER, PipelineScenario } from './testing/pipeline-scenario.ts';
 
@@ -44,6 +45,31 @@ describe('MergeOnOrder', () => {
     scenario.github.checkRuns = [{ name: 'ci', conclusion: 'pending', url: 'https://ci.example/1' }];
     await expect(scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head })).rejects.toThrow('checks still running');
     expect((await scenario.journal()).state).toBe('pr-open');
+  });
+
+  it('merges despite a check that fails the same way on the base branch, which the change did not cause', async () => {
+    const { scenario, head } = await scenarioWithOpenPullRequest();
+    scenario.github.checkRuns = [
+      { name: 'lint-pull-request-title', conclusion: 'failure', url: 'https://ci.example/2' },
+      { name: 'unit', conclusion: 'success', url: 'https://ci.example/3' },
+    ];
+    scenario.github.baseCheckRuns = [{ name: 'lint-pull-request-title', conclusion: 'failure', url: 'https://ci.example/1' }];
+    await scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head });
+    expect(scenario.github.merges).toHaveLength(1);
+  });
+
+  it('tells which failing checks the change caused and which already failed on the base', () => {
+    const checks = [
+      { name: 'lint', conclusion: 'failure' as const, url: '' },
+      { name: 'unit', conclusion: 'failure' as const, url: '' },
+    ];
+    const base = [
+      { name: 'lint', conclusion: 'failure' as const, url: '' },
+      { name: 'unit', conclusion: 'success' as const, url: '' },
+    ];
+    expect(failingOnBase(checks, base)).toEqual(new Set(['lint']));
+    expect(checksBlockingMerge(checks, base)).toBe('checks failed: unit (failure)');
+    expect(checksBlockingMerge(checks, [])).toBe('checks failed: lint (failure), unit (failure)');
   });
 
   it('resumes a merge interrupted after the evidence removal was pushed', async () => {

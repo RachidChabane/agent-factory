@@ -14,8 +14,23 @@ const ISSUE_NUMBER_PATTERN = new RegExp(`^${ISSUE_SUBJECT_PREFIX}(\\d+)$`);
 const REFUSED_CONCLUSIONS: readonly CheckConclusion[] = ['failure', 'cancelled'];
 const PENDING_CONCLUSION: CheckConclusion = 'pending';
 
-export function checksBlockingMerge(checks: readonly CheckRunSummary[]): string | null {
-  const failing = checks.filter((check) => REFUSED_CONCLUSIONS.includes(check.conclusion));
+function isRefused(check: CheckRunSummary): boolean {
+  return REFUSED_CONCLUSIONS.includes(check.conclusion);
+}
+
+/** The failing checks of a head that also fail on the base branch: failures the change did not cause. */
+export function failingOnBase(checks: readonly CheckRunSummary[], baseChecks: readonly CheckRunSummary[]): ReadonlySet<string> {
+  const failedOnBase = new Set(baseChecks.filter(isRefused).map((check) => check.name));
+  return new Set(checks.filter((check) => isRefused(check) && failedOnBase.has(check.name)).map((check) => check.name));
+}
+
+/**
+ * Why the checks of a head block its merge, or null. A check that fails the same way on the base
+ * branch was failing before the change, so it does not block; a pending one does, until it ends.
+ */
+export function checksBlockingMerge(checks: readonly CheckRunSummary[], baseChecks: readonly CheckRunSummary[] = []): string | null {
+  const preExisting = failingOnBase(checks, baseChecks);
+  const failing = checks.filter((check) => isRefused(check) && !preExisting.has(check.name));
   if (failing.length > 0) return `checks failed: ${describeChecks(failing)}`;
   const pending = checks.filter((check) => check.conclusion === PENDING_CONCLUSION);
   return pending.length > 0 ? `checks still running: ${describeChecks(pending)}` : null;
@@ -121,7 +136,8 @@ export class MergeOnOrder {
   }
 
   private async assertChecksGreen(order: MergeOrder): Promise<void> {
-    const blocking = checksBlockingMerge(await this.dependencies.github.checks(order.expectedHeadSha));
+    const { github } = this.dependencies;
+    const blocking = checksBlockingMerge(await github.checks(order.expectedHeadSha), await github.baseBranchChecks());
     if (blocking !== null) throw new MergeRefusedError(order.pullRequestNumber, blocking);
   }
 

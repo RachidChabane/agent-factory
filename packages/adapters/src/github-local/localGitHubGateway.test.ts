@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Clock } from '@agent-factory/application';
 import { PullRequestHeadMovedError } from '../github/errors.ts';
@@ -17,6 +17,7 @@ import {
 } from '../git/testSupport.ts';
 import type { LocalCheckMode } from './constants.ts';
 import { LocalGitHubFileError, LocalMergeConflictError, LocalPullRequestRefusedError, LocalRecordNotFoundError, UnknownCommitError } from './errors.ts';
+import { LocalGateChecks, type LocalCheckRun, type LocalCheckRunner } from './localGateChecks.ts';
 import { LocalGitHubGateway } from './localGitHubGateway.ts';
 
 const NOW = new Date('2026-10-10T08:00:00.000Z');
@@ -386,9 +387,52 @@ describe('LocalGitHubGateway', () => {
   });
 
   describe('checks', () => {
-    it('reports no check or a configured success', async () => {
-      expect(await gateway('none').checks()).toEqual([]);
-      expect(await gateway('success').checks()).toEqual([{ name: 'local-rehearsal', conclusion: 'success', url: '' }]);
+    function gated(runner: LocalCheckRunner): { github: LocalGitHubGateway; checks: LocalGateChecks } {
+      const checks = new LocalGateChecks(directory, runner, FIXED_CLOCK, new AbortController().signal);
+      const github = new LocalGitHubGateway(
+        testRunner(),
+        { directory, bareRepositoryPath: repositories.remote, baseBranch: TEST_BASE_BRANCH, checks: 'gate', identity: TEST_IDENTITY, environment: localOnlyGitEnvironment(TEST_GIT_ENVIRONMENT), gateChecks: checks },
+        FIXED_CLOCK,
+      );
+      return { github, checks };
+    }
+
+    it('reports no check when the forge runs none', async () => {
+      expect(await gateway('none').checks(TEST_BASE_BRANCH)).toEqual([]);
+    });
+
+    it("runs the project's gate once per commit, pending until it finishes, then one check per step with the gate's log", async () => {
+      const runs: string[] = [];
+      let finish: (run: LocalCheckRun) => void = () => undefined;
+      const { github, checks } = gated({
+        run: (sha) => {
+          runs.push(sha);
+          return new Promise((resolve) => {
+            finish = resolve;
+          });
+        },
+      });
+      const head = bareHead(TEST_BASE_BRANCH);
+      const logUrl = pathToFileURL(join(directory, 'checks', `${head}.log`)).href;
+      expect(await github.checks(TEST_BASE_BRANCH)).toEqual([{ name: 'gate', conclusion: 'pending', url: logUrl }]);
+      expect(await github.checks(head)).toEqual([{ name: 'gate', conclusion: 'pending', url: logUrl }]);
+      finish({ steps: [{ name: 'lint', passed: true }, { name: 'unit', passed: false }], log: '$ npm test\n1 failing\n' });
+      await checks.settled();
+      expect(await github.checks(head)).toEqual([
+        { name: 'lint', conclusion: 'success', url: logUrl },
+        { name: 'unit', conclusion: 'failure', url: logUrl },
+      ]);
+      expect(runs).toEqual([head]);
+      expect(await readFile(join(directory, 'checks', `${head}.log`), 'utf8')).toBe('$ npm test\n1 failing\n');
+    });
+
+    it('shows a gate that could not run as one failed check that says why', async () => {
+      const { github, checks } = gated({ run: () => Promise.reject(new Error('the clean checkout could not be prepared')) });
+      const head = bareHead(TEST_BASE_BRANCH);
+      await github.checks(head);
+      await checks.settled();
+      expect(await github.checks(head)).toEqual([{ name: 'gate', conclusion: 'failure', url: pathToFileURL(join(directory, 'checks', `${head}.log`)).href }]);
+      expect(await readFile(join(directory, 'checks', `${head}.log`), 'utf8')).toContain('the clean checkout could not be prepared');
     });
   });
 });

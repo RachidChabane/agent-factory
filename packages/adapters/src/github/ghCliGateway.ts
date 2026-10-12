@@ -306,6 +306,10 @@ export class GhCliGateway implements GitHubGateway {
     return [...runs, ...statuses];
   }
 
+  baseBranchChecks(): Promise<readonly CheckRunSummary[]> {
+    return this.checks(this.settings.baseBranch);
+  }
+
   async squashMerge(number: number, expectedHeadSha: string): Promise<string> {
     const head = await this.ghJson(
       ['pr', 'view', String(number), '--repo', this.repositorySlug, '--json', 'headRefOid'],
