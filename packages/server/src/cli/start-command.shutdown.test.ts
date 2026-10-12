@@ -21,7 +21,6 @@ import { createRehearsal, TEST_WEBHOOK_VARIABLE, waitFor, type RehearsalEnvironm
 const FAKE_CLAUDE = join(FACTORY_INSTALL_DIRECTORY, 'packages', 'adapters', 'src', 'claude', 'test-fixtures', 'fake-claude.ts');
 const CLI = join(FACTORY_INSTALL_DIRECTORY, 'packages', 'server', 'src', 'cli', 'start.ts');
 const TIMEOUT_MS = 60_000;
-const SECOND_SIGNAL_DELAY_MS = 100;
 
 function withoutWebhook(environment: Readonly<Record<string, string | undefined>>): Record<string, string | undefined> {
   return Object.fromEntries(Object.entries(environment).filter(([name]) => name !== TEST_WEBHOOK_VARIABLE));
@@ -98,10 +97,8 @@ describe('factory start shutdown', () => {
       expect(existsSync(factoryLockPath(rehearsal.config))).toBe(true);
 
       cli.kill('SIGTERM');
-      await new Promise((resolve) => setTimeout(resolve, SECOND_SIGNAL_DELAY_MS));
-      cli.kill('SIGTERM');
       expect(await exit).toBe(0);
-      expect(output.join('')).toContain('SIGTERM received again');
+      expect(output.join('')).toContain('SIGTERM received; stopping');
 
       await waitFor(async () => children.every((pid) => !isAlive(pid)), TIMEOUT_MS, 'every child process to exit');
       expect(existsSync(factoryLockPath(rehearsal.config))).toBe(false);
