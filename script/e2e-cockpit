@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Clicks every button of the cockpit in a real browser against a real factory, in the demonstration mode
+# and in the rehearsal mode, and fails when a command of the contract is never clicked. Builds the cockpit
+# first when its build is missing or older than its sources. Arguments go to Playwright (a spec file,
+# --grep, --project=demo); a run with arguments is partial and skips the check that every command was clicked.
+# Usage: script/e2e-cockpit [playwright arguments]
+#   script/e2e-cockpit --project=rehearsal
+set -euo pipefail
+cd "$(dirname "$0")/.."
+source script/lib/heavy.sh
+source script/lib/cockpit-build.sh
+
+ensure_cockpit_build
+run_heavy pnpm exec tsc --noEmit -p e2e/tsconfig.json
+# Playwright removes the browsers no installed version needs unless told otherwise; other projects may need them.
+PLAYWRIGHT_SKIP_BROWSER_GC=1 run_heavy pnpm exec playwright install chromium
+if [ "$#" -eq 0 ]; then
+  export E2E_COMPLETE_RUN=1
+fi
+run_heavy pnpm exec playwright test --config e2e/playwright.config.ts "$@"
