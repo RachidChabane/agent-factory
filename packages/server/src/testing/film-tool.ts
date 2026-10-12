@@ -1,12 +1,14 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { SKIPPED_REASON } from '../demo/films/demo-film.ts';
+import { UNAVAILABLE_SCENARIO } from '../demo/films/demo-film-request.ts';
 
+export { UNAVAILABLE_SCENARIO };
 export const FILM_TOOL_FILE = 'film-tool.mjs';
 export const FILM_GATE_VARIABLE = 'FILM_GATE';
 export const FILM_LOG_FILE = 'invocations.log';
-/** A scenario this tool cannot record: it reports it skipped, with this reason. */
-export const UNAVAILABLE_SCENARIO = 'unavailable-scenario';
-export const UNAVAILABLE_REASON = 'the sandbox account is locked';
+/** The reason this tool gives for a scenario it cannot record, which it reports skipped. */
+export const UNAVAILABLE_REASON = SKIPPED_REASON;
 
 /**
  * A stand-in for a project's film tool. It waits for the file named by FILM_GATE to exist when that variable

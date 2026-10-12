@@ -22,6 +22,7 @@ import {
 import {
   attributeCommit,
   compareVersions,
+  isFilmScenarioName,
   matchesAnyGlob,
   NAMED_CRITERION_PATTERN,
   releaseVersionOf,
@@ -114,7 +115,7 @@ function specOf({ issue, number }: NumberedIssue): IssueSpec {
     outOfScope: [...issue.spec.outOfScope],
     dependsOn: [],
     commitKind: null,
-    films: [],
+    films: [...(issue.spec.films ?? [])],
   };
 }
 
@@ -450,6 +451,16 @@ describe.each(CONTEXTS)('the content for the $story.project project', (context) 
       story.issues.forEach((issue, index) => {
         for (const key of issue.dependsOn) expect(keys.indexOf(key), `${issue.key} waits on ${key}`).toBeLessThan(index);
       });
+    });
+
+    it('declares films with names the factory accepts, only in a project that films, on issues whose pull request opens by itself and stays open', () => {
+      const declaring = story.issues.filter((issue) => (issue.spec.films ?? []).length > 0);
+      for (const issue of declaring) {
+        for (const scenario of issue.spec.films ?? []) expect(isFilmScenarioName(scenario), `${issue.key}: ${scenario}`).toBe(true);
+        expect(issue.decision, `${issue.key} asks no decision, so its pull request opens without a visitor`).toBeNull();
+        expect(story.merges, `${issue.key} films its pull request, which stays open`).not.toContain(issue.key);
+      }
+      if (declaring.length > 0) expect(projectOf(CONFIGURATION, story.project).evidence.films, `the ${story.project} project films`).not.toBeNull();
     });
 
     it('merges validated issues, the first of which is the one the scheduler starts first', () => {

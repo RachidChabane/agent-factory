@@ -1,5 +1,9 @@
 import { join } from 'node:path';
+import { FILM_PLACEHOLDERS } from '@agent-factory/application';
 import type { DemoHealthEndpoints, DemoEnvironmentHealth } from './demo-health.ts';
+import { DEMO_FILM_COMMAND_MAIN, DEMO_FILMS_DIRECTORY } from './demo-paths.ts';
+import { FILM_PACE_VARIABLE } from './films/demo-film.ts';
+import { DEMO_REPLAY_FILE } from './films/demo-film-request.ts';
 import type { DemoProject } from './demo-world.ts';
 
 const DANA = { name: 'Dana Reyes', email: 'dana.reyes@example.com' };
@@ -20,6 +24,21 @@ export const DEMO_ENVIRONMENTS: readonly DemoEnvironmentHealth[] = [
 
 const CATALOG_ADMIN = 'catalog-admin';
 const SESSION_KEEP_ALIVE_MINUTES = 5;
+/** Long enough for the cockpit to show a film being recorded, short enough to wait for. */
+const FILM_SECONDS_PER_RUN = 4;
+const FILM_TIMEOUT_MINUTES = 2;
+
+/** The film command of the demonstration: a stand-in for a product's own tool, needing no browser, no account and no network. */
+function demoFilms(): Readonly<Record<string, unknown>> {
+  const { ref, output, scenario, replay } = FILM_PLACEHOLDERS;
+  return {
+    command: [process.execPath, DEMO_FILM_COMMAND_MAIN, '--ref', ref, '--out', output, '--scenario', scenario, '--replay', replay],
+    workingDirectory: DEMO_FILMS_DIRECTORY,
+    environment: { [FILM_PACE_VARIABLE]: String(FILM_SECONDS_PER_RUN) },
+    timeoutMinutes: FILM_TIMEOUT_MINUTES,
+    replayFile: DEMO_REPLAY_FILE,
+  };
+}
 
 /** A tool of the catalogue service whose session is a file: logged out until the operator logs in from the cockpit. */
 function catalogAdmin(sessionsDirectory: string): Readonly<Record<string, unknown>> {
@@ -64,6 +83,7 @@ const storefront: DemoProject = {
       ],
     },
     audits: { ignore: [{ name: 'Dependency updates', authors: ['dependency-bot[bot]'] }] },
+    evidence: { films: demoFilms() },
     tools: [
       {
         name: 'design-export',
