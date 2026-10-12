@@ -52,7 +52,6 @@ const FIRST_SEQUENCE = 0;
 const RESOURCES_CAUSE = 'resources';
 const NEWLINE = '\n';
 const UNKNOWN_VERSION = '0.0.0';
-const DEFAULT_OPERATOR = 'operator';
 const DAEMON_STARTED_EVENT = 'daemon.started';
 const DAEMON_STOPPED_EVENT = 'daemon.stopped';
 const FILE_URL_PREFIX = 'file://';
@@ -183,7 +182,7 @@ export class SnapshotSource {
       installation: {
         version: this.version,
         mode: runtime.mode,
-        operator: runtime.environment['USER'] ?? DEFAULT_OPERATOR,
+        operator: runtime.operator,
         publicUrl: config.server.publicUrl,
         startedAt: this.startedAt(split.installation),
         pauses,

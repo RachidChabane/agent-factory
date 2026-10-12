@@ -42,8 +42,6 @@ const COCKPIT_NOT_BUILT = 'the cockpit is not built; run "pnpm --filter @agent-f
 const ISSUE_EVIDENCE_PREFIX = 'issue-';
 const INTEGER = /^\d+$/;
 const POSITIVE_INTEGER = /^[1-9]\d*$/;
-const ANONYMOUS_OPERATOR = 'operator';
-
 export interface CommandOutcome {
   readonly status: number;
   readonly body: unknown;
@@ -69,6 +67,8 @@ export interface ProjectFileDirectories {
 export interface HttpServerSettings {
   readonly host: string;
   readonly port: number;
+  /** Who acts for a request that carries no identity, such as one from the operator's own machine. */
+  readonly operator: string;
   readonly remoteAccess: RemoteAccessConfig;
   readonly projectDirectories: (project: string) => ProjectFileDirectories | null;
   readonly cockpitDirectory: string;
@@ -165,7 +165,7 @@ export class FactoryHttpServer {
         sendJson(response, HTTP.forbidden, { error: `the ${COMMAND_TOKEN_HEADER} header is missing or wrong` });
         return;
       }
-      await this.command(request, response, decodeURIComponent(path.slice(API_COMMANDS_PATH.length + 1)), decision.operator ?? ANONYMOUS_OPERATOR);
+      await this.command(request, response, decodeURIComponent(path.slice(API_COMMANDS_PATH.length + 1)), decision.operator ?? this.settings.operator);
       return;
     }
     if (method !== GET && method !== HEAD) {

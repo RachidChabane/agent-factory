@@ -46,6 +46,7 @@ export function createHttpServer(runtime: InstallationRuntime, daemons: RunningD
     {
       host: config.server.host,
       port: config.server.port,
+      operator: runtime.operator,
       remoteAccess: config.server.remoteAccess,
       projectDirectories: (id) => {
         const project = runtime.projects.find((candidate) => candidate.id === id);

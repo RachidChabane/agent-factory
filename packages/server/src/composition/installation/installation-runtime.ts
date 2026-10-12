@@ -34,6 +34,8 @@ import { usageRefresher, usageReportSource } from './usage.ts';
 export const INSTALLATION_MODES = ['live', 'demo', 'rehearsal'] as const;
 export type InstallationMode = (typeof INSTALLATION_MODES)[number];
 const UTF8 = 'utf8';
+const OPERATOR_VARIABLE = 'USER';
+const UNNAMED_OPERATOR = 'operator';
 
 export interface InstallationOverrides {
   /** Replaces the Claude CLI for agent runs. */
@@ -48,11 +50,15 @@ export interface InstallationOverrides {
   readonly mode?: InstallationMode;
   /** Opens only these projects of the configuration; every project when absent. */
   readonly projects?: readonly string[];
+  /** The person running the factory; the USER of the environment when absent. */
+  readonly operator?: string;
 }
 
 export interface InstallationRuntime extends InstallationContext {
   readonly live: LiveInstallation;
   readonly mode: InstallationMode;
+  /** Who acts when the cockpit is used from this machine, and whose name the cockpit shows. */
+  readonly operator: string;
   /** Notices about the whole installation, such as its pauses, linking to the cockpit's home. */
   readonly notifications: OperatorNotifications;
   readonly tools: ToolProber;
@@ -148,6 +154,7 @@ export async function openInstallation(config: AgentFactoryConfig, environment: 
       },
       live,
       mode: overrides.mode ?? inferredMode(config),
+      operator: overrides.operator ?? environment[OPERATOR_VARIABLE] ?? UNNAMED_OPERATOR,
       notifications: new OperatorNotifications(notifier, config.server.publicUrl, log),
       tools: installationToolProber(config, toolSettings),
       configuredTools: installationTools(config),
