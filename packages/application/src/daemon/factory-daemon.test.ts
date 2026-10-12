@@ -570,6 +570,18 @@ describe('worktrees held by open pull requests', () => {
     await daemon.settle();
   });
 
+  it('leaves the shortage as it stands while a film holds the slots, and does not announce it again', async () => {
+    const { github, daemon, notifier, events } = setup({ settings: { poolSize: 2, concurrency: 2 } });
+    await holdWithPullRequest(events, 1, 10);
+    await holdWithPullRequest(events, 2, 11);
+    github.issues.set(3, validated(3));
+    await daemon.tick(SIGNAL);
+    await daemon.tick(SIGNAL, SLOTS_HELD);
+    await daemon.tick(SIGNAL);
+    expect(events.typesOf('daemon')).toEqual(['scheduler.worktrees-full']);
+    expect(notifier.titles).toEqual(['No worktree is free: issues wait']);
+  });
+
   it('records nothing when the concurrency limit alone holds an issue back', async () => {
     const { github, drivers, daemon, events } = setup({ settings: { poolSize: 2, concurrency: 1 } });
     github.issues.set(1, validated(1));
