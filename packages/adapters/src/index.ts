@@ -159,3 +159,4 @@ export { DeclarativeToolProber, type DeclaredTool, type DeclarativeToolProbeSett
 export { InvalidToolDeclarationError } from './tools/errors.ts';
 export { RoutingToolProber } from './tools/routing-tool-prober.ts';
 export { ClaudeUsageReport, parseUsageReport, USAGE_PROMPT, USAGE_REPORT_ARGUMENTS, USAGE_REPORT_TIMEOUT_MS, UsageReportError, type AbortableRunner, type ClaudeUsageReportSettings } from './claude/usage-report.ts';
+export { GitReferenceSnapshots, type GitReferenceSnapshotsSettings } from './references/gitReferenceSnapshots.ts';
