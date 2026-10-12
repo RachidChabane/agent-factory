@@ -15,9 +15,13 @@ import {
 import {
   AGENT_ROLES,
   COMMIT_KINDS,
+  DEFAULT_DELEGATE_ACTOR,
   DEFAULT_ISSUE_TYPES,
   DEFAULT_TYPE_LABEL_PREFIX,
+  DELEGATE_ACTOR_RULE,
   EVIDENCE_KINDS,
+  isDelegateActor,
+  MERGE_CONDITIONS,
   PROMOTION_POLICIES,
   PROOF_STRATEGIES,
   REFERENCE_NAME_MAX_LENGTH,
@@ -28,6 +32,7 @@ import {
   REFERENCE_REVISION_RULE,
   REVIEW_FOCUSES,
   isProductionLookingName,
+  unknownMergeTypes,
 } from '@agent-factory/domain';
 import {
   EnvironmentSetSchema,
@@ -254,6 +259,25 @@ const FilmsSchema = z
     for (const problem of filmCommandProblems(films.command)) context.addIssue({ code: 'custom', path: ['command'], message: problem });
   });
 
+/** Lets the delegate merge the pull requests of some issue types, once the conditions hold. */
+const MergeRuleSchema = z.strictObject({
+  /** The ids of the issue types the rule covers; each has to be a type of the project. */
+  types: z.array(Identifier).min(1),
+  requires: z.array(z.enum(MERGE_CONDITIONS)).default([]),
+});
+
+/** What the project delegates to its orchestrator; without any of it, every gesture stays the operator's. */
+const AutonomySchema = z
+  .strictObject({
+    /** Who acts for the operator: the `--as` of the command line has to name it. */
+    actor: z.string().refine(isDelegateActor, { message: `must be ${DELEGATE_ACTOR_RULE}` }).default(DEFAULT_DELEGATE_ACTOR),
+    validateSpecs: z.boolean().default(false),
+    answerDecisions: z.boolean().default(false),
+    resume: z.boolean().default(false),
+    merge: z.array(MergeRuleSchema).default([]),
+  })
+  .prefault({});
+
 const KnowledgeSourceSchema = z.union([z.strictObject({ path: PathString }), z.strictObject({ repository: PathString })]);
 
 const RoleKey = z.enum(AGENT_ROLES);
@@ -303,6 +327,7 @@ export const ProjectSchema = z
       .prefault({}),
     delivery: DeliverySchema.prefault({}),
     audits: AuditsSchema,
+    autonomy: AutonomySchema,
     tools: ToolChecksSchema,
   })
   .superRefine((project, context) => {
@@ -322,6 +347,9 @@ export const ProjectSchema = z
     const typeIds = new Set(project.issueTypes?.map((type) => type.id) ?? DEFAULT_ISSUE_TYPES.map((type) => type.id));
     for (const id of project.stack?.issueTypes ?? []) {
       if (!typeIds.has(id)) context.addIssue({ code: 'custom', path: ['stack', 'issueTypes'], message: `issue type ${id} is not an issue type of the project` });
+    }
+    for (const id of unknownMergeTypes(project.autonomy, [...typeIds])) {
+      context.addIssue({ code: 'custom', path: ['autonomy', 'merge'], message: `issue type ${id} is not an issue type of the project` });
     }
   });
 export type RawProject = z.infer<typeof ProjectSchema>;

@@ -266,6 +266,11 @@
           "default": 120,
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "checksSettleSeconds": {
+          "default": 120,
+          "type": "number",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -408,6 +413,28 @@
               }
             ]
           }
+        },
+        "media": {
+          "type": "object",
+          "properties": {
+            "upload": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "timeoutSeconds": {
+              "default": 120,
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "upload"
+          ],
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -1944,6 +1971,60 @@
                   },
                   "required": [
                     "name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "autonomy": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "actor": {
+                "default": "orchestrator",
+                "type": "string"
+              },
+              "validateSpecs": {
+                "default": false,
+                "type": "boolean"
+              },
+              "answerDecisions": {
+                "default": false,
+                "type": "boolean"
+              },
+              "resume": {
+                "default": false,
+                "type": "boolean"
+              },
+              "merge": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "types": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      }
+                    },
+                    "requires": {
+                      "default": [],
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "films-recorded"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "types"
                   ],
                   "additionalProperties": false
                 }

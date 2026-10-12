@@ -369,6 +369,93 @@ describe('the reference repositories of a project', () => {
   });
 });
 
+describe('the autonomy of a project', () => {
+  const autonomy = (value: Record<string, unknown>): Record<string, unknown> => minimalProject({ autonomy: value });
+
+  it('delegates nothing to the orchestrator unless the project says so', () => {
+    expect(projectOf(parse(document()), 'storefront').autonomy).toEqual({ actor: 'orchestrator', validateSpecs: false, answerDecisions: false, resume: false, merge: [] });
+    expect(projectOf(parse(document({}, [autonomy({})])), 'storefront').autonomy).toEqual(projectOf(parse(document()), 'storefront').autonomy);
+  });
+
+  it('reads what is delegated, the delegate and the merge rules with their conditions', () => {
+    const declared = projectOf(
+      parse(
+        document({}, [
+          autonomy({
+            actor: 'release-bot',
+            validateSpecs: true,
+            answerDecisions: true,
+            resume: true,
+            merge: [{ types: ['docs', 'fix'], requires: ['films-recorded'] }, { types: ['refactor'] }],
+          }),
+        ]),
+      ),
+      'storefront',
+    ).autonomy;
+    expect(declared).toEqual({
+      actor: 'release-bot',
+      validateSpecs: true,
+      answerDecisions: true,
+      resume: true,
+      merge: [{ types: ['docs', 'fix'], requires: ['films-recorded'] }, { types: ['refactor'], requires: [] }],
+    });
+  });
+
+  it.each(['operator', 'Orchestrator', 'two words', '-bot', ''])('refuses the delegate named %j', (actor) => {
+    expect(configProblems(document({}, [autonomy({ actor })]))).toEqual([expect.stringContaining('projects.0.autonomy.actor: must be lowercase letters, digits and dashes')]);
+  });
+
+  it('refuses a merge rule for an issue type the project does not have', () => {
+    expect(configProblems(document({}, [autonomy({ merge: [{ types: ['docs', 'wiki'] }] })]))).toEqual(['projects.0.autonomy.merge: issue type wiki is not an issue type of the project']);
+  });
+
+  it('checks the merge types against the types the project declares, not the presets', () => {
+    const typed = minimalProject({
+      issueTypes: [{ id: 'chore', proof: 'none', commit: { type: 'chore' } }],
+      autonomy: { merge: [{ types: ['chore'] }] },
+    });
+    expect(configProblems(document({}, [typed]))).toEqual([]);
+    expect(configProblems(document({}, [{ ...typed, autonomy: { merge: [{ types: ['docs'] }] } }]))).toEqual(['projects.0.autonomy.merge: issue type docs is not an issue type of the project']);
+  });
+
+  it('refuses a rule without a type, an unknown condition and a key it does not know', () => {
+    expect(configProblems(document({}, [autonomy({ merge: [{ types: [] }] })]))).toEqual([expect.stringMatching(/^projects\.0\.autonomy\.merge\.0\.types: /)]);
+    expect(configProblems(document({}, [autonomy({ merge: [{ types: ['docs'], requires: ['green-checks'] }] })]))).toEqual([expect.stringMatching(/^projects\.0\.autonomy\.merge\.0\.requires\.0: /)]);
+    expect(configProblems(document({}, [autonomy({ mergeEverything: true })]))).toEqual([expect.stringContaining('projects.0.autonomy')]);
+  });
+});
+
+describe('the media of the notifications', () => {
+  it('has no upload command unless the installation declares one', () => {
+    expect(parse(document()).notifications.media).toBeNull();
+  });
+
+  it('reads the upload command and its time limit', () => {
+    const media = parse(document({ notifications: { media: { upload: ['share', '--public', '{file}'], timeoutSeconds: 45 } } })).notifications.media;
+    expect(media).toEqual({ command: ['share', '--public', '{file}'], timeoutMs: 45_000 });
+  });
+
+  it('gives an upload command two minutes by default', () => {
+    expect(parse(document({ notifications: { media: { upload: ['share', '{file}'] } } })).notifications.media?.timeoutMs).toBe(120_000);
+  });
+
+  it('refuses a command that does not take the file, an empty one and a limit of zero', () => {
+    expect(configProblems(document({ notifications: { media: { upload: ['share', '--public'] } } }))).toEqual(['notifications.media.upload: the command must contain {file}']);
+    expect(configProblems(document({ notifications: { media: { upload: [] } } }))).toEqual([expect.stringMatching(/^notifications\.media\.upload: /)]);
+    expect(configProblems(document({ notifications: { media: { upload: ['share', '{file}'], timeoutSeconds: 0 } } }))).toEqual([expect.stringMatching(/^notifications\.media\.timeoutSeconds: /)]);
+    expect(configProblems(document({ notifications: { media: { upload: ['share', '{file}'], token: 'abc' } } }))).toEqual([expect.stringContaining('notifications.media')]);
+  });
+});
+
+describe('the time a forge has to register checks', () => {
+  it('is two minutes, and may be shortened to none', () => {
+    expect(parse(document()).daemon.checksSettleMs).toBe(120_000);
+    expect(parse(document({ daemon: { checksSettleSeconds: 0 } })).daemon.checksSettleMs).toBe(0);
+    expect(parse(document({ daemon: { checksSettleSeconds: 30 } })).daemon.checksSettleMs).toBe(30_000);
+    expect(configProblems(document({ daemon: { checksSettleSeconds: -1 } }))).toEqual([expect.stringMatching(/^daemon\.checksSettleSeconds: /)]);
+  });
+});
+
 describe('the address a client reaches the server at', () => {
   it('is the configured host and port', () => {
     expect(serverClientUrl({ host: '127.0.0.1', port: 7430 })).toBe('http://127.0.0.1:7430');
