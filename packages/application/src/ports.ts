@@ -148,6 +148,9 @@ export interface IssueRecord {
   readonly labels: readonly string[];
   readonly state: 'open' | 'closed';
   readonly blockedBy: readonly number[];
+  /** When the forge says the issue was opened and last changed. */
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
 }
 
 export interface CommitDiff {

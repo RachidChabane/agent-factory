@@ -62,4 +62,15 @@ describe('cached readings', () => {
     expect(observedView({ value: 2, readAt: new Date(START), error: null }, (value) => value * 2)).toEqual({ value: 4, readAt: '2026-10-12T09:00:00.000Z', error: null });
     expect(observedView({ value: null, readAt: null, error: 'down' }, (value: number) => value)).toEqual({ value: null, readAt: null, error: 'down' });
   });
+
+  it('reads again before the interval ends once something changed after the last read', async () => {
+    let now = new Date('2026-10-10T08:00:00.000Z');
+    let reads = 0;
+    const reading = new CachedReading(() => Promise.resolve((reads += 1)), 60_000, { now: () => now });
+    await reading.get();
+    now = new Date('2026-10-10T08:00:10.000Z');
+    expect((await reading.get(new Date('2026-10-10T07:59:00.000Z'))).value).toBe(1);
+    expect((await reading.get(new Date('2026-10-10T08:00:05.000Z'))).value).toBe(2);
+    expect((await reading.get(null)).value).toBe(2);
+  });
 });

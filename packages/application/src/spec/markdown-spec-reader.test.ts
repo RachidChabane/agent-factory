@@ -33,6 +33,7 @@ const VALID_BODY = [
 ].join('\r\n');
 
 const READER = new MarkdownSpecReader(DEFAULT_PROJECT_CONVENTIONS);
+const OPENED_AT = new Date('2026-03-02T08:00:00.000Z');
 
 function issue(overrides: Partial<IssueRecord> = {}): IssueRecord {
   return {
@@ -42,6 +43,8 @@ function issue(overrides: Partial<IssueRecord> = {}): IssueRecord {
     labels: ['type:ui', 'spec:validated'],
     state: 'open',
     blockedBy: [12, 7, 12],
+    createdAt: OPENED_AT,
+    updatedAt: OPENED_AT,
     ...overrides,
   };
 }

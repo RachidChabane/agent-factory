@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { issueSubject } from '@agent-factory/domain';
 import type { IssueState, ResourceSnapshot } from '@agent-factory/domain';
 import { auditSubject, AUDIT_CONCLUDED_EVENT, AUDIT_STARTED_EVENT } from '../audit/events.ts';
-import { commit, FakeGitHubGateway, InMemoryEventStore } from '../audit/testing/fakes.ts';
+import { commit, FakeGitHubGateway, InMemoryEventStore, ISSUE_OPENED_AT } from '../audit/testing/fakes.ts';
 import type { AuditOutcome } from '../audit/audit-merge.ts';
 import { BudgetGovernor } from '../budget/budget-governor.ts';
 import { OperatorNotifications } from '../notifications/operator-notifications.ts';
@@ -112,7 +112,7 @@ class ReleasingPool implements WorktreePool {
 }
 
 function validated(number: number, blockedBy: readonly number[] = []): IssueRecord {
-  return { number, title: `issue ${number}`, body: '', labels: ['type:docs', 'spec:validated'], state: 'open', blockedBy };
+  return { number, title: `issue ${number}`, body: '', labels: ['type:docs', 'spec:validated'], state: 'open', blockedBy, createdAt: ISSUE_OPENED_AT, updatedAt: ISSUE_OPENED_AT };
 }
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, TEST_SLEEP_MS * 2));

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ISSUE_CREATED_EVENT } from '../spec/issue-events.ts';
 import { FakeGitHubGateway, InMemoryEventStore } from '../audit/testing/fakes.ts';
 import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import { InMemoryWorkspace } from '../pipeline/testing/pipeline-fakes.ts';
@@ -66,7 +67,10 @@ describe('request decisions', () => {
     const github = new FakeGitHubGateway();
     await challenged(events, workspace);
     const created = await acceptProposedSpecs({ events, github, files: workspace }, SETTINGS, 'req-1', ['spec-1']);
-    expect(created.map((issue) => issue.labels)).toEqual([['type:ui']]);
+    expect(created.map((issue) => issue.labels)).toEqual([['factory', 'type:ui']]);
+    expect(events.records.filter((record) => record.type === ISSUE_CREATED_EVENT).map((record) => [record.subject, record.payload])).toEqual([
+      [`issue/${created[0]?.number ?? 0}`, { title: 'Link the conversation', labels: ['factory', 'type:ui'], requestId: 'req-1', specId: 'spec-1' }],
+    ]);
     expect(await acceptProposedSpecs({ events, github, files: workspace }, SETTINGS, 'req-1', ['spec-1'])).toEqual([]);
     expect(await loadRequest(events, 'req-1')).toMatchObject({ state: 'accepted', issueNumbers: [created[0]?.number] });
   });
@@ -97,6 +101,6 @@ describe('request decisions', () => {
     expect(() => planIssueCreation(text.replace('Labels: type:ui', 'Labels: bug'), null, CONVENTIONS)).toThrow('none of the type labels of this project');
     const github = new FakeGitHubGateway();
     const issue = await createIssueFromPlan({ events, github }, planIssueCreation(text, null, CONVENTIONS));
-    expect(github.createdIssues).toEqual([{ title: 'Link the conversation', body: issue.body, labels: ['type:ui'] }]);
+    expect(github.createdIssues).toEqual([{ title: 'Link the conversation', body: issue.body, labels: ['factory', 'type:ui'] }]);
   });
 });

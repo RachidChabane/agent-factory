@@ -109,7 +109,10 @@ function readKind(labels: readonly string[], kindPrefix: string, problems: SpecP
   return kind;
 }
 
-export function parseIssueSpec(issue: IssueRecord, conventions: ProjectConventions): IssueSpec {
+/** What a spec is read from: the parts of an issue the forge gives, whatever else it records. */
+export type SpecSource = Pick<IssueRecord, 'number' | 'title' | 'body' | 'labels' | 'blockedBy'>;
+
+export function parseIssueSpec(issue: SpecSource, conventions: ProjectConventions): IssueSpec {
   const problems: SpecProblem[] = [];
   const title = issue.title.trim();
   if (title === '') problems.push(problem('empty-title', null, 'the issue title is empty'));

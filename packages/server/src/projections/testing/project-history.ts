@@ -424,7 +424,7 @@ export function projectContext(history: ProjectHistory = projectHistory(), overr
       evidence: (number, path) => `/api/projects/${PROJECT_ID}/evidence/${number}/${path}`,
       requestAttachment: (id, path) => `/api/projects/${PROJECT_ID}/requests/${id}/${path}`,
     },
-    pendingIssues: [PENDING_SPEC],
+    pendingIssues: [{ spec: PENDING_SPEC, validated: true, createdAt: new Date('2026-10-09T09:30:00.000Z'), updatedAt: new Date('2026-10-09T10:00:00.000Z') }],
     pullRequestChecks: new Map([[100, { value: [{ name: 'ci', conclusion: 'success', url: 'https://github.com/acme/widgets/actions/runs/1' }], readAt: new Date('2026-10-09T11:59:00.000Z'), error: null }]]),
     pullRequestTitles: new Map(),
     logs: new Map([['42/before-proof.log', '2 failed: header has no conversation link'], ['42/gate-attempt-1.log', GATE_LOG]]),

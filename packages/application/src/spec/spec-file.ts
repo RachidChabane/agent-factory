@@ -11,7 +11,6 @@ export const SPEC_FILE_HEADERS = {
 const LABEL_SEPARATOR = ',';
 const NEWLINE = '\n';
 const DRAFT_ISSUE_NUMBER = 1;
-const DRAFT_ISSUE_STATE = 'open';
 
 export interface SpecFile {
   readonly title: string;
@@ -61,11 +60,10 @@ export function specFileProblems(file: SpecFile, conventions: ProjectConventions
   try {
     parseIssueSpec(
       {
-      number: DRAFT_ISSUE_NUMBER,
-      title: file.title,
-      body: file.body,
-      labels: file.labels,
-        state: DRAFT_ISSUE_STATE,
+        number: DRAFT_ISSUE_NUMBER,
+        title: file.title,
+        body: file.body,
+        labels: file.labels,
         blockedBy: [],
       },
       conventions,

@@ -7,6 +7,8 @@ export const IssueResponseSchema = z.object({
   body: z.string().nullable(),
   state: z.enum(['open', 'closed']),
   labels: z.array(z.object({ name: z.string() })),
+  created_at: z.iso.datetime({ offset: true }),
+  updated_at: z.iso.datetime({ offset: true }),
   pull_request: z.unknown().optional(),
 });
 export type IssueResponse = z.infer<typeof IssueResponseSchema>;

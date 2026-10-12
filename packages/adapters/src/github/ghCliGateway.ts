@@ -490,6 +490,8 @@ function toIssueRecord(issue: IssueResponse, blockedBy: readonly number[]): Issu
     labels: issue.labels.map((label) => label.name),
     state: issue.state,
     blockedBy,
+    createdAt: new Date(issue.created_at),
+    updatedAt: new Date(issue.updated_at),
   };
 }
 

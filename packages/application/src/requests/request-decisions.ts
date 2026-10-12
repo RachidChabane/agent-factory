@@ -1,6 +1,7 @@
-import { assertRequestTransition } from '@agent-factory/domain';
+import { assertRequestTransition, issueSubject } from '@agent-factory/domain';
 import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import type { EventStore, GitHubGateway, IssueRecord, WorkspaceFiles } from '../ports.ts';
+import { ISSUE_CREATED_EVENT, type IssueCreatedPayload } from '../spec/issue-events.ts';
 import { parseSpecFile, specFileProblems, type SpecFile } from '../spec/spec-file.ts';
 import { RequestNotFoundError } from './errors.ts';
 import { renderSpecFile, type ProposedSpecDraft } from './proposed-spec-file.ts';
@@ -107,7 +108,7 @@ export function planIssueCreation(text: string, origin: SpecOrigin | null, conve
   }
   const problems = specFileProblems(file, conventions);
   if (problems.length > 0) throw new SpecFileRefusedError(problems.map((problem) => problem.message).join('; '));
-  return { title: file.title, labels: file.labels, body: file.body, origin };
+  return { title: file.title, labels: [...new Set([conventions.labels.factory, ...file.labels])], body: file.body, origin };
 }
 
 export async function createIssueFromPlan(
@@ -115,6 +116,8 @@ export async function createIssueFromPlan(
   plan: IssueCreationPlan,
 ): Promise<IssueRecord> {
   const issue = await dependencies.github.createIssue(plan.title, plan.body, plan.labels);
+  const created: IssueCreatedPayload = { title: issue.title, labels: [...issue.labels], requestId: plan.origin?.requestId ?? null, specId: plan.origin?.specId ?? null };
+  await dependencies.events.append(ISSUE_CREATED_EVENT, issueSubject(issue.number), created);
   if (plan.origin !== null) {
     await dependencies.events.append(REQUEST_ISSUE_CREATED_EVENT, requestSubject(plan.origin.requestId), {
       specId: plan.origin.specId,

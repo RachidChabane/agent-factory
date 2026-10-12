@@ -1,9 +1,8 @@
 import { issueSubject } from '@agent-factory/domain';
 import type { EventStore, GitHubGateway } from '../ports.ts';
 import type { ProjectConventions } from '../conventions/project-conventions.ts';
+import { ISSUE_SPEC_VALIDATED_EVENT } from './issue-events.ts';
 import { parseIssueSpec } from './markdown-spec-reader.ts';
-
-export const ISSUE_SPEC_VALIDATED_EVENT = 'issue.spec-validated';
 
 export async function validateSpec(
   dependencies: { readonly github: GitHubGateway; readonly events: EventStore },

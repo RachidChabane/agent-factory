@@ -59,6 +59,15 @@ describe('the view of one project', () => {
     ]);
   });
 
+  it('shows an issue the factory opened as a draft until the operator validates it, dated by the forge', () => {
+    const history = projectHistory();
+    const [waiting] = projectContext(history).pendingIssues;
+    if (waiting === undefined) throw new Error('the project has an issue waiting to be taken');
+    const drafted = viewOf(history, projectContext(history, { pendingIssues: [{ ...waiting, validated: false }] }));
+    expect(drafted.view.issues.find((issue) => issue.number === 43)).toMatchObject({ state: 'spec-draft', createdAt: '2026-10-09T09:30:00.000Z', updatedAt: '2026-10-09T10:00:00.000Z' });
+    expect(view.issues.find((issue) => issue.number === 43)?.state).toBe('spec-validated');
+  });
+
   it('names the forge and the environments the project declares, unknown until read', () => {
     expect(view.forge).toEqual({ kind: 'github', url: 'https://github.com/acme/widgets' });
     expect(view.environments.map((environment) => [environment.name, environment.status, environment.production])).toEqual([

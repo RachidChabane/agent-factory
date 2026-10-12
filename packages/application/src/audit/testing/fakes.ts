@@ -19,6 +19,8 @@ import type {
 } from '../../ports.ts';
 import type { AgentRole } from '@agent-factory/domain';
 
+export const ISSUE_OPENED_AT = new Date('2026-03-02T08:00:00.000Z');
+
 const EPOCH = new Date(0);
 
 export class InMemoryEventStore implements EventStore {
@@ -101,7 +103,7 @@ export class FakeGitHubGateway implements GitHubGateway {
 
   createIssue(title: string, body: string, labels: readonly string[]): Promise<IssueRecord> {
     this.createdIssues.push({ title, body, labels });
-    const issue: IssueRecord = { number: this.nextIssueNumber, title, body, labels, state: 'open', blockedBy: [] };
+    const issue: IssueRecord = { number: this.nextIssueNumber, title, body, labels, state: 'open', blockedBy: [], createdAt: ISSUE_OPENED_AT, updatedAt: ISSUE_OPENED_AT };
     this.nextIssueNumber += 1;
     this.issues.set(issue.number, issue);
     return Promise.resolve(issue);

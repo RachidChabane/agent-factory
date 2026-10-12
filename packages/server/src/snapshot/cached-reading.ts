@@ -31,10 +31,12 @@ export class CachedReading<Value> {
     this.clock = clock;
   }
 
-  /** The cached value, read again first when the interval has passed. */
-  get(): Promise<Observed<Value>> {
+  /** The cached value, read again first when the interval has passed or when it was read before `changedAt`. */
+  get(changedAt: Date | null = null): Promise<Observed<Value>> {
     const now = this.clock.now().getTime();
-    if (this.attemptedAt !== null && now - this.attemptedAt < this.intervalMs) return Promise.resolve(this.observed);
+    const fresh = this.attemptedAt !== null && now - this.attemptedAt < this.intervalMs;
+    const outdated = changedAt !== null && (this.attemptedAt === null || this.attemptedAt < changedAt.getTime());
+    if (fresh && !outdated) return Promise.resolve(this.observed);
     return this.refresh();
   }
 

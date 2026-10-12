@@ -18,6 +18,14 @@ export interface SnapshotLinks {
   requestAttachment(requestId: string, relativePath: string): string;
 }
 
+/** An issue on the forge the factory has not taken yet: a draft until the operator validates its spec. */
+export interface PendingIssue {
+  readonly spec: IssueSpec;
+  readonly validated: boolean;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
 export function logKey(issueNumber: number, name: string): string {
   return `${issueNumber}/${name}`;
 }
@@ -28,8 +36,8 @@ export interface ProjectSnapshotContext {
   readonly project: string;
   readonly conventions: ProjectConventions;
   readonly links: SnapshotLinks;
-  /** Validated issues the factory has not started yet, as last read from the forge. */
-  readonly pendingIssues: readonly IssueSpec[];
+  /** Open issues of the factory it has not taken yet, drafts and validated ones, as last read from the forge. */
+  readonly pendingIssues: readonly PendingIssue[];
   readonly pullRequestChecks: ReadonlyMap<number, Observed<readonly CheckRunSummary[]>>;
   readonly pullRequestTitles: ReadonlyMap<number, string>;
   readonly logs: ReadonlyMap<string, string>;

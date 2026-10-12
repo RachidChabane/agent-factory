@@ -22,8 +22,8 @@ import { withClosingLines } from '../github/pullRequestConventions.ts';
 import { LOCAL_CHECK_NAME, type LocalCheckMode } from './constants.ts';
 import { LocalMergeConflictError, LocalPullRequestRefusedError, LocalRecordNotFoundError } from './errors.ts';
 import { LocalBareRepository, type LocalCommit } from './localBareRepository.ts';
-import { LocalGitHubFiles, type LocalIssue } from './localGitHubFiles.ts';
-import type { PullRequestFile } from './schemas.ts';
+import { LocalGitHubFiles, type IssueDraft, type LocalIssue } from './localGitHubFiles.ts';
+import type { IssueFrontMatter, PullRequestFile } from './schemas.ts';
 
 const ISSUE_KIND = 'issue';
 const PULL_REQUEST_KIND = 'pull request';
@@ -52,6 +52,8 @@ function toIssueRecord(issue: LocalIssue): IssueRecord {
     labels: issue.frontMatter.labels,
     state: issue.frontMatter.state,
     blockedBy: issue.frontMatter.blockedBy,
+    createdAt: issue.createdAt,
+    updatedAt: issue.updatedAt,
   };
 }
 
@@ -118,23 +120,21 @@ export class LocalGitHubGateway implements GitHubGateway {
   }
 
   async createIssue(title: string, body: string, labels: readonly string[]): Promise<IssueRecord> {
-    const issue: LocalIssue = {
+    const openedAt = this.clock.now().toISOString();
+    const draft: IssueDraft = {
       number: await this.files.nextNumber(),
-      frontMatter: { title, labels: withoutDuplicates(labels), state: OPEN_STATE, blockedBy: [] },
+      frontMatter: { title, labels: withoutDuplicates(labels), state: OPEN_STATE, blockedBy: [], createdAt: openedAt, updatedAt: openedAt },
       body,
     };
-    await this.files.writeIssue(issue);
-    return toIssueRecord(issue);
+    await this.files.writeIssue(draft);
+    return toIssueRecord(await this.requireIssue(draft.number));
   }
 
   async addBlockedBy(issueNumber: number, blockingIssueNumber: number): Promise<void> {
     const issue = await this.requireIssue(issueNumber);
     await this.requireIssue(blockingIssueNumber);
     if (issue.frontMatter.blockedBy.includes(blockingIssueNumber)) return;
-    await this.files.writeIssue({
-      ...issue,
-      frontMatter: { ...issue.frontMatter, blockedBy: [...issue.frontMatter.blockedBy, blockingIssueNumber] },
-    });
+    await this.updateIssue(issue, { blockedBy: [...issue.frontMatter.blockedBy, blockingIssueNumber] });
   }
 
   async setLabels(issueNumber: number, add: readonly string[], remove: readonly string[]): Promise<void> {
@@ -142,7 +142,7 @@ export class LocalGitHubGateway implements GitHubGateway {
       withoutDuplicates([...labels, ...add]).filter((label) => !remove.includes(label));
     const issue = await this.files.readIssue(issueNumber);
     if (issue !== null) {
-      await this.files.writeIssue({ ...issue, frontMatter: { ...issue.frontMatter, labels: relabel(issue.frontMatter.labels) } });
+      await this.updateIssue(issue, { labels: relabel(issue.frontMatter.labels) });
       return;
     }
     const pullRequest = await this.files.readPullRequest(issueNumber);
@@ -284,9 +284,18 @@ export class LocalGitHubGateway implements GitHubGateway {
     for (const number of numbers) {
       const issue = await this.files.readIssue(number);
       if (issue !== null && issue.frontMatter.state !== CLOSED_STATE) {
-        await this.files.writeIssue({ ...issue, frontMatter: { ...issue.frontMatter, state: CLOSED_STATE } });
+        await this.updateIssue(issue, { state: CLOSED_STATE });
       }
     }
+  }
+
+  /** Writes a change to an issue, keeping the time it was opened and stamping the time of the change. */
+  private async updateIssue(issue: LocalIssue, change: Partial<IssueFrontMatter>): Promise<void> {
+    await this.files.writeIssue({
+      number: issue.number,
+      body: issue.body,
+      frontMatter: { ...issue.frontMatter, ...change, createdAt: issue.createdAt.toISOString(), updatedAt: this.clock.now().toISOString() },
+    });
   }
 
   private async requireIssue(number: number): Promise<LocalIssue> {

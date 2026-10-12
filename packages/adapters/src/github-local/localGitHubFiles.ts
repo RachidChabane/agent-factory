@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { z } from 'zod';
 import {
@@ -33,10 +33,15 @@ const MISSING_FILE_CODE = 'ENOENT';
 const TEMPORARY_SUFFIX = '.tmp';
 const NUMBERED_FILE = /^([1-9]\d*)\.(md|json)$/;
 
-export interface LocalIssue {
+export interface IssueDraft {
   readonly number: number;
   readonly frontMatter: IssueFrontMatter;
   readonly body: string;
+}
+
+export interface LocalIssue extends IssueDraft {
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
 }
 
 function isMissing(error: unknown): boolean {
@@ -112,10 +117,18 @@ export class LocalGitHubFiles {
     } catch (error) {
       throw new LocalGitHubFileError(path, error);
     }
-    return { number, frontMatter: parseWith(IssueFrontMatterSchema, document.data, path), body: document.body };
+    const frontMatter = parseWith(IssueFrontMatterSchema, document.data, path);
+    const { mtime } = await stat(path);
+    return {
+      number,
+      frontMatter,
+      body: document.body,
+      createdAt: frontMatter.createdAt === undefined ? mtime : new Date(frontMatter.createdAt),
+      updatedAt: frontMatter.updatedAt === undefined ? mtime : new Date(frontMatter.updatedAt),
+    };
   }
 
-  async writeIssue(issue: LocalIssue): Promise<void> {
+  async writeIssue(issue: IssueDraft): Promise<void> {
     await writeAtomically(this.issuePath(issue.number), renderFrontMatter(issue.frontMatter, issue.body));
   }
 

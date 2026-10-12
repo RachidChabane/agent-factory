@@ -5,3 +5,4 @@ export * from './spec-errors.ts';
 export * from './spec-format.ts';
 export * from './spec-file.ts';
 export * from './validate-spec.ts';
+export * from './issue-events.ts';

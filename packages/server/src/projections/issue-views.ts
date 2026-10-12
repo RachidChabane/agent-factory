@@ -24,7 +24,7 @@ import {
   type PipelineJournal,
 } from '@agent-factory/application';
 import { firstOf, iso, type EventIndex } from './event-index.ts';
-import type { ProjectSnapshotContext } from './snapshot-context.ts';
+import type { PendingIssue, ProjectSnapshotContext } from './snapshot-context.ts';
 
 type AttemptKind = Attempt['kind'];
 type AttemptOutcome = Attempt['outcome'];
@@ -46,7 +46,8 @@ const IMPLEMENTER_ROLE = 'implementer';
 const SUCCESS = 'success';
 const IMAGE_EXTENSIONS: readonly string[] = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 const ISSUE_NUMBER_PATTERN = new RegExp(`^${ISSUE_SUBJECT_PREFIX}(\\d+)$`);
-const BEFORE_STATE_FOR_PENDING = 'spec-validated';
+const DRAFT_STATE = 'spec-draft';
+const VALIDATED_STATE = 'spec-validated';
 const EPOCH = new Date(0);
 
 function isImage(path: string): boolean {
@@ -178,16 +179,17 @@ function issueView(
   context: ProjectSnapshotContext,
   paused: ReadonlySet<number>,
   requestOfIssue: ReadonlyMap<number, string>,
+  pending: PendingIssue | null = null,
 ): IssueView {
-  const created = records[0]?.occurredAt ?? context.generatedAt;
-  const updated = records.at(-1)?.occurredAt ?? context.generatedAt;
+  const created = pending?.createdAt ?? records[0]?.occurredAt ?? context.generatedAt;
+  const updated = pending?.updatedAt ?? records.at(-1)?.occurredAt ?? context.generatedAt;
   const frozenAt = firstOf(records, PIPELINE_EVENTS.checksFrozen);
   const proof = journal?.beforeProof?.evaluation;
   return {
     number,
     title: spec.title,
     type: spec.type,
-    state: journal?.state ?? BEFORE_STATE_FOR_PENDING,
+    state: journal?.state ?? (pending?.validated === true ? VALIDATED_STATE : DRAFT_STATE),
     resumeTarget: journal !== null && journal.state === ISSUE_ESCALATION_STATE ? journal.stateBeforeEscalation : null,
     paused: paused.has(number),
     spec: { need: spec.need, acceptanceCriteria: [...spec.acceptanceCriteria], outOfScope: [...spec.outOfScope], expectedProof: spec.expectedProof },
@@ -228,9 +230,10 @@ export function projectIssues(
     if (journal.spec === null) continue;
     views.push(issueView(number, journal.spec, journal, index.subject(issueSubject(number)), context, paused, requestOfIssue));
   }
-  for (const spec of context.pendingIssues) {
+  for (const pending of context.pendingIssues) {
+    const { spec } = pending;
     if ((journals.get(spec.number)?.spec ?? null) !== null) continue;
-    views.push(issueView(spec.number, spec, null, [], context, paused, requestOfIssue));
+    views.push(issueView(spec.number, spec, null, [], context, paused, requestOfIssue, pending));
   }
   return views.sort((left, right) => left.number - right.number);
 }

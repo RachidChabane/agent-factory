@@ -1,6 +1,6 @@
 import { DEFAULT_ISSUE_TYPES, IssueTypology, type EscalationProfile, type IssueSpec } from '@agent-factory/domain';
 import { DEFAULT_PROJECT_CONVENTIONS, type ProjectConventions } from '../../conventions/project-conventions.ts';
-import { StubPromptCatalog } from '../../audit/testing/fakes.ts';
+import { ISSUE_OPENED_AT, StubPromptCatalog } from '../../audit/testing/fakes.ts';
 import { RUNNER_REPORTING } from '../../acceptance/test-reports/test-report-reader.ts';
 import { ACCEPTANCE_REPORT_DIRECTORY } from '../../acceptance/structured-command.ts';
 import type { AgentRunRequest, IssueRecord, Worktree } from '../../ports.ts';
@@ -118,6 +118,8 @@ export function issueRecord(overrides: Partial<IssueRecord> = {}): IssueRecord {
     labels: ['type:ui', 'spec:validated'],
     state: 'open',
     blockedBy: [],
+    createdAt: ISSUE_OPENED_AT,
+    updatedAt: ISSUE_OPENED_AT,
     ...overrides,
   };
 }

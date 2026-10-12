@@ -101,10 +101,22 @@ describe('LocalGitHubGateway', () => {
       const first = await github.createIssue('Serve the domain', SPEC_BODY, ['type:infra', 'spec:validated', 'type:infra']);
       const second = await github.createIssue('Another', SPEC_BODY, []);
       expect([first.number, second.number]).toEqual([1, 2]);
+      const opened = NOW.toISOString();
       expect(await readFile(join(directory, 'issues', '1.md'), 'utf8')).toBe(
-        ['---', 'title: Serve the domain', 'labels:', '  - type:infra', '  - spec:validated', 'state: open', 'blockedBy: []', '---', '', SPEC_BODY].join(
-          '\n',
-        ),
+        [
+          '---',
+          'title: Serve the domain',
+          'labels:',
+          '  - type:infra',
+          '  - spec:validated',
+          'state: open',
+          'blockedBy: []',
+          `createdAt: ${opened}`,
+          `updatedAt: ${opened}`,
+          '---',
+          '',
+          SPEC_BODY,
+        ].join('\n'),
       );
       expect(await github.getIssue(1)).toEqual({
         number: 1,
@@ -113,8 +125,26 @@ describe('LocalGitHubGateway', () => {
         labels: ['type:infra', 'spec:validated'],
         state: 'open',
         blockedBy: [],
+        createdAt: NOW,
+        updatedAt: NOW,
       });
       await expect(github.getIssue(9)).rejects.toBeInstanceOf(LocalRecordNotFoundError);
+    });
+
+    it('keeps the time an issue was opened when it is relabelled, and dates a hand-written issue from its file', async () => {
+      let now = NOW;
+      const github = new LocalGitHubGateway(
+        testRunner(),
+        { directory, bareRepositoryPath: repositories.remote, baseBranch: TEST_BASE_BRANCH, checks: 'none', identity: TEST_IDENTITY, environment: localOnlyGitEnvironment(TEST_GIT_ENVIRONMENT) },
+        { now: () => now },
+      );
+      const issue = await github.createIssue('Serve the domain', SPEC_BODY, ['type:infra']);
+      now = new Date(NOW.getTime() + 60_000);
+      await github.setLabels(issue.number, ['spec:validated'], []);
+      expect(await github.getIssue(issue.number)).toMatchObject({ labels: ['type:infra', 'spec:validated'], createdAt: NOW, updatedAt: now });
+      await writeFile(join(directory, 'issues', '2.md'), ['---', 'title: Written by hand', 'labels: []', '---', '', SPEC_BODY].join('\n'));
+      const written = await github.getIssue(2);
+      expect(written.createdAt.getTime()).toBe(written.updatedAt.getTime());
     });
 
     it('lists the open issues carrying a label', async () => {

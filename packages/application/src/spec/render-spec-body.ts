@@ -14,7 +14,6 @@ import {
 
 const PARAGRAPH_BREAK = '\n\n';
 const NEWLINE = '\n';
-const ROUND_TRIP_OPEN_STATE = 'open';
 
 function heading(key: SpecSectionKey): string {
   return `${SPEC_SECTION_HEADING_MARKER} ${SPEC_SECTION_HEADINGS[key]}`;
@@ -58,7 +57,6 @@ function assertRoundTrips(spec: IssueSpec, body: string, conventions: ProjectCon
         title: spec.title,
         body,
         labels: [typeLabel, ...(spec.commitKind === null ? [] : [kindLabel(spec.commitKind, conventions.labels.kindPrefix)])],
-        state: ROUND_TRIP_OPEN_STATE,
         blockedBy: spec.dependsOn,
       },
       conventions,

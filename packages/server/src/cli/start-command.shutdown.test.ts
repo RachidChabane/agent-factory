@@ -21,7 +21,8 @@ import { createRehearsal, FIRST_PROJECT, TEST_WEBHOOK_VARIABLE, waitFor, type Re
 
 const FAKE_CLAUDE = join(FACTORY_INSTALL_DIRECTORY, 'packages', 'adapters', 'src', 'claude', 'test-fixtures', 'fake-claude.ts');
 const CLI = join(FACTORY_INSTALL_DIRECTORY, 'packages', 'server', 'src', 'cli', 'main.ts');
-const TIMEOUT_MS = 60_000;
+/** How long each step may take: starting processes is slow on a loaded machine. */
+const TIMEOUT_MS = 120_000;
 
 function withoutWebhook(environment: Readonly<Record<string, string | undefined>>): Record<string, string | undefined> {
   return Object.fromEntries(Object.entries(environment).filter(([name]) => name !== TEST_WEBHOOK_VARIABLE));

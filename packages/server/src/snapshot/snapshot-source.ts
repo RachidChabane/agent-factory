@@ -9,12 +9,13 @@ import {
   latestToolChecks,
   parseIssueSpec,
   parseProjectSubject,
+  PENDING_ISSUE_EVENTS,
   type CheckRunSummary,
   type FactoryEventRecord,
   type RunLogLine,
   type WorkflowRunRecord,
 } from '@agent-factory/application';
-import type { IssueSpec, ResourceSnapshot } from '@agent-factory/domain';
+import type { ResourceSnapshot } from '@agent-factory/domain';
 import type { InstallationRuntime } from '../composition/installation/installation-runtime.ts';
 import { projectTools } from '../composition/installation/tools.ts';
 import { forgeUrl } from '../composition/project/forge.ts';
@@ -31,7 +32,7 @@ import { issueJournals } from '../projections/issue-views.ts';
 import { withoutLocalPaths } from '../projections/local-paths.ts';
 import { proofLogExcerpt } from '../projections/pull-request-views.ts';
 import { projectRuns, recordedRuns, type RecordedRun } from '../projections/run-views.ts';
-import { logKey, type ProjectSnapshotContext, type RunLogSummary } from '../projections/snapshot-context.ts';
+import { logKey, type PendingIssue, type ProjectSnapshotContext, type RunLogSummary } from '../projections/snapshot-context.ts';
 import { projectView, type ProjectViewProjection } from '../projections/project-view.ts';
 import { CachedReading, CachedReadings, observedView, type Observed } from './cached-reading.ts';
 
@@ -106,7 +107,7 @@ function splitByProject(records: readonly FactoryEventRecord[]): SplitRecords {
 
 /** The readings of one project from its forge and its files, each with the time it was read. */
 class ProjectReadings {
-  readonly pendingIssues: CachedReading<readonly IssueSpec[]>;
+  readonly pendingIssues: CachedReading<readonly PendingIssue[]>;
   readonly checks: CachedReadings<string, readonly CheckRunSummary[]>;
   readonly titles: CachedReadings<number, string>;
   readonly deployments: CachedReadings<string, EnvironmentDeployments>;
@@ -117,15 +118,18 @@ class ProjectReadings {
   constructor(project: ProjectRuntime, runtime: InstallationRuntime) {
     const { clock } = runtime;
     const forge = project.forge;
+    const { labels } = project.conventions;
     this.pendingIssues = new CachedReading(
-      async () =>
-        (await forge.listIssues(project.conventions.labels.validated)).flatMap((issue) => {
+      async () => {
+        const listed = [...(await forge.listIssues(labels.factory)), ...(await forge.listIssues(labels.validated))];
+        return [...new Map(listed.map((issue) => [issue.number, issue])).values()].flatMap((issue): PendingIssue[] => {
           try {
-            return [parseIssueSpec(issue, project.conventions)];
+            return [{ spec: parseIssueSpec(issue, project.conventions), validated: issue.labels.includes(labels.validated), createdAt: issue.createdAt, updatedAt: issue.updatedAt }];
           } catch {
             return [];
           }
-        }),
+        });
+      },
       FORGE_READ_INTERVAL_MS,
       clock,
     );
@@ -261,7 +265,7 @@ export class SnapshotSource {
     const readings = this.projectReadings(project);
     const index = indexEvents(records);
     const journals = issueJournals(index);
-    const pending = await readings.pendingIssues.get();
+    const pending = await readings.pendingIssues.get(records.findLast((record) => PENDING_ISSUE_EVENTS.includes(record.type))?.occurredAt ?? null);
     const checks = new Map<number, Observed<readonly CheckRunSummary[]>>();
     const titles = new Map<number, string>();
     for (const journal of journals.values()) {

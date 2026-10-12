@@ -181,7 +181,7 @@ describe('the agent-factory command line', () => {
   it('shows the issue it would create on GitHub and creates nothing without --confirm', async () => {
     await writeFile(join(home, 'spec.md'), SPEC_FILE);
     expect(await runCli(['issue', 'create', 'spec.md'], context())).toBe(5);
-    expect(captured.lines.slice(0, 3)).toEqual(['This creates an issue on GitHub acme/widgets:', 'Title: Serve the domain from the UI', 'Labels: type:infra']);
+    expect(captured.lines.slice(0, 3)).toEqual(['This creates an issue on GitHub acme/widgets:', 'Title: Serve the domain from the UI', 'Labels: factory, type:infra']);
     expect(captured.errors).toEqual(['Nothing was created. Re-run with --confirm to create it.']);
   });
 

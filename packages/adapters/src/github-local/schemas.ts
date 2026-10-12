@@ -7,11 +7,16 @@ export type PullRequestState = (typeof PULL_REQUEST_STATES)[number];
 const PositiveNumber = z.number().int().positive();
 const Label = z.string().trim().min(1);
 
+const Instant = z.iso.datetime({ offset: true });
+
 export const IssueFrontMatterSchema = z.strictObject({
   title: z.string().trim().min(1),
   labels: z.array(Label).default([]),
   state: z.enum(ISSUE_STATES).default('open'),
   blockedBy: z.array(PositiveNumber).default([]),
+  /** When the issue was opened; an issue file written by hand without it dates from its last change. */
+  createdAt: Instant.optional(),
+  updatedAt: Instant.optional(),
 });
 export type IssueFrontMatter = z.infer<typeof IssueFrontMatterSchema>;
 

@@ -44,7 +44,6 @@ function parseRendered(spec: IssueSpec, body: string): IssueSpec {
         ...(spec.commitKind === null ? [] : [kindLabel(spec.commitKind, CONVENTIONS.labels.kindPrefix)]),
         CONVENTIONS.labels.validated,
       ],
-      state: 'open',
       blockedBy: spec.dependsOn,
     },
     CONVENTIONS,
