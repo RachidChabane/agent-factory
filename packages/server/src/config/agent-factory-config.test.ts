@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { isReferenceName, isReferenceRevision } from '@agent-factory/domain';
 import { describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
-import { configProblems, parseAgentFactoryConfig, projectOf, UnknownProjectError } from './agent-factory-config.ts';
+import { configProblems, parseAgentFactoryConfig, projectOf, serverClientUrl, UnknownProjectError, UnknownServerPortError } from './agent-factory-config.ts';
 
 const HOME = '/home/operator/.agent-factory';
 const USER_HOME = '/home/operator';
@@ -117,7 +117,7 @@ describe('the configuration of a project', () => {
     const project = projectOf(parse(document()), 'storefront');
     expect(project.directory).toBe(`${HOME}/projects/storefront`);
     expect(project.clonePath).toBe(`${HOME}/projects/storefront/clone`);
-    expect(project.worktreePool).toEqual({ directory: `${HOME}/projects/storefront/worktrees`, size: 3 });
+    expect(project.worktreePool).toEqual({ directory: `${HOME}/projects/storefront/worktrees`, size: 5 });
     expect(project.directories.evidence).toBe(`${HOME}/projects/storefront/evidence`);
     expect(project.repository).toEqual({ owner: 'example-org', name: 'storefront' });
   });
@@ -303,5 +303,23 @@ describe('the reference repositories of a project', () => {
       }),
       { numRuns: 300 },
     );
+  });
+});
+
+describe('the address a client reaches the server at', () => {
+  it('is the configured host and port', () => {
+    expect(serverClientUrl({ host: '127.0.0.1', port: 7430 })).toBe('http://127.0.0.1:7430');
+    expect(serverClientUrl({ host: 'factory.example.com', port: 8080 })).toBe('http://factory.example.com:8080');
+  });
+
+  it('goes through the loopback when the server listens on every address, and brackets an IPv6 host', () => {
+    expect(serverClientUrl({ host: '0.0.0.0', port: 7430 })).toBe('http://127.0.0.1:7430');
+    expect(serverClientUrl({ host: '::', port: 7430 })).toBe('http://[::1]:7430');
+    expect(serverClientUrl({ host: '::1', port: 7430 })).toBe('http://[::1]:7430');
+  });
+
+  it('cannot be known for a server that picks a free port at each start', () => {
+    expect(() => serverClientUrl({ host: '127.0.0.1', port: 0 })).toThrow(UnknownServerPortError);
+    expect(() => serverClientUrl({ host: '127.0.0.1', port: 0 })).toThrow(/give the port with --port/);
   });
 });

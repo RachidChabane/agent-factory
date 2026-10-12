@@ -102,7 +102,9 @@ projects:
     baseBranch: main
     clone: clone
     commitIdentity: { name: Example Factory, email: factory@example.invalid }
-    worktrees: { size: 3 }
+    # Each running issue, each open pull request and each issue waiting for a person keeps a
+    # worktree: new issues stop once all are held. Keep the size above the concurrency ceiling.
+    worktrees: { size: 5 }
     concurrency: { issues: 1, ceiling: 3 }
     setup:
       - name: install

@@ -2,6 +2,7 @@ import type {
   InstallationSettingsView,
   NamedCommandView,
   PauseView,
+  ProjectSchedulerView,
   ProjectSettingsView,
   RoleSetting,
   ToolSessionView,
@@ -26,6 +27,7 @@ import {
   USAGE_SUBJECT_PREFIX,
   UsageReadFailedPayloadSchema,
   UsageReadPayloadSchema,
+  worktreeShortageOf,
   type AccountUsage,
   type CheckedTool,
   type FactoryEventRecord,
@@ -57,6 +59,20 @@ export function pauseViews(records: readonly FactoryEventRecord[], scope: PauseV
     }
   }
   return [...active.values()];
+}
+
+/** What a project's scheduler recorded besides its pauses: the issues that wait for a worktree, and who holds them. */
+export function schedulerView(records: readonly FactoryEventRecord[]): ProjectSchedulerView {
+  const shortage = worktreeShortageOf(records);
+  if (shortage === null) return { worktreeShortage: null };
+  return {
+    worktreeShortage: {
+      since: iso(shortage.since),
+      poolSize: shortage.poolSize,
+      waiting: [...shortage.waiting],
+      holders: shortage.holders.map((holder) => ({ ...holder })),
+    },
+  };
 }
 
 interface AccountReads {

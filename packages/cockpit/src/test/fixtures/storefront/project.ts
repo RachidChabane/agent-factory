@@ -129,6 +129,7 @@ export function buildStorefront(clock: FixtureClock, runs: RunWorld): ProjectVie
     forge: { kind: 'github', url: STOREFRONT_FORGE_URL },
     baseBranch: 'main',
     pauses: [],
+    scheduler: { worktreeShortage: null },
     issueTypes: issueTypeInfos(null),
     requests: newestFirst(storefrontRequests(clock, runs), (request) => request.receivedAt),
     issues: oldestFirstByNumber([...deliveredIssues(clock, runs), ...activeIssues(clock, runs)]),

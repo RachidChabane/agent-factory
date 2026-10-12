@@ -5,7 +5,7 @@ import type { Observed } from '../snapshot/cached-reading.ts';
 import { projectAudits, projectSkippedChanges } from './audit-views.ts';
 import { environmentView, type EnvironmentDeployments } from './environment-views.ts';
 import { indexEvents } from './event-index.ts';
-import { pauseViews, projectSettingsView } from './installation-views.ts';
+import { pauseViews, projectSettingsView, schedulerView } from './installation-views.ts';
 import { issueJournals, projectIssues } from './issue-views.ts';
 import { projectPullRequests } from './pull-request-views.ts';
 import { projectReleases, releaseOfCommits } from './release-views.ts';
@@ -45,6 +45,7 @@ export function projectView(project: ProjectConfig, records: readonly FactoryEve
     forge: { kind: project.forge.kind, url: readings.forgeUrl },
     baseBranch: project.baseBranch,
     pauses: pauseViews(records, 'project'),
+    scheduler: schedulerView(records),
     issueTypes: project.issueTypes.map((type) => ({
       id: type.id,
       label: type.label,

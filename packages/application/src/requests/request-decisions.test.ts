@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ISSUE_CREATED_EVENT } from '../spec/issue-events.ts';
-import { FakeGitHubGateway, InMemoryEventStore } from '../audit/testing/fakes.ts';
+import { FakeGitHubGateway, InMemoryEventStore, ISSUE_OPENED_AT } from '../audit/testing/fakes.ts';
 import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
 import { InMemoryWorkspace } from '../pipeline/testing/pipeline-fakes.ts';
 import { renderSpecFile } from './proposed-spec-file.ts';
@@ -102,5 +102,33 @@ describe('request decisions', () => {
     const github = new FakeGitHubGateway();
     const issue = await createIssueFromPlan({ events, github }, planIssueCreation(text, null, CONVENTIONS));
     expect(github.createdIssues).toEqual([{ title: 'Link the conversation', body: issue.body, labels: ['factory', 'type:ui'] }]);
+  });
+
+  describe('an issue that waits on others', () => {
+    const text = renderSpecFile(DRAFT, CONVENTIONS).content;
+    const openIssue = (github: FakeGitHubGateway, number: number) =>
+      github.issues.set(number, { number, title: `issue ${number}`, body: '', labels: ['factory'], state: 'open', blockedBy: [], createdAt: ISSUE_OPENED_AT, updatedAt: ISSUE_OPENED_AT });
+
+    it('is linked to the issues it waits on, each listed once, before it is returned', async () => {
+      const github = new FakeGitHubGateway();
+      openIssue(github, 12);
+      openIssue(github, 14);
+      const plan = planIssueCreation(text, null, CONVENTIONS, [14, 12, 14]);
+      expect(plan.blockedBy).toEqual([14, 12]);
+      const issue = await createIssueFromPlan({ events: new InMemoryEventStore(), github }, plan);
+      expect(issue.blockedBy).toEqual([14, 12]);
+      expect((await github.getIssue(issue.number)).blockedBy).toEqual([14, 12]);
+    });
+
+    it('creates nothing when an issue it waits on does not exist', async () => {
+      const github = new FakeGitHubGateway();
+      openIssue(github, 12);
+      await expect(createIssueFromPlan({ events: new InMemoryEventStore(), github }, planIssueCreation(text, null, CONVENTIONS, [12, 99]))).rejects.toThrow('no issue 99');
+      expect(github.createdIssues).toEqual([]);
+    });
+
+    it('waits on nothing unless told so', () => {
+      expect(planIssueCreation(text, null, CONVENTIONS).blockedBy).toEqual([]);
+    });
   });
 });

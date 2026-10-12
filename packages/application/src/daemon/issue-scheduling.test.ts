@@ -22,7 +22,7 @@ const LIMITS = { concurrency: 1, poolSize: 3 };
 describe('daemon scheduling decision', () => {
   it('starts the lowest validated issue the factory has never seen, within the concurrency limit', () => {
     const decision = decideScheduling(inputs({ validated: [{ number: 9, blockedBy: [] }, { number: 4, blockedBy: [] }] }), LIMITS);
-    expect(decision).toEqual({ resume: [], start: [4], waiting: [9], cycles: [] });
+    expect(decision).toEqual({ resume: [], start: [4], waiting: [9], awaitingWorktree: [], cycles: [] });
   });
 
   it('does not count an issue waiting at an open pull request against the concurrency limit', () => {
@@ -42,12 +42,31 @@ describe('daemon scheduling decision', () => {
     expect(decision.waiting).toEqual([5]);
   });
 
+  it('names the issues a full pool holds back, up to the concurrency that would let them start', () => {
+    const decision = decideScheduling(
+      inputs({
+        validated: [{ number: 5, blockedBy: [] }, { number: 6, blockedBy: [] }, { number: 7, blockedBy: [] }],
+        states: new Map([[1, 'pr-open'], [2, 'pr-open'], [3, 'needs-human']]),
+        heldWorktrees: 3,
+      }),
+      { concurrency: 2, poolSize: 3 },
+    );
+    expect(decision).toMatchObject({ start: [], waiting: [5, 6, 7], awaitingWorktree: [5, 6] });
+  });
+
+  it('does not blame the pool when the concurrency limit alone holds an issue back, or while a worktree is free', () => {
+    const limited = decideScheduling(inputs({ validated: [{ number: 2, blockedBy: [] }], busySlots: 1, heldWorktrees: 3 }), LIMITS);
+    expect(limited.awaitingWorktree).toEqual([]);
+    const roomy = decideScheduling(inputs({ validated: [{ number: 5, blockedBy: [] }, { number: 6, blockedBy: [] }], heldWorktrees: 2 }), { concurrency: 3, poolSize: 3 });
+    expect(roomy).toMatchObject({ start: [5], waiting: [6], awaitingWorktree: [] });
+  });
+
   it('never starts again an abandoned issue whose spec is still validated on the tracker', () => {
     const decision = decideScheduling(
       inputs({ validated: [{ number: 5, blockedBy: [] }, { number: 6, blockedBy: [] }], states: new Map([[5, 'abandoned']]) }),
       LIMITS,
     );
-    expect(decision).toEqual({ resume: [], start: [6], waiting: [], cycles: [] });
+    expect(decision).toEqual({ resume: [], start: [6], waiting: [], awaitingWorktree: [], cycles: [] });
   });
 
   it('drives an issue whose frozen check the operator ordered rewritten, even at an open pull request', () => {
@@ -131,6 +150,27 @@ describe('daemon scheduling decision', () => {
           );
           const launched = decision.resume.length + decision.start.length;
           return launched <= Math.max(0, concurrency - busy) && decision.start.length <= Math.max(0, 5 - held);
+        },
+      ),
+    );
+  });
+
+  it('reports a shortage only when no worktree is free, and then every issue it reports would have started', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.integer({ min: 1, max: 30 }), { maxLength: 20 }),
+        fc.integer({ min: 1, max: 4 }),
+        fc.integer({ min: 0, max: 6 }),
+        fc.integer({ min: 0, max: 3 }),
+        (validated, concurrency, held, busy) => {
+          const decision = decideScheduling(
+            inputs({ validated: [...new Set(validated)].map((number) => ({ number, blockedBy: [] })), heldWorktrees: held, busySlots: busy }),
+            { concurrency, poolSize: 5 },
+          );
+          const reported = decision.awaitingWorktree;
+          const slots = Math.max(0, concurrency - busy);
+          if (reported.length === 0) return true;
+          return held >= 5 && decision.start.length === 0 && reported.length <= slots && reported.every((number) => decision.waiting.includes(number));
         },
       ),
     );

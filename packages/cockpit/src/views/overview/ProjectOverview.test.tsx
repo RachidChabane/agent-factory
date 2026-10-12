@@ -119,6 +119,22 @@ describe('ProjectOverview pauses', () => {
   });
 });
 
+describe('ProjectOverview worktrees', () => {
+  it('says in the scope of the project that its issues wait for a worktree, and who holds them', async () => {
+    const snapshot = mapProject(fixtureSnapshot(), 'storefront', (project) => ({
+      ...project,
+      scheduler: { worktreeShortage: { since: '2026-10-12T09:40:00.000Z', poolSize: 2, waiting: [31], holders: [{ issueNumber: 22, state: 'pr-open', pullRequestNumber: 22 }, { issueNumber: 28, state: 'implementing', pullRequestNumber: null }] } },
+    }));
+    await openOverview('storefront', { snapshot });
+    const project = screen.getByRole('region', { name: 'This project' });
+    expect(within(project).getByText('Waiting for a worktree')).toBeInTheDocument();
+    expect(project).toHaveTextContent('1 issue is ready but waits for a worktree: #31');
+    expect(project).toHaveTextContent('All 2 worktrees of the pool are held by:');
+    expect(within(project).getByRole('link', { name: 'pull request #22' })).toHaveAttribute('href', '/projects/storefront/pull-requests/22');
+    expect(within(screen.getByRole('region', { name: 'Whole installation' })).queryByText('No free worktree')).not.toBeInTheDocument();
+  });
+});
+
 describe('ProjectOverview board and runs', () => {
   it('embeds the board of the project alone', async () => {
     await openOverview('storefront');

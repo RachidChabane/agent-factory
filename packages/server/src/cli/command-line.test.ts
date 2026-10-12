@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommandLine, type CliCommand } from './command-line.ts';
+import { COMMAND_SUBCOMMANDS, COMMAND_VERBS, parseCommandLine, USAGE, type CliCommand } from './command-line.ts';
 
 const SHA = '0123456789abcdef0123456789abcdef01234567';
 
@@ -40,8 +40,13 @@ describe('parseCommandLine', () => {
     expect(parseCommandLine(['request', 'add', 'ask.md', '--images', 'shots', '--requester=Dana'])).toEqual(ok({ kind: 'request-add', path: 'ask.md', imagesDirectory: 'shots', requester: 'Dana' }));
     expect(parseCommandLine(['request', 'add', 'ask.md'])).toEqual(ok({ kind: 'request-add', path: 'ask.md', imagesDirectory: null, requester: 'unknown' }));
     expect(parseCommandLine(['request', 'challenge', 'req-3'])).toEqual(ok({ kind: 'request-challenge', requestId: 'req-3' }));
-    expect(parseCommandLine(['issue', 'create', 'spec.md', '--confirm'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', confirmed: true, start: false }));
-    expect(parseCommandLine(['issue', 'create', 'spec.md', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', confirmed: false, start: true }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--confirm'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [], confirmed: true, start: false }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [], confirmed: false, start: true }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by', '12, 14,12', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [12, 14], confirmed: false, start: true }));
+    expect(parseCommandLine(['issue', 'create', '--blocked-by=7', 'spec.md'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [7], confirmed: false, start: false }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by', '12,x'])).toEqual({ ok: false, error: '--blocked-by must list issue numbers separated by commas, got "12,x"' });
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by', '0'])).toEqual({ ok: false, error: '--blocked-by must list issue numbers separated by commas, got "0"' });
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by'])).toEqual({ ok: false, error: 'missing value for --blocked-by' });
     expect(parseCommandLine(['pr', 'feedback', '12', 'notes.md', '--author', 'Riley'])).toEqual(ok({ kind: 'pr-feedback', pullRequestNumber: 12, path: 'notes.md', author: 'Riley' }));
     expect(parseCommandLine(['pr', 'feedback', '12', 'notes.md'])).toEqual({ ok: false, error: 'missing --author <name>' });
     expect(parseCommandLine(['audit', '8d33a43', '38ab3a0'])).toEqual(ok({ kind: 'audit', commits: ['8d33a43', '38ab3a0'] }));
@@ -87,6 +92,26 @@ describe('parseCommandLine', () => {
     expect(parseCommandLine(['start', '--demo', '--port', '7440'])).toEqual(ok({ kind: 'start', demo: true, port: 7440 }));
     expect(parseCommandLine(['start', '--port=70000'])).toEqual({ ok: false, error: '--port must be a port number from 1 to 65535, got "70000"' });
     expect(parseCommandLine(['start', '--port', 'http'])).toEqual({ ok: false, error: '--port must be a port number from 1 to 65535, got "http"' });
+  });
+
+  it('parses the watch of the running factory', () => {
+    expect(parseCommandLine(['watch'])).toEqual(ok({ kind: 'watch', intervalSeconds: 20, once: false, json: false, port: null }));
+    expect(parseCommandLine(['watch', '--once', '--json'])).toEqual(ok({ kind: 'watch', intervalSeconds: 20, once: true, json: true, port: null }));
+    expect(parseCommandLine(['watch', '--interval', '5', '--port=7445'])).toEqual(ok({ kind: 'watch', intervalSeconds: 5, once: false, json: false, port: 7445 }));
+    expect(parseCommandLine(['watch', '--interval=0'])).toEqual({ ok: false, error: '--interval must be a whole number of seconds, 1 or more, got "0"' });
+    expect(parseCommandLine(['watch', '--interval', 'often'])).toEqual({ ok: false, error: '--interval must be a whole number of seconds, 1 or more, got "often"' });
+    expect(parseCommandLine(['watch', '--interval'])).toEqual({ ok: false, error: 'missing value for --interval' });
+    expect(parseCommandLine(['watch', '--port', '70000'])).toEqual({ ok: false, error: '--port must be a port number from 1 to 65535, got "70000"' });
+    expect(parseCommandLine(['watch', 'now'])).toEqual({ ok: false, error: 'unexpected arguments: now' });
+    expect(parseCommandLine(['watch', '--follow'])).toEqual({ ok: false, error: 'unknown option --follow' });
+  });
+
+  it('lists every verb and subcommand it defines, and prints each verb in its usage', () => {
+    expect(COMMAND_VERBS).toEqual(expect.arrayContaining(['init', 'validate', 'start', 'status', 'watch', 'stop', 'merge', 'resume', 'issue', 'pr', 'request', 'tool']));
+    expect(COMMAND_SUBCOMMANDS['issue']).toEqual(['create', 'abandon']);
+    expect(COMMAND_SUBCOMMANDS['pr']).toEqual(['feedback']);
+    expect(COMMAND_SUBCOMMANDS['run-issue']).toBeUndefined();
+    for (const verb of COMMAND_VERBS.filter((candidate) => candidate !== 'help')) expect(USAGE, verb).toContain(`  ${verb}`);
   });
 
   it('shows help without arguments or when asked', () => {

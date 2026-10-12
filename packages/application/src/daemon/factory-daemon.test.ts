@@ -27,6 +27,7 @@ import {
 import { CONFIGURATION_RELOADED_EVENT, SETTINGS_CHANGED_EVENT, SETTINGS_SUBJECT } from '../settings/settings-events.ts';
 import { setIssuePaused } from './issue-pause.ts';
 import { heldWorktrees } from './held-worktrees.ts';
+import { activeWorktreeShortage } from './worktree-shortage.ts';
 import { decideScheduling } from './issue-scheduling.ts';
 import { issueStates } from '../pipeline/pipeline-capacity.ts';
 import { pauseScheduling } from './pause-state.ts';
@@ -432,6 +433,54 @@ describe('worktrees held by escalated issues', () => {
       },
       { concurrency: 1, poolSize: 1 },
     );
-    expect(decision).toEqual({ resume: [], start: [], waiting: [10], cycles: [] });
+    expect(decision).toEqual({ resume: [], start: [], waiting: [10], awaitingWorktree: [10], cycles: [] });
+  });
+});
+
+describe('worktrees held by open pull requests', () => {
+  async function holdWithPullRequest(events: InMemoryEventStore, issueNumber: number, pullRequestNumber: number): Promise<void> {
+    const subject = issueSubject(issueNumber);
+    await recordState(events, issueNumber, 'pr-open');
+    await events.append(PIPELINE_EVENTS.worktreeAcquired, subject, { path: `/pool/slot-${issueNumber}`, branch: `factory/${issueNumber}-x`, baseSha: 'base' });
+    await events.append(PIPELINE_EVENTS.pullRequestOpened, subject, { number: pullRequestNumber, url: `https://example.invalid/pull/${pullRequestNumber}`, headSha: 'h' });
+  }
+
+  it('records that issues wait for a worktree, notifies it once, and clears it when a pull request is merged', async () => {
+    const { github, drivers, daemon, notifier, events } = setup({ settings: { poolSize: 2, concurrency: 2 } });
+    await holdWithPullRequest(events, 1, 10);
+    await holdWithPullRequest(events, 2, 11);
+    github.issues.set(3, validated(3));
+    await daemon.tick(SIGNAL);
+    await daemon.tick(SIGNAL);
+    expect(drivers.started).toEqual([]);
+    expect(events.typesOf('daemon')).toEqual(['scheduler.worktrees-full']);
+    expect(notifier.titles).toEqual(['No worktree is free: issues wait']);
+    expect(await activeWorktreeShortage(events)).toMatchObject({
+      poolSize: 2,
+      waiting: [3],
+      holders: [
+        { issueNumber: 1, state: 'pr-open', pullRequestNumber: 10 },
+        { issueNumber: 2, state: 'pr-open', pullRequestNumber: 11 },
+      ],
+    });
+    await events.append(PIPELINE_EVENTS.worktreeReleased, issueSubject(1), { path: '/pool/slot-1' });
+    await daemon.tick(SIGNAL);
+    expect(drivers.started).toEqual([3]);
+    expect(events.typesOf('daemon')).toEqual(['scheduler.worktrees-full', 'scheduler.worktrees-free']);
+    expect(await activeWorktreeShortage(events)).toBeNull();
+    drivers.finish(3, { kind: 'needs-human', issueNumber: 3, reason: 'stop' });
+    await daemon.settle();
+  });
+
+  it('records nothing when the concurrency limit alone holds an issue back', async () => {
+    const { github, drivers, daemon, events } = setup({ settings: { poolSize: 2, concurrency: 1 } });
+    github.issues.set(1, validated(1));
+    github.issues.set(2, validated(2));
+    await daemon.tick(SIGNAL);
+    await daemon.tick(SIGNAL);
+    expect(drivers.started).toEqual([1]);
+    expect(events.typesOf('daemon')).toEqual([]);
+    drivers.finish(1, { kind: 'needs-human', issueNumber: 1, reason: 'stop' });
+    await daemon.settle();
   });
 });

@@ -1,5 +1,6 @@
 import type { AuditVerdict, PauseCause } from '@agent-factory/domain';
 import { SHORT_SHA_LENGTH } from '../audit/audit-issue-renderer.ts';
+import type { WorktreesFullPayload } from '../daemon/daemon-events.ts';
 import type { Notifier, OperationLog, PullRequestRef } from '../ports.ts';
 import { COCKPIT_PATHS, cockpitLink } from './cockpit-links.ts';
 
@@ -22,6 +23,13 @@ const RESUME_TITLES: Readonly<Record<PauseCause, string>> = {
   operator: 'Factory resumed by the operator',
   drain: 'Factory stopped after finishing its running work',
 };
+
+const LIST_SEPARATOR = ', ';
+
+function holderText(holder: WorktreesFullPayload['holders'][number]): string {
+  if (holder.pullRequestNumber !== null) return `issue #${holder.issueNumber} with pull request #${holder.pullRequestNumber}`;
+  return holder.state === 'needs-human' ? `issue #${holder.issueNumber} waiting for a person` : `issue #${holder.issueNumber} in progress`;
+}
 
 export const NOTICES = {
   needsHuman: (issueNumber: number, reason: string): OperatorNotice => ({
@@ -59,6 +67,16 @@ export const NOTICES = {
     body: 'Scheduling continues.',
     path: COCKPIT_PATHS.board,
   }),
+  worktreesFull: (shortage: WorktreesFullPayload): OperatorNotice => {
+    const waiting = shortage.waiting.map((number) => `#${number}`).join(LIST_SEPARATOR);
+    const ready = shortage.waiting.length === 1 ? `Issue ${waiting} is ready` : `Issues ${waiting} are ready`;
+    const pool = shortage.poolSize === 1 ? 'its only worktree is' : `all ${shortage.poolSize} worktrees are`;
+    return {
+      title: 'No worktree is free: issues wait',
+      body: `${ready} to start, but ${pool} held by ${shortage.holders.map(holderText).join(LIST_SEPARATOR)}. Merge or abandon one to make room.`,
+      path: COCKPIT_PATHS.board,
+    };
+  },
   requestChallenged: (requestId: string, specCount: number): OperatorNotice => ({
     title: `Request ${requestId} challenged`,
     body: `The report, the draft reply and ${specCount} proposed spec(s) wait for your review.`,

@@ -41,6 +41,8 @@ export interface IssueCreationPlan {
   readonly labels: readonly string[];
   readonly body: string;
   readonly origin: SpecOrigin | null;
+  /** The issues that must be done before this one starts; the factory takes the issue once they are. */
+  readonly blockedBy: readonly number[];
 }
 
 async function requireRequest(events: EventStore, requestId: string): Promise<RequestRecord> {
@@ -100,7 +102,7 @@ export async function specOriginOf(events: EventStore, requestsDirectory: string
   return request === undefined || spec === undefined ? null : { requestId: request.id, specId: spec.id };
 }
 
-export function planIssueCreation(text: string, origin: SpecOrigin | null, conventions: ProjectConventions): IssueCreationPlan {
+export function planIssueCreation(text: string, origin: SpecOrigin | null, conventions: ProjectConventions, blockedBy: readonly number[] = []): IssueCreationPlan {
   const file: SpecFile = parseSpecFile(text);
   const { validated } = conventions.labels;
   if (file.labels.includes(validated)) {
@@ -108,13 +110,18 @@ export function planIssueCreation(text: string, origin: SpecOrigin | null, conve
   }
   const problems = specFileProblems(file, conventions);
   if (problems.length > 0) throw new SpecFileRefusedError(problems.map((problem) => problem.message).join('; '));
-  return { title: file.title, labels: [...new Set([conventions.labels.factory, ...file.labels])], body: file.body, origin };
+  return { title: file.title, labels: [...new Set([conventions.labels.factory, ...file.labels])], body: file.body, origin, blockedBy: [...new Set(blockedBy)] };
 }
 
+/**
+ * Creates the issue of a plan. The issues it waits on are looked up first, so an unknown one
+ * creates nothing, and linked before the issue is returned, so nothing can validate it without them.
+ */
 export async function createIssueFromPlan(
   dependencies: { readonly events: EventStore; readonly github: GitHubGateway },
   plan: IssueCreationPlan,
 ): Promise<IssueRecord> {
+  for (const blocking of plan.blockedBy) await dependencies.github.getIssue(blocking);
   const issue = await dependencies.github.createIssue(plan.title, plan.body, plan.labels);
   const created: IssueCreatedPayload = { title: issue.title, labels: [...issue.labels], requestId: plan.origin?.requestId ?? null, specId: plan.origin?.specId ?? null };
   await dependencies.events.append(ISSUE_CREATED_EVENT, issueSubject(issue.number), created);
@@ -124,7 +131,8 @@ export async function createIssueFromPlan(
       issueNumber: issue.number,
     });
   }
-  return issue;
+  for (const blocking of plan.blockedBy) await dependencies.github.addBlockedBy(issue.number, blocking);
+  return { ...issue, blockedBy: [...plan.blockedBy] };
 }
 
 export async function acceptProposedSpecs(

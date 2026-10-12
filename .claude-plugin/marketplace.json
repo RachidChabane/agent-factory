@@ -1,0 +1,12 @@
+{
+  "name": "agent-factory",
+  "owner": { "name": "Agent Factory" },
+  "metadata": { "description": "The orchestrator agent and skills that drive an Agent Factory installation." },
+  "plugins": [
+    {
+      "name": "agent-factory",
+      "source": "./packages/plugin",
+      "description": "The orchestrator agent for an Agent Factory installation, and the skills it works with."
+    }
+  ]
+}

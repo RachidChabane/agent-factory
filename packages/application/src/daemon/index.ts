@@ -5,4 +5,6 @@ export * from './issue-pause.ts';
 export * from './issue-scheduling.ts';
 export * from './pause-state.ts';
 export * from './scheduling-pauses.ts';
+export * from './worktree-capacity.ts';
+export * from './worktree-shortage.ts';
 export * from './installation-daemon.ts';

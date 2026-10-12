@@ -145,8 +145,11 @@ export class FakeGitHubGateway implements GitHubGateway {
   listIssues(label: string): Promise<readonly IssueRecord[]> {
     return Promise.resolve([...this.issues.values()].filter((issue) => issue.state === 'open' && issue.labels.includes(label)));
   }
-  addBlockedBy(): never {
-    throw new Error('not used');
+  addBlockedBy(issueNumber: number, blockingIssueNumber: number): Promise<void> {
+    const issue = this.issues.get(issueNumber);
+    if (issue === undefined) return Promise.reject(new Error(`no issue ${issueNumber}`));
+    this.issues.set(issueNumber, { ...issue, blockedBy: [...issue.blockedBy, blockingIssueNumber] });
+    return Promise.resolve();
   }
   setLabels(): never {
     throw new Error('not used');

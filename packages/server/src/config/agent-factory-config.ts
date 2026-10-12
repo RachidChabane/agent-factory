@@ -44,6 +44,10 @@ const HOME_ONLY = '~';
 const MILLISECONDS_PER_MINUTE = 60_000;
 const MILLISECONDS_PER_SECOND = 1_000;
 const HTTP_SCHEME = 'http://';
+const WILDCARD_HOSTS: ReadonlyMap<string, string> = new Map([
+  ['0.0.0.0', '127.0.0.1'],
+  ['::', '::1'],
+]);
 const REPOSITORY_SEPARATOR = '/';
 const UTF8 = 'utf8';
 const MISSING_FILE_CODE = 'ENOENT';
@@ -482,6 +486,21 @@ export function resolveAgentFactoryConfig(raw: RawAgentFactoryConfig, home: stri
 
 function serverUrl(host: string, port: number): string {
   return `${HTTP_SCHEME}${host}:${port}`;
+}
+
+/** Why a client cannot find a server configured on port 0, which picks a free port at each start. */
+export class UnknownServerPortError extends Error {
+  constructor() {
+    super('server.port is 0: the factory picks a free port at each start, so no client can know it; give the port with --port, or set server.port');
+    this.name = 'UnknownServerPortError';
+  }
+}
+
+/** The address a client on this machine reaches the server at: a server listening on every address is reached through the loopback. */
+export function serverClientUrl(server: { readonly host: string; readonly port: number }): string {
+  if (server.port === 0) throw new UnknownServerPortError();
+  const host = WILDCARD_HOSTS.get(server.host) ?? server.host;
+  return serverUrl(host.includes(':') ? `[${host}]` : host, server.port);
 }
 
 /** The configuration served on another port; a public URL derived from the port follows it, an explicit one stays. */

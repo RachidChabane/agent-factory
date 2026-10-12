@@ -1,0 +1,11 @@
+{
+  "name": "agent-factory",
+  "version": "0.0.0",
+  "description": "The orchestrator agent for an Agent Factory installation, and the skills it works with: write specs, declare films, watch the factory, triage escalations, merge, report each morning and upgrade the factory.",
+  "author": {
+    "name": "Agent Factory"
+  },
+  "homepage": "https://github.com/RachidChabane/agent-factory",
+  "repository": "https://github.com/RachidChabane/agent-factory",
+  "license": "AGPL-3.0-only"
+}

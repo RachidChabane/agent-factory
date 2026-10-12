@@ -60,6 +60,46 @@ A spec has a title and four sections: **Need**, **Acceptance criteria** (numbere
 **Out of scope** and **Expected proof**. The issue's `type:` label chooses its proof
 rule and its commit type.
 
+## Writing a spec
+
+A spec file is what `agent-factory issue create <spec.md>` turns into an issue:
+
+```markdown
+Title: Show the cart total in the header badge
+Labels: type:ui
+Films: checkout-flow
+
+## Need
+Shoppers cannot tell what their cart costs without opening it.
+
+## Acceptance criteria
+1. The header badge shows the sum of the cart's line totals, in the shop's currency.
+2. The total updates when a line is added, changed or removed.
+
+## Out of scope
+- Discount codes.
+
+## Expected proof
+Component tests assert both criteria. The pull request updates the cart page of the user guide.
+```
+
+- The first line is `Title:`, the second `Labels:` with one `type:` label of the
+  project's issue types. An optional `Films:` line follows, for a project that
+  configures films. `spec:validated` is never written in the file: validating is the
+  operator's gesture.
+- The four sections are `Need`, `Acceptance criteria` (a numbered list), `Out of scope`
+  (a bullet list) and `Expected proof`, none empty.
+- Every acceptance criterion is checkable by the repository's own test tooling, as the
+  issue type describes it, and states an observable result.
+- Documentation requirements go in `Need` and in `Expected proof`, never in the
+  criteria.
+- Behaviour that needs the whole running product goes to a film (`Films: <scenario>[,
+  <scenario>]`), not to a criterion.
+- One issue per independently mergeable change. An issue that cannot be merged before
+  another is created with `--blocked-by`: create the blocking issue first, then
+  `agent-factory issue create <spec.md> --blocked-by <number>[,<number>]`. The factory
+  starts an issue once every issue it is blocked by is merged.
+
 ## While an issue runs
 
 The factory writes the checks, proves they fail on the base, implements, gates,
@@ -74,6 +114,41 @@ reviews and opens the pull request with its evidence. You do nothing unless it a
   page with an instruction; the acceptance author rewrites it and the proof runs again.
 - **Pause** an issue, a project or the whole factory, and **Resume** it.
 
+## Watching what blocks
+
+`agent-factory watch` polls the running factory every 20 seconds (`--interval
+<seconds>`) and prints one line for each blocker that appears or clears, with the time
+of the reading. Nothing is printed while nothing changes.
+
+```
+2026-10-12T14:03:20Z blocked needs-human storefront#12: the before proof is not valid
+2026-10-12T14:09:41Z cleared needs-human storefront#12
+```
+
+| Kind | The blocker |
+|---|---|
+| `needs-human` | an issue the factory stopped, with the reason it gave |
+| `decision-pending` | an agent run that asked a question and waits for the answer |
+| `run-failed` | the latest run of an issue still in the pipeline failed in the last hour |
+| `stalled` | an issue in a stage that owes an agent run has had no run and no activity for 10 minutes |
+| `paused` | the operator, the budget or the machine's resources paused the factory or a project for over 10 minutes |
+| `no-free-worktree` | validated issues wait because every worktree of the project's pool is held |
+| `cockpit-unreachable` | the factory does not answer, until it does |
+
+The first reading prints every blocker present. `--once` prints the blockers present now
+and exits 1 when there are any, 0 when there are none. `--json` prints one JSON object
+per line. `--port <port>` names a factory started on another port; the host and port
+otherwise come from `server` in the configuration, and a server on port `0` cannot be
+watched.
+
+Each running issue, each open pull request and each issue waiting for a person keeps a
+worktree (`worktrees.size`, 5 by default). When all are held, validated issues wait: the
+board and the project's overview name the issues that wait and the ones that hold the
+worktrees, and one notice reaches the declared channels. Merge a pull request or abandon
+an issue to make room. `agent-factory validate` states how many pull requests the pool
+lets await review beside the running issues, and warns when it leaves no room for one at
+the concurrency ceiling.
+
 ## Merging and feedback
 
 A pull request is merged on your order only: **Merge** (or `agent-factory merge <pr>
@@ -81,6 +156,12 @@ A pull request is merged on your order only: **Merge** (or `agent-factory merge 
 reviewed. A check that also fails on the base branch is shown but does not block.
 Review feedback from people goes back to the factory with **Send feedback** (or
 `agent-factory pr feedback <pr> <file> --author <name>`), which starts a new cycle.
+
+A check that fails on every pull request and on the base branch is the repository's
+problem, not the change's: the cockpit marks it as failing on the base and the merge
+does not wait for it. Fix it in its own issue. A re-run of a check runs the workflow as
+the original run had it, so a workflow fixed afterwards reaches a pull request only with
+a new run, which a new commit on its branch gives.
 
 ## Releases and environments
 
@@ -114,6 +195,44 @@ issue.
 - **Notifications** reach the declared channels when something needs you: a decision,
   an issue that needs a person, a pull request ready to merge, a release gate, a
   pause.
+
+## Working with the orchestrator
+
+The repository is also a Claude Code marketplace. Its plugin adds an orchestrator agent
+that drives the factory for you through the `agent-factory` command line, with a skill
+for each part of the work: writing specs, declaring films, watching the factory,
+triaging escalations, merging, reporting each morning, upgrading the factory.
+
+```sh
+claude plugin marketplace add RachidChabane/agent-factory
+claude plugin install agent-factory@agent-factory
+claude --agent agent-factory:orchestrator
+```
+
+In a session, `/plugin marketplace add RachidChabane/agent-factory` and `/plugin install
+agent-factory@agent-factory` do the same. Run the agent on the machine that runs the
+factory. The plugin declares no hook: the hooks that gate the factory's own runs are
+injected per run, and installing the plugin changes no session besides adding the agent
+and its skills.
+
+The orchestrator keeps `agent-factory watch` running and reacts to each line. It turns
+requests into specs and issues, answers what the repository and your earlier
+instructions answer, merges what needs no judgement, and prepares a one-line review of
+the rest. It never edits the factory's event log, its worktrees or the forge, changes
+`config.yaml` only for a cause that grants nothing new, and takes no step that widens
+what agents may reach unless you ask. It reports each morning: what merged, what waits
+for you, what is blocked and why, what it decided for you, and the subscription limits
+with their reset times.
+
+What it may do alone is yours to declare, per project, in `autonomy` ([ADR
+0033](adr/0033-autonomy-policy.md)): validating specs, answering decisions, resuming
+issues, and merging the issue types you list under the conditions you name. Without
+`autonomy`, nothing is delegated. The orchestrator makes each of these gestures with
+`--as orchestrator --reason "<why>"`; the factory refuses what the policy does not
+delegate, names the rule that is missing, and records what it accepts with the reason.
+The cockpit lists each project's delegated decisions. The orchestrator runs with your
+account, so the policy keeps its gestures within what you delegated and makes each
+visible; it does not confine a hostile process.
 
 ## Following from elsewhere
 

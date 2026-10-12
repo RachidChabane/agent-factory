@@ -9,7 +9,7 @@ import {
   NonLocalRemoteError,
   RemoteLocalityGuard,
 } from '@agent-factory/adapters';
-import { PIPELINE_ROLES, requiredLabels, type CommandRunner, type ReferenceSource, type ToolProber } from '@agent-factory/application';
+import { PIPELINE_ROLES, requiredLabels, worktreesBesideRuns, type CommandRunner, type ReferenceSource, type ToolProber } from '@agent-factory/application';
 import { admitAgentRun, REQUIRED_TOOLS, type ToolProbeResult } from '@agent-factory/domain';
 import { z } from 'zod';
 import type { AgentFactoryConfig, NotificationChannelConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
@@ -245,6 +245,33 @@ export function sandboxOutcome(project: ProjectConfig, engineSockets: readonly s
   return { ok: true, detail: [...domains, `container engine granted at ${socket}: ${ENGINE_CONSEQUENCE}`].join('; ') };
 }
 
+function countOf(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+/**
+ * What the project's pool of worktrees holds: the issues that run at once, and beside them the pull
+ * requests that await review and the issues that wait for a person, which keep their worktree. At
+ * the concurrency ceiling at least one worktree must remain for a pull request.
+ */
+export function worktreesOutcome(project: ProjectConfig): CheckOutcome {
+  const { size } = project.worktreePool;
+  const { issues, ceiling } = project.concurrency;
+  const besideCeiling = worktreesBesideRuns(size, ceiling);
+  if (besideCeiling < 1) {
+    return {
+      ok: false,
+      detail: `a pool of ${size} equals the concurrency ceiling of ${ceiling}: running at the ceiling leaves no worktree for a pull request awaiting review, and new issues stop with the first one; raise worktrees.size above the ceiling`,
+    };
+  }
+  return {
+    ok: true,
+    detail:
+      `a pool of ${size} holds ${countOf(issues, 'issue')} at once beside up to ${countOf(worktreesBesideRuns(size, issues), 'pull request')} awaiting review ` +
+      `(${besideCeiling} beside ${ceiling} at the ceiling); no new issue starts once pull requests and escalated issues hold all ${size}`,
+  };
+}
+
 /** How a GitHub project merges: with the administrator bypass, the merge needs a login the base branch's rules let bypass the review. */
 export function mergeOutcome(project: ProjectConfig): CheckOutcome {
   const slug = `${project.repository.owner}/${project.repository.name}`;
@@ -274,6 +301,7 @@ export function projectChecks(config: AgentFactoryConfig, project: ProjectConfig
     ...project.references.map(
       (reference): ValidationCheck => ({ name: `reference ${reference.name}`, severity: 'required', runsCommands: true, run: () => guarded(() => referenceOutcome(project, reference, settings)) }),
     ),
+    { name: 'worktrees', severity: 'optional', runsCommands: false, run: () => Promise.resolve(worktreesOutcome(project)) },
     { name: 'sandbox', severity: 'optional', runsCommands: false, run: () => guarded(() => Promise.resolve(sandboxOutcome(project, projectEngineSockets(project, settings)()))) },
     ...project.tools.map((tool) => toolCheck(prober, tool.name, 'optional', `tool ${tool.name}`)),
   ];

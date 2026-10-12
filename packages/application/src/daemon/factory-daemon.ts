@@ -26,10 +26,11 @@ import {
 } from '../settings/settings-events.ts';
 import type { ChallengeOutcome } from '../requests/challenge-request.ts';
 import { DAEMON_STARTED_EVENT, DAEMON_STOPPED_EVENT, DAEMON_SUBJECT } from './daemon-events.ts';
-import { heldWorktrees } from './held-worktrees.ts';
+import { worktreeHolders, type WorktreeHolder } from './held-worktrees.ts';
 import { pausedIssues } from './issue-pause.ts';
 import { decideScheduling, type SchedulingDecision } from './issue-scheduling.ts';
 import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
+import { WorktreeShortageReporter } from './worktree-shortage.ts';
 
 export const MAX_AUDIT_ATTEMPTS = 3;
 export const DEFAULT_RETRY_DELAY_MS = 5 * 60_000;
@@ -101,6 +102,12 @@ interface Drive {
   readonly controller: AbortController;
 }
 
+/** What one scheduling pass decided, with the issues holding the pool's worktrees when it decided. */
+interface Scheduled {
+  readonly decision: SchedulingDecision;
+  readonly holders: readonly WorktreeHolder[];
+}
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -108,6 +115,7 @@ function message(error: unknown): string {
 export class FactoryDaemon {
   private readonly dependencies: DaemonDependencies;
   private readonly settings: DaemonSettings;
+  private readonly shortage: WorktreeShortageReporter;
   private readonly running = new Map<number, Drive>();
   private readonly deferredUntil = new Map<number, number>();
   private backgroundTask: Promise<void> | null = null;
@@ -121,6 +129,7 @@ export class FactoryDaemon {
     this.dependencies = dependencies;
     this.settings = settings;
     this.concurrency = settings.concurrency;
+    this.shortage = new WorktreeShortageReporter({ events: dependencies.events, notifications: dependencies.notifications });
   }
 
   get concurrentIssues(): number {
@@ -224,8 +233,10 @@ export class FactoryDaemon {
     const pauses = await this.refreshPauses();
     await this.guard('pausing issues', () => this.stopPausedIssues());
     if (pauses.size > 0 || signal.aborted) return;
-    const decision = await this.guard('scheduling issues', () => this.schedule(signal));
-    if (decision === null) return;
+    const scheduled = await this.guard('scheduling issues', () => this.schedule(signal));
+    if (scheduled === null) return;
+    await this.guard('reporting the worktrees', () => this.reportWorktrees(scheduled));
+    const { decision } = scheduled;
     const idle = decision.resume.length + decision.start.length + decision.waiting.length === 0;
     if (!idle) return;
     const challenging = await this.guard('starting a request challenge', () => this.maybeChallenge(signal));
@@ -278,7 +289,7 @@ export class FactoryDaemon {
     }
   }
 
-  private async schedule(signal: AbortSignal): Promise<SchedulingDecision> {
+  private async schedule(signal: AbortSignal): Promise<Scheduled> {
     const { events, clock, log } = this.dependencies;
     const now = clock.now().getTime();
     for (const [issueNumber, until] of this.deferredUntil) {
@@ -287,6 +298,7 @@ export class FactoryDaemon {
     const states = await issueStates(events);
     const validated = await this.validatedIssues(now);
     const paused = await pausedIssues(events);
+    const holders = await worktreeHolders(events);
     const decision = decideScheduling(
       {
         validated: validated.map((issue) => ({ number: issue.number, blockedBy: issue.blockedBy })),
@@ -294,14 +306,19 @@ export class FactoryDaemon {
         dependencyStates: await this.dependencyStates(validated, states),
         inProcess: new Set(this.running.keys()),
         deferred: new Set([...this.deferredUntil.keys(), ...paused]),
-        heldWorktrees: await heldWorktrees(events),
+        heldWorktrees: holders.length,
         busySlots: this.running.size + (this.backgroundTask === null ? 0 : 1),
       },
       { concurrency: this.concurrency, poolSize: this.settings.poolSize },
     );
     for (const cycle of decision.cycles) log.warn(`issues ${cycle.map((number) => `#${number}`).join(', ')} depend on each other`);
     for (const issueNumber of [...decision.resume, ...decision.start]) this.launch(issueNumber, signal);
-    return decision;
+    return { decision, holders };
+  }
+
+  private reportWorktrees({ decision, holders }: Scheduled): Promise<void> {
+    const found = decision.awaitingWorktree.length === 0 ? null : { poolSize: this.settings.poolSize, waiting: [...decision.awaitingWorktree], holders: [...holders] };
+    return this.shortage.reconcile(found);
   }
 
   private async validatedIssues(now: number): Promise<readonly IssueRecord[]> {

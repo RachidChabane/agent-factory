@@ -409,6 +409,9 @@ async function runUnderFactoryHooks(sandbox: Sandbox, factoryRun: FactoryRun): P
     writableDirectories: [],
     deniedReadPaths: [],
     readablePaths: [],
+    shellCommands: [],
+    unixSockets: [],
+    socketsAllOrNothing: false,
   });
   await writeFile(settingsPath, JSON.stringify(rendered.settings));
 

@@ -23,6 +23,8 @@ import { openInstallation, type InstallationRuntime } from '../composition/insta
 import { SILENT_LOG } from '../composition/operation-log.ts';
 import { createHttpServer, startFactory, type RunningFactory } from '../composition/runtime.ts';
 import { DECISION_QUESTION, RehearsalAgents } from '../testing/rehearsal-agents.ts';
+import { blockersOf } from '../watch/blockers-of.ts';
+import { HttpSnapshotSource } from '../watch/snapshot-source.ts';
 import { createRehearsal, FIRST_PROJECT, SECOND_PROJECT, waitFor, type RehearsalEnvironment } from '../testing/rehearsal-environment.ts';
 
 const TIMEOUT_MS = 60_000;
@@ -250,6 +252,29 @@ describe('the factory HTTP server end to end, with two projects', () => {
       );
       expect((await state()).runs.find((candidate) => candidate.id === waiting.id)).toMatchObject({ status: 'succeeded', pendingQuestion: null });
       expect(agents.requests.filter((request) => request.role === 'implementer').at(-1)?.prompt).toContain('By team.');
+    },
+    TIMEOUT_MS * 2,
+  );
+
+  it(
+    'serves the snapshot agent-factory watch reads, and names the question an agent waits on as the one blocker of the issue',
+    async () => {
+      const source = new HttpSnapshotSource(base);
+      const quiet = await source.read(controller.signal);
+      expect(blockersOf(quiet, new Date(quiet.generatedAt))).toEqual([]);
+      agents.decisionsToAsk = 1;
+      const issue = await rehearsal.project(SECOND_PROJECT).addDocIssue('Document the release owners');
+      const blockers = await waitFor(
+        async () => {
+          const snapshot = await source.read(controller.signal);
+          const found = blockersOf(snapshot, new Date(snapshot.generatedAt));
+          return found.length > 0 ? found : null;
+        },
+        TIMEOUT_MS,
+        'the question to block the issue',
+      );
+      expect(blockers.map((blocker) => [blocker.kind, blocker.project, blocker.issue])).toEqual([['decision-pending', SECOND_PROJECT, issue]]);
+      expect(blockers[0]?.detail).toContain(DECISION_QUESTION);
     },
     TIMEOUT_MS * 2,
   );

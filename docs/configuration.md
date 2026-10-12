@@ -65,7 +65,7 @@ applies at the next tick, and the cockpit lists what waits for a restart.
 | `conventions.branchPrefix` | `factory/` | the prefix of the branches of issues |
 | `conventions.labels` | see meaning | the labels the factory reads and writes: `factory` (`factory`), `validated` (`spec:validated`), `audit` (`audit`), `typePrefix` (`type:`), `kindPrefix` (`kind:`) |
 | `conventions.defaultScope` | `repo` | the Conventional Commit scope when the issue type gives none |
-| `worktrees.size` | `3` | worktrees kept for running issues |
+| `worktrees.size` | `5` | worktrees of the pool. A running issue, an open pull request and an issue waiting for a person each keep one; once all are held, validated issues wait and the cockpit says so. `validate` states how many pull requests the pool lets await review beside the running issues |
 | `concurrency.issues` / `ceiling` | `1` / `3` | issues of this project at once, and the most the operator may raise it to (never above `worktrees.size`) |
 | `setup` | `[]` | commands that prepare a worktree (installs); `{ name, run, network?: <why> }` |
 | `gate.beforeAcceptance` / `afterAcceptance` | `[]` | the gate's commands around the acceptance checks |
