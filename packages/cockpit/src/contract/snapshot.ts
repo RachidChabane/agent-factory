@@ -436,7 +436,7 @@ export const WorkflowRunSchema = z.object({
   trigger: z.string(),
   status: z.enum(WORKFLOW_STATUSES),
   conclusion: z.enum(CHECK_CONCLUSIONS).nullable(),
-  actor: z.string(),
+  actor: z.string().nullable(),
   startedAt: IsoDateTimeSchema,
   durationMs: CountSchema.nullable(),
   url: z.string(),
