@@ -1,5 +1,6 @@
 import { forecastFilmArrivals, ISSUE_SUBJECT_PREFIX, typicalFilmDurationMs, type FilmForecastEntry, type FilmSlot } from '@agent-factory/domain';
 import { issueJournalsOf } from '../daemon/held-worktrees.ts';
+import { ProjectEventStore } from '../projects/project-event-store.ts';
 import { FilmFailedSchema, FilmFinishedSchema, FilmStartedSchema, PIPELINE_EVENTS } from '../pipeline/journal-events.ts';
 import { isFilmPending, type FilmOrderState, type PipelineJournal } from '../pipeline/pipeline-journal.ts';
 import type { Clock, EventStore, FactoryEventRecord } from '../ports.ts';
@@ -24,6 +25,11 @@ export interface FilmProjectState {
   readonly projectId: string;
   readonly records: readonly FactoryEventRecord[];
   readonly journals: ReadonlyMap<number, PipelineJournal>;
+}
+
+/** What a project's records say of its issues, whichever way they were read. */
+export function filmProjectState(projectId: string, records: readonly FactoryEventRecord[]): FilmProjectState {
+  return { projectId, records, journals: issueJournalsOf(records) };
 }
 
 export function filmKey(projectId: string, issueNumber: number, scenario: string): string {
@@ -132,13 +138,18 @@ export class FilmLedger {
     this.fallbackDurationMs = fallbackDurationMs;
   }
 
+  /** The ledger of the projects named, each seen through its own view of the installation's log. */
+  static ofInstallation(events: EventStore, projectIds: readonly string[], clock: Clock, fallbackDurationMs: number): FilmLedger {
+    return new FilmLedger(projectIds.map((projectId) => ({ projectId, events: new ProjectEventStore(events, projectId) })), clock, fallbackDurationMs);
+  }
+
   async read(): Promise<readonly FilmProjectState[]> {
-    return Promise.all(
-      this.projects.map(async ({ projectId, events }) => {
-        const records = await readIssueRecords(events);
-        return { projectId, records, journals: issueJournalsOf(records) };
-      }),
-    );
+    return Promise.all(this.projects.map(async ({ projectId, events }) => filmProjectState(projectId, await readIssueRecords(events))));
+  }
+
+  /** The forecast from records already read, one list per project, each with the subjects the project sees. */
+  forecastFrom(recordsByProject: ReadonlyMap<string, readonly FactoryEventRecord[]>): FilmForecast {
+    return this.forecastOf(this.projects.map(({ projectId }) => filmProjectState(projectId, recordsByProject.get(projectId) ?? [])));
   }
 
   forecastOf(world: readonly FilmProjectState[]): FilmForecast {

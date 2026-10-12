@@ -137,3 +137,24 @@ describe('film durations', () => {
     expect(filmDurations(state?.records ?? []).map((duration) => duration.durationMs)).toEqual([7 * MINUTE_MS]);
   });
 });
+
+describe('film ledger over the installation log', () => {
+  it('sees each project through its own view of the log, and forecasts from records already read', async () => {
+    const log = new FilmLog();
+    await log.openPullRequest('storefront', 1);
+    await log.openPullRequest('ledger', 2);
+    await log.queue('ledger', 2, 'month-end');
+    await log.queue('storefront', 1, 'checkout-flow');
+    const ledger = FilmLedger.ofInstallation(log.installation, ['storefront', 'ledger'], log.clock, FALLBACK_MS);
+
+    const fromLog = await ledger.forecast();
+    const records = new Map([
+      ['storefront', await log.project('storefront').read('', 0)],
+      ['ledger', await log.project('ledger').read('', 0)],
+    ]);
+
+    expect(fromLog.of('storefront', 1, 'checkout-flow')?.filmsAhead).toBe(1);
+    expect(ledger.forecastFrom(records).of('storefront', 1, 'checkout-flow')).toEqual(fromLog.of('storefront', 1, 'checkout-flow'));
+    expect(ledger.forecastFrom(new Map()).of('storefront', 1, 'checkout-flow')).toBeNull();
+  });
+});
