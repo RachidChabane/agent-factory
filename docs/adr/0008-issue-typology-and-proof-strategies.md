@@ -45,10 +45,13 @@ Option 3. A project lists its `issueTypes`; each declares:
 - `paths`: optional globs that suggest the type of an audited change.
 
 Test runners are adapters behind one port: `pytest` (JUnit XML), `vitest` and
-`playwright` (JSON reports), `junit` (any runner writing JUnit XML, such as
-`node --test`, Maven or Go tools) and `eval` (scored cases). Each adapter knows its
-reporter arguments, how to read its report and how to tell an assertion failure
-from an error.
+`playwright` (JSON reports), `node-test` (the Node.js test runner's JUnit XML; the
+runner reads its reporters before the test files, so they travel in `NODE_OPTIONS`)
+and `eval` (scored cases). Each adapter knows how to ask its runner for a report,
+how to read it, and how to tell an assertion failure from an error or a file that
+did not load. The acceptance-author is told the runners by name, and the check
+guidance of the issue type, through placeholders of its role prompt; the
+challenger is told the project's type ids the same way.
 
 `agent-factory init` writes a typology that fits the detected stack, starting from
 a preset (`feature`, `fix`, `ui`, `api`, `security`, `infra`, `data`, `dependencies`,
