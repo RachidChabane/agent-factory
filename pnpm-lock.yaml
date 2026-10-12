@@ -117,6 +117,8 @@ importers:
 
   packages/domain: {}
 
+  packages/fake-claude: {}
+
   packages/plugin:
     dependencies:
       '@agent-factory/domain':
