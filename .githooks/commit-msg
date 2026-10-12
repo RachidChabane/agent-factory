@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Strips AI attribution lines from the commit message, then refuses a message that
+# carries a denylisted term.
+set -euo pipefail
+
+message_file="$1"
+attribution='^(co-authored-by:.*(claude|copilot|anthropic|openai|gemini|codex|cursor|noreply@anthropic\.com)|claude-session:|.*generated with \[?(claude|copilot|chatgpt|codex|gemini|cursor)|🤖).*$'
+
+filtered="$(mktemp)"
+trap 'rm -f "$filtered"' EXIT
+grep -v -i -E "$attribution" "$message_file" > "$filtered" || true
+# Drop the trailing blank lines the removed trailers leave behind.
+awk 'NF { for (i = 0; i < blank; i++) print ""; blank = 0; print; next } { blank++ }' "$filtered" > "$message_file"
+
+root="$(git rev-parse --show-toplevel)"
+exec node "$root/tools/denylist/src/scan.ts" --message "$message_file"

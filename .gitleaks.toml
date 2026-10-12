@@ -1,0 +1,5 @@
+# Secret scanning configuration for gitleaks: the default rules.
+title = "agent-factory"
+
+[extend]
+useDefault = true

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Refuses a commit whose staged content or paths carry a denylisted term or a secret.
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+node "$root/tools/denylist/src/scan.ts" --staged
+if command -v gitleaks > /dev/null 2>&1; then
+  gitleaks git --pre-commit --staged --no-banner --redact --config "$root/.gitleaks.toml" "$root"
+else
+  echo "pre-commit: gitleaks is not installed; the secret scan runs in CI and in the pre-push hook of a machine that has it" >&2
+fi

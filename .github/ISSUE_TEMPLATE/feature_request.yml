@@ -1,0 +1,22 @@
+name: Feature request
+description: A capability the factory or the cockpit should have.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Need
+      description: The problem you want solved, in your own terms.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: How you would know it works
+      description: Observable outcomes, one per line.
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope

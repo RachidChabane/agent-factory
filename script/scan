@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Scans the working tree and the whole history (content, paths, commit messages,
+# authors, references) for denylisted terms, then for secrets with gitleaks.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+node tools/denylist/src/scan.ts --tree
+if git rev-parse --verify HEAD > /dev/null 2>&1; then
+  node tools/denylist/src/scan.ts --history
+fi
+if ! command -v gitleaks > /dev/null 2>&1; then
+  echo "scan: gitleaks is not installed" >&2
+  exit 1
+fi
+gitleaks dir --no-banner --redact --config .gitleaks.toml .
+if git rev-parse --verify HEAD > /dev/null 2>&1; then
+  gitleaks git --no-banner --redact --config .gitleaks.toml .
+fi

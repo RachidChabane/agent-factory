@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Lints and type-checks every package, then checks the shell scripts and the workflows.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+source script/lib/heavy.sh
+
+run_heavy pnpm exec eslint .
+run_heavy pnpm -r --workspace-concurrency=1 --if-present run typecheck
+
+shell_files=(script/setup script/lint script/test script/scan script/lib/*.sh .githooks/*)
+if command -v shellcheck > /dev/null 2>&1; then
+  shellcheck -x "${shell_files[@]}"
+else
+  echo "lint: shellcheck is not installed; skipping the shell checks" >&2
+fi
+if command -v actionlint > /dev/null 2>&1 && [ -d .github/workflows ]; then
+  actionlint
+fi
