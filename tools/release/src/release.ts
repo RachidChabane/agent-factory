@@ -5,11 +5,14 @@ import { assertVersion, parseCommit, prependSection, renderSection, repositoryPa
 
 /**
  * The release tool: `prepare <version>` writes the new section of CHANGELOG.md from the commits since the previous
- * release tag, sets the version of the root package.json and prints the section; `notes <version>` prints the section
- * of an existing release, as its release notes.
+ * release tag, sets the version of the root package.json and of the plugin, and prints the section; `notes <version>`
+ * prints the section of an existing release, as its release notes.
  */
 const CHANGELOG_FILE = 'CHANGELOG.md';
 const MANIFEST_FILE = 'package.json';
+const PLUGIN_MANIFEST_FILE = 'packages/plugin/.claude-plugin/plugin.json';
+/** The files whose `version` is the factory's: the installed factory reports it, and the plugin ships with it. */
+const VERSIONED_MANIFESTS: readonly string[] = [MANIFEST_FILE, PLUGIN_MANIFEST_FILE];
 const JSON_INDENT = 2;
 const TAG_PREFIX = 'v';
 const FIELD_SEPARATOR = '\u001f';
@@ -67,16 +70,15 @@ function prepare(root: string, version: string): number {
     repositoryUrl: remote === null ? null : repositoryPage(remote),
   });
   writeFileSync(join(root, CHANGELOG_FILE), prependSection(readChangelog(root), section));
-  setManifestVersion(root, version);
+  for (const manifest of VERSIONED_MANIFESTS) setManifestVersion(root, manifest, version);
   process.stdout.write(`${section}\n`);
   return 0;
 }
 
-/** The version the installed factory reports, in the root manifest. */
-function setManifestVersion(root: string, version: string): void {
-  const path = join(root, MANIFEST_FILE);
+function setManifestVersion(root: string, file: string, version: string): void {
+  const path = join(root, file);
   const manifest: unknown = JSON.parse(readFileSync(path, UTF8));
-  if (typeof manifest !== 'object' || manifest === null) throw new Error(`${MANIFEST_FILE} is not an object`);
+  if (typeof manifest !== 'object' || manifest === null) throw new Error(`${file} is not an object`);
   writeFileSync(path, `${JSON.stringify({ ...manifest, version }, null, JSON_INDENT)}\n`);
 }
 
