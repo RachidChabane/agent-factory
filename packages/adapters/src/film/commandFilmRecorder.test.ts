@@ -131,6 +131,22 @@ describe('CommandFilmRecorder', () => {
     await expect(recorder().record(request('crash'))).rejects.toThrow('the film command exited with 3: Error: the session expired');
   });
 
+  it('reports the error output, without colour codes, rather than the last progress lines', async () => {
+    const failing = {
+      run: () =>
+        Promise.resolve({
+          exitCode: 1,
+          stdout: '\u001b[1mApply complete! Resources: 0 added\u001b[0m\n',
+          stderr: 'evidence: memory pressure level is 2 after waiting 600s, expected 1\n',
+          durationMs: 5,
+          timedOut: false,
+        }),
+    };
+    await expect(new CommandFilmRecorder(failing, { film: film(), operatorEnvironment: {} }).record(request('checkout-flow'))).rejects.toThrow(
+      'the film command exited with 1: evidence: memory pressure level is 2 after waiting 600s, expected 1',
+    );
+  });
+
   it('fails when the command wrote no report', async () => {
     await expect(recorder().record(request('no-report'))).rejects.toThrow('wrote no report.json');
   });
