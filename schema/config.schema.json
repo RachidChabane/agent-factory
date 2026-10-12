@@ -1031,7 +1031,7 @@
             "type": "object",
             "properties": {
               "size": {
-                "default": 3,
+                "default": 5,
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991

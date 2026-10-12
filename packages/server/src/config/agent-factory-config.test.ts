@@ -115,7 +115,7 @@ describe('the configuration of a project', () => {
     const project = projectOf(parse(document()), 'storefront');
     expect(project.directory).toBe(`${HOME}/projects/storefront`);
     expect(project.clonePath).toBe(`${HOME}/projects/storefront/clone`);
-    expect(project.worktreePool).toEqual({ directory: `${HOME}/projects/storefront/worktrees`, size: 3 });
+    expect(project.worktreePool).toEqual({ directory: `${HOME}/projects/storefront/worktrees`, size: 5 });
     expect(project.directories.evidence).toBe(`${HOME}/projects/storefront/evidence`);
     expect(project.repository).toEqual({ owner: 'example-org', name: 'storefront' });
   });
