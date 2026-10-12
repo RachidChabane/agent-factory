@@ -162,6 +162,19 @@ describe('renderBubblewrapArguments', () => {
     );
   });
 
+  it('binds the read-only directories on themselves, in order, after every writable, hidden and engine mount', () => {
+    fc.assert(
+      fc.property(safePath(), fc.array(safePath()), fc.array(safePath()), fc.uniqueArray(safePath()), (working, writable, hidden, readOnly) => {
+        const args = renderBubblewrapArguments({ workingDirectory: working, writableDirectories: writable, hiddenDirectories: hidden, hiddenFiles: [], engineSockets: [], readOnlyDirectories: readOnly, network: true });
+        const readOnlyBinds = indexesOf(args, '--ro-bind-try');
+        const earlier = [...indexesOf(args, '--bind'), ...indexesOf(args, '--bind-try'), ...indexesOf(args, '--tmpfs')];
+        expect(readOnlyBinds.map((index) => args.slice(index + 1, index + 3))).toEqual(readOnly.map((directory) => [directory, directory]));
+        expect(readOnlyBinds.every((index) => earlier.every((other) => index > other))).toBe(true);
+        expect(args.slice(-3)).toEqual(['--chdir', working, COMMAND_SEPARATOR]);
+      }),
+    );
+  });
+
   it('mounts every directory it is given on itself and nothing else', () => {
     fc.assert(
       fc.property(safePath(), fc.array(safePath()), (working, writable) => {

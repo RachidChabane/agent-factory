@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   NO_REFERENCE_MOUNTS,
@@ -22,6 +23,22 @@ describe('referenceCopyRules', () => {
     expect(referenceCopyRules([TOKENS, ICONS])).toHaveLength(4);
     expect(referenceCopyRules([TOKENS, ICONS])[2]).toBe(`Bash(cp ${ICONS.path}/*)`);
     expect(referenceCopyRules([])).toEqual([]);
+  });
+});
+
+describe('referenceCopyRules, whatever the snapshots', () => {
+  const snapshotPath = fc.array(fc.stringMatching(/^[a-z][a-z0-9._@-]{0,8}$/), { minLength: 1, maxLength: 5 }).map((segments) => `/${segments.join('/')}`);
+
+  it('allows a copy from under each snapshot directory and from nowhere else, with no other form of cp', () => {
+    fc.assert(
+      fc.property(fc.uniqueArray(snapshotPath, { maxLength: 5 }), (paths) => {
+        const rules = referenceCopyRules(paths.map((path) => ({ ...TOKENS, path })));
+        expect(rules).toHaveLength(paths.length * 2);
+        paths.forEach((path, index) => {
+          expect(rules.slice(index * 2, index * 2 + 2)).toEqual([`Bash(cp ${path}/*)`, `Bash(cp -R ${path}/*)`]);
+        });
+      }),
+    );
   });
 });
 

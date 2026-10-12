@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -68,6 +69,22 @@ describe('renderSeatbeltProfile', () => {
     expect(profile.indexOf(`(allow file-read*\n  ${snapshot})`)).toBeGreaterThan(profile.indexOf('(deny file-read*'));
     expect(profile.indexOf(`(deny file-write*\n  ${snapshot})`)).toBeGreaterThan(profile.indexOf('(allow file-write*'));
     expect(profile.trimEnd().endsWith(')')).toBe(true);
+  });
+
+  it('grants the reads of every read-only directory after the denies and ends with the denial of their writes, whatever they are', () => {
+    const segment = fc.stringMatching(/^[a-z][a-z0-9._@-]{0,8}$/);
+    const directory = fc.array(segment, { minLength: 1, maxLength: 4 }).map((segments) => `/${segments.join('/')}`);
+    fc.assert(
+      fc.property(fc.uniqueArray(directory, { minLength: 1, maxLength: 4 }), fc.boolean(), (directories, network) => {
+        const profile = renderSeatbeltProfile({ ...POLICY, readOnlyDirectories: directories, network });
+        const listed = directories.map((path) => `(subpath "${path}")`).join('\n  ');
+        const lastWriteDenial = profile.lastIndexOf('(deny file-write*');
+        expect(profile).toContain(`(allow file-read*\n  ${listed})`);
+        expect(profile.indexOf('(allow file-read*')).toBeGreaterThan(profile.indexOf('(deny file-read*'));
+        expect(profile.slice(lastWriteDenial)).toContain(`(deny file-write*\n  ${listed})`);
+        expect(profile.lastIndexOf('(allow file-write*')).toBeLessThan(lastWriteDenial);
+      }),
+    );
   });
 
   it('refuses a read-only directory that would break out of its string literal', () => {
