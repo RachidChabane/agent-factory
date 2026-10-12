@@ -1,6 +1,6 @@
 import type { IssueSpec } from '@agent-factory/domain';
 import type { ProjectConventions } from '../conventions/project-conventions.ts';
-import { SPEC_FILE_HEADERS, SpecRenderError, formatSpecSections, renderSpecBody } from '../spec/index.ts';
+import { SPEC_FILE_HEADERS, SpecRenderError, filmsHeaderLines, formatSpecSections, renderSpecBody } from '../spec/index.ts';
 import { FILE_PATH_SEPARATOR, REQUEST_SPECS_DIRECTORY } from './request-files.ts';
 
 const DRAFT_ISSUE_NUMBER = 1;
@@ -21,6 +21,8 @@ export interface ProposedSpecDraft {
   readonly acceptanceCriteria: readonly string[];
   readonly outOfScope: readonly string[];
   readonly expectedProof: string;
+  /** The film scenarios the pull request must show, written as the spec file's `Films:` header; none when absent. */
+  readonly films?: readonly string[];
 }
 
 export interface RenderedSpecFile {
@@ -57,7 +59,7 @@ function toIssueSpec(draft: ProposedSpecDraft): IssueSpec {
     expectedProof: draft.expectedProof,
     dependsOn: [],
     commitKind: null,
-    films: [],
+    films: [...(draft.films ?? [])],
   };
 }
 
@@ -80,6 +82,10 @@ function renderBody(draft: ProposedSpecDraft, conventions: ProjectConventions): 
 export function renderSpecFile(draft: ProposedSpecDraft, conventions: ProjectConventions): RenderedSpecFile {
   const { body, problems } = renderBody(draft, conventions);
   const labels = conventions.typology.has(draft.type) ? conventions.typology.get(draft.type).label : '';
-  const header = [`${SPEC_FILE_HEADERS.title} ${draft.title}`, `${SPEC_FILE_HEADERS.labels} ${labels}`.trimEnd()].join(NEWLINE);
+  const header = [
+    `${SPEC_FILE_HEADERS.title} ${draft.title}`,
+    `${SPEC_FILE_HEADERS.labels} ${labels}`.trimEnd(),
+    ...filmsHeaderLines(draft.films ?? []),
+  ].join(NEWLINE);
   return { content: `${header}${BLANK_LINE}${body}`, problems };
 }

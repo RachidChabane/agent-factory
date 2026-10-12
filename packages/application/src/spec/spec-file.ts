@@ -11,6 +11,7 @@ export const SPEC_FILE_HEADERS = {
 } as const;
 
 const LIST_SEPARATOR = ',';
+const LIST_JOINER = `${LIST_SEPARATOR} `;
 const NEWLINE = '\n';
 const DRAFT_ISSUE_NUMBER = 1;
 
@@ -45,6 +46,11 @@ function headerValue(line: string | undefined, header: string, position: string)
     throw new SpecFileFormatError(`the ${position} line must start with "${header}"`);
   }
   return line.slice(header.length).trim();
+}
+
+/** The `Films:` line of a spec file that declares scenarios; no line for a spec that declares none. */
+export function filmsHeaderLines(films: readonly string[]): readonly string[] {
+  return films.length === 0 ? [] : [`${SPEC_FILE_HEADERS.films} ${films.join(LIST_JOINER)}`];
 }
 
 export function parseSpecFile(text: string): SpecFile {

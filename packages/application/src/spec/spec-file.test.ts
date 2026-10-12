@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
-import { parseLabelList, parseSpecFile, specFileLabels, specFileProblems, SpecFileFormatError, withExtraLabels } from './spec-file.ts';
+import { filmsHeaderLines, parseLabelList, parseSpecFile, specFileLabels, specFileProblems, SpecFileFormatError, withExtraLabels } from './spec-file.ts';
 import { FILM_SCENARIO_MAX_LENGTH } from '@agent-factory/domain';
 
 const SPEC_FILE = [
@@ -78,5 +78,15 @@ describe('spec files', () => {
     expect(() => parseSpecFile(SPEC_FILE.replace('Title:', 'Name:'))).toThrow(SpecFileFormatError);
     expect(() => parseSpecFile(SPEC_FILE.replace('Labels:', 'Tags:'))).toThrow(SpecFileFormatError);
     expect(() => parseSpecFile('Title:   \nLabels: a\n## Need\nx\n')).toThrow(SpecFileFormatError);
+  });
+});
+
+describe('filmsHeaderLines', () => {
+  it('is one Films line holding every scenario', () => {
+    expect(filmsHeaderLines(['checkout-flow', 'order.history'])).toEqual(['Films: checkout-flow, order.history']);
+  });
+
+  it('is no line at all when no scenario is declared', () => {
+    expect(filmsHeaderLines([])).toEqual([]);
   });
 });
