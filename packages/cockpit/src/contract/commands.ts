@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AGENT_ROLES, EFFORT_LEVELS, PAUSE_ABOVE_PRESSURE_LEVELS } from '@agent-factory/domain';
+import { AGENT_ROLES, EFFORT_LEVELS, FILM_SCENARIO_RULE, isFilmScenarioName, PAUSE_ABOVE_PRESSURE_LEVELS } from '@agent-factory/domain';
 import { AmountSchema, CountSchema, IssueNumberSchema, IssueTypeIdSchema, PercentSchema, ProjectIdSchema } from './primitives.ts';
 
 const ProjectRefSchema = z.object({ project: ProjectIdSchema });
@@ -61,6 +61,8 @@ export const COMMAND_BODY_SCHEMAS = {
   'run.answer': RunRefSchema.extend({ questionId: z.string().min(1), answer: z.string().min(1) }),
   'pr.merge': ProjectRefSchema.extend({ number: IssueNumberSchema, expectedHeadSha: z.string().min(1) }),
   'pr.feedback': ProjectRefSchema.extend({ number: IssueNumberSchema, author: z.string().min(1), body: z.string().min(1) }),
+  /** Orders the film of a scenario on the pull request of an issue; the installation's queue records it in its turn. */
+  'pr.film': IssueRefSchema.extend({ scenario: z.string().trim().refine(isFilmScenarioName, { message: `the scenario name must be ${FILM_SCENARIO_RULE}` }) }),
   'deployment.redeploy': ProjectRefSchema.extend({ environment: z.string().min(1), confirmVersion: z.string().trim().min(1) }),
   'release.cut': ReleaseRefSchema,
   'release.evaluate': ReleaseRefSchema,

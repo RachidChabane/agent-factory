@@ -13,7 +13,7 @@ function issue(number: number, state: IssueState, dependsOn: readonly number[] =
     type: 'feature',
     state,
     dependsOn: [...dependsOn],
-    spec: { need: 'A need', acceptanceCriteria: ['A criterion'], outOfScope: [], expectedProof: 'A proof' },
+    spec: { need: 'A need', acceptanceCriteria: ['A criterion'], outOfScope: [], expectedProof: 'A proof', films: [] },
     createdAt: MOMENT,
     updatedAt: MOMENT,
     url: `https://forge.example.com/issues/${number}`,

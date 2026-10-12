@@ -75,6 +75,7 @@ export const HTTP_TIMEOUT_SPEC: IssueSpecView = {
   acceptanceCriteria: ['The payment provider call sets its timeout to 30 seconds explicitly.', 'A unit test fails when the configured timeout is not 30 seconds.'],
   outOfScope: ['Retrying failed payment calls'],
   expectedProof: `A unit test of the payment provider client, as a follow-up of the audit of the bump merged for #${ISSUE.httpClientBump}.`,
+  films: [],
 };
 
 function draftBodyOf(spec: IssueSpecView): string {

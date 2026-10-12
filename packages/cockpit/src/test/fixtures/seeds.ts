@@ -61,6 +61,8 @@ export type PullRequestSeed = WithDefaults<
   | 'evidenceComplete'
   | 'missingEvidence'
   | 'evidence'
+  | 'films'
+  | 'filmOrders'
   | 'reviewRounds'
   | 'externalFeedback'
   | 'files'
@@ -75,6 +77,8 @@ export function pullRequestView(seed: PullRequestSeed): PullRequestView {
     evidenceComplete: true,
     missingEvidence: [],
     evidence: [],
+    films: [],
+    filmOrders: [],
     reviewRounds: [],
     externalFeedback: [],
     files: [],

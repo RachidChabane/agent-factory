@@ -36,7 +36,7 @@ function issue(number: number, state: IssueState, overrides: Partial<IssueView> 
     title: `Issue ${number}`,
     type: 'feature',
     state,
-    spec: { need: 'A need', acceptanceCriteria: ['A criterion'], outOfScope: [], expectedProof: 'A proof' },
+    spec: { need: 'A need', acceptanceCriteria: ['A criterion'], outOfScope: [], expectedProof: 'A proof', films: [] },
     createdAt: MOMENT,
     updatedAt: MOMENT,
     url: `https://forge.example.com/issues/${number}`,

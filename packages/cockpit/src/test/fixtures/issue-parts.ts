@@ -42,7 +42,7 @@ export function attemptsOf(runs: RunWorld, ...steps: readonly [string, AttemptKi
 }
 
 export function specOfProposal(proposal: ProposedSpec): IssueSpecView {
-  return { need: proposal.need, acceptanceCriteria: [...proposal.acceptanceCriteria], outOfScope: [...proposal.outOfScope], expectedProof: proposal.expectedProof };
+  return { need: proposal.need, acceptanceCriteria: [...proposal.acceptanceCriteria], outOfScope: [...proposal.outOfScope], expectedProof: proposal.expectedProof, films: [] };
 }
 
 /** What the agent runs of an issue cost, summed. */
