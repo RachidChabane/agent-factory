@@ -412,6 +412,7 @@ async function runUnderFactoryHooks(sandbox: Sandbox, factoryRun: FactoryRun): P
     shellCommands: [],
     unixSockets: [],
     socketsAllOrNothing: false,
+    references: [],
   });
   await writeFile(settingsPath, JSON.stringify(rendered.settings));
 
