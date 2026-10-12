@@ -61,6 +61,8 @@ export interface CommandContext {
   /** The running daemons, or null when the command comes from outside a running factory. */
   readonly daemons: RunningDaemons | null;
   readonly operator: string;
+  /** Aborts when the factory stops: a command that starts a process stops it then, so none outlives the factory. */
+  readonly lifetime: AbortSignal;
 }
 
 export interface CommandResponse {
@@ -316,7 +318,7 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
     return startedByDaemon(context, `Scheduling resumed for ${scope.label}`);
   }),
   'usage.refresh': command(COMMAND_BODY_SCHEMAS['usage.refresh'], async (_body, context) => {
-    const usage = await context.runtime.usage.refreshNow(new AbortController().signal);
+    const usage = await context.runtime.usage.refreshNow(context.lifetime);
     return `Subscription usage read for ${usage.length} account(s)`;
   }),
   'tools.check': command(COMMAND_BODY_SCHEMAS['tools.check'], async (body, context) => {
@@ -333,7 +335,7 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
       body.project === null
         ? { events: runtime.events, sessions: runtime.toolSessions, prober: runtime.tools }
         : { events: projectOf(context, body.project).dependencies.events, sessions: runtime.projectToolSessions(body.project), prober: runtime.projectTools(body.project) };
-    const { login, check } = await logInTool(dependencies, body.tool, operator, new AbortController().signal);
+    const { login, check } = await logInTool(dependencies, body.tool, operator, context.lifetime);
     return `${body.tool}: login ${login.outcome} (${login.detail}); the tool is now ${check.status}`;
   }),
   'health.check': command(COMMAND_BODY_SCHEMAS['health.check'], async (body, context) => {

@@ -23,6 +23,7 @@ const DELIVERED: NotifyFetchFunction = () => Promise.resolve({ status: 200 });
 const WIDGETS_SCENARIO = 'doc-tour';
 const GADGETS_SCENARIO = 'rota-tour';
 const OPERATOR = 'alex';
+const LIFETIME = new AbortController().signal;
 
 interface FilmSpan {
   readonly project: string;
@@ -265,17 +266,17 @@ describe('films across an installation of two projects that film', () => {
     const cursor = new SequenceCursor(installation.events);
     const order = { project: FIRST_PROJECT, issueNumber: widgetsIssue, scenario: 'ordered-by-cockpit' };
 
-    const stopped = await dispatchCommand('pr.film', order, { runtime: installation, daemons: null, operator: OPERATOR }, cursor);
+    const stopped = await dispatchCommand('pr.film', order, { runtime: installation, daemons: null, operator: OPERATOR, lifetime: LIFETIME }, cursor);
     expect(stopped).toMatchObject({ status: 409, body: { error: 'the factory is not running; start it with "agent-factory start"' } });
 
     const daemons = createDaemons(installation);
-    const accepted = await dispatchCommand('pr.film', order, { runtime: installation, daemons, operator: OPERATOR }, cursor);
+    const accepted = await dispatchCommand('pr.film', order, { runtime: installation, daemons, operator: OPERATOR, lifetime: LIFETIME }, cursor);
     expect(accepted).toMatchObject({ status: 200, body: { effect: expect.stringContaining(`The film of scenario ordered-by-cockpit is queued for issue #${widgetsIssue} of ${FIRST_PROJECT}`) } });
     expect((await journalOf(widgetsEvents, widgetsIssue)).filmOrders.find((candidate) => candidate.scenario === 'ordered-by-cockpit')).toMatchObject({ status: 'queued', operator: OPERATOR });
 
-    const again = await dispatchCommand('pr.film', order, { runtime: installation, daemons, operator: OPERATOR }, cursor);
+    const again = await dispatchCommand('pr.film', order, { runtime: installation, daemons, operator: OPERATOR, lifetime: LIFETIME }, cursor);
     expect(again).toMatchObject({ status: 409, body: { error: expect.stringContaining('already queued') } });
-    const merged = await dispatchCommand('pr.film', { ...order, project: SECOND_PROJECT, issueNumber: gadgetsIssue }, { runtime: installation, daemons, operator: OPERATOR }, cursor);
+    const merged = await dispatchCommand('pr.film', { ...order, project: SECOND_PROJECT, issueNumber: gadgetsIssue }, { runtime: installation, daemons, operator: OPERATOR, lifetime: LIFETIME }, cursor);
     expect(merged).toMatchObject({ status: 409, body: { error: expect.stringContaining('already merged') } });
   });
 });

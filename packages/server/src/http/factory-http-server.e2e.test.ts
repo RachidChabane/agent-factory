@@ -518,7 +518,7 @@ describe('the factory HTTP server end to end, with two projects', () => {
 
   it('refuses requests without an allowed Tailscale identity once remote access goes through the tailnet', async () => {
     const tailnet = { ...installation.config.server, remoteAccess: { kind: 'tailscale' as const, allowedLogins: ['alex@example.com'] } };
-    const guarded = createHttpServer({ ...installation, config: { ...installation.config, server: tailnet } }, null, { cockpitDirectory: join(rehearsal.root, 'cockpit-dist') });
+    const guarded = createHttpServer({ ...installation, config: { ...installation.config, server: tailnet } }, null, controller.signal, { cockpitDirectory: join(rehearsal.root, 'cockpit-dist') });
     const address = await guarded.start();
     try {
       const url = `http://127.0.0.1:${address.port}/api/state`;
