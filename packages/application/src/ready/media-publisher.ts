@@ -1,6 +1,6 @@
 import type { MediaFailureRecord } from '../pipeline/journal-events.ts';
 import type { NoticeLink, OperationLog } from '../ports.ts';
-import type { MediaFile } from './ready-media.ts';
+import type { MediaToUpload } from './ready-media.ts';
 import type { FileFingerprints, MediaLinkCache, MediaUploader } from './ready-ports.ts';
 
 export interface MediaPublisherDependencies {
@@ -33,7 +33,7 @@ export class MediaPublisher {
     this.dependencies = dependencies;
   }
 
-  async publish(files: readonly MediaFile[], signal: AbortSignal): Promise<PublishedMedia> {
+  async publish(files: readonly MediaToUpload[], signal: AbortSignal): Promise<PublishedMedia> {
     const links: NoticeLink[] = [];
     const failures: MediaFailureRecord[] = [];
     for (const file of files) {
@@ -49,7 +49,7 @@ export class MediaPublisher {
     return { links, failures };
   }
 
-  private async urlOf(file: MediaFile): Promise<string> {
+  private async urlOf(file: MediaToUpload): Promise<string> {
     const { uploader, fingerprints, cache } = this.dependencies;
     const fingerprint = await fingerprints.of(file.path);
     const known = await cache.find(fingerprint);
