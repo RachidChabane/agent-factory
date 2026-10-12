@@ -16,7 +16,7 @@ Rules:
 - Follow the repository's rules in its AGENTS.md and CLAUDE.md for the files you write.
 - Use only test tooling the repository already has. If a criterion cannot be checked with it, stop and say which criterion and why.
 - If a criterion is ambiguous, stop and state the ambiguity and the readings it allows. Do not choose one.
-
+{{films}}
 When the checks are written, write `.factory/acceptance.json`:
 ```json
 {

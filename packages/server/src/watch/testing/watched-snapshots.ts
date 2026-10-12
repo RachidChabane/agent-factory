@@ -1,4 +1,4 @@
-import type { WatchedIssue, WatchedProject, WatchedRun, WatchedSnapshot } from '../watched-snapshot.ts';
+import type { WatchedFilmOrder, WatchedIssue, WatchedProject, WatchedPullRequest, WatchedRun, WatchedSnapshot } from '../watched-snapshot.ts';
 
 export const READ_AT = new Date('2026-10-12T14:00:00.000Z');
 const MILLISECONDS_PER_MINUTE = 60_000;
@@ -28,8 +28,16 @@ export function runView(id: string, overrides: Partial<WatchedRun> = {}): Watche
   };
 }
 
+export function filmOrderView(scenario: string, overrides: Partial<WatchedFilmOrder> = {}): WatchedFilmOrder {
+  return { scenario, operator: 'Alex Morgan', state: 'queued', expectedAt: null, filmsAhead: 0, reason: null, since: minutesBefore(1), ...overrides };
+}
+
+export function pullRequestView(number: number, issueNumber: number, overrides: Partial<WatchedPullRequest> = {}): WatchedPullRequest {
+  return { number, issueNumber, state: 'open', filmOrders: [], ...overrides };
+}
+
 export function projectView(id: string, overrides: Partial<WatchedProject> = {}): WatchedProject {
-  return { id, pauses: [], scheduler: { worktreeShortage: null }, issues: [], ...overrides };
+  return { id, pauses: [], scheduler: { worktreeShortage: null }, issues: [], pullRequests: [], ...overrides };
 }
 
 export function watchedSnapshot(overrides: Partial<WatchedSnapshot> = {}): WatchedSnapshot {

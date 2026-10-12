@@ -66,6 +66,10 @@ describe('rehearsal on a local forge', () => {
       expect(captured.lines.at(-1)).toBe('Local issue gadgets#1: Serve the domain from the UI [type:infra, spec:validated]');
       expect(await readFile(`${home}/projects/gadgets/forge/issues/1.md`, 'utf8')).toContain('## Acceptance criteria\n1. The production values declare the route.');
 
+      await writeFile(join(home, 'spec.md'), SPEC_FILE.replace('Labels: type:infra\n', 'Labels: type:infra\n\nFilms: checkout-flow\n'));
+      expect(await runCli(['rehearsal', 'add-issue', 'spec.md', '--labels', 'spec:validated'], context())).toBe(0);
+      expect(captured.lines.at(-1)).toBe('Local issue gadgets#2: Serve the domain from the UI [type:infra, spec:validated, film:checkout-flow]');
+
       await writeFile(join(home, 'spec.md'), SPEC_FILE.replace('## Out of scope\n- DNS records.\n', ''));
       expect(await runCli(['rehearsal', 'add-issue', 'spec.md'], context())).toBe(1);
       expect(captured.errors.at(-1)).toContain('section "## Out of scope" is missing');

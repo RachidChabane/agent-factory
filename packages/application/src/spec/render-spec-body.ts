@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
-import type { IssueSpec } from '@agent-factory/domain';
+import { filmLabel, type IssueSpec } from '@agent-factory/domain';
 import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import { parseIssueSpec } from './markdown-spec-reader.ts';
 import { SpecFormatError, SpecRenderError } from './spec-errors.ts';
@@ -56,7 +56,7 @@ function assertRoundTrips(spec: IssueSpec, body: string, conventions: ProjectCon
         number: spec.number,
         title: spec.title,
         body,
-        labels: [typeLabel, ...(spec.commitKind === null ? [] : [kindLabel(spec.commitKind, conventions.labels.kindPrefix)])],
+        labels: [typeLabel, ...(spec.commitKind === null ? [] : [kindLabel(spec.commitKind, conventions.labels.kindPrefix)]), ...spec.films.map(filmLabel)],
         blockedBy: spec.dependsOn,
       },
       conventions,

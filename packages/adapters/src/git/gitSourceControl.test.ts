@@ -60,6 +60,30 @@ describe('GitSourceControl', () => {
     await expect(access(marker)).rejects.toThrow();
   });
 
+  it('discards the listed paths, restoring tracked ones and removing new ones, and touches nothing else', async () => {
+    await writeRepositoryFile(worktree.path, 'films/kept.txt', 'committed\n');
+    await sourceControl.commitAll(worktree, 'chore(evidence): add films');
+    await writeRepositoryFile(worktree.path, 'films/kept.txt', 'overwritten\n');
+    await writeRepositoryFile(worktree.path, 'films/new.txt', 'new\n');
+    await writeRepositoryFile(worktree.path, 'other/unrelated.txt', 'keep me\n');
+
+    await sourceControl.discardPaths(worktree, ['films/kept.txt', 'films/new.txt']);
+
+    expect(await readFile(join(worktree.path, 'films/kept.txt'), 'utf8')).toBe('committed\n');
+    await expect(access(join(worktree.path, 'films/new.txt'))).rejects.toThrow();
+    expect(await readFile(join(worktree.path, 'other/unrelated.txt'), 'utf8')).toBe('keep me\n');
+    expect(git(worktree.path, 'status', '--porcelain')).toBe('?? other/');
+  });
+
+  it('discards paths that were never tracked nor created without failing', async () => {
+    await sourceControl.discardPaths(worktree, ['films/missing.mp4']);
+    expect(await sourceControl.isClean(worktree)).toBe(true);
+  });
+
+  it('refuses to discard a path outside the worktree', async () => {
+    await expect(sourceControl.discardPaths(worktree, ['../outside.txt'])).rejects.toBeInstanceOf(PathOutsideWorktreeError);
+  });
+
   it('reports head sha equal to the base sha on a fresh worktree', async () => {
     expect(await sourceControl.headSha(worktree)).toBe(worktree.baseSha);
   });

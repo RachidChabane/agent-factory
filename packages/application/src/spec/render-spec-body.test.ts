@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { COMMIT_KINDS, DEFAULT_ISSUE_TYPES } from '@agent-factory/domain';
+import { COMMIT_KINDS, DEFAULT_ISSUE_TYPES, filmLabel } from '@agent-factory/domain';
 import type { IssueSpec } from '@agent-factory/domain';
 import { parseIssueSpec } from './markdown-spec-reader.ts';
 import { renderSpecBody } from './render-spec-body.ts';
@@ -31,6 +31,7 @@ const issueSpec: fc.Arbitrary<IssueSpec> = fc.record({
   expectedProof: multiLineText,
   dependsOn: fc.uniqueArray(fc.integer({ min: 1, max: 100_000 }), { maxLength: 4 }).map((numbers) => numbers.sort((a, b) => a - b)),
   commitKind: fc.option(fc.constantFrom(...COMMIT_KINDS), { nil: null }),
+  films: fc.uniqueArray(fc.constantFrom('checkout-flow', 'order.history', 'v2_login'), { maxLength: 3 }),
 });
 
 function parseRendered(spec: IssueSpec, body: string): IssueSpec {
@@ -42,6 +43,7 @@ function parseRendered(spec: IssueSpec, body: string): IssueSpec {
       labels: [
         CONVENTIONS.typology.get(spec.type).label,
         ...(spec.commitKind === null ? [] : [kindLabel(spec.commitKind, CONVENTIONS.labels.kindPrefix)]),
+        ...spec.films.map(filmLabel),
         CONVENTIONS.labels.validated,
       ],
       blockedBy: spec.dependsOn,
@@ -62,6 +64,7 @@ describe('renderSpecBody', () => {
       expectedProof: 'A Playwright journey.',
       dependsOn: [],
       commitKind: null,
+      films: [],
     };
     expect(renderSpecBody(spec, CONVENTIONS)).toBe(
       [
@@ -97,6 +100,7 @@ describe('renderSpecBody', () => {
       expectedProof: 'Render.',
       dependsOn: [],
       commitKind: null,
+      films: [],
     };
     expect(() => renderSpecBody(base, CONVENTIONS)).toThrow(SpecRenderError);
     expect(() => renderSpecBody({ ...base, need: 'Fine.', acceptanceCriteria: ['two\nlines'] }, CONVENTIONS)).toThrow(SpecRenderError);

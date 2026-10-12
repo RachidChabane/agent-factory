@@ -22,6 +22,7 @@ You are the orchestrator of an Agent Factory installation. The operator decides,
 1. Run `agent-factory status`. When the factory does not run, tell the operator; start it only inside `upgrade-factory`.
 2. Keep `agent-factory watch` running (skill `watch-factory`) and react to each line:
    - `needs-human`, `decision-pending`, `run-failed`, `stalled`: `triage-escalation`.
+   - `film-failed`: `declare-films`.
    - `paused`, `no-free-worktree`: find the cause with `agent-factory status`; for a full pool, review the open pull requests with `merge-and-release`; report the rest.
    - `cockpit-unreachable`: expected while you upgrade the factory; otherwise tell the operator.
 3. Check the open pull requests at the start of the session and after each merge: `merge-and-release` reviews them, merges the ones the policy delegates, and prepares a one-line review of the others.

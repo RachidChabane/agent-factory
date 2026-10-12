@@ -3,6 +3,8 @@ import type { StoryIssue } from '../story-types.ts';
 import { CART_BADGE_TOTAL_CHECK, LABELS_MODULE, RENDER_TEST_WITH_BADGE, RENDER_WITH_BADGE } from './cart-badge-total.files.ts';
 
 const HEADER_IMAGE = 'test-results/cart-badge.svg';
+/** The journey the pull request shows on video: a customer from the cart to the payment. */
+const CHECKOUT_FLOW_SCENARIO = 'checkout-flow';
 
 export const CART_BADGE_TOTAL: StoryIssue = {
   key: 'cart-badge-total',
@@ -27,6 +29,7 @@ export const CART_BADGE_TOTAL: StoryIssue = {
     ],
     expectedProof:
       'Unit tests of `renderPage` for carts of zero, one and several items, and of `countLabel`. The page tests read the text of the badge element and compare it with the expected wording. The first of them also draws the header it rendered as an image, so that the pull request shows the header before and after the change.',
+    films: [CHECKOUT_FLOW_SCENARIO],
   },
   dependsOn: [],
   validate: true,

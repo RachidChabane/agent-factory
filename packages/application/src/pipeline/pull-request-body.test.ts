@@ -18,6 +18,7 @@ const INPUT: PullRequestBodyInput = {
     expectedProof: 'A Playwright journey with screenshots of the header.',
     dependsOn: [7],
     commitKind: null,
+    films: [],
   },
   branch: 'factory/42-link-mockups-to-their-conversation',
   baseSha: '1111111aaaaaaa',
@@ -102,6 +103,7 @@ const INPUT: PullRequestBodyInput = {
     { criterion: 2, test: 'app/e2e/mockup-link.spec.ts > mockup header > links the conversation', base: 'red (assertion)', branch: 'green' },
     { criterion: 2, test: 'app/e2e/conversation.spec.ts > opens at the producing message', base: 'red (assertion)', branch: 'green' },
   ],
+  filmSection: null,
 };
 
 describe('PullRequestBodyRenderer', () => {
@@ -135,6 +137,13 @@ describe('PullRequestBodyRenderer', () => {
     const body = new PullRequestBodyRenderer().render({ ...INPUT, beforeProof: { ...INPUT.beforeProof, runner: null, tests: [] }, acceptanceTests: [] });
     expect(body).toContain('**Before** on base `1111111`: the acceptance checks fail (exit code 1).');
     expect(body).not.toContain('| Criterion | Test |');
+  });
+
+  it('ends with the film section the films of the pull request announce', () => {
+    const section = '## Behaviour on video\n\n### Scenario `checkout-flow`\n\nThe videos are being recorded.';
+    const body = new PullRequestBodyRenderer().render({ ...INPUT, filmSection: section });
+    expect(body.endsWith(`${section}\n`)).toBe(true);
+    expect(new PullRequestBodyRenderer().render(INPUT)).not.toContain('Behaviour on video');
   });
 
   it('states the base score and the branch score of a scored issue', () => {

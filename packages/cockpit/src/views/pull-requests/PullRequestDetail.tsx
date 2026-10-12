@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { useProject } from '../../app/ProjectRoute.tsx';
 import { CircleAlert, ShieldCheck } from 'lucide-react';
 import type { PullRequestView } from '../../contract/index.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
@@ -8,10 +9,12 @@ import { EmptyState } from '../../ui/components/EmptyState.tsx';
 import { ChangedFiles } from './ChangedFiles.tsx';
 import { EvidenceGallery } from './EvidenceGallery.tsx';
 import { ExternalFeedback } from './ExternalFeedback.tsx';
+import { FilmSection } from './FilmSection.tsx';
 import { MergeDialog } from './MergeDialog.tsx';
 import { MergeBlockers } from './MergeBlockers.tsx';
 import { PullRequestHeader } from './PullRequestHeader.tsx';
 import { PullRequestChecks } from './PullRequestChecks.tsx';
+import { hasFilmsToShow } from './film-model.ts';
 import { mergeAvailability } from './pull-request-model.ts';
 import { ReviewRounds } from './ReviewRounds.tsx';
 import { useMergeDialog } from './use-merge-dialog.ts';
@@ -60,11 +63,13 @@ export function PullRequestDetail({ pullRequest, requested }: PullRequestDetailP
   const availability = mergeAvailability(pullRequest);
   const blockersId = useId();
   const merge = useMergeDialog(requested && availability.kind === 'ready');
+  const project = useProject();
   return (
     <article className="detail pr-detail">
       <PullRequestHeader pullRequest={pullRequest} availability={availability} blockersId={blockersId} onMerge={() => merge.setOpen(true)} />
       {availability.kind === 'blocked' ? <MergeBlockers id={blockersId} blockers={availability.blockers} /> : null}
       <EvidenceSection pullRequest={pullRequest} />
+      {hasFilmsToShow(project, pullRequest) ? <FilmSection pullRequest={pullRequest} /> : null}
       <div className="pr-detail__columns">
         <ReviewRounds rounds={pullRequest.reviewRounds} />
         <PullRequestChecks pullRequest={pullRequest} />

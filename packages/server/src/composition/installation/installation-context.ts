@@ -7,6 +7,7 @@ import type {
   Clock,
   CommandRunner,
   EventStore,
+  FilmLedger,
   Notifier,
   OperationLog,
   ResourceGuard,
@@ -44,6 +45,8 @@ export interface InstallationContext {
   readonly lifetime: AbortSignal;
   /** When the gate of a local forge runs once a commit's checks are asked for. */
   readonly localChecks: LocalCheckScheduling;
+  /** The films of every project that films, in one queue; null when no project films. */
+  readonly filmLedger: FilmLedger | null;
   /** The agent that runs instead of the Claude CLI, in tests and in the demonstration. */
   readonly harnessFor: ((project: ProjectConfig) => AgentHarness) | null;
 }

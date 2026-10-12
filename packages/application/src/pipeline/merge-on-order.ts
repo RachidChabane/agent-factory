@@ -1,13 +1,16 @@
 import { ISSUE_SUBJECT_PREFIX } from '@agent-factory/domain';
-import type { IssueState } from '@agent-factory/domain';
 import { EVIDENCE_DIRECTORY } from '../acceptance/acceptance-manifest.ts';
 import type { CheckConclusion, CheckRunSummary, EventStore, Worktree } from '../ports.ts';
+import type { FilmMergeGuard } from '../film/film-merge-guard.ts';
 import { evidenceRemovalCommitMessage } from './conventional-commit.ts';
 import { PIPELINE_EVENTS, PullRequestOpenedSchema } from './journal-events.ts';
 import { IssueJournalWriter } from './journal-writer.ts';
 import type { PipelineDependencies } from './pipeline-dependencies.ts';
 import { MergeRefusedError, PullRequestNotFromFactoryError, WorktreeUnavailableError } from './pipeline-errors.ts';
+import { MERGEABLE_STATES } from './mergeable-states.ts';
 import { loadJournal, type PipelineJournal } from './pipeline-journal.ts';
+
+export { MERGEABLE_STATES };
 
 const FIRST_SEQUENCE = 0;
 const ISSUE_NUMBER_PATTERN = new RegExp(`^${ISSUE_SUBJECT_PREFIX}(\\d+)$`);
@@ -35,7 +38,6 @@ export function checksBlockingMerge(checks: readonly CheckRunSummary[], baseChec
   const pending = checks.filter((check) => check.conclusion === PENDING_CONCLUSION);
   return pending.length > 0 ? `checks still running: ${describeChecks(pending)}` : null;
 }
-export const MERGEABLE_STATES: readonly IssueState[] = ['pr-open', 'ci', 'ready-to-merge'];
 
 export type MergeOnOrderDependencies = Pick<
   PipelineDependencies,
@@ -68,9 +70,12 @@ function describeChecks(checks: readonly CheckRunSummary[]): string {
 
 export class MergeOnOrder {
   private readonly dependencies: MergeOnOrderDependencies;
+  private readonly films: FilmMergeGuard | null;
 
-  constructor(dependencies: MergeOnOrderDependencies) {
+  /** `films` holds the merge while a film of the pull request is queued or recording; null when the project films nothing. */
+  constructor(dependencies: MergeOnOrderDependencies, films: FilmMergeGuard | null = null) {
     this.dependencies = dependencies;
+    this.films = films;
   }
 
   async merge(order: MergeOrder): Promise<MergeOutcome> {
@@ -82,6 +87,8 @@ export class MergeOnOrder {
     if (journal.state === null || !MERGEABLE_STATES.includes(journal.state)) {
       throw new MergeRefusedError(order.pullRequestNumber, `issue #${issueNumber} is ${journal.state ?? 'unknown'}, not awaiting a merge`);
     }
+    const filmBlocker = this.films === null ? null : await this.films.blockerOf(journal);
+    if (filmBlocker !== null) throw new MergeRefusedError(order.pullRequestNumber, filmBlocker);
     const worktree = await this.worktreeOf(journal);
     if (journal.evidenceRemoval === null) {
       await this.removeEvidence(order, journal, worktree, writer);

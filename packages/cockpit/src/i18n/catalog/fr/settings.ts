@@ -48,6 +48,11 @@ export const frSettings = {
   'settings.environment.description': 'Les variables transmises aux commandes des checks. Seuls leurs noms sont affichés : les valeurs restent sur la machine.',
   'settings.environment.empty': 'Aucune variable n’est transmise aux commandes des checks.',
 
+  'settings.films.title': 'Tournages',
+  'settings.films.description': 'Les pull requests du projet sont filmées sur la base et sur la tête par la commande que sa configuration déclare. Cette commande s’exécute hors du bac à sable, avec votre environnement et vos sessions.',
+  'settings.films.none': 'Aucune commande de tournage n’est déclarée pour ce projet.',
+  'settings.films.timeZone': 'Fuseau horaire des arrivées prévues',
+  'settings.films.timeout': 'Enregistrement le plus long',
   'settings.conventions.title': 'Conventions',
   'settings.conventions.factoryLabel': 'Label de l’usine',
   'settings.conventions.validatedLabel': 'Label de validation',

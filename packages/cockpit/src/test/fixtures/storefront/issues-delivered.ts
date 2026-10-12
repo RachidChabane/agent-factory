@@ -35,6 +35,7 @@ export function deliveredIssues(clock: FixtureClock, runs: RunWorld): IssueView[
         ],
         outOfScope: ['Documenting the deployment pipeline'],
         expectedProof: 'The existing tests still pass and the diff touches documentation only.',
+        films: [],
       },
       beforeProofKind: 'none',
       pullRequestNumber: PULL_REQUEST.localSetupDocs,
@@ -55,6 +56,7 @@ export function deliveredIssues(clock: FixtureClock, runs: RunWorld): IssueView[
         ],
         outOfScope: ['Replacing the HTTP client', 'Changing request timeouts'],
         expectedProof: 'The existing tests, unchanged: they pass before and after.',
+        films: [],
       },
       beforeProofKind: 'none',
       pullRequestNumber: PULL_REQUEST.httpClientBump,
@@ -75,6 +77,7 @@ export function deliveredIssues(clock: FixtureClock, runs: RunWorld): IssueView[
         ],
         outOfScope: ['Caching build outputs'],
         expectedProof: 'A node:test check that parses the workflow and asserts the cache step and the key script.',
+        films: [],
       },
       pullRequestNumber: PULL_REQUEST.ciPackageCache,
       checks: [
@@ -104,6 +107,7 @@ export function deliveredIssues(clock: FixtureClock, runs: RunWorld): IssueView[
         ],
         outOfScope: ['Estimating dates for items that are not in stock'],
         expectedProof: 'A browser journey on a product with an estimate and on one without, with a screenshot of the banner.',
+        films: [],
       },
       pullRequestNumber: PULL_REQUEST.deliveryBanner,
       checks: [
@@ -137,6 +141,7 @@ export function deliveredIssues(clock: FixtureClock, runs: RunWorld): IssueView[
         ],
         outOfScope: ['Changing which codes can be combined'],
         expectedProof: 'Unit tests of the discount computation that fail on the current code.',
+        films: [],
       },
       pullRequestNumber: PULL_REQUEST.promoRounding,
       checks: [
@@ -162,6 +167,7 @@ export function deliveredIssues(clock: FixtureClock, runs: RunWorld): IssueView[
         acceptanceCriteria: ['The badge shows the total quantity of items in the cart.', 'Removing a line updates the badge without reloading the page.'],
         outOfScope: ['Animating the badge'],
         expectedProof: 'Component tests of the badge that fail on the current code.',
+        films: [],
       },
       pullRequestNumber: PULL_REQUEST.cartBadgeSync,
       checks: [

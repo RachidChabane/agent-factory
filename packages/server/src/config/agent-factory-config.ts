@@ -4,7 +4,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import { BARE_REPOSITORY_SUFFIX, type LocalCheckMode } from '@agent-factory/adapters';
-import type { NamedCommand, ReferenceSource, StackSettings } from '@agent-factory/application';
+import { machineTimeZone, type FilmSettings, type NamedCommand, type ReferenceSource, type StackSettings } from '@agent-factory/application';
 import {
   DEFAULT_ISSUE_TYPES,
   NO_DAILY_CAP,
@@ -166,7 +166,7 @@ export interface ProjectConfig {
   readonly knowledge: readonly KnowledgeSourceConfig[];
   /** The repositories specifications cite, each with the local clone its snapshot is taken from. */
   readonly references: readonly ReferenceSource[];
-  readonly evidence: { readonly maxFileBytes: number; readonly maxTotalBytes: number };
+  readonly evidence: { readonly maxFileBytes: number; readonly maxTotalBytes: number; readonly films: FilmSettings | null };
   readonly delivery: { readonly release: ReleaseModelConfig; readonly environments: readonly EnvironmentConfig[]; readonly healthIntervalMs: number };
   readonly audits: { readonly ignore: readonly { readonly name: string; readonly branches: readonly string[]; readonly authors: readonly string[] }[] };
   readonly tools: readonly ToolCheckConfig[];
@@ -266,6 +266,17 @@ function stackSettings(raw: NonNullable<RawProject['stack']>): StackSettings {
     environment: raw.environment,
     issueTypes: raw.issueTypes,
     stopGraceMs: seconds(raw.stopGraceSeconds),
+  };
+}
+
+function filmSettings(raw: NonNullable<RawProject['evidence']['films']>, at: (path: string) => string): FilmSettings {
+  return {
+    command: raw.command,
+    workingDirectory: at(raw.workingDirectory),
+    environment: raw.environment,
+    timeoutMs: minutes(raw.timeoutMinutes),
+    replayFile: raw.replayFile,
+    timeZone: raw.timeZone ?? machineTimeZone(),
   };
 }
 
@@ -424,7 +435,7 @@ function resolveProject(raw: RawProject, config: RawAgentFactoryConfig, home: st
     prompts: Object.fromEntries(Object.entries(raw.prompts).map(([role, path]) => [role, at(path)])),
     knowledge: raw.knowledge.map((source) => ('path' in source ? { kind: 'path', path: at(source.path) } : { kind: 'repository', path: source.repository })),
     references: raw.references.map((reference) => ({ name: reference.name, repository: reference.repository, ref: reference.ref, source: at(reference.source) })),
-    evidence: raw.evidence,
+    evidence: { maxFileBytes: raw.evidence.maxFileBytes, maxTotalBytes: raw.evidence.maxTotalBytes, films: raw.evidence.films === undefined ? null : filmSettings(raw.evidence.films, at) },
     delivery: { release: raw.delivery.release, environments: raw.delivery.environments.map(environmentConfig), healthIntervalMs: minutes(raw.delivery.healthIntervalMinutes) },
     audits: raw.audits,
     tools: raw.tools.map(toolCheck),

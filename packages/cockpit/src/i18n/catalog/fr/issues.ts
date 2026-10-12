@@ -125,6 +125,7 @@ export const frIssues = {
   'issues.spec.criteria': 'Critères d’acceptation',
   'issues.spec.outOfScope': 'Hors périmètre',
   'issues.spec.proof': 'Preuve attendue',
+  'issues.spec.films': 'Vidéos déclarées',
   'issues.spec.notStated': 'Non précisé',
   'issues.spec.noCriteria': 'Aucun critère d’acceptation n’est écrit.',
   'issues.spec.nothingOutOfScope': 'Rien n’est déclaré hors périmètre.',

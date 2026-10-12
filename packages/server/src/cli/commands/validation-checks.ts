@@ -33,6 +33,10 @@ const FULLY_CONFINED_DETAIL = 'agents and commands stay confined: no container e
 const ENGINE_CONSEQUENCE =
   'a container can mount any directory the engine shares and reach any network, so what runs through the engine is not confined';
 const ENGINE_MISSING_DETAIL = 'the container engine is granted but no engine socket was found: start the engine, or set DOCKER_HOST';
+const FFMPEG_VERSION_COMMAND: readonly string[] = ['ffmpeg', '-version'];
+const FILM_CONSEQUENCE = "runs outside the sandbox, with your environment and your sessions, like one of your own scripts: declare only a command you trust";
+const FFMPEG_NEED = 'ffmpeg is needed only when the film command writes a video that is not an MP4';
+const MILLISECONDS_PER_MINUTE = 60_000;
 const LabelListSchema = z.array(z.object({ name: z.string() }));
 
 export interface CheckOutcome {
@@ -281,6 +285,20 @@ export function mergeOutcome(project: ProjectConfig): CheckOutcome {
   };
 }
 
+/** The film command of a project, with what it is allowed: everything the operator is, outside the sandbox. */
+export async function filmsOutcome(project: ProjectConfig): Promise<CheckOutcome> {
+  const films = project.evidence.films;
+  if (films === null) return { ok: true, detail: 'no film command declared' };
+  if (!(await isDirectory(films.workingDirectory))) return { ok: false, detail: `the working directory ${films.workingDirectory} does not exist` };
+  const timeout = Math.round(films.timeoutMs / MILLISECONDS_PER_MINUTE);
+  return { ok: true, detail: `${films.command.join(' ')} ${FILM_CONSEQUENCE}; it runs from ${films.workingDirectory} and stops after ${timeout} minutes` };
+}
+
+async function ffmpegOutcome(settings: ValidationSettings, cwd: string): Promise<CheckOutcome> {
+  const probed = await commandOutcome(settings.runner, FFMPEG_VERSION_COMMAND, definedEnvironment(settings.environment), cwd);
+  return probed.ok ? { ok: true, detail: probed.detail } : { ok: false, detail: `${FFMPEG_NEED}: ${probed.detail}` };
+}
+
 /** What one project needs: its clone, its labels, its prompts and knowledge, and its declared tools. */
 export function projectChecks(config: AgentFactoryConfig, project: ProjectConfig, settings: ValidationSettings): readonly ValidationCheck[] {
   const cwd = config.home;
@@ -303,6 +321,12 @@ export function projectChecks(config: AgentFactoryConfig, project: ProjectConfig
     ),
     { name: 'worktrees', severity: 'optional', runsCommands: false, run: () => Promise.resolve(worktreesOutcome(project)) },
     { name: 'sandbox', severity: 'optional', runsCommands: false, run: () => guarded(() => Promise.resolve(sandboxOutcome(project, projectEngineSockets(project, settings)()))) },
+    ...(project.evidence.films === null
+      ? []
+      : [
+          { name: 'films', severity: 'required', runsCommands: false, run: () => guarded(() => filmsOutcome(project)) } satisfies ValidationCheck,
+          { name: 'films ffmpeg', severity: 'optional', runsCommands: true, run: () => guarded(() => ffmpegOutcome(settings, cwd)) } satisfies ValidationCheck,
+        ]),
     ...project.tools.map((tool) => toolCheck(prober, tool.name, 'optional', `tool ${tool.name}`)),
   ];
 }

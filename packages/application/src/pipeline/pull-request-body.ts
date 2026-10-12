@@ -46,6 +46,8 @@ export interface PullRequestBodyInput {
   readonly costUsd: number;
   readonly externalFeedback: readonly ExternalFeedbackSummary[];
   readonly acceptanceTests: readonly AcceptanceTestRow[];
+  /** The `Behaviour on video` section the films of the pull request announce; null when it films nothing. */
+  readonly filmSection: string | null;
 }
 
 export interface ExternalFeedbackSummary {
@@ -191,6 +193,7 @@ function technicalDetails(input: PullRequestBodyInput): string {
 
 export class PullRequestBodyRenderer {
   render(input: PullRequestBodyInput): string {
-    return `${[whatToLookAt(input), issues(input), acceptanceCriteria(input), risks(input), technicalDetails(input)].join(PARAGRAPH)}${NEWLINE}`;
+    const sections = [whatToLookAt(input), issues(input), acceptanceCriteria(input), risks(input), technicalDetails(input)];
+    return `${[...sections, ...(input.filmSection === null ? [] : [input.filmSection])].join(PARAGRAPH)}${NEWLINE}`;
   }
 }

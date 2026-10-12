@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BLOCKER_KINDS, DEFAULT_BLOCKER_THRESHOLDS } from './blocker.ts';
 import { blockersOf } from './blockers-of.ts';
-import { issueView, minutesBefore, projectView, READ_AT, runView, storefrontWith, watchedSnapshot } from './testing/watched-snapshots.ts';
+import { filmOrderView, issueView, minutesBefore, projectView, pullRequestView, READ_AT, runView, storefrontWith, watchedSnapshot } from './testing/watched-snapshots.ts';
+import type { WatchedFilmOrder, WatchedPullRequest } from './watched-snapshot.ts';
 
 const kindsOf = (snapshot = storefrontWith([])) => blockersOf(snapshot, READ_AT).map((blocker) => blocker.kind);
 
@@ -140,6 +141,52 @@ describe('what blocks work in a snapshot', () => {
     });
   });
 
+  describe('a film that failed', () => {
+    const failedFilm = (scenario: string, overrides: Partial<WatchedFilmOrder> = {}) =>
+      filmOrderView(scenario, { state: 'failed', reason: 'the session expired', since: minutesBefore(12), ...overrides });
+    const withPullRequest = (orders: readonly WatchedFilmOrder[], overrides: Partial<WatchedPullRequest> = {}) =>
+      watchedSnapshot({ projects: [projectView('storefront', { pullRequests: [pullRequestView(31, 12, { filmOrders: [...orders], ...overrides })] })] });
+
+    it('is reported with its scenario, its pull request and the reason it gave, on one line', () => {
+      const snapshot = withPullRequest([failedFilm('checkout-flow', { reason: 'the session expired:\n  sign in again' })]);
+      expect(blockersOf(snapshot, READ_AT)).toEqual([
+        {
+          key: `film-failed|storefront|31|checkout-flow|${minutesBefore(12)}`,
+          kind: 'film-failed',
+          project: 'storefront',
+          issue: 12,
+          detail: 'film checkout-flow of pull request #31: the session expired: sign in again',
+        },
+      ]);
+    });
+
+    it('is one blocker for each failed scenario, and none for a film that waits, records or finished', () => {
+      const orders = [
+        failedFilm('checkout-flow'),
+        failedFilm('order-history', { reason: null }),
+        filmOrderView('wishlist', { state: 'queued' }),
+        filmOrderView('returns', { state: 'recording-head' }),
+        filmOrderView('gift-cards', { state: 'finished' }),
+      ];
+      expect(blockersOf(withPullRequest(orders), READ_AT).map((blocker) => [blocker.kind, blocker.detail])).toEqual([
+        ['film-failed', 'film checkout-flow of pull request #31: the session expired'],
+        ['film-failed', 'film order-history of pull request #31: no reason recorded'],
+      ]);
+    });
+
+    it('is over once the film is ordered again, and a new blocker when the new recording fails', () => {
+      const first = blockersOf(withPullRequest([failedFilm('checkout-flow')]), READ_AT);
+      expect(kindsOf(withPullRequest([filmOrderView('checkout-flow', { state: 'queued' })]))).toEqual([]);
+      const second = blockersOf(withPullRequest([failedFilm('checkout-flow', { since: minutesBefore(2) })]), READ_AT);
+      expect(second).toHaveLength(1);
+      expect(second[0]?.key).not.toBe(first[0]?.key);
+    });
+
+    it('is forgotten once the pull request is merged or closed', () => {
+      for (const state of ['merged', 'closed'] as const) expect(kindsOf(withPullRequest([failedFilm('checkout-flow')], { state })), state).toEqual([]);
+    });
+  });
+
   describe('a full pool of worktrees', () => {
     it('is reported with the issues that wait and the issues that hold the worktrees', () => {
       const shortage = {
@@ -172,10 +219,11 @@ describe('what blocks work in a snapshot', () => {
       projects: [
         projectView('storefront', {
           issues: [issueView(12, { state: 'needs-human', escalation: { reason: 'stop', diagnosis: '', since: minutesBefore(30) } }), issueView(13)],
+          pullRequests: [pullRequestView(31, 13, { filmOrders: [filmOrderView('checkout-flow', { state: 'failed', reason: 'the session expired' })] })],
         }),
       ],
       runs: [runView('run-9', { status: 'waiting', pendingQuestion: question })],
     });
-    expect(blockersOf(snapshot, READ_AT).map((blocker) => blocker.kind)).toEqual([BLOCKER_KINDS.decisionPending, BLOCKER_KINDS.paused]);
+    expect(blockersOf(snapshot, READ_AT).map((blocker) => blocker.kind)).toEqual([BLOCKER_KINDS.decisionPending, BLOCKER_KINDS.paused, BLOCKER_KINDS.filmFailed]);
   });
 });

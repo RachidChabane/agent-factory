@@ -1,5 +1,6 @@
 import { CHECK_REWRITABLE_STATES, ISSUE_CHECK_REWRITE_STATE, ISSUE_ESCALATION_STATE } from '@agent-factory/domain';
 import type { IssueState } from '@agent-factory/domain';
+import type { FilmBodies } from '../film/film-bodies.ts';
 import { AgentRunAdmission } from '../resources/agent-run-admission.ts';
 import { AgentRuns, type AgentEventListener } from './agent-runs.ts';
 import { EvidenceCollector } from './evidence.ts';
@@ -31,6 +32,8 @@ const UNKNOWN_ESCALATION_REASON = 'no reason recorded';
 export interface IssuePipelineOptions {
   readonly onAgentEvent?: AgentEventListener;
   readonly signal?: AbortSignal;
+  /** Where the films of a pull request are announced; absent when the project films nothing. */
+  readonly films?: FilmBodies | null;
 }
 
 const STAGES: readonly PipelineStage[] = [
@@ -92,6 +95,7 @@ export class IssuePipeline {
       evidence: new EvidenceCollector(dependencies.files, settings.evidenceCacheDirectory),
       bodies: new PullRequestBodyRenderer(),
       stacks: new IssueStacks({ services: dependencies.services, logs: dependencies.logs, slots: dependencies.stackSlots }, settings.stack, shell),
+      films: options.films ?? null,
     };
   }
 

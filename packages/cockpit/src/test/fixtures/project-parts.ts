@@ -27,6 +27,8 @@ export interface ProjectSettingsSeed {
   readonly environmentVariables: readonly string[];
   readonly automations: ProjectSettingsView['automations'];
   readonly releaseModel: ProjectSettingsView['releaseModel'];
+  /** The films of the project; none unless the seed says so. */
+  readonly films?: ProjectSettingsView['films'];
 }
 
 const GATE_TIMEOUT_MINUTES = 30;
@@ -43,6 +45,7 @@ export function projectSettings(seed: ProjectSettingsSeed): ProjectSettingsView 
     branchPrefix: 'factory/',
     automations: seed.automations.map((automation) => ({ ...automation })),
     releaseModel: seed.releaseModel,
+    films: seed.films ?? null,
   };
 }
 

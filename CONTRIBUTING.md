@@ -14,6 +14,8 @@ fix, open an issue first so we can agree on the shape of it. Read
   (`pnpm exec playwright install chromium`).
 - On Linux, [bubblewrap](https://github.com/containers/bubblewrap) (`bwrap`) for the
   sandbox integration tests.
+- `ffmpeg` with libx264, only to regenerate the demonstration's sample videos
+  (`script/demo-films`); the demonstration itself and the tests do not need it.
 
 Nothing else: the tests use a fake `claude` and a local forge, so no model, no
 credential and no network are needed.
@@ -34,6 +36,7 @@ Every verb is a shebang script in `script/`, also reachable as `pnpm run <verb>`
 | `script/scan` | denylist scan of the working tree and the whole history, then gitleaks |
 | `script/screenshots` | regenerate the README screenshots from the demonstration (`--check` verifies they are current) |
 | `script/schema` | regenerate `schema/config.schema.json` from the configuration's schema (`--check` verifies it) |
+| `script/demo-films` | regenerate the two sample videos the demonstration films with (needs `ffmpeg`); they are the only videos the repository holds |
 | `script/third-party-notices` | regenerate `THIRD_PARTY_NOTICES.md` from the production dependencies (`--check` verifies it) |
 | `script/lockfile` | rewrite `pnpm-lock.yaml` without installing anything |
 | `script/ci` | everything CI runs, in the same order |

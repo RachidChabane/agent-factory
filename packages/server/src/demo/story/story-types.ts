@@ -42,6 +42,8 @@ export interface StorySpec {
   readonly acceptanceCriteria: readonly string[];
   readonly outOfScope: readonly string[];
   readonly expectedProof: string;
+  /** The scenarios the pull request must show on video, written as the spec file's `Films:` header; none when absent. */
+  readonly films?: readonly string[];
 }
 
 /** What the reviewer says about the change, and the findings it reports. */

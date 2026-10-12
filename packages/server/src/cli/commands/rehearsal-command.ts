@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { RehearsalRepositories, type RehearsalLayout } from '@agent-factory/adapters';
-import { parseSpecFile, specFileProblems, withExtraLabels } from '@agent-factory/application';
+import { parseSpecFile, specFileLabels, specFileProblems, withExtraLabels } from '@agent-factory/application';
 import type { AgentFactoryConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
 import { openForge, projectGitEnvironment } from '../../composition/project/forge.ts';
 import { projectConventions } from '../../composition/project/project-settings.ts';
@@ -88,7 +88,7 @@ export async function rehearsalAddIssueCommand(specPath: string, labels: readonl
     return EXIT_CODES.failure;
   }
   const forge = await openForge(project, context.runner, context.environment, context.clock);
-  const issue = await forge.createIssue(file.title, file.body, file.labels);
+  const issue = await forge.createIssue(file.title, file.body, specFileLabels(file));
   context.output.line(`Local issue ${itemName(project, issue.number)}: ${issue.title} [${issue.labels.join(LABEL_SEPARATOR)}]`);
   return EXIT_CODES.ok;
 }

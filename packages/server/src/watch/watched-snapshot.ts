@@ -1,9 +1,14 @@
 import { z } from 'zod';
-import { InstallationInfoSchema, IsoDateTimeSchema, IssueViewSchema, ProjectViewSchema, RunViewSchema } from '@agent-factory/cockpit';
+import { InstallationInfoSchema, IsoDateTimeSchema, IssueViewSchema, ProjectViewSchema, PullRequestViewSchema, RunViewSchema } from '@agent-factory/cockpit';
 
 const WatchedIssueSchema = IssueViewSchema.pick({ number: true, state: true, paused: true, escalation: true, updatedAt: true });
 
-const WatchedProjectSchema = ProjectViewSchema.pick({ id: true, pauses: true, scheduler: true }).extend({ issues: z.array(WatchedIssueSchema) });
+const WatchedPullRequestSchema = PullRequestViewSchema.pick({ number: true, issueNumber: true, state: true, filmOrders: true });
+
+const WatchedProjectSchema = ProjectViewSchema.pick({ id: true, pauses: true, scheduler: true }).extend({
+  issues: z.array(WatchedIssueSchema),
+  pullRequests: z.array(WatchedPullRequestSchema),
+});
 
 const WatchedRunSchema = RunViewSchema.pick({ id: true, project: true, role: true, status: true, outcome: true, subject: true, startedAt: true, endedAt: true, lastLine: true, pendingQuestion: true });
 
@@ -21,4 +26,6 @@ export const WatchedSnapshotSchema = z.object({
 export type WatchedSnapshot = z.infer<typeof WatchedSnapshotSchema>;
 export type WatchedProject = WatchedSnapshot['projects'][number];
 export type WatchedIssue = WatchedProject['issues'][number];
+export type WatchedPullRequest = WatchedProject['pullRequests'][number];
+export type WatchedFilmOrder = WatchedPullRequest['filmOrders'][number];
 export type WatchedRun = WatchedSnapshot['runs'][number];

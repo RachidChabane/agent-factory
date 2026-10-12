@@ -15,6 +15,7 @@ import {
   referenceState,
   type CheckRunSummary,
   type FactoryEventRecord,
+  type FilmForecast,
   type ReferenceState,
   type RunLogLine,
   type WorkflowRunRecord,
@@ -208,7 +209,8 @@ export class SnapshotSource {
     const split = splitByProject(records);
     const installation = indexEvents(split.installation);
     const runs = recordedRuns(installation);
-    const projects = await Promise.all(runtime.projects.map((project) => this.projectSnapshot(project, split.projects.get(project.id) ?? [], runs, generatedAt)));
+    const forecast = runtime.filmLedger?.forecastFrom(split.projects) ?? null;
+    const projects = await Promise.all(runtime.projects.map((project) => this.projectSnapshot(project, split.projects.get(project.id) ?? [], runs, generatedAt, forecast)));
     const questions = new Map(projects.flatMap((project) => [...project.questions]));
     const pauses = pauseViews(split.installation, 'installation');
     const config = runtime.config;
@@ -296,7 +298,13 @@ export class SnapshotSource {
     return created;
   }
 
-  private async projectSnapshot(project: ProjectRuntime, records: readonly FactoryEventRecord[], runs: readonly RecordedRun[], generatedAt: Date): Promise<ProjectViewProjection> {
+  private async projectSnapshot(
+    project: ProjectRuntime,
+    records: readonly FactoryEventRecord[],
+    runs: readonly RecordedRun[],
+    generatedAt: Date,
+    forecast: FilmForecast | null,
+  ): Promise<ProjectViewProjection> {
     const readings = this.projectReadings(project);
     const index = indexEvents(records);
     const journals = issueJournals(index);
@@ -336,6 +344,7 @@ export class SnapshotSource {
       productionWorkflowUrl: productionWorkflowUrl(project.config),
       issueCosts: issueCosts(runs, project.id),
       changedFiles,
+      films: project.films === null || forecast === null ? null : { forecast, presentation: project.films.presentation },
     };
     const config = project.config;
     const deployments = new Map<string, Observed<EnvironmentDeployments>>();

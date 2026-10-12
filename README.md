@@ -62,9 +62,11 @@ script/factory start --demo
 Open <http://127.0.0.1:7431>. The demonstration plays a working week of two
 fictional teams on local forges, with a fake Claude: requests arrive and are
 challenged, issues run through the whole cycle, an agent asks a decision, a pull
-request is merged, an outside change is audited and a release waits on its gate.
-Nothing needs an account, a token or the network, and the demonstration removes its
-files when it stops (Ctrl-C).
+request is merged, another is filmed before and after the change, an outside change
+is audited and a release waits on its gate. The film comes from a stand-in film
+command: ordering the scenario `unavailable-scenario` from a pull request page shows a
+film that fails. Nothing needs an account, a token or the network, and the
+demonstration removes its files when it stops (Ctrl-C).
 
 ## Use it on your repository
 

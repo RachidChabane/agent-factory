@@ -193,6 +193,20 @@ describe('the agent-factory command line', () => {
     expect(captured.lines).toEqual([`FAIL configuration: ${missing.message}`]);
   });
 
+  it('shows the films a spec file declares among what it would create on GitHub', async () => {
+    await writeFile(join(home, 'spec.md'), SPEC_FILE.replace('Labels: type:infra\n', 'Labels: type:infra\nFilms: checkout-flow, order.history\n'));
+    expect(await runCli(['issue', 'create', 'spec.md'], context())).toBe(5);
+    expect(captured.lines.slice(0, 4)).toEqual([
+      'This creates an issue on GitHub acme/widgets:',
+      'Title: Serve the domain from the UI',
+      'Labels: factory, type:infra, film:checkout-flow, film:order.history',
+      'Films: checkout-flow, order.history',
+    ]);
+    await writeFile(join(home, 'spec.md'), SPEC_FILE.replace('Labels: type:infra\n', 'Labels: type:infra\nFilms: ../escape\n'));
+    expect(await runCli(['issue', 'create', 'spec.md'], context())).toBe(1);
+    expect(captured.errors.at(-1)).toContain('Films: "../escape" is refused');
+  });
+
   it('shows the issue it would create on GitHub and creates nothing without --confirm', async () => {
     await writeFile(join(home, 'spec.md'), SPEC_FILE);
     expect(await runCli(['issue', 'create', 'spec.md'], context())).toBe(5);

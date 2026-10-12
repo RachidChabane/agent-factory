@@ -320,6 +320,20 @@ describe('IssueDetail specification', () => {
     expect(within(spec).queryAllByRole('listitem')).toHaveLength(0);
   });
 
+  it('leaves the films out when the spec declares none', async () => {
+    await openIssue(ISSUE.promoSavingsSummary);
+    expect(within(region('Specification')).queryByText('Videos declared')).not.toBeInTheDocument();
+  });
+
+  it('lists the films the spec declares', async () => {
+    const snapshot = withIssue(STOREFRONT, ISSUE.promoSavingsSummary, (issue) => ({ ...issue, spec: { ...issue.spec, films: ['checkout-flow', 'order.history'] } }));
+    await openIssue(ISSUE.promoSavingsSummary, { snapshot });
+    const spec = region('Specification');
+    expect(within(spec).getByText('Videos declared')).toBeInTheDocument();
+    expect(within(spec).getByText('checkout-flow')).toHaveClass('mono');
+    expect(within(spec).getByText('order.history')).toBeInTheDocument();
+  });
+
   it('says that the need and the proof are not stated when they are empty', async () => {
     const snapshot = withIssue(STOREFRONT, ISSUE.promoSavingsSummary, (issue) => ({ ...issue, spec: { ...issue.spec, need: ' ', expectedProof: '' } }));
     await openIssue(ISSUE.promoSavingsSummary, { snapshot });

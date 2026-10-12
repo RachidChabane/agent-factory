@@ -124,6 +124,7 @@ export const enIssues = {
   'issues.spec.criteria': 'Acceptance criteria',
   'issues.spec.outOfScope': 'Out of scope',
   'issues.spec.proof': 'Expected proof',
+  'issues.spec.films': 'Videos declared',
   'issues.spec.notStated': 'Not stated',
   'issues.spec.noCriteria': 'No acceptance criterion is written.',
   'issues.spec.nothingOutOfScope': 'Nothing is declared out of scope.',

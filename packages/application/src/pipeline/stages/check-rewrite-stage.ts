@@ -105,7 +105,7 @@ export class CheckRewriteStage implements PipelineStage {
     const profile = profileOf(context, 'acceptance-author');
     const current = (await dependencies.files.readText(worktree.path, path)) ?? '';
     const type = issueTypeOfSpec(context, spec);
-    const rendered = dependencies.roles.render('acceptance-author', acceptanceAuthorValues(settings.repository, spec, type));
+    const rendered = dependencies.roles.render('acceptance-author', acceptanceAuthorValues(settings.repository, spec, type, toolkit.films !== null));
     const result = await toolkit.stacks.around(writer, journal.issueNumber, type.id, worktree.path, () =>
       toolkit.agents.run(writer, {
         role: 'acceptance-author',

@@ -11,6 +11,7 @@ that work.
 agent-factory start
 ├── HTTP server ─────────── the cockpit (static files), its JSON API, an event stream
 ├── installation daemon ─── one loop for the whole machine
+│   ├── films ──────────── one queue for every project, one film at a time
 │   ├── tasks ──────────── subscription usage, config.yaml edits, health sampling,
 │   │                       tool keep-alives
 │   └── project daemons ── one per project: schedule validated issues, drive their
@@ -59,6 +60,13 @@ the factory adds no step to it.
 | `producing-evidence` | evidence | the factory commits the before and after evidence, pushes, and opens the pull request |
 | `pr-open` → `closed` | the operator | the merge happens on the operator's order: squash, after the evidence folder is removed |
 
+A film is evidence added to an open pull request, not a stage
+([ADR 0030](adr/0030-films.md)). Once the pull request is open, the factory orders the
+scenarios the spec declares; the installation's daemon films them one at a time, across
+projects, while nothing else runs: the base, then the head, committed on the branch in
+one evidence commit and announced in the pull request body. The merge waits for the
+films of its pull request.
+
 Failures retry within bounds: two corrections in the same session, then one fresh
 restart, then `needs-human` with the reason. A decision only a person can take
 stops the run and comes back to the agent with the answer.
@@ -78,6 +86,7 @@ stops the run and comes back to the agent with the answer.
 | `Notifier` | system notifications, Slack, Google Chat, a generic webhook ([ADR 0013](adr/0013-notification-channels.md)) |
 | `ToolProber`, `ToolSessionCommands` | the declared checks, logins and keep-alives of the connected tools ([ADR 0014](adr/0014-declarative-tool-checks.md), [ADR 0017](adr/0017-tool-logins-and-session-keepers.md)) |
 | `ResourceGuard` | memory and memory pressure of the machine |
+| `FilmRecorder`, `VideoTranscoder` | `CommandFilmRecorder` runs the project's film command; `FfmpegTranscoder` turns a video that is not an MP4 into H.264 ([ADR 0030](adr/0030-films.md)) |
 
 ## The cockpit
 
@@ -97,6 +106,9 @@ the cockpit parses what it receives.
 
 - Agent runs: Claude Code's own sandbox and permission settings, generated per run
   with the deny lists of credentials, other projects and the factory's state.
+- Film commands: the one command the factory runs outside the sandbox, with the operator's
+  environment, in the factory itself and in a process group stopped on timeout and on stop
+  ([ADR 0030](adr/0030-films.md)).
 - Setup, gate and acceptance commands: the operating system's sandbox, no credential
   reads, writes limited to the worktree and the caches, no network unless a command
   declares why it needs it, and the factory's own ports refused.

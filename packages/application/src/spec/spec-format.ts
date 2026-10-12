@@ -1,3 +1,4 @@
+import { FILM_SCENARIO_RULE, isFilmScenarioName } from '@agent-factory/domain';
 import type { CommitKind } from '@agent-factory/domain';
 
 export const SPEC_SECTION_KEYS = ['need', 'acceptanceCriteria', 'outOfScope', 'expectedProof'] as const;
@@ -15,6 +16,11 @@ export const NUMBERED_ITEM_SUFFIX = '.';
 export const BULLET_MARKER = '-';
 export function kindLabel(kind: CommitKind, prefix: string): string {
   return `${prefix}${kind}`;
+}
+
+/** Why a name cannot be a film scenario of a spec, or null when it can. */
+export function filmScenarioProblem(scenario: string): string | null {
+  return isFilmScenarioName(scenario) ? null : `the film scenario name must be ${FILM_SCENARIO_RULE}`;
 }
 
 export function normaliseHeading(heading: string): string {

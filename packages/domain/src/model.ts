@@ -53,6 +53,8 @@ export interface IssueSpec {
   readonly expectedProof: string;
   readonly dependsOn: readonly number[];
   readonly commitKind: CommitKind | null;
+  /** The film scenarios the pull request must show, recorded by the factory once it is open. */
+  readonly films: readonly string[];
 }
 
 export interface FrozenCheck {

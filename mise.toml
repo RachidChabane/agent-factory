@@ -36,6 +36,10 @@ run = "script/screenshots"
 description = "Regenerate the configuration JSON Schema (--check verifies it)"
 run = "script/schema"
 
+[tasks."demo-films"]
+description = "Regenerate the two sample videos the demonstration films with (needs ffmpeg)"
+run = "script/demo-films"
+
 [tasks."third-party-notices"]
 description = "Regenerate THIRD_PARTY_NOTICES.md (--check verifies it)"
 run = "script/third-party-notices"

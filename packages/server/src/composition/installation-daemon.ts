@@ -1,7 +1,18 @@
-import { InstallationDaemon, MachineSchedulingPauses, ToolSessionKeepers, type FactoryDaemon, type InstallationTask, type PauseSet } from '@agent-factory/application';
+import {
+  activePauses,
+  FilmLane,
+  InstallationDaemon,
+  MachineSchedulingPauses,
+  ToolSessionKeepers,
+  type FactoryDaemon,
+  type FilmLaneProject,
+  type InstallationFilms,
+  type InstallationTask,
+  type PauseSet,
+} from '@agent-factory/application';
 import { ConfigurationFileWatch } from './installation/configuration-watch.ts';
 import type { InstallationRuntime } from './installation/installation-runtime.ts';
-import { projectDaemon, projectScheduler } from './project/project-use-cases.ts';
+import { filmRunner, projectDaemon, projectScheduler } from './project/project-use-cases.ts';
 import { SystemSleeper } from './system.ts';
 
 /** The daemons of a running installation: one per project, driven by one loop. */
@@ -19,6 +30,15 @@ function healthTasks(runtime: InstallationRuntime): readonly InstallationTask[] 
         await project.health.sampleIfDue();
       },
     }));
+}
+
+/** The films of every project that films, in one queue. */
+function installationFilms(runtime: InstallationRuntime): InstallationFilms | null {
+  const projects = runtime.projects.flatMap((project): FilmLaneProject[] => {
+    const films = filmRunner(project, runtime);
+    return films === null ? [] : [{ projectId: project.id, films, notifications: project.notifications, log: project.log, pauses: () => activePauses(project.dependencies.events) }];
+  });
+  return projects.length === 0 ? null : new FilmLane(projects);
 }
 
 const INSTALLATION_SCOPE = 'the installation';
@@ -58,6 +78,7 @@ export function createDaemons(runtime: InstallationRuntime): RunningDaemons {
         const daemon = daemons.get(project.id);
         return daemon === undefined ? [] : [projectScheduler(project, daemon)];
       }),
+      films: installationFilms(runtime),
     },
     { pollIntervalMs: runtime.config.daemon.pollIntervalMs },
   );

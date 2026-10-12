@@ -1,4 +1,5 @@
 import { parseLabelList } from '@agent-factory/application';
+import { FILM_SCENARIO_RULE, isFilmScenarioName } from '@agent-factory/domain';
 import { FORGE_KINDS, type ForgeKind } from '../config/schema/project.ts';
 import { DEFAULT_WATCH_INTERVAL_SECONDS } from '../watch/watch-settings.ts';
 
@@ -21,6 +22,7 @@ export const COMMAND_NAMES = {
   issue: 'issue',
   pr: 'pr',
   audit: 'audit',
+  film: 'film',
   tool: 'tool',
   help: 'help',
 } as const;
@@ -54,6 +56,7 @@ export const EXPECTED_HEAD_OPTION = '--expected-head';
 export const LABELS_OPTION = '--labels';
 export const ANSWER_OPTION = '--answer';
 export const REASON_OPTION = '--reason';
+export const SCENARIO_OPTION = '--scenario';
 export const SKIP_GATE_PREFLIGHT_FLAG = '--skip-gate-preflight';
 export const OFFLINE_FLAG = '--offline';
 export const REFRESH_FLAG = '--refresh';
@@ -104,16 +107,18 @@ export const USAGE = [
   '  request add <file> [--images <dir>] [--requester <name>]   store a product request with its images',
   '  request challenge <id>                       challenge a stored request and draft its specs, report and reply',
   '  issue create <spec.md> [--blocked-by <n>[,<n>]] [--confirm] [--start]',
-  '                                               create an issue from a spec file (on GitHub it needs --confirm); --blocked-by lists the issues it waits on;',
-  '                                               --start validates it at once',
+  '                                               create an issue from a spec file (on GitHub it needs --confirm; a Films: header names the scenarios to film);',
+  '                                               --blocked-by lists the issues it waits on; --start validates it at once',
   '  issue abandon <issue> --reason <text>        stop the factory work on an escalated issue and free its worktree',
   '  pr feedback <pull-request> <file> --author <name>   record review feedback and start a new cycle',
   '  audit <commit> [<commit>...]                 audit commits of the base branch, one at a time',
+  '  film <issue> --scenario <name>               order the film of a scenario on the open pull request of the issue: it records the base and the head,',
+  '                                               commits both on the branch and adds them to the pull request body (needs evidence.films)',
   '',
   'Rehearsal (projects on a local forge)',
   '  rehearsal init <source-clone>                mirror a source clone into the local forge and clone it for the project',
   '  rehearsal reset <source-clone>               reset the local forge and its clone to the source clone',
-  '  rehearsal add-issue <spec.md> [--labels a,b] create a local issue from a spec file',
+  '  rehearsal add-issue <spec.md> [--labels a,b] create a local issue from a spec file (Title:, Labels:, optional Films:, then the four sections)',
 ].join('\n');
 
 export type CliCommand =
@@ -137,6 +142,7 @@ export type CliCommand =
   | { readonly kind: 'issue-abandon'; readonly issueNumber: number; readonly reason: string }
   | { readonly kind: 'pr-feedback'; readonly pullRequestNumber: number; readonly path: string; readonly author: string }
   | { readonly kind: 'audit'; readonly commits: readonly string[] }
+  | { readonly kind: 'film'; readonly issueNumber: number; readonly scenario: string }
   | { readonly kind: 'tool-check'; readonly tool: string }
   | { readonly kind: 'tool-login'; readonly tool: string }
   | { readonly kind: 'help' };
@@ -383,6 +389,19 @@ function parseAudit(rest: readonly string[]): ParsedCommand {
   });
 }
 
+function parseFilm(rest: readonly string[]): ParsedCommand {
+  return withOptions(rest, [SCENARIO_OPTION], [], ({ positional, values }) => {
+    const problem = exactly(positional, ['issue number']);
+    if (problem !== null) return failure(problem);
+    const issueNumber = positiveInteger(positional[0], 'issue number');
+    if (typeof issueNumber === 'string') return failure(issueNumber);
+    const scenario = values.get(SCENARIO_OPTION);
+    if (scenario === undefined) return failure(`missing ${SCENARIO_OPTION} <name>`);
+    if (!isFilmScenarioName(scenario)) return failure(`${SCENARIO_OPTION} must be ${FILM_SCENARIO_RULE}, got "${scenario}"`);
+    return done({ kind: 'film', issueNumber, scenario });
+  });
+}
+
 function parseTool(rest: readonly string[]): ParsedCommand {
   const [subcommand, ...arguments_] = rest;
   if (subcommand !== TOOL_SUBCOMMANDS.check && subcommand !== TOOL_SUBCOMMANDS.login) {
@@ -432,6 +451,8 @@ function parseCommand(name: string, rest: readonly string[]): ParsedCommand {
       return parsePullRequest(rest);
     case COMMAND_NAMES.audit:
       return parseAudit(rest);
+    case COMMAND_NAMES.film:
+      return parseFilm(rest);
     case COMMAND_NAMES.tool:
       return parseTool(rest);
     default:

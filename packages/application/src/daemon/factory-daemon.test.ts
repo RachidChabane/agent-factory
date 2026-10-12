@@ -33,6 +33,10 @@ import { issueStates } from '../pipeline/pipeline-capacity.ts';
 import { pauseScheduling } from './pause-state.ts';
 import { MachineSchedulingPauses } from './scheduling-pauses.ts';
 import { DEFAULT_PROJECT_CONVENTIONS } from '../conventions/project-conventions.ts';
+import { FilmRefusedError } from '../film/film-errors.ts';
+import type { FilmRunner } from '../film/film-runner.ts';
+import { ORPHAN_FILM_REASON } from '../film/orphan-films.ts';
+import { SLOTS_HELD } from './scheduling-hold.ts';
 
 const START = new Date('2026-10-10T08:00:00.000Z');
 const MINUTE_MS = 60_000;
@@ -134,7 +138,12 @@ function yieldingSleep(_milliseconds: number, signal: AbortSignal): Promise<void
 }
 
 function setup(
-  overrides: { readonly audits?: AuditRunner | null; readonly settings?: Partial<DaemonSettings>; readonly configuration?: ConfigurationSource | null } = {},
+  overrides: {
+    readonly audits?: AuditRunner | null;
+    readonly films?: FilmRunner | null;
+    readonly settings?: Partial<DaemonSettings>;
+    readonly configuration?: ConfigurationSource | null;
+  } = {},
 ) {
   const events = new InMemoryEventStore();
   const clock = new SteppingClock(START);
@@ -174,6 +183,7 @@ function setup(
       pipelines: (signal) => drivers.create(signal),
       audits: overrides.audits ?? null,
       challenges: null,
+      films: overrides.films ?? null,
       releases,
       configuration: overrides.configuration ?? null,
       reclaimStacks: () => Promise.resolve(0),
@@ -409,6 +419,94 @@ describe('FactoryDaemon', () => {
     expect(drivers.pending.every((entry) => entry.signal.aborted)).toBe(true);
     expect(events.typesOf('daemon')).toEqual([DAEMON_STARTED_EVENT, DAEMON_STOPPED_EVENT]);
     expect(daemon.runningIssues()).toEqual([]);
+  });
+});
+
+describe('FactoryDaemon and the films of the installation', () => {
+  function filmRunner(): FilmRunner & { readonly refreshed: number[] } {
+    const refreshed: number[] = [];
+    return {
+      refreshed,
+      prepare: () => Promise.resolve(),
+      film: () => Promise.reject(new Error('not used')),
+      order: () => Promise.resolve(),
+      orderDeclared: () => Promise.resolve([]),
+      next: () => Promise.resolve(null),
+      fail: () => Promise.resolve(),
+      refreshBodies: () => {
+        refreshed.push(refreshed.length);
+        return Promise.resolve({ updated: [], failed: [] });
+      },
+    };
+  }
+
+  it('starts no issue while a film holds the slots, and starts it once they are free', async () => {
+    const { github, drivers, daemon } = setup();
+    github.issues.set(1, validated(1));
+    await daemon.tick(SIGNAL, SLOTS_HELD);
+    expect(drivers.started).toEqual([]);
+    await daemon.tick(SIGNAL);
+    expect(drivers.started).toEqual([1]);
+  });
+
+  it('starts no audit while a film holds the slots', async () => {
+    const audited: string[] = [];
+    const audits: AuditRunner = {
+      audit: (auditId): Promise<AuditOutcome> => {
+        audited.push(auditId);
+        return Promise.resolve({ status: 'failed', auditId, reason: 'not used' });
+      },
+    };
+    const context = setup({ audits });
+    const controller = new AbortController();
+    const running = context.daemon.run(controller.signal);
+    await flush();
+    controller.abort();
+    await running;
+    context.github.history.push(commit({ sha: 'hotfix1' }));
+    context.clock.set(new Date(START.getTime() + SETTINGS.mergeWatchIntervalMs));
+
+    await context.daemon.tick(SIGNAL, SLOTS_HELD);
+    await context.daemon.settle();
+    expect(audited).toEqual([]);
+
+    await context.daemon.tick(SIGNAL);
+    await context.daemon.settle();
+    expect(audited).toEqual(['hotfix1']);
+  });
+
+  it('fails the films a stopped factory left recording and renders the placeholders again when it starts', async () => {
+    const films = filmRunner();
+    const { daemon, events } = setup({ films });
+    const subject = issueSubject(5);
+    await events.append(PIPELINE_EVENTS.filmQueued, subject, { scenario: 'checkout-flow', operator: 'Alex Morgan' });
+    await events.append(PIPELINE_EVENTS.filmStarted, subject, { scenario: 'checkout-flow', operator: 'Alex Morgan', baseSha: 'base', headSha: 'head' });
+
+    await daemon.start();
+
+    const journal = await loadJournal(events, 5);
+    expect(journal.filmOrders.map((order) => [order.status, order.reason])).toEqual([['failed', ORPHAN_FILM_REASON]]);
+    expect(films.refreshed).toHaveLength(1);
+  });
+
+  it('still starts when the placeholders cannot be rendered', async () => {
+    const films: FilmRunner = { ...filmRunner(), refreshBodies: () => Promise.reject(new Error('forge unreachable')) };
+    const { daemon, events } = setup({ films });
+    await daemon.start();
+    expect(events.typesOf('daemon')).toEqual([DAEMON_STARTED_EVENT]);
+  });
+
+  it('refuses to order a film when the project films nothing', async () => {
+    const { daemon } = setup();
+    await expect(daemon.orderFilm({ issueNumber: 1, scenario: 'checkout-flow', operator: 'Alex Morgan' })).rejects.toBeInstanceOf(FilmRefusedError);
+  });
+
+  it('hands an order to the films of the project', async () => {
+    const ordered: string[] = [];
+    const films: FilmRunner = { ...filmRunner(), order: (order) => Promise.resolve(void ordered.push(order.scenario)) };
+    const { daemon } = setup({ films });
+    await daemon.orderFilm({ issueNumber: 1, scenario: 'checkout-flow', operator: 'Alex Morgan' });
+    expect(ordered).toEqual(['checkout-flow']);
   });
 });
 

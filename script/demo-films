@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Regenerates the two sample videos the demonstration films with, before.mp4 and after.mp4, in
+# packages/server/src/demo/films (or in the directory given as the first argument, from the repository root).
+# They come from a fixed synthetic source, a test pattern tinted red and then green with a white bar that
+# grows from a third to the whole width: 320x180 H.264, three seconds, about 20 KB each, with no metadata
+# of the machine that made them, so a second run writes the same bytes. They are the only videos the
+# repository holds (docs/adr/0030-films.md). Needs ffmpeg with libx264.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+readonly DEFAULT_DIRECTORY=packages/server/src/demo/films
+readonly SIZE=320x180
+readonly RATE=15
+readonly DURATION_SECONDS=3
+readonly NICENESS=10
+readonly BITRATE=60k
+readonly MAX_BITRATE=80k
+readonly BUFFER_SIZE=120k
+readonly SEI_UNIT_TYPE=6
+
+if ! command -v ffmpeg > /dev/null 2>&1; then
+  echo "demo-films: ffmpeg is not installed; install it (with libx264) to regenerate the sample videos" >&2
+  exit 1
+fi
+
+output=${1:-$DEFAULT_DIRECTORY}
+mkdir -p "$output"
+
+# render <target> <tint> <bar share of the width>
+render() {
+  local target=$1 tint=$2 bar=$3
+  nice -n "$NICENESS" ffmpeg -hide_banner -loglevel error -y \
+    -f lavfi -i "testsrc2=size=${SIZE}:rate=${RATE}:duration=${DURATION_SECONDS}" \
+    -f lavfi -i "color=c=${tint}:s=${SIZE}:r=${RATE}:d=${DURATION_SECONDS}" \
+    -filter_complex "[0][1]blend=all_mode=overlay:all_opacity=0.5,drawbox=x=0:y=0:w=iw*${bar}:h=14:color=white:t=fill,format=yuv420p" \
+    -map_metadata -1 -fflags +bitexact -flags:v +bitexact \
+    -c:v libx264 -preset veryslow -b:v "$BITRATE" -maxrate "$MAX_BITRATE" -bufsize "$BUFFER_SIZE" -pix_fmt yuv420p \
+    -an -threads 1 -x264-params threads=1 -bsf:v "filter_units=remove_types=${SEI_UNIT_TYPE}" \
+    -movflags +faststart "$target"
+}
+
+render "$output/before.mp4" 0xb04040 0.3
+render "$output/after.mp4" 0x40b060 1.0
+echo "demo-films: wrote $output/before.mp4 and $output/after.mp4"

@@ -96,6 +96,14 @@ export class GitSourceControl implements SourceControl {
     return this.headSha(worktree);
   }
 
+  async discardPaths(worktree: Worktree, paths: readonly string[]): Promise<void> {
+    const relativePaths = paths.map((path) => toRelativeInside(worktree.path, path));
+    const listing = await this.git.run(worktree.path, ['ls-tree', '-r', '--name-only', '-z', 'HEAD', '--', ...relativePaths], LITERAL_PATHSPECS_ENVIRONMENT);
+    const tracked = splitNul(listing);
+    if (tracked.length > 0) await this.git.run(worktree.path, ['checkout', 'HEAD', '--', ...tracked], LITERAL_PATHSPECS_ENVIRONMENT);
+    await this.git.run(worktree.path, ['clean', '-fdq', '--', ...relativePaths], LITERAL_PATHSPECS_ENVIRONMENT);
+  }
+
   async hashFiles(worktree: Worktree, paths: readonly string[]): Promise<readonly FrozenCheck[]> {
     return Promise.all(
       paths.map(async (path) => {

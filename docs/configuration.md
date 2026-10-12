@@ -81,6 +81,7 @@ applies at the next tick, and the cockpit lists what waits for a restart.
 | `knowledge` | `[]` | sources of the knowledge pack given to agents: `{ path }` (a file or directory) or `{ repository: <path in the repo> }` |
 | `references` | `[]` | other repositories the specifications cite, read as snapshots: `{ name, repository, ref, source }`; see [References](#references) |
 | `evidence.maxFileBytes` / `maxTotalBytes` | 5 MB / 40 MB | limits of the evidence committed to a pull request |
+| `evidence.films` | none | the command that films a pull request; see [Films](#films) |
 | `delivery` | none | see [Delivery](#delivery) |
 | `audits.ignore` | `[]` | other automations of the repository: `{ name, branches?: [globs], authors?: [globs] }`; their changes are recorded, not audited |
 | `tools` | `[]` | the tools of this project; see [Tools](#tools) |
@@ -109,6 +110,44 @@ lists the variables of the factory's environment that reach confined commands;
 `environment.set` adds fixed ones. A name that looks like a credential (`TOKEN`,
 `SECRET`, `GH_`, `AWS_` …) is refused: credentials never reach check commands or agent
 runs.
+
+### Films
+
+`evidence.films` makes the factory film the behaviour of its pull requests
+([ADR 0030](adr/0030-films.md)). Without it, nothing is filmed.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `command` | required | the argument template of the film command; it holds `{ref}` (the commit to record), `{output}` (an empty directory) and `{scenario}`, and may hold `{replay}` after an option such as `--replay` |
+| `workingDirectory` | required | where the command runs: absolute, `~/…`, or relative to the project's directory |
+| `environment` | `{}` | variables added to your environment for the command; a name that looks like a credential is allowed here |
+| `timeoutMinutes` | `20` | the bound of one recording; the command's process group is stopped when it expires, and with the factory |
+| `replayFile` | `replay.json` | the file the recording of the base writes in `{output}`; `{replay}` is its path in the recording of the head |
+| `timeZone` | the machine's | the zone of the expected arrival times in the pull request body and the cockpit |
+
+The command runs **outside the sandbox**, with your environment and your sessions
+(containers, secrets, cloud and browser logins): declare only a command you trust like
+your own scripts. `agent-factory validate` says so on the project's `films` line, checks
+the working directory, and warns when `ffmpeg` is missing.
+
+A recording writes into `{output}`:
+
+- `report.json`: `{ "status": "recorded" | "skipped", "reason": "…", "facts": [{ "label", "value" }], "keyFrames": ["relative/path.png"] }`.
+  A fact's value is a string, a number or a boolean; at most 20 facts are kept, each
+  on one line. A `skipped` status fails the film with its `reason`.
+- one video, `.mp4`, `.webm`, `.mov` or `.mkv` anywhere under `{output}`; the largest
+  one is the film. A video that is not an MP4 is transcoded to H.264 with `ffmpeg`,
+  under `nice`; an MP4 is kept as it is.
+- screenshots (`.png`, `.jpg`, `.jpeg`, `.webp`, `.svg`): the last one in path order is
+  the final screenshot, and the report's `keyFrames` name up to six more.
+
+The first recording films the issue's base commit, the second the head of the pull
+request. A spec declares the scenarios its pull request shows in a `Films:
+<scenario>[, <scenario>…]` header, which the issue stores as `film:<scenario>` labels; the
+operator orders any other with `agent-factory film <issue> --scenario <name>` or from the
+pull request page. A scenario name is letters, digits, dots, dashes and underscores, at
+most 45 characters. Films wait in one queue for the whole installation, one at a time,
+while nothing else runs: see [ADR 0030](adr/0030-films.md).
 
 ### Issue types
 

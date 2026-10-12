@@ -165,6 +165,8 @@ export const IssueSpecViewSchema = z.object({
   acceptanceCriteria: z.array(z.string()),
   outOfScope: z.array(z.string()),
   expectedProof: z.string(),
+  /** The film scenarios the spec declares for its pull request. */
+  films: z.array(z.string().min(1)),
 });
 export type IssueSpecView = z.infer<typeof IssueSpecViewSchema>;
 
@@ -428,6 +430,47 @@ export const CheckRunViewSchema = z.object({
 });
 export type CheckRunView = z.infer<typeof CheckRunViewSchema>;
 
+/** Where a film stands: waiting its turn, in one of the stages of its recording, or ended. */
+export const FILM_ORDER_STATES = ['queued', 'recording-base', 'recording-head', 'committing', 'finished', 'failed'] as const;
+export type FilmOrderState = (typeof FILM_ORDER_STATES)[number];
+export const PENDING_FILM_STATES: readonly FilmOrderState[] = ['queued', 'recording-base', 'recording-head', 'committing'];
+
+export const FilmFactSchema = z.object({ label: z.string().min(1), value: z.string() });
+export type FilmFact = z.infer<typeof FilmFactSchema>;
+
+/** One recording of a film: the commit it was taken at, its video, its screenshots and the facts the report gave. */
+export const FilmPhaseViewSchema = z.object({
+  sha: z.string().min(1),
+  videoUrl: z.string().min(1),
+  /** The final screenshot first, then the key frames. */
+  screenshotUrls: z.array(z.string().min(1)),
+  facts: z.array(FilmFactSchema),
+});
+export type FilmPhaseView = z.infer<typeof FilmPhaseViewSchema>;
+
+/** A scenario recorded on the base and on the head of the pull request. */
+export const FilmViewSchema = z.object({
+  scenario: z.string().min(1),
+  recordedAt: IsoDateTimeSchema,
+  before: FilmPhaseViewSchema,
+  after: FilmPhaseViewSchema,
+});
+export type FilmView = z.infer<typeof FilmViewSchema>;
+
+/** A scenario ordered for the pull request, and where its film stands in the installation's queue. */
+export const FilmOrderViewSchema = z.object({
+  scenario: z.string().min(1),
+  operator: z.string().min(1),
+  state: z.enum(FILM_ORDER_STATES),
+  /** When the film is expected to be recorded, estimated at `generatedAt` of the snapshot; null once it ended. */
+  expectedAt: IsoDateTimeSchema.nullable(),
+  /** The films, of any project, that finish before this one. */
+  filmsAhead: CountSchema,
+  reason: z.string().nullable(),
+  since: IsoDateTimeSchema,
+});
+export type FilmOrderView = z.infer<typeof FilmOrderViewSchema>;
+
 export const PullRequestViewSchema = z.object({
   number: IssueNumberSchema,
   title: z.string(),
@@ -444,6 +487,10 @@ export const PullRequestViewSchema = z.object({
   evidenceComplete: z.boolean(),
   missingEvidence: z.array(z.string()),
   evidence: z.array(EvidenceSchema),
+  /** The scenarios recorded on this pull request. */
+  films: z.array(FilmViewSchema),
+  /** The scenarios ordered for it, whichever way they ended or wait. */
+  filmOrders: z.array(FilmOrderViewSchema),
   reviewRounds: z.array(ReviewRoundSchema),
   externalFeedback: z.array(ExternalFeedbackSchema),
   files: z.array(ChangedFileSchema),
@@ -729,6 +776,8 @@ export const ProjectSettingsViewSchema = z.object({
   branchPrefix: z.string(),
   automations: z.array(z.object({ name: z.string(), branches: z.array(z.string()), authors: z.array(z.string()) })),
   releaseModel: z.enum(RELEASE_MODEL_KINDS),
+  /** The films of the project's pull requests; null when the project declares no film command. */
+  films: z.object({ timeZone: z.string().min(1), timeoutMinutes: CountSchema }).nullable(),
 });
 export type ProjectSettingsView = z.infer<typeof ProjectSettingsViewSchema>;
 

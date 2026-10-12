@@ -50,6 +50,7 @@ export const FIXTURE_SPEC: IssueSpec = {
   expectedProof: 'A Playwright journey with a screenshot of the header.',
   dependsOn: [],
   commitKind: null,
+  films: [],
 };
 
 const PENDING_SPEC: IssueSpec = { ...FIXTURE_SPEC, number: 43, title: 'Show the mockup author', dependsOn: [42] };
@@ -434,6 +435,7 @@ export function projectContext(history: ProjectHistory = projectHistory(), overr
     productionWorkflowUrl: 'https://github.com/acme/widgets/actions/workflows/production.yaml',
     issueCosts: issueCosts(recordedRuns(indexEvents(history.installation)), PROJECT_ID),
     changedFiles: new Map(),
+    films: null,
     ...overrides,
   };
 }

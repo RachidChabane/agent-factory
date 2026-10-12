@@ -12,6 +12,7 @@ export const BLOCKER_KINDS = {
   stalled: 'stalled',
   paused: 'paused',
   noFreeWorktree: 'no-free-worktree',
+  filmFailed: 'film-failed',
   cockpitUnreachable: 'cockpit-unreachable',
 } as const;
 export type BlockerKind = (typeof BLOCKER_KINDS)[keyof typeof BLOCKER_KINDS];

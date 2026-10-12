@@ -26,7 +26,7 @@ import type { RemoteAccessConfig } from '../config/agent-factory-config.ts';
 import { EventStreamConnection, runLogJson, type EventStreamSettings } from './event-stream.ts';
 import { identify } from './identity.ts';
 import { CommandToken } from './command-token.ts';
-import { contentTypeOf, isFile, resolveInside, sendFile } from './static-files.ts';
+import { contentTypeOf, isFile, resolveInside, sendBytes, sendFile } from './static-files.ts';
 
 export const INDEX_FILE = 'index.html';
 export const MAX_COMMAND_BODY_BYTES = 32 * 1024 * 1024;
@@ -192,14 +192,14 @@ export class FactoryHttpServer {
       return;
     }
     if (path.startsWith(`${API_PROJECTS_PATH}${PATH_SEPARATOR}`)) {
-      await this.projectFile(response, path);
+      await this.projectFile(request, response, path);
       return;
     }
     if (path.startsWith(API_PREFIX)) {
       sendJson(response, HTTP.notFound, { error: `no route for ${path}` });
       return;
     }
-    await this.cockpit(response, path);
+    await this.cockpit(request, response, path);
   }
 
   private async command(request: IncomingMessage, response: ServerResponse, name: string, operator: string): Promise<void> {
@@ -257,7 +257,7 @@ export class FactoryHttpServer {
    * `/api/projects/<project>/forge/<path>`, `/api/projects/<project>/blob/<sha>/<path>` and
    * `/api/projects/<project>/pull-requests/<number>/diff`.
    */
-  private async projectFile(response: ServerResponse, path: string): Promise<void> {
+  private async projectFile(request: IncomingMessage, response: ServerResponse, path: string): Promise<void> {
     const [project, segment, owner, ...rest] = path.slice(API_PROJECTS_PATH.length + 1).split(PATH_SEPARATOR).map(decodeURIComponent);
     const directories = project === undefined ? null : this.settings.projectDirectories(project);
     if (project === undefined || directories === null || owner === undefined) {
@@ -265,7 +265,7 @@ export class FactoryHttpServer {
       return;
     }
     if (segment === REPOSITORY_FILE_SEGMENT && rest.length > 0) {
-      await this.repositoryFile(response, project, owner, rest.join(PATH_SEPARATOR), path);
+      await this.repositoryFile(request, response, project, owner, rest.join(PATH_SEPARATOR), path);
       return;
     }
     if (segment === PULL_REQUESTS_SEGMENT && POSITIVE_INTEGER.test(owner) && rest.length === 1 && rest[0] === DIFF_SEGMENT) {
@@ -275,7 +275,7 @@ export class FactoryHttpServer {
       return;
     }
     if (segment === FORGE_SEGMENT && directories.forge !== null) {
-      await this.sendInside(response, directories.forge, [owner, ...rest].join(PATH_SEPARATOR), path);
+      await this.sendInside(request, response, directories.forge, [owner, ...rest].join(PATH_SEPARATOR), path);
       return;
     }
     if (rest.length === 0) {
@@ -283,7 +283,7 @@ export class FactoryHttpServer {
       return;
     }
     if (segment === EVIDENCE_SEGMENT && POSITIVE_INTEGER.test(owner)) {
-      await this.sendInside(response, join(directories.evidence, `${EVIDENCE_CACHE_ISSUE_PREFIX}${owner}`), rest.join(PATH_SEPARATOR), path);
+      await this.sendInside(request, response, join(directories.evidence, `${EVIDENCE_CACHE_ISSUE_PREFIX}${owner}`), rest.join(PATH_SEPARATOR), path);
       return;
     }
     const requestRoot = segment === REQUESTS_SEGMENT ? resolveInside(directories.requests, owner) : null;
@@ -291,10 +291,10 @@ export class FactoryHttpServer {
       sendJson(response, HTTP.notFound, { error: `no file at ${path}` });
       return;
     }
-    await this.sendInside(response, requestRoot, rest.join(PATH_SEPARATOR), path);
+    await this.sendInside(request, response, requestRoot, rest.join(PATH_SEPARATOR), path);
   }
 
-  private async repositoryFile(response: ServerResponse, project: string, sha: string, filePath: string, path: string): Promise<void> {
+  private async repositoryFile(request: IncomingMessage, response: ServerResponse, project: string, sha: string, filePath: string, path: string): Promise<void> {
     let bytes: Uint8Array | null;
     try {
       bytes = await this.dependencies.repositoryFile(project, sha, filePath);
@@ -306,20 +306,19 @@ export class FactoryHttpServer {
       sendJson(response, HTTP.notFound, { error: `no file at ${path}` });
       return;
     }
-    response.writeHead(HTTP.ok, { 'content-type': contentTypeOf(filePath), 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=3600' });
-    response.end(bytes);
+    sendBytes(request, response, bytes, { 'content-type': contentTypeOf(filePath), 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=3600' });
   }
 
-  private async sendInside(response: ServerResponse, root: string, relativePath: string, path: string): Promise<void> {
+  private async sendInside(request: IncomingMessage, response: ServerResponse, root: string, relativePath: string, path: string): Promise<void> {
     const file = resolveInside(root, relativePath);
     if (file === null || !(await isFile(file))) {
       sendJson(response, HTTP.notFound, { error: `no file at ${path}` });
       return;
     }
-    sendFile(response, file);
+    await sendFile(request, response, file);
   }
 
-  private async cockpit(response: ServerResponse, path: string): Promise<void> {
+  private async cockpit(request: IncomingMessage, response: ServerResponse, path: string): Promise<void> {
     const index = join(this.settings.cockpitDirectory, INDEX_FILE);
     if (!(await isFile(index))) {
       sendJson(response, HTTP.notFound, { error: COCKPIT_NOT_BUILT });
@@ -327,7 +326,7 @@ export class FactoryHttpServer {
     }
     const asset = path === PATH_SEPARATOR ? null : resolveInside(this.settings.cockpitDirectory, path.slice(1));
     if (asset !== null && (await isFile(asset)) && asset !== index) {
-      sendFile(response, asset);
+      await sendFile(request, response, asset);
       return;
     }
     const page = await readFile(index, 'utf8');

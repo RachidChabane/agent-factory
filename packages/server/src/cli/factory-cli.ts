@@ -1,6 +1,7 @@
 import type { CliContext } from './cli-context.ts';
 import { parseCommandLine, USAGE, type CommandLine } from './command-line.ts';
 import { auditCommand } from './commands/audit-command.ts';
+import { filmCommand } from './commands/film-command.ts';
 import { initCommand } from './commands/init-command.ts';
 import { issueAbandonCommand } from './commands/issue-abandon-command.ts';
 import { issueCreateCommand } from './commands/issue-create-command.ts';
@@ -71,6 +72,8 @@ async function dispatch({ project, command }: CommandLine, context: CliContext):
       return prFeedbackCommand(command.pullRequestNumber, command.path, command.author, project, context);
     case 'audit':
       return auditCommand(command.commits, project, context);
+    case 'film':
+      return filmCommand(command.issueNumber, command.scenario, project, context);
     case 'tool-check':
       return toolCommand('check', command.tool, project, context);
     case 'tool-login':

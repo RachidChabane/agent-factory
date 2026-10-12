@@ -192,7 +192,7 @@ function issueView(
     state: journal?.state ?? (pending?.validated === true ? VALIDATED_STATE : DRAFT_STATE),
     resumeTarget: journal !== null && journal.state === ISSUE_ESCALATION_STATE ? journal.stateBeforeEscalation : null,
     paused: paused.has(number),
-    spec: { need: spec.need, acceptanceCriteria: [...spec.acceptanceCriteria], outOfScope: [...spec.outOfScope], expectedProof: spec.expectedProof },
+    spec: { need: spec.need, acceptanceCriteria: [...spec.acceptanceCriteria], outOfScope: [...spec.outOfScope], expectedProof: spec.expectedProof, films: [...spec.films] },
     dependsOn: [...spec.dependsOn],
     requestId: requestOfIssue.get(number) ?? null,
     branch: journal?.branch ?? null,

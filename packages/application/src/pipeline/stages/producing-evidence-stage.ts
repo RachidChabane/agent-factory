@@ -164,6 +164,7 @@ export class ProducingEvidenceStage implements PipelineStage {
       costUsd: totalCostUsd(journal),
       externalFeedback: journal.feedback.map((feedback) => ({ author: feedback.author, summary: firstLine(feedback.body) })),
       acceptanceTests: acceptanceTestsOf(journal),
+      filmSection: (await toolkit.films?.sectionFor(journal)) ?? null,
     });
   }
 }

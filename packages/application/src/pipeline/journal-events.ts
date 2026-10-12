@@ -45,6 +45,13 @@ export const PIPELINE_EVENTS = {
   checkRewriteAuthored: 'pipeline.check-rewrite-authored',
   checkRewriteProved: 'pipeline.check-rewrite-proved',
   checkRewritten: 'pipeline.check-rewritten',
+  filmQueued: 'pipeline.film-queued',
+  filmStarted: 'pipeline.film-started',
+  filmStageEntered: 'pipeline.film-stage-entered',
+  filmCommitted: 'pipeline.film-committed',
+  filmPushed: 'pipeline.film-pushed',
+  filmFinished: 'pipeline.film-finished',
+  filmFailed: 'pipeline.film-failed',
 } as const;
 
 const Sha256Schema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -319,6 +326,65 @@ export const ExternalFeedbackReceivedSchema = z.object({
 });
 
 export const PullRequestUpdatedSchema = z.object({ headSha: z.string().min(1) });
+
+/** Who orders the films a spec declares. */
+export const FACTORY_FILM_OPERATOR = 'factory';
+
+/** The two recordings of a film: the issue's base commit, then the pull request head. */
+export const FILM_PHASES = ['before', 'after'] as const;
+export type FilmPhase = (typeof FILM_PHASES)[number];
+
+export const FILM_RUNNING_STAGES = ['recording-base', 'recording-head', 'committing'] as const;
+export type FilmRunningStage = (typeof FILM_RUNNING_STAGES)[number];
+
+export const FilmQueuedSchema = z.object({
+  scenario: z.string().min(1),
+  operator: z.string().min(1),
+});
+
+export const FilmStageEnteredSchema = z.object({
+  scenario: z.string().min(1),
+  stage: z.enum(FILM_RUNNING_STAGES),
+});
+
+export const FilmStartedSchema = z.object({
+  scenario: z.string().min(1),
+  operator: z.string().min(1),
+  baseSha: z.string().min(1),
+  headSha: z.string().min(1),
+});
+
+export const FilmCommittedSchema = z.object({ scenario: z.string().min(1), sha: z.string().min(1) });
+
+export const FilmPushedSchema = z.object({ headSha: z.string().min(1) });
+
+export const FilmFailedSchema = z.object({ scenario: z.string().min(1), reason: z.string().min(1) });
+
+export const FilmFactSchema = z.object({ label: z.string().min(1), value: z.string() });
+
+/** What one recording left on the branch, and where its files stand in the factory's film store. */
+const FilmPhaseRecordSchema = z.object({
+  video: z.string().min(1),
+  report: z.string().min(1),
+  /** The final screenshot first, then the key frames. */
+  screenshots: z.array(z.string().min(1)),
+  facts: z.array(FilmFactSchema),
+  storeVideo: z.string().min(1),
+  storeScreenshots: z.array(z.string().min(1)),
+});
+
+export const FilmFinishedSchema = z.object({
+  scenario: z.string().min(1),
+  baseSha: z.string().min(1),
+  headSha: z.string().min(1),
+  commitSha: z.string().min(1),
+  before: FilmPhaseRecordSchema,
+  after: FilmPhaseRecordSchema,
+});
+
+export type FilmFinishedRecord = z.infer<typeof FilmFinishedSchema>;
+export type FilmPhaseRecord = z.infer<typeof FilmPhaseRecordSchema>;
+export type FilmStartedRecord = z.infer<typeof FilmStartedSchema>;
 
 export type AgentRunFinished = z.infer<typeof AgentRunFinishedSchema>;
 export type BeforeProofRecord = z.infer<typeof BeforeProofRecordedSchema>;

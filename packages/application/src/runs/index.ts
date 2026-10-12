@@ -3,3 +3,4 @@ export * from './recording-harness.ts';
 export * from './governed-harness.ts';
 export * from './orphan-runs.ts';
 export * from './run-slots.ts';
+export * from './run-activity.ts';

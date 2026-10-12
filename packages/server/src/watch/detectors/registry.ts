@@ -1,5 +1,6 @@
 import type { BlockerDetector } from '../blocker.ts';
 import { decisionPendingDetector } from './decision-pending.ts';
+import { filmFailedDetector } from './film-failed.ts';
 import { needsHumanDetector } from './needs-human.ts';
 import { noFreeWorktreeDetector } from './no-free-worktree.ts';
 import { pausedDetector } from './paused.ts';
@@ -14,4 +15,5 @@ export const BLOCKER_DETECTORS: readonly BlockerDetector[] = [
   stalledDetector,
   pausedDetector,
   noFreeWorktreeDetector,
+  filmFailedDetector,
 ];

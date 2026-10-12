@@ -74,7 +74,18 @@ describe('MarkdownSpecReader', () => {
       expectedProof: 'A Playwright journey and screenshots of the header.\n\n```text\n## not a heading inside a fence\n```',
       dependsOn: [7, 12],
       commitKind: null,
+      films: [],
     });
+  });
+
+  it('reads the declared film scenarios from the film labels, each once', () => {
+    const spec = READER.read(issue({ labels: ['type:ui', 'film:checkout-flow', 'film:checkout-flow', 'film:order.history'] }));
+    expect(spec.films).toEqual(['checkout-flow', 'order.history']);
+    expect(READER.read(issue()).films).toEqual([]);
+  });
+
+  it('reports a film label that names no valid scenario', () => {
+    expect(problemCodes(issue({ labels: ['type:ui', 'film:../x'] }))).toEqual(['invalid-film-label']);
   });
 
   it('reports every missing section by name', () => {

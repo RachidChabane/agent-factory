@@ -11,6 +11,7 @@ import { ConcurrencyForm } from './ConcurrencyForm.tsx';
 import { IssueTypeList } from './IssueTypeList.tsx';
 import { GateCommands, SetupCommands } from './ProjectCommands.tsx';
 import { EnvironmentVariables, ProjectConventions } from './ProjectConventions.tsx';
+import { ProjectFilms } from './ProjectFilms.tsx';
 import { ReferenceList } from './ReferenceList.tsx';
 import { RoleEditor } from './RoleEditor.tsx';
 
@@ -20,6 +21,7 @@ const SECTION_IDS = {
   setup: 'project-settings-setup',
   gate: 'project-settings-gate',
   environment: 'project-settings-environment',
+  films: 'project-settings-films',
   conventions: 'project-settings-conventions',
   automations: 'project-settings-automations',
   issueTypes: 'project-settings-issue-types',
@@ -50,6 +52,9 @@ export function ProjectSettingsView() {
       </Section>
       <Section title={t('settings.environment.title')} id={SECTION_IDS.environment} description={t('settings.environment.description')}>
         <EnvironmentVariables names={settings.environmentVariables} />
+      </Section>
+      <Section title={t('settings.films.title')} id={SECTION_IDS.films} description={t('settings.films.description')}>
+        <ProjectFilms films={settings.films} />
       </Section>
       <Section title={t('settings.conventions.title')} id={SECTION_IDS.conventions}>
         <ProjectConventions settings={settings} />

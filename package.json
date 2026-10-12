@@ -22,6 +22,7 @@
     "scan": "script/scan",
     "screenshots": "script/screenshots",
     "schema": "script/schema",
+    "demo-films": "script/demo-films",
     "third-party-notices": "script/third-party-notices",
     "lockfile": "script/lockfile",
     "ci": "script/ci",

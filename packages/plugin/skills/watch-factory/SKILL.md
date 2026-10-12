@@ -34,6 +34,7 @@ The time is the reading time, in UTC. The place is `<project>#<issue>`, `<projec
 | `stalled` | an issue in a stage that owes an agent run (authoring, rewriting a check, implementing, reviewing) has had no run and no activity for 10 minutes | `triage-escalation` |
 | `paused` | the operator, the budget or the machine's resources paused the factory or a project for over 10 minutes | read the reason; a budget pause lifts at its reset time, a resources pause when memory is free again, an operator pause is theirs: report it |
 | `no-free-worktree` | validated issues wait because every worktree is held; the holders follow | `merge-and-release`: merging a pull request frees its worktree |
+| `film-failed` | the latest recording of a film of an open pull request failed; the scenario, the pull request and the reason follow | `declare-films`: fix the cause the reason names, then order the film again |
 | `cockpit-unreachable` | the factory does not answer | expected while you run `upgrade-factory`; otherwise run `agent-factory status` and tell the operator |
 
 While the cockpit is unreachable the blockers known stay as they were, and the watch clears or confirms them at the first answer.

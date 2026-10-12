@@ -25,9 +25,6 @@ const MINIMUM_QUOTED_COMMANDS = 20;
 const EXPECTED_SKILLS = ['declare-films', 'drive-factory', 'merge-and-release', 'morning-report', 'triage-escalation', 'upgrade-factory', 'watch-factory', 'write-spec'];
 const ALLOWED_AGENT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Skill', 'Monitor', 'TaskStop', 'AskUserQuestion'];
 
-/** Verbs the plugin documents from the accepted decisions; their own tests cover them. */
-const VERBS_DEFINED_BY_DECISIONS = ['film'];
-
 /** Wording that dates a statement: the plugin's text holds for whoever reads it, whenever. */
 const DATING_WORDS = /\b(currently|previously|no longer|at the moment|for now|used to|was added|newly|as of)\b/i;
 
@@ -154,12 +151,11 @@ describe('the orchestrator agent', () => {
 
 describe('the commands the plugin quotes', () => {
   it('are verbs and subcommands of the command line', async () => {
-    const known = [...COMMAND_VERBS, ...VERBS_DEFINED_BY_DECISIONS];
     let quoted = 0;
     for (const file of await markdownFiles()) {
       for (const { verb, subcommand } of commandsIn(await readFile(file, 'utf8'))) {
         quoted += 1;
-        expect(known, `${file}: ${PROGRAM} ${verb}`).toContain(verb);
+        expect(COMMAND_VERBS, `${file}: ${PROGRAM} ${verb}`).toContain(verb);
         const subcommands = COMMAND_SUBCOMMANDS[verb];
         if (subcommands !== undefined) expect(subcommands, `${file}: ${PROGRAM} ${verb} ${subcommand ?? ''}`).toContain(subcommand);
       }
