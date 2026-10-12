@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Writes schema/config.schema.json from the configuration schema the factory validates with.
+# With --check, fails when the committed file is out of date instead of writing it.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+mkdir -p schema
+exec node packages/server/src/cli/config-schema-file.ts schema/config.schema.json "$@"
