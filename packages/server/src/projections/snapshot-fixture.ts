@@ -164,6 +164,7 @@ export function fixtureEvents(): readonly FactoryEventRecord[] {
   run('run-author', 'acceptance-author', 0, 0.4);
   add('pipeline.acceptance-authored', issue, {
     manifest: {
+      runner: 'playwright',
       checks: [{ criterion: 1, paths: ['app/e2e/link.spec.ts'], description: 'the header links the conversation' }],
       command: ['pnpm', 'exec', 'playwright', 'test', 'app/e2e/link.spec.ts'],
       evidence: ['app/test-results/link.png'],

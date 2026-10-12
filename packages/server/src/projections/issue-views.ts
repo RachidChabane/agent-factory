@@ -105,7 +105,7 @@ function checksOf(journal: PipelineJournal, spec: IssueSpec, context: SnapshotCo
   const before = beforeResult(journal);
   const screenshot = journal.beforeProof?.evidence.find((entry) => entry.cachedPath !== null && isImage(entry.path));
   const withScreenshot = { ...before, screenshotUrl: screenshot === undefined ? null : context.links.evidence(spec.number, screenshot.cachedPath ?? screenshot.path) };
-  const runner = journal.manifest?.runner ?? null;
+  const runner = journal.manifest?.runner ?? journal.beforeProof?.runner ?? null;
   const kind = runner === null ? UNKNOWN_RUNNER_KIND : CHECK_KIND_BY_RUNNER[runner];
   if (journal.frozen !== null) {
     return journal.frozen.checks.map((check) => ({

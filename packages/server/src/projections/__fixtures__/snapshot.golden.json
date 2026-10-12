@@ -5,7 +5,69 @@
     "repository": "acme/widgets",
     "defaultBranch": "main",
     "operator": "operator",
-    "schedulerPaused": true
+    "schedulerPaused": true,
+    "issueTypes": [
+      {
+        "id": "feature",
+        "label": "type:feature",
+        "proof": "fails-on-base"
+      },
+      {
+        "id": "fix",
+        "label": "type:fix",
+        "proof": "fails-on-base"
+      },
+      {
+        "id": "ui",
+        "label": "type:ui",
+        "proof": "fails-on-base"
+      },
+      {
+        "id": "api",
+        "label": "type:api",
+        "proof": "fails-on-base"
+      },
+      {
+        "id": "security",
+        "label": "type:security",
+        "proof": "fails-on-base"
+      },
+      {
+        "id": "infra",
+        "label": "type:infra",
+        "proof": "fails-on-base-when-expressible"
+      },
+      {
+        "id": "data",
+        "label": "type:data",
+        "proof": "fails-on-base"
+      },
+      {
+        "id": "dependencies",
+        "label": "type:dependencies",
+        "proof": "none"
+      },
+      {
+        "id": "docs",
+        "label": "type:docs",
+        "proof": "none"
+      },
+      {
+        "id": "refactor",
+        "label": "type:refactor",
+        "proof": "none"
+      },
+      {
+        "id": "release",
+        "label": "type:release",
+        "proof": "none"
+      },
+      {
+        "id": "prompt",
+        "label": "type:prompt",
+        "proof": "base-score"
+      }
+    ]
   },
   "requests": [
     {
@@ -166,7 +228,7 @@
     {
       "number": 44,
       "title": "List the release owners",
-      "type": "doc",
+      "type": "docs",
       "state": "needs-human",
       "resumeTarget": "implementing",
       "paused": false,

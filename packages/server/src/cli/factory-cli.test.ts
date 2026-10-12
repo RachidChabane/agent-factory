@@ -420,7 +420,7 @@ describe('factory CLI', () => {
     const runner = healthyRunner(home).answer('gh label list', JSON.stringify([{ name: 'factory' }, { name: 'bug' }]));
     expect(await runCli(['validate'], context({ runner }))).toBe(1);
     const labels = captured.lines.find((line) => line.startsWith('FAIL labels')) ?? '';
-    expect(labels).toContain('acme/widgets lacks the labels spec:validated, audit, type:ui');
+    expect(labels).toContain('acme/widgets lacks the labels spec:validated, audit, type:feature, type:fix, type:ui');
     expect(labels).not.toContain(' factory,');
   });
 
