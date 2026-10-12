@@ -6,6 +6,7 @@ export const API_PROJECTS_PATH = '/api/projects';
 export const AFTER_QUERY_PARAMETER = 'after';
 export const EVIDENCE_SEGMENT = 'evidence';
 export const REQUESTS_SEGMENT = 'requests';
+export const FORGE_SEGMENT = 'forge';
 
 export const STREAM_FACTORY_EVENT = 'factory';
 export const STREAM_RUN_LOG_EVENT = 'run-log';
@@ -36,6 +37,11 @@ export function evidencePath(project: string, issueNumber: number, path: string)
 /** An attachment of a request, served from the project's requests directory. */
 export function requestAttachmentPath(project: string, requestId: string, path: string): string {
   return `${API_PROJECTS_PATH}/${encodeURIComponent(project)}/${REQUESTS_SEGMENT}/${encodeURIComponent(requestId)}/${relativePath(path)}`;
+}
+
+/** A file of a project's local forge (its issues and pull requests), which a browser cannot open from disk. */
+export function forgeFilePath(project: string, path: string): string {
+  return `${API_PROJECTS_PATH}/${encodeURIComponent(project)}/${FORGE_SEGMENT}/${relativePath(path)}`;
 }
 
 export const COCKPIT_DEV_SERVER_PORT = 5199;
