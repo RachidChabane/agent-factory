@@ -49,19 +49,25 @@ export function menuLink(page: Page, href: string) {
 
 /**
  * Clicks the entry in the page itself and resolves with the milliseconds until the view of its address is drawn: the
- * address is reached, a heading other than the previous view's stands, and nothing is still loading.
+ * address is reached (its path and every parameter of the entry; a view may add parameters of its own), a heading
+ * other than the previous view's stands, and nothing is still loading.
  */
 const MENU_CLICK_SCRIPT = `({ href, sidebar, heading, busy, timeoutMs }) =>
   new Promise((resolve, reject) => {
     const started = performance.now();
-    if (location.pathname + location.search === href) {
+    const target = new URL(href, location.origin);
+    const reached = () => {
+      const parameters = new URLSearchParams(location.search);
+      return location.pathname === target.pathname && [...target.searchParams].every(([key, value]) => parameters.get(key) === value);
+    };
+    if (reached()) {
       resolve(0);
       return;
     }
     const previous = document.querySelector(heading);
     const ready = () => {
       const current = document.querySelector(heading);
-      return location.pathname + location.search === href && current !== null && current !== previous && document.querySelector(busy) === null;
+      return reached() && current !== null && current !== previous && document.querySelector(busy) === null;
     };
     const settle = () => {
       if (!ready()) return;
