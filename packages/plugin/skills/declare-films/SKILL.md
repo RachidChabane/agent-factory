@@ -1,6 +1,6 @@
 ---
 name: declare-films
-description: Declare the films a pull request must show, and order another film. Use when a spec's behaviour can only be judged by watching the running product, or when a reviewer asks for a scenario to be recorded.
+description: Declare the films a pull request must show, and order another film. Use when a spec's behaviour can only be judged by watching the running product, when a reviewer asks for a scenario to be recorded, or when watch reports film-failed.
 ---
 
 # Declare films
