@@ -17,8 +17,9 @@ on the base and on the branch, and shows them side by side. What is missing is t
 stack those runs need, started from the code under test and stopped afterwards.
 
 Everything that depends on one product stays in that product's repository: how its
-stack signs a user in, the identity it uses, the journeys and their decisions, films
-recorded with real accounts. The factory runs the commands the project declares.
+stack signs a user in, the identity it uses, the journeys and their decisions, the tool
+that films a scenario with real accounts. The factory runs the commands the project
+declares, the film command included (ADR 0030).
 
 ## Options
 
