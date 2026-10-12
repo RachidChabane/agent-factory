@@ -37,6 +37,12 @@
   sandbox, away from credentials and from other projects. The factory reads the
   subscription's usage for free and pauses before a limit, and watches the machine's
   memory.
+- **An orchestrator for the day-to-day.** The repository is a Claude Code marketplace:
+  `/plugin install agent-factory --marketplace RachidChabane/agent-factory` adds an
+  agent, started with `claude --agent agent-factory:orchestrator`, that writes specs,
+  watches what blocks the factory with `agent-factory watch`, unblocks escalations,
+  merges within the autonomy you delegate and reports each morning
+  ([how it works](docs/operator-guide.md#working-with-the-orchestrator)).
 - **Rehearse before going live.** A local forge runs the whole cycle against your
   repository's code without reaching GitHub; the demonstration runs it on fictional
   projects with no account at all.

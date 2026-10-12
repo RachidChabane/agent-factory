@@ -35,7 +35,7 @@ Dependencies point inward ([ADR 0005](adr/0005-layered-architecture.md)).
 | `domain` | the model: issue and release lifecycles, issue types and proof strategies, budgets, retry and admission policies, the release gate | nothing |
 | `application` | use cases and their ports: the issue pipeline and its stages, requests and their challenge, audits, releases, delivery, the daemons | `domain` |
 | `adapters` | the ports' implementations: `gh` and the local forge, git, the Claude Code harness, the sandboxes, SQLite, notifications, tool probes, process supervision | `domain`, `application` |
-| `plugin` | what runs inside an agent session: the Stop-hook gate, the guard of frozen checks, the role prompts | `domain` |
+| `plugin` | what runs inside an agent session: the Stop-hook gate, the guard of frozen checks, the role prompts. It is also a Claude Code plugin that adds the orchestrator agent and its skills to the operator's sessions ([ADR 0032](adr/0032-one-plugin-and-the-orchestrator.md)) | `domain` |
 | `server` | composition: the configuration, the installation and project runtimes, the HTTP server, the command line, projections, the demonstration | all of the above |
 | `cockpit` | the React cockpit and the contract (zod schemas) it shares with the server | `domain` |
 | `fake-claude` | a deterministic stand-in for the `claude` CLI that plays a scenario file | nothing |

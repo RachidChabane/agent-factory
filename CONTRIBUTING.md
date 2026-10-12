@@ -26,7 +26,7 @@ Every verb is a shebang script in `script/`, also reachable as `pnpm run <verb>`
 | Script | Does |
 |---|---|
 | `script/setup` | install the dependencies from the lockfile, build the cockpit, and activate the git hooks |
-| `script/lint` | ESLint, type-check every package, the schema and notices freshness, shellcheck, actionlint |
+| `script/lint` | ESLint, type-check every package, the schema and notices freshness, `claude plugin validate` of the plugin and its marketplace (skipped when `claude` is not installed), shellcheck, actionlint |
 | `script/test` | unit, property, contract and integration tests of every package |
 | `script/e2e` | both end-to-end suites below |
 | `script/e2e-example` | the fictional example project from spec to merge through the command line, with the fake `claude` |
@@ -62,6 +62,10 @@ normal, and run under `nice -n 10`. Tests run with at most two workers
   parsed with a zod schema.
 - Every literal with meaning is a named constant declared next to its domain
   concept.
+- The plugin (`packages/plugin`) carries the orchestrator agent and its skills beside
+  the run hooks and role prompts. A skill states rules and commands for the agent that
+  reads it and quotes only verbs the command line defines; a test of the server
+  package checks both, and `script/lint` validates the manifests.
 - State changes go through the domain transition tables and are appended to the
   event log.
 - Agent runs never receive credentials; outward writes live in orchestrator code

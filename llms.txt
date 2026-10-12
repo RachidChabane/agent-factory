@@ -9,7 +9,7 @@ Run it from a clone: `script/setup` (dependencies and the cockpit build), then `
 - [README](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/README.md): what it is, the five-minute start, screenshots
 - [Architecture](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/docs/ARCHITECTURE.md): processes, packages, the cycle of an issue, ports and adapters, the cockpit, confinement, tests
 - [Configuration reference](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/docs/configuration.md): every key of config.yaml, its default and meaning
-- [Operator guide](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/docs/operator-guide.md): a day with the factory, the cockpit, requests, decisions, merges, releases
+- [Operator guide](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/docs/operator-guide.md): a day with the factory, the cockpit, requests, writing a spec, watching what blocks, decisions, merges, releases, the orchestrator plugin
 - [Add a project](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/docs/adding-a-project.md): init, the gate, issue types, the sandbox, a stack, rehearsal on a local forge
 - [Contributing](https://raw.githubusercontent.com/RachidChabane/agent-factory/main/CONTRIBUTING.md): the front-door scripts, tests, code rules
 
