@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { SubscriptionWindowSchema } from './primitives.ts';
-import { ResourceSampleSchema } from './snapshot.ts';
+import { ResourcesViewSchema, RunViewSchema, UsageViewSchema } from './snapshot.ts';
 
+/** What changes between events: the machine's resources, the subscription usage and the runs in progress. */
 export const TelemetrySampleSchema = z.object({
-  resources: ResourceSampleSchema,
-  subscription: z.array(SubscriptionWindowSchema),
+  resources: ResourcesViewSchema,
+  usage: UsageViewSchema,
+  runs: z.array(RunViewSchema),
 });
 export type TelemetrySample = z.infer<typeof TelemetrySampleSchema>;

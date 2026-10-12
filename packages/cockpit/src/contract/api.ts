@@ -2,8 +2,10 @@ export const API_STATE_PATH = '/api/state';
 export const API_EVENTS_PATH = '/api/events';
 export const API_COMMANDS_PATH = '/api/commands';
 export const API_RUNS_PATH = '/api/runs';
-export const API_EVIDENCE_PATH = '/api/evidence';
+export const API_PROJECTS_PATH = '/api/projects';
 export const AFTER_QUERY_PARAMETER = 'after';
+export const EVIDENCE_SEGMENT = 'evidence';
+export const REQUESTS_SEGMENT = 'requests';
 
 export const STREAM_FACTORY_EVENT = 'factory';
 export const STREAM_RUN_LOG_EVENT = 'run-log';
@@ -20,6 +22,20 @@ export function eventsPath(afterSequence: number): string {
 
 export function commandPath(name: string): string {
   return `${API_COMMANDS_PATH}/${encodeURIComponent(name)}`;
+}
+
+function relativePath(path: string): string {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
+/** A file of an issue's evidence, served from the project's evidence directory. */
+export function evidencePath(project: string, issueNumber: number, path: string): string {
+  return `${API_PROJECTS_PATH}/${encodeURIComponent(project)}/${EVIDENCE_SEGMENT}/${issueNumber}/${relativePath(path)}`;
+}
+
+/** An attachment of a request, served from the project's requests directory. */
+export function requestAttachmentPath(project: string, requestId: string, path: string): string {
+  return `${API_PROJECTS_PATH}/${encodeURIComponent(project)}/${REQUESTS_SEGMENT}/${encodeURIComponent(requestId)}/${relativePath(path)}`;
 }
 
 export const COCKPIT_DEV_SERVER_PORT = 5199;

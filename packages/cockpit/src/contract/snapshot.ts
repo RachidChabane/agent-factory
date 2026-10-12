@@ -2,19 +2,27 @@ import { z } from 'zod';
 import {
   AGENT_ROLES,
   AUDIT_REASONS,
+  AUDIT_STATES,
   BASE_EXPECTATIONS,
   BASE_TEST_RESULTS,
-  BRANCH_TEST_RESULTS,
-  AUDIT_STATES,
   BEFORE_PROOF_KINDS,
+  BILLING_MODES,
+  BRANCH_TEST_RESULTS,
   EFFORT_LEVELS,
   ISSUE_STATES,
+  PAUSE_CAUSES,
+  PROMOTION_POLICIES,
   PROOF_STRATEGIES,
+  RELEASE_MODEL_KINDS,
   RELEASE_STATES,
   REQUEST_STATES,
   REVIEW_CATEGORIES,
   REVIEW_SEVERITIES,
   TEST_RUNNERS,
+  TOOL_STATUSES,
+  USAGE_FRESHNESS,
+  USAGE_LIMIT_KINDS,
+  USAGE_SOURCES,
 } from '@agent-factory/domain';
 import {
   AmountSchema,
@@ -24,52 +32,64 @@ import {
   IssueNumberSchema,
   IssueTypeIdSchema,
   PercentSchema,
-  SubscriptionWindowSchema,
+  ProjectIdSchema,
+  RatioSchema,
+  readingOf,
+  TokenTotalsSchema,
   TokenUsageSchema,
 } from './primitives.ts';
 import {
   AGENT_RUN_OUTCOMES,
-  ALERT_SEVERITIES,
-  ALERT_STATES,
   ATTEMPT_KINDS,
   ATTEMPT_OUTCOMES,
   AUDIT_FINDING_LEVELS,
   BEFORE_RESULTS,
   CHALLENGE_VERDICTS,
   CHECK_CONCLUSIONS,
-  CHECK_KINDS,
   CHECK_RUN_OUTCOMES,
   COMMIT_ATTRIBUTIONS,
-  DECISION_STATUSES,
+  COST_BASIS_VIEWS,
   DEPLOYMENT_OUTCOMES,
   ENVIRONMENT_STATUSES,
-  ENVIRONMENTS,
-  FEEDBACK_RATINGS,
+  FORGE_KINDS,
+  INSTALLATION_MODES,
+  KNOWLEDGE_SOURCE_KINDS,
   MEMORY_PRESSURES,
-  METRIC_UNITS,
-  POD_STATUSES,
+  NOTIFICATION_CHANNEL_KINDS,
+  PAUSE_SCOPES,
   PULL_REQUEST_STATES,
+  RELEASE_SOURCES,
   RUN_STATUSES,
   RUN_SUBJECT_KINDS,
-  SOURCE_KINDS,
   SUBAGENT_STATUSES,
-  TOOL_STATUSES,
+  TOOL_SCOPES,
   WORKFLOW_STATUSES,
-  WORKFLOW_TRIGGERS,
 } from './vocabulary.ts';
 
-export const IssueTypeInfoSchema = z.object({ id: IssueTypeIdSchema, label: z.string().min(1), proof: z.enum(PROOF_STRATEGIES) });
-export type IssueTypeInfo = z.infer<typeof IssueTypeInfoSchema>;
+// ---------------------------------------------------------------- installation
 
-export const FactoryInfoSchema = z.object({
-  repository: z.string().min(1),
-  defaultBranch: z.string().min(1),
-  operator: z.string().min(1),
-  schedulerPaused: z.boolean(),
-  /** The issue types of the project, in its order. */
-  issueTypes: z.array(IssueTypeInfoSchema),
+export const PauseViewSchema = z.object({
+  scope: z.enum(PAUSE_SCOPES),
+  cause: z.enum(PAUSE_CAUSES),
+  reason: z.string(),
+  since: IsoDateTimeSchema,
+  resumesAt: IsoDateTimeSchema.nullable(),
 });
-export type FactoryInfo = z.infer<typeof FactoryInfoSchema>;
+export type PauseView = z.infer<typeof PauseViewSchema>;
+
+export const InstallationInfoSchema = z.object({
+  version: z.string().min(1),
+  mode: z.enum(INSTALLATION_MODES),
+  operator: z.string().min(1),
+  publicUrl: z.string(),
+  startedAt: IsoDateTimeSchema.nullable(),
+  /** The installation-wide pauses: the operator's, short memory, a spent budget. */
+  pauses: z.array(PauseViewSchema),
+  runSlots: z.object({ limit: CountSchema, running: CountSchema, queued: CountSchema }),
+});
+export type InstallationInfo = z.infer<typeof InstallationInfoSchema>;
+
+// ---------------------------------------------------------------- requests
 
 export const SourceRefSchema = z.object({ label: z.string(), reference: z.string() });
 export type SourceRef = z.infer<typeof SourceRefSchema>;
@@ -97,7 +117,7 @@ export const ProposedSpecSchema = z.object({
   acceptanceCriteria: z.array(z.string()),
   outOfScope: z.array(z.string()),
   expectedProof: z.string(),
-  validated: z.boolean(),
+  problems: z.array(z.string()),
   issueNumber: IssueNumberSchema.nullable(),
 });
 export type ProposedSpec = z.infer<typeof ProposedSpecSchema>;
@@ -126,10 +146,13 @@ export const RequestViewSchema = z.object({
   body: z.string(),
   attachments: z.array(AttachmentSchema),
   challenge: ChallengeReportSchema.nullable(),
+  lastChallengeFailure: z.object({ at: IsoDateTimeSchema, reason: z.string() }).nullable(),
   issueNumbers: z.array(IssueNumberSchema),
   declineReason: z.string().nullable(),
 });
 export type RequestView = z.infer<typeof RequestViewSchema>;
+
+// ---------------------------------------------------------------- issues
 
 export const IssueSpecViewSchema = z.object({
   need: z.string(),
@@ -141,7 +164,8 @@ export type IssueSpecView = z.infer<typeof IssueSpecViewSchema>;
 
 export const AcceptanceCheckSchema = z.object({
   path: z.string().min(1),
-  kind: z.enum(CHECK_KINDS),
+  /** The test runner the acceptance manifest names; null before the manifest is written. */
+  runner: z.enum(TEST_RUNNERS).nullable(),
   sha256: z.string().nullable(),
   onBase: z.enum(BASE_EXPECTATIONS).nullable(),
   before: z.object({
@@ -177,6 +201,7 @@ export const IssueViewSchema = z.object({
   resumeTarget: z.enum(ISSUE_STATES).nullable(),
   paused: z.boolean(),
   spec: IssueSpecViewSchema,
+  /** The issues this one is blocked by, as the forge records them. */
   dependsOn: z.array(IssueNumberSchema),
   requestId: z.string().nullable(),
   branch: z.string().nullable(),
@@ -186,11 +211,14 @@ export const IssueViewSchema = z.object({
   checksFrozenAt: IsoDateTimeSchema.nullable(),
   attempts: z.array(AttemptSchema),
   escalation: EscalationSchema.nullable(),
+  costUsd: AmountSchema,
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
   url: z.string(),
 });
 export type IssueView = z.infer<typeof IssueViewSchema>;
+
+// ---------------------------------------------------------------- runs
 
 export const RunSubagentSchema = z.object({
   toolUseId: z.string(),
@@ -213,9 +241,12 @@ export type RunSubject = z.infer<typeof RunSubjectSchema>;
 
 export const RunViewSchema = z.object({
   id: z.string().min(1),
+  /** The project the run works for; null for installation work. */
+  project: ProjectIdSchema.nullable(),
   role: z.enum(AGENT_ROLES),
   model: z.string(),
   effort: z.enum(EFFORT_LEVELS),
+  account: z.string().nullable(),
   status: z.enum(RUN_STATUSES),
   outcome: z.enum(AGENT_RUN_OUTCOMES).nullable(),
   subject: RunSubjectSchema,
@@ -235,6 +266,8 @@ export const RunViewSchema = z.object({
   pendingQuestion: PendingQuestionSchema.nullable(),
 });
 export type RunView = z.infer<typeof RunViewSchema>;
+
+// ---------------------------------------------------------------- pull requests
 
 export const RunOutcomeSummarySchema = z.object({
   passed: CountSchema,
@@ -378,7 +411,8 @@ export const PullRequestViewSchema = z.object({
   state: z.enum(PULL_REQUEST_STATES),
   openedAt: IsoDateTimeSchema,
   mergedAt: IsoDateTimeSchema.nullable(),
-  checks: z.array(CheckRunViewSchema),
+  /** The check runs of the head commit, as last read from the forge. */
+  checks: readingOf(z.array(CheckRunViewSchema)),
   evidenceComplete: z.boolean(),
   missingEvidence: z.array(z.string()),
   evidence: z.array(EvidenceSchema),
@@ -396,7 +430,7 @@ export const WorkflowRunSchema = z.object({
   title: z.string(),
   branch: z.string(),
   sha: z.string(),
-  trigger: z.enum(WORKFLOW_TRIGGERS),
+  trigger: z.string(),
   status: z.enum(WORKFLOW_STATUSES),
   conclusion: z.enum(CHECK_CONCLUSIONS).nullable(),
   actor: z.string(),
@@ -406,23 +440,48 @@ export const WorkflowRunSchema = z.object({
 });
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;
 
+// ---------------------------------------------------------------- delivery
+
 export const DeploymentSchema = z.object({
   id: z.string(),
   version: z.string(),
+  ref: z.string(),
   sha: z.string(),
   deployedAt: IsoDateTimeSchema,
   actor: z.string(),
   outcome: z.enum(DEPLOYMENT_OUTCOMES),
-  workflowUrl: z.string(),
+  workflowUrl: z.string().nullable(),
 });
 export type Deployment = z.infer<typeof DeploymentSchema>;
 
-export const EnvironmentViewSchema = z.object({
-  name: z.enum(ENVIRONMENTS),
+export const HealthSampleSchema = z.object({
+  at: IsoDateTimeSchema,
+  ok: z.boolean(),
+  statusCode: CountSchema.nullable(),
+  latencyMs: CountSchema.nullable(),
+  detail: z.string(),
+});
+export type HealthSample = z.infer<typeof HealthSampleSchema>;
+
+export const HealthCheckViewSchema = z.object({
+  name: z.string(),
   url: z.string(),
+  latest: HealthSampleSchema.nullable(),
+  /** Samples of the last day, oldest first. */
+  series: z.array(HealthSampleSchema),
+});
+export type HealthCheckView = z.infer<typeof HealthCheckViewSchema>;
+
+export const EnvironmentViewSchema = z.object({
+  name: z.string().min(1),
+  production: z.boolean(),
+  promotion: z.enum(PROMOTION_POLICIES),
   status: z.enum(ENVIRONMENT_STATUSES),
-  current: DeploymentSchema.nullable(),
-  history: z.array(DeploymentSchema),
+  /** Null when the project declares no deployment source for this environment. */
+  deployments: readingOf(z.object({ current: DeploymentSchema.nullable(), history: z.array(DeploymentSchema) })).nullable(),
+  health: z.array(HealthCheckViewSchema),
+  redeployable: z.boolean(),
+  workflowUrl: z.string().nullable(),
 });
 export type EnvironmentView = z.infer<typeof EnvironmentViewSchema>;
 
@@ -433,13 +492,15 @@ export const ReleaseCommitSchema = z.object({
   pullRequestNumber: IssueNumberSchema.nullable(),
   issueNumber: IssueNumberSchema.nullable(),
   attribution: z.enum(COMMIT_ATTRIBUTIONS),
+  /** The automation the project names, for a change attributed to one. */
+  automation: z.string().nullable(),
   auditId: z.string().nullable(),
   evidenceComplete: z.boolean().nullable(),
 });
 export type ReleaseCommit = z.infer<typeof ReleaseCommitSchema>;
 
-export const PrepHealthCheckViewSchema = z.object({ name: z.string(), passed: z.boolean(), detail: z.string() });
-export type PrepHealthCheckView = z.infer<typeof PrepHealthCheckViewSchema>;
+export const ReleaseHealthCheckViewSchema = z.object({ environment: z.string(), name: z.string(), passed: z.boolean(), detail: z.string() });
+export type ReleaseHealthCheckView = z.infer<typeof ReleaseHealthCheckViewSchema>;
 
 export const ReleaseGateViewSchema = z.object({
   promotable: z.boolean(),
@@ -451,18 +512,28 @@ export type ReleaseGateView = z.infer<typeof ReleaseGateViewSchema>;
 export const ReleaseViewSchema = z.object({
   id: z.string().min(1),
   state: z.enum(RELEASE_STATES),
-  branch: z.string(),
-  createdAt: IsoDateTimeSchema,
+  source: z.enum(RELEASE_SOURCES),
+  /** The release pull request or the tag, with the time the forge created it. */
+  ref: z.string(),
+  title: z.string(),
+  pullRequestNumber: IssueNumberSchema.nullable(),
+  createdAt: IsoDateTimeSchema.nullable(),
+  /** When the factory noticed the release, which is not when it was created. */
+  detectedAt: IsoDateTimeSchema,
   cutAt: IsoDateTimeSchema.nullable(),
   promotedAt: IsoDateTimeSchema.nullable(),
   verifiedAt: IsoDateTimeSchema.nullable(),
+  /** A release pull request whose version is already published: shown, never pending. */
+  supersededBy: z.string().nullable(),
   commits: z.array(ReleaseCommitSchema),
   gate: ReleaseGateViewSchema,
-  prepHealth: z.array(PrepHealthCheckViewSchema),
-  productionWorkflowUrl: z.string(),
+  health: z.array(ReleaseHealthCheckViewSchema),
+  productionWorkflowUrl: z.string().nullable(),
   report: z.string(),
 });
 export type ReleaseView = z.infer<typeof ReleaseViewSchema>;
+
+// ---------------------------------------------------------------- audits
 
 export const AuditFindingViewSchema = z.object({
   level: z.enum(AUDIT_FINDING_LEVELS),
@@ -488,7 +559,6 @@ export const AuditViewSchema = z.object({
   reason: z.enum(AUDIT_REASONS),
   commitMessage: z.string(),
   authorLogin: z.string().nullable(),
-  authorName: z.string().nullable(),
   pullRequestNumber: IssueNumberSchema.nullable(),
   branch: z.string().nullable(),
   state: z.enum(AUDIT_STATES),
@@ -506,127 +576,49 @@ export const AuditViewSchema = z.object({
 });
 export type AuditView = z.infer<typeof AuditViewSchema>;
 
-export const MetricSeriesSchema = z.object({
-  current: z.number(),
-  unit: z.enum(METRIC_UNITS),
-  points: z.array(z.number()),
-  threshold: z.number().nullable(),
+/** A change of another automation of the repository, recorded without an audit. */
+export const SkippedChangeViewSchema = z.object({
+  commitSha: z.string(),
+  automation: z.string(),
+  commitMessage: z.string(),
+  authorLogin: z.string().nullable(),
+  pullRequestNumber: IssueNumberSchema.nullable(),
+  branch: z.string().nullable(),
+  recordedAt: IsoDateTimeSchema,
 });
-export type MetricSeries = z.infer<typeof MetricSeriesSchema>;
+export type SkippedChangeView = z.infer<typeof SkippedChangeViewSchema>;
 
-export const FeedbackEntrySchema = z.object({
-  id: z.string(),
-  at: IsoDateTimeSchema,
-  rating: z.enum(FEEDBACK_RATINGS),
-  comment: z.string(),
+// ---------------------------------------------------------------- knowledge
+
+export const KnowledgeDocumentSchema = z.object({ path: z.string(), title: z.string(), bytes: CountSchema });
+export type KnowledgeDocument = z.infer<typeof KnowledgeDocumentSchema>;
+
+export const KnowledgeSourceViewSchema = z.object({
+  kind: z.enum(KNOWLEDGE_SOURCE_KINDS),
+  location: z.string(),
+  documents: readingOf(z.array(KnowledgeDocumentSchema)),
 });
-export type FeedbackEntry = z.infer<typeof FeedbackEntrySchema>;
+export type KnowledgeSourceView = z.infer<typeof KnowledgeSourceViewSchema>;
 
-export const PodViewSchema = z.object({
-  name: z.string(),
-  status: z.enum(POD_STATUSES),
-  restarts: CountSchema,
-  startedAt: IsoDateTimeSchema,
-  version: z.string(),
+// ---------------------------------------------------------------- tools
+
+/** A tool the installation or a project checks, listed whether or not it was checked yet. */
+export const ToolViewSchema = z.object({
+  name: z.string().min(1),
+  scope: z.enum(TOOL_SCOPES),
+  builtIn: z.boolean(),
+  description: z.string().nullable(),
+  /** Null until the tool is checked for the first time. */
+  status: z.enum(TOOL_STATUSES).nullable(),
+  version: z.string().nullable(),
+  detail: z.string().nullable(),
+  fixCommand: z.string().nullable(),
+  installHint: z.string().nullable(),
+  checkedAt: IsoDateTimeSchema.nullable(),
 });
-export type PodView = z.infer<typeof PodViewSchema>;
+export type ToolView = z.infer<typeof ToolViewSchema>;
 
-export const AlertViewSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  severity: z.enum(ALERT_SEVERITIES),
-  status: z.enum(ALERT_STATES),
-  triggeredAt: IsoDateTimeSchema,
-  url: z.string(),
-});
-export type AlertView = z.infer<typeof AlertViewSchema>;
-
-export const HealthEnvironmentSchema = z.object({
-  environment: z.enum(ENVIRONMENTS),
-  errorRate: MetricSeriesSchema,
-  latencyP95: MetricSeriesSchema,
-  llmCost: MetricSeriesSchema,
-  requests: MetricSeriesSchema,
-  feedback: z.object({ positive: CountSchema, negative: CountSchema, recent: z.array(FeedbackEntrySchema) }),
-  pods: z.array(PodViewSchema),
-  alerts: z.array(AlertViewSchema),
-  datadogUrl: z.string(),
-  sampledAt: IsoDateTimeSchema,
-});
-export type HealthEnvironment = z.infer<typeof HealthEnvironmentSchema>;
-
-export const HealthViewSchema = z.object({
-  seriesIntervalMinutes: CountSchema,
-  environments: z.array(HealthEnvironmentSchema),
-});
-export type HealthView = z.infer<typeof HealthViewSchema>;
-
-export const DailyCostSchema = z.object({
-  date: IsoDateSchema,
-  costUsd: AmountSchema,
-  inputTokens: CountSchema,
-  outputTokens: CountSchema,
-  runs: CountSchema,
-});
-export type DailyCost = z.infer<typeof DailyCostSchema>;
-
-export const CostEntrySchema = z.object({ key: z.string(), costUsd: AmountSchema, tokens: CountSchema, runs: CountSchema });
-export type CostEntry = z.infer<typeof CostEntrySchema>;
-
-export const CostCapsSchema = z.object({
-  dailyUsd: AmountSchema,
-  perRunUsd: AmountSchema,
-  pauseAtUtilization: z.number().min(0).max(1),
-});
-export type CostCaps = z.infer<typeof CostCapsSchema>;
-
-export const CostsViewSchema = z.object({
-  monthToDateUsd: AmountSchema,
-  daily: z.array(DailyCostSchema),
-  byRole: z.array(z.object({ role: z.enum(AGENT_ROLES), costUsd: AmountSchema, tokens: CountSchema, runs: CountSchema })),
-  byModel: z.array(CostEntrySchema),
-  byIssue: z.array(z.object({ issueNumber: IssueNumberSchema, costUsd: AmountSchema, tokens: CountSchema, runs: CountSchema })),
-  subscription: z.array(SubscriptionWindowSchema),
-  caps: CostCapsSchema,
-});
-export type CostsView = z.infer<typeof CostsViewSchema>;
-
-export const ResourceSampleSchema = z.object({
-  freeMemoryPercent: PercentSchema,
-  pressure: z.enum(MEMORY_PRESSURES),
-  thresholdPercent: PercentSchema,
-  schedulingPaused: z.boolean(),
-  sampledAt: IsoDateTimeSchema,
-});
-export type ResourceSample = z.infer<typeof ResourceSampleSchema>;
-
-export const KnowledgeViewSchema = z.object({
-  refreshedAt: IsoDateTimeSchema,
-  productAreas: z.array(
-    z.object({ id: z.string(), name: z.string(), description: z.string(), paths: z.array(z.string()), owners: z.array(z.string()) }),
-  ),
-  screens: z.array(z.object({ id: z.string(), name: z.string(), route: z.string(), area: z.string(), description: z.string() })),
-  decisions: z.array(
-    z.object({
-      id: z.string(),
-      title: z.string(),
-      status: z.enum(DECISION_STATUSES),
-      date: IsoDateSchema,
-      summary: z.string(),
-      link: z.string(),
-    }),
-  ),
-  sources: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      kind: z.enum(SOURCE_KINDS),
-      location: z.string(),
-      refreshedAt: IsoDateTimeSchema,
-    }),
-  ),
-});
-export type KnowledgeView = z.infer<typeof KnowledgeViewSchema>;
+// ---------------------------------------------------------------- settings
 
 export const RoleSettingSchema = z.object({
   role: z.enum(AGENT_ROLES),
@@ -634,51 +626,166 @@ export const RoleSettingSchema = z.object({
   effort: z.enum(EFFORT_LEVELS),
   maxBudgetUsd: AmountSchema,
   maxTurns: CountSchema,
+  timeoutMinutes: CountSchema,
 });
 export type RoleSetting = z.infer<typeof RoleSettingSchema>;
 
-/** A tool the installation or the project checks: the built-in ones and those the configuration declares. */
-export const ConfiguredToolSchema = z.object({ name: z.string().min(1), description: z.string().nullable() });
-export type ConfiguredTool = z.infer<typeof ConfiguredToolSchema>;
-
-export const ToolConnectionSchema = z.object({
-  tool: z.string().min(1),
-  status: z.enum(TOOL_STATUSES),
-  version: z.string().nullable(),
-  detail: z.string(),
-  fixCommand: z.string().nullable(),
-  checkedAt: IsoDateTimeSchema,
+export const IssueTypeInfoSchema = z.object({
+  id: IssueTypeIdSchema,
+  label: z.string().min(1),
+  proof: z.enum(PROOF_STRATEGIES),
+  checks: z.string(),
+  commitType: z.string(),
+  commitScope: z.string().nullable(),
 });
-export type ToolConnection = z.infer<typeof ToolConnectionSchema>;
+export type IssueTypeInfo = z.infer<typeof IssueTypeInfoSchema>;
 
-export const SettingsViewSchema = z.object({
-  models: z.array(z.string()),
+export const NamedCommandViewSchema = z.object({ name: z.string(), run: z.string(), network: z.string().nullable() });
+export type NamedCommandView = z.infer<typeof NamedCommandViewSchema>;
+
+export const ProjectSettingsViewSchema = z.object({
   roles: z.array(RoleSettingSchema),
-  concurrency: z.object({ ceiling: CountSchema, maximum: CountSchema, active: CountSchema }),
-  resourceGuard: z.object({ freeMemoryThresholdPercent: PercentSchema, pauseAbovePressure: z.enum(MEMORY_PRESSURES) }),
-  /** Every tool to check, in the configured order, whether or not it was checked yet. */
-  configuredTools: z.array(ConfiguredToolSchema),
-  /** The latest check of each tool that was checked at least once. */
-  tools: z.array(ToolConnectionSchema),
+  /** The roles whose prompt the project overrides. */
+  overriddenPrompts: z.array(z.enum(AGENT_ROLES)),
+  concurrency: z.object({ issues: CountSchema, ceiling: CountSchema }),
+  setup: z.array(NamedCommandViewSchema),
+  gate: z.object({
+    beforeAcceptance: z.array(NamedCommandViewSchema),
+    afterAcceptance: z.array(NamedCommandViewSchema),
+    timeoutMinutes: CountSchema,
+  }),
+  /** Names of the variables passed to check commands; values stay on the machine. */
+  environmentVariables: z.array(z.string()),
+  labels: z.object({ factory: z.string(), validated: z.string(), audit: z.string(), kindPrefix: z.string() }),
+  branchPrefix: z.string(),
+  automations: z.array(z.object({ name: z.string(), branches: z.array(z.string()), authors: z.array(z.string()) })),
+  releaseModel: z.enum(RELEASE_MODEL_KINDS),
 });
-export type SettingsView = z.infer<typeof SettingsViewSchema>;
+export type ProjectSettingsView = z.infer<typeof ProjectSettingsViewSchema>;
+
+export const NotificationChannelViewSchema = z.object({
+  kind: z.enum(NOTIFICATION_CHANNEL_KINDS),
+  /** False when the environment variable that holds the channel's secret is not set. */
+  configured: z.boolean(),
+});
+export type NotificationChannelView = z.infer<typeof NotificationChannelViewSchema>;
+
+export const InstallationSettingsViewSchema = z.object({
+  models: z.array(z.string()),
+  defaultRoles: z.array(RoleSettingSchema),
+  resources: z.object({
+    minimumFreeMemoryPercent: PercentSchema,
+    pauseAbovePressure: z.enum(MEMORY_PRESSURES),
+    maxConcurrentRuns: CountSchema,
+  }),
+  notifications: z.array(NotificationChannelViewSchema),
+  remoteAccess: z.enum(['none', 'tailscale']),
+});
+export type InstallationSettingsView = z.infer<typeof InstallationSettingsViewSchema>;
+
+// ---------------------------------------------------------------- usage, costs, resources
+
+export const UsageLimitViewSchema = z.object({
+  kind: z.enum(USAGE_LIMIT_KINDS),
+  /** The model of a weekly limit scoped to one model. */
+  scope: z.string().nullable(),
+  utilization: RatioSchema,
+  resetsAt: IsoDateTimeSchema.nullable(),
+  freshness: z.enum(USAGE_FRESHNESS),
+  /** The utilization at which the factory pauses for this limit. */
+  pauseAt: RatioSchema,
+});
+export type UsageLimitView = z.infer<typeof UsageLimitViewSchema>;
+
+export const UsageAccountViewSchema = z.object({
+  name: z.string().min(1),
+  billing: z.enum(BILLING_MODES),
+  limits: z.array(UsageLimitViewSchema),
+  source: z.enum(USAGE_SOURCES).nullable(),
+  readAt: IsoDateTimeSchema.nullable(),
+  lastFailure: z.object({ at: IsoDateTimeSchema, reason: z.string() }).nullable(),
+});
+export type UsageAccountView = z.infer<typeof UsageAccountViewSchema>;
+
+export const UsageViewSchema = z.object({
+  accounts: z.array(UsageAccountViewSchema),
+  refreshMinutes: CountSchema,
+  staleAfterMinutes: CountSchema,
+});
+export type UsageView = z.infer<typeof UsageViewSchema>;
+
+export const DailyCostSchema = z.object({ date: IsoDateSchema, costUsd: AmountSchema, runs: CountSchema, tokens: TokenTotalsSchema });
+export type DailyCost = z.infer<typeof DailyCostSchema>;
+
+export const CostEntrySchema = z.object({ key: z.string(), costUsd: AmountSchema, runs: CountSchema, tokens: TokenTotalsSchema });
+export type CostEntry = z.infer<typeof CostEntrySchema>;
+
+export const DailyCapViewSchema = z.discriminatedUnion('kind', [z.object({ kind: z.literal('none') }), z.object({ kind: z.literal('usd'), amount: AmountSchema })]);
+export type DailyCapView = z.infer<typeof DailyCapViewSchema>;
+
+export const CostsViewSchema = z.object({
+  /** What the dollar figures mean; under a subscription they are the API price of the same usage. */
+  basis: z.enum(COST_BASIS_VIEWS),
+  today: z.object({ date: IsoDateSchema, costUsd: AmountSchema, runs: CountSchema }),
+  monthToDateUsd: AmountSchema,
+  dailyCap: DailyCapViewSchema,
+  perRunCapUsd: AmountSchema.nullable(),
+  tokens: TokenTotalsSchema,
+  daily: z.array(DailyCostSchema),
+  byProject: z.array(CostEntrySchema),
+  byRole: z.array(CostEntrySchema),
+  byModel: z.array(CostEntrySchema),
+  byIssue: z.array(CostEntrySchema.extend({ project: ProjectIdSchema, issueNumber: IssueNumberSchema })),
+});
+export type CostsView = z.infer<typeof CostsViewSchema>;
+
+export const ResourceSampleSchema = z.object({ freeMemoryPercent: PercentSchema, pressure: z.enum(MEMORY_PRESSURES) });
+export type ResourceSample = z.infer<typeof ResourceSampleSchema>;
+
+export const ResourcesViewSchema = z.object({
+  sample: readingOf(ResourceSampleSchema),
+  minimumFreeMemoryPercent: PercentSchema,
+  pauseAbovePressure: z.enum(MEMORY_PRESSURES),
+  schedulingPaused: z.boolean(),
+});
+export type ResourcesView = z.infer<typeof ResourcesViewSchema>;
+
+// ---------------------------------------------------------------- projects
+
+export const ProjectViewSchema = z.object({
+  id: ProjectIdSchema,
+  name: z.string().min(1),
+  repository: z.string().min(1),
+  forge: z.object({ kind: z.enum(FORGE_KINDS), url: z.string().nullable() }),
+  baseBranch: z.string().min(1),
+  /** The project's own pauses, on top of the installation's. */
+  pauses: z.array(PauseViewSchema),
+  issueTypes: z.array(IssueTypeInfoSchema),
+  requests: z.array(RequestViewSchema),
+  issues: z.array(IssueViewSchema),
+  pullRequests: z.array(PullRequestViewSchema),
+  /** Null when the project's forge has no workflow runs. */
+  workflows: readingOf(z.array(WorkflowRunSchema)).nullable(),
+  environments: z.array(EnvironmentViewSchema),
+  releases: z.array(ReleaseViewSchema),
+  audits: z.array(AuditViewSchema),
+  skippedChanges: z.array(SkippedChangeViewSchema),
+  knowledge: z.array(KnowledgeSourceViewSchema),
+  tools: z.array(ToolViewSchema),
+  settings: ProjectSettingsViewSchema,
+});
+export type ProjectView = z.infer<typeof ProjectViewSchema>;
 
 export const CockpitSnapshotSchema = z.object({
   sequence: CountSchema,
   generatedAt: IsoDateTimeSchema,
-  factory: FactoryInfoSchema,
-  requests: z.array(RequestViewSchema),
-  issues: z.array(IssueViewSchema),
+  installation: InstallationInfoSchema,
+  projects: z.array(ProjectViewSchema),
   runs: z.array(RunViewSchema),
-  pullRequests: z.array(PullRequestViewSchema),
-  workflows: z.array(WorkflowRunSchema),
-  environments: z.array(EnvironmentViewSchema),
-  releases: z.array(ReleaseViewSchema),
-  audits: z.array(AuditViewSchema),
-  health: HealthViewSchema,
+  usage: UsageViewSchema,
   costs: CostsViewSchema,
-  knowledge: KnowledgeViewSchema,
-  settings: SettingsViewSchema,
-  resources: ResourceSampleSchema,
+  resources: ResourcesViewSchema,
+  tools: z.array(ToolViewSchema),
+  settings: InstallationSettingsViewSchema,
 });
 export type CockpitSnapshot = z.infer<typeof CockpitSnapshotSchema>;

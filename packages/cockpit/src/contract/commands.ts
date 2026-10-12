@@ -1,14 +1,17 @@
 import { z } from 'zod';
 import { AGENT_ROLES, EFFORT_LEVELS } from '@agent-factory/domain';
-import { AmountSchema, CountSchema, IssueNumberSchema, IssueTypeIdSchema, PercentSchema } from './primitives.ts';
-import { CostCapsSchema } from './snapshot.ts';
+import { AmountSchema, CountSchema, IssueNumberSchema, IssueTypeIdSchema, PercentSchema, ProjectIdSchema } from './primitives.ts';
 import { MEMORY_PRESSURES } from './vocabulary.ts';
 
-const RequestRefSchema = z.object({ requestId: z.string().min(1) });
-const IssueRefSchema = z.object({ issueNumber: IssueNumberSchema });
+const ProjectRefSchema = z.object({ project: ProjectIdSchema });
+const RequestRefSchema = ProjectRefSchema.extend({ requestId: z.string().min(1) });
+const IssueRefSchema = ProjectRefSchema.extend({ issueNumber: IssueNumberSchema });
+const AuditRefSchema = ProjectRefSchema.extend({ auditId: z.string().min(1) });
+const ReleaseRefSchema = ProjectRefSchema.extend({ releaseId: z.string().min(1) });
+/** Run ids are unique across the installation, so a run command needs no project. */
 const RunRefSchema = z.object({ runId: z.string().min(1) });
-const AuditRefSchema = z.object({ auditId: z.string().min(1) });
-const ReleaseRefSchema = z.object({ releaseId: z.string().min(1) });
+/** Null addresses the whole installation. */
+const ScopeSchema = z.object({ project: ProjectIdSchema.nullable() });
 
 export const PastedAttachmentSchema = z.object({
   name: z.string().min(1),
@@ -27,8 +30,17 @@ export const SpecDraftSchema = z.object({
 });
 export type SpecDraft = z.infer<typeof SpecDraftSchema>;
 
+export const RoleChangeSchema = z.object({
+  role: z.enum(AGENT_ROLES),
+  model: z.string().min(1),
+  effort: z.enum(EFFORT_LEVELS),
+  maxBudgetUsd: AmountSchema,
+  maxTurns: CountSchema,
+});
+export type RoleChange = z.infer<typeof RoleChangeSchema>;
+
 export const COMMAND_BODY_SCHEMAS = {
-  'request.create': z.object({
+  'request.create': ProjectRefSchema.extend({
     title: z.string().min(1),
     requester: z.string().min(1),
     body: z.string().min(1),
@@ -47,29 +59,30 @@ export const COMMAND_BODY_SCHEMAS = {
   'run.stop': RunRefSchema,
   'run.resume': RunRefSchema,
   'run.answer': RunRefSchema.extend({ questionId: z.string().min(1), answer: z.string().min(1) }),
-  'pr.merge': z.object({ number: IssueNumberSchema, expectedHeadSha: z.string().min(1) }),
-  'pr.feedback': z.object({ number: IssueNumberSchema, author: z.string().min(1), body: z.string().min(1) }),
-  'deployment.redeploy': z.object({ environment: z.enum(['dev', 'prep']), confirmVersion: z.string().trim().min(1) }),
+  'pr.merge': ProjectRefSchema.extend({ number: IssueNumberSchema, expectedHeadSha: z.string().min(1) }),
+  'pr.feedback': ProjectRefSchema.extend({ number: IssueNumberSchema, author: z.string().min(1), body: z.string().min(1) }),
+  'deployment.redeploy': ProjectRefSchema.extend({ environment: z.string().min(1), confirmVersion: z.string().trim().min(1) }),
   'release.cut': ReleaseRefSchema,
   'release.evaluate': ReleaseRefSchema,
+  'audit.request': ProjectRefSchema.extend({ commitSha: z.string().min(1) }),
   'audit.publish-issue': AuditRefSchema,
   'audit.resolve': AuditRefSchema.extend({ note: z.string().min(1) }),
-  'settings.update-role': z.object({
-    role: z.enum(AGENT_ROLES),
-    model: z.string().min(1),
-    effort: z.enum(EFFORT_LEVELS),
-    maxBudgetUsd: AmountSchema,
-    maxTurns: CountSchema,
-  }),
-  'settings.update-limits': z.object({
-    concurrencyCeiling: CountSchema,
-    freeMemoryThresholdPercent: PercentSchema,
+  'scheduler.pause': ScopeSchema,
+  'scheduler.resume': ScopeSchema,
+  'usage.refresh': z.object({}),
+  'tools.check': ScopeSchema.extend({ tool: z.string().min(1) }),
+  'health.check': ProjectRefSchema.extend({ environment: z.string().min(1) }),
+  'settings.update-role': ScopeSchema.extend({ change: RoleChangeSchema }),
+  'settings.update-resources': z.object({
+    minimumFreeMemoryPercent: PercentSchema,
     pauseAbovePressure: z.enum(MEMORY_PRESSURES),
+    maxConcurrentRuns: CountSchema,
   }),
-  'settings.test-tool': z.object({ tool: z.string().min(1) }),
-  'costs.update-caps': CostCapsSchema,
-  'scheduler.pause': z.object({}),
-  'scheduler.resume': z.object({}),
+  'settings.update-budget': z.object({
+    dailyCapUsd: AmountSchema.positive().nullable(),
+    perRunCapUsd: AmountSchema.positive().nullable(),
+  }),
+  'settings.update-concurrency': ProjectRefSchema.extend({ issues: CountSchema, ceiling: CountSchema }),
 } as const;
 
 export type CommandName = keyof typeof COMMAND_BODY_SCHEMAS;
@@ -77,7 +90,8 @@ export type CommandBody<N extends CommandName> = z.infer<(typeof COMMAND_BODY_SC
 
 export const COMMAND_NAMES = Object.freeze(Object.keys(COMMAND_BODY_SCHEMAS));
 
-export const CommandAcceptedSchema = z.object({ sequence: CountSchema });
+/** What the factory did: the event that records it, when there is one, and the effect in words. */
+export const CommandAcceptedSchema = z.object({ sequence: CountSchema.nullable(), effect: z.string().min(1) });
 export type CommandAccepted = z.infer<typeof CommandAcceptedSchema>;
 
 export const CommandRejectedSchema = z.object({ error: z.string() });
