@@ -54,6 +54,14 @@ describe('formatters', () => {
     expect(english.absolute('2026-10-12T09:30:14.000Z')).toBe('October 12, 2026 at 9:30:14 AM UTC');
   });
 
+  it('writes an instant in the zone it is told in, with the zone named, whatever zone the formatters were made for', () => {
+    const instant = '2026-10-12T21:11:00.000Z';
+    expect(english.dateTimeIn(instant, 'Europe/Paris').replace(/\s/g, ' ')).toBe('Oct 12, 2026, 11:11 PM (Europe/Paris)');
+    expect(english.dateTimeIn(instant, 'Asia/Tokyo').replace(/\s/g, ' ')).toBe('Oct 13, 2026, 6:11 AM (Asia/Tokyo)');
+    expect(english.dateTimeIn(instant, 'UTC').replace(/\s/g, ' ')).toBe('Oct 12, 2026, 9:11 PM (UTC)');
+    expect(french.dateTimeIn(instant, 'Europe/Paris').replace(/\s/g, ' ')).toBe('12 oct. 2026, 23:11 (Europe/Paris)');
+  });
+
   it('writes a calendar day without shifting it by a time zone', () => {
     const west = createFormatters('en', LABELS, 'America/Los_Angeles');
     expect(west.calendarDay('2026-10-12')).toBe('Oct 12');

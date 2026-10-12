@@ -52,6 +52,8 @@ export interface Formatters {
   /** A calendar day written as `YYYY-MM-DD`, shown without any time zone shift. */
   calendarDay(day: string): string;
   dateTime(iso: string): string;
+  /** The date and time in the given zone, with the zone named: for an instant the factory tells in a zone that is not the reader's. */
+  dateTimeIn(iso: string, timeZone: string): string;
   time(iso: string): string;
   weekdayTime(iso: string): string;
   /** The full date and time with seconds and zone, for tooltips and `title` attributes. */
@@ -120,6 +122,7 @@ export function createFormatters(locale: Locale, labels: FormatterLabels, timeZo
     shortDate: (iso) => shortDateFormat.format(toEpoch(iso)),
     calendarDay: (day) => calendarDayFormat.format(Date.parse(`${day}T00:00:00Z`)),
     dateTime: (iso) => dateTimeFormat.format(toEpoch(iso)),
+    dateTimeIn: (iso, timeZone) => `${new Intl.DateTimeFormat(tag, { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(toEpoch(iso))} (${timeZone})`,
     time: (iso) => timeFormat.format(toEpoch(iso)),
     weekdayTime: (iso) => weekdayTimeFormat.format(toEpoch(iso)),
     absolute: (iso) => absoluteFormat.format(toEpoch(iso)),

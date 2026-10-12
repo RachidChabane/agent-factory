@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { IssueSpecView } from '../../contract/index.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 
-type SpecFields = Pick<IssueSpecView, 'need' | 'acceptanceCriteria' | 'outOfScope' | 'expectedProof'>;
+type SpecFields = Pick<IssueSpecView, 'need' | 'acceptanceCriteria' | 'outOfScope' | 'expectedProof'> & { readonly films?: IssueSpecView['films'] | undefined };
 
 function Block({ title, children }: { readonly title: string; readonly children: ReactNode }) {
   return (
@@ -51,6 +51,17 @@ export function SpecContent({ spec }: { readonly spec: SpecFields }) {
       <Block title={t('issues.spec.proof')}>
         <Prose text={spec.expectedProof} />
       </Block>
+      {spec.films === undefined || spec.films.length === 0 ? null : (
+        <Block title={t('issues.spec.films')}>
+          <ul className="bullets">
+            {spec.films.map((scenario) => (
+              <li key={scenario} className="mono">
+                {scenario}
+              </li>
+            ))}
+          </ul>
+        </Block>
+      )}
     </div>
   );
 }

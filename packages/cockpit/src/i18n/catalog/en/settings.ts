@@ -47,6 +47,11 @@ export const enSettings = {
   'settings.environment.description': 'The variables passed to the check commands. Only their names are shown: the values stay on the machine.',
   'settings.environment.empty': 'No variable is passed to the check commands.',
 
+  'settings.films.title': 'Films',
+  'settings.films.description': 'The pull requests of the project are filmed on the base and on the head by the command its configuration declares. That command runs outside the sandbox, with your environment and your sessions.',
+  'settings.films.none': 'No film command is declared for this project.',
+  'settings.films.timeZone': 'Time zone of the expected arrivals',
+  'settings.films.timeout': 'Longest recording',
   'settings.conventions.title': 'Conventions',
   'settings.conventions.factoryLabel': 'Factory label',
   'settings.conventions.validatedLabel': 'Validated label',

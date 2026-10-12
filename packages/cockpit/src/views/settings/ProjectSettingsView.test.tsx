@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { clickAndExpectCommand, expectCommand } from '../../test/commands.ts';
 import { renderApp, renderRoute } from '../../test/render.tsx';
-import { LEDGER, openProjectSettings, replaceText, roleForm, STOREFRONT } from './settings-test-support.ts';
+import { LEDGER, openProjectSettings, replaceText, roleForm, STOREFRONT, withProjectSettings } from './settings-test-support.ts';
 
 const section = (name: string) => screen.getByRole('region', { name });
 
@@ -26,12 +26,34 @@ describe('ProjectSettingsView page', () => {
   it('lays out the sections of the project in a fixed order', async () => {
     await openProjectSettings();
     const titles = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
-    expect(titles).toEqual(['Agent roles', 'Concurrency', 'Setup commands', 'Gate commands', 'Check environment', 'Conventions', 'Automations', 'Issue types', 'Tools']);
+    expect(titles).toEqual(['Agent roles', 'Concurrency', 'Setup commands', 'Gate commands', 'Check environment', 'Films', 'Conventions', 'Automations', 'Issue types', 'Tools']);
   });
 
   it('says that the project does not exist for an unknown address', async () => {
     await renderRoute('/projects/nowhere/settings');
     expect(await screen.findByText('Project “nowhere” not found')).toBeInTheDocument();
+  });
+});
+
+describe('ProjectSettingsView films', () => {
+  it('says that the project declares no film command', async () => {
+    await openProjectSettings();
+    expect(within(section('Films')).getByText('No film command is declared for this project.')).toBeInTheDocument();
+  });
+
+  it('says where the film command runs, in which zone the arrivals are told and how long a recording may take', async () => {
+    const snapshot = withProjectSettings(STOREFRONT, (settings) => ({ ...settings, films: { timeZone: 'Europe/Paris', timeoutMinutes: 20 } }));
+    await openProjectSettings(STOREFRONT, { snapshot });
+    const films = section('Films');
+    expect(within(films).getByText('That command runs outside the sandbox', { exact: false })).toBeInTheDocument();
+    expect(within(films).getByText('Europe/Paris')).toBeInTheDocument();
+    expect(within(films).getByText('Time zone of the expected arrivals')).toBeInTheDocument();
+    expect(within(films).getByText('Longest recording').nextElementSibling).toHaveTextContent('20');
+  });
+
+  it('is shown in French', async () => {
+    await openProjectSettings(STOREFRONT, { locale: 'fr' });
+    expect(within(section('Tournages')).getByText('Aucune commande de tournage n’est déclarée pour ce projet.')).toBeInTheDocument();
   });
 });
 
@@ -180,7 +202,7 @@ describe('ProjectSettingsView in French', () => {
   it('writes the sections, the commands and the conventions in French', async () => {
     await openProjectSettings(STOREFRONT, { locale: 'fr' });
     const titles = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
-    expect(titles).toEqual(['Rôles des agents', 'Concurrence', 'Commandes de préparation', 'Commandes de la gate', 'Environnement des checks', 'Conventions', 'Automatisations', 'Types d’issue', 'Outils']);
+    expect(titles).toEqual(['Rôles des agents', 'Concurrence', 'Commandes de préparation', 'Commandes de la gate', 'Environnement des checks', 'Tournages', 'Conventions', 'Automatisations', 'Types d’issue', 'Outils']);
     expect(screen.getByText('Réseau : downloads the packages from the private registry')).toBeInTheDocument();
     expect(screen.getAllByText('Pas de réseau').length).toBeGreaterThan(0);
     expect(screen.getByText('La gate expire au bout de 30 min.')).toBeInTheDocument();
