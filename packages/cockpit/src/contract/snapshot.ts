@@ -24,6 +24,7 @@ import {
   USAGE_LIMIT_KINDS,
   USAGE_SOURCES,
 } from '@agent-factory/domain';
+import { StreamEventSchema } from './events.ts';
 import {
   AmountSchema,
   CountSchema,
@@ -86,6 +87,8 @@ export const InstallationInfoSchema = z.object({
   /** The installation-wide pauses: the operator's, short memory, a spent budget. */
   pauses: z.array(PauseViewSchema),
   runSlots: z.object({ limit: CountSchema, running: CountSchema, queued: CountSchema }),
+  /** How old a reading of each kind may be before the cockpit calls it stale, from the intervals the factory reads it at. */
+  staleAfterMs: z.object({ forge: CountSchema, health: CountSchema, resources: CountSchema, tools: CountSchema, knowledge: CountSchema }),
 });
 export type InstallationInfo = z.infer<typeof InstallationInfoSchema>;
 
@@ -780,6 +783,8 @@ export const CockpitSnapshotSchema = z.object({
   sequence: CountSchema,
   generatedAt: IsoDateTimeSchema,
   installation: InstallationInfoSchema,
+  /** The latest events of the installation, newest first, for the activity feed. */
+  activity: z.array(StreamEventSchema),
   projects: z.array(ProjectViewSchema),
   runs: z.array(RunViewSchema),
   usage: UsageViewSchema,
