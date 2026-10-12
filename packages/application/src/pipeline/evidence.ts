@@ -1,4 +1,4 @@
-import type { IssueSpec, IssueTypeDefinition } from '@agent-factory/domain';
+import type { IssueTypeDefinition } from '@agent-factory/domain';
 import type { AcceptanceManifest } from '../acceptance/acceptance-manifest.ts';
 import { declaredOutputPaths, EVIDENCE_DIRECTORY } from '../acceptance/acceptance-manifest.ts';
 import type { WorkspaceFiles, Worktree } from '../ports.ts';
