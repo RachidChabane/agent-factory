@@ -4,6 +4,12 @@ import { AGENT_ROLES, EFFORT_LEVELS, MEMORY_PRESSURE_LEVELS, TOOL_STATUSES } fro
 export const SETTINGS_SUBJECT = 'settings';
 export const SETTINGS_CHANGED_EVENT = 'settings.changed';
 export const CONFIGURATION_RELOADED_EVENT = 'settings.configuration-reloaded';
+/** Someone edited the configuration file by hand; the daemon reloads it as it does after a settings change. */
+export const CONFIGURATION_EDITED_EVENT = 'settings.file-edited';
+/** A reload refused the file, so the factory kept the settings it had. */
+export const CONFIGURATION_RELOAD_FAILED_EVENT = 'settings.reload-failed';
+/** The events after which the daemon reloads the configuration. */
+export const CONFIGURATION_CHANGE_EVENTS: readonly string[] = [SETTINGS_CHANGED_EVENT, CONFIGURATION_EDITED_EVENT];
 export const TOOL_CHECKED_EVENT = 'settings.tool-checked';
 
 const DailyCapSchema = z.discriminatedUnion('kind', [z.object({ kind: z.literal('none') }), z.object({ kind: z.literal('usd'), amount: z.number() })]);
@@ -42,6 +48,16 @@ export const ConfigurationReloadedPayloadSchema = z.object({
   restartRequired: z.array(z.string()),
 });
 export type ConfigurationReloadedPayload = z.infer<typeof ConfigurationReloadedPayloadSchema>;
+
+export const ConfigurationEditedPayloadSchema = z.object({ digest: z.string().min(1) });
+export type ConfigurationEditedPayload = z.infer<typeof ConfigurationEditedPayloadSchema>;
+
+export const ConfigurationReloadFailedPayloadSchema = z.object({
+  /** The last change the failed reload tried to apply; the daemon tries again only after a newer one. */
+  failedThrough: z.number().int().nonnegative(),
+  reason: z.string(),
+});
+export type ConfigurationReloadFailedPayload = z.infer<typeof ConfigurationReloadFailedPayloadSchema>;
 
 export const ToolCheckedPayloadSchema = z.object({
   tool: z.string().min(1),

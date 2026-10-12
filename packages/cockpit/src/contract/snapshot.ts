@@ -685,6 +685,12 @@ export const InstallationSettingsViewSchema = z.object({
   }),
   notifications: z.array(NotificationChannelViewSchema),
   remoteAccess: z.enum(['none', 'tailscale']),
+  /** The configuration file and what its last reload left pending: settings that apply only after a restart, or the reason it was refused. */
+  configuration: z.object({
+    path: z.string(),
+    restartRequired: z.array(z.string()),
+    reloadFailure: z.object({ at: IsoDateTimeSchema, reason: z.string() }).nullable(),
+  }),
 });
 export type InstallationSettingsView = z.infer<typeof InstallationSettingsViewSchema>;
 

@@ -201,7 +201,7 @@ export class SnapshotSource {
       }),
       resources: await this.resourcesView(pauses.some((pause) => pause.cause === RESOURCES_CAUSE)),
       tools: toolViews(runtime.configuredTools, latestToolChecks(split.installation), 'installation'),
-      settings: installationSettingsView(config, runtime.environment),
+      settings: installationSettingsView(config, runtime.environment, split.installation),
     };
   }
 

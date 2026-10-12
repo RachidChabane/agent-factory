@@ -9,11 +9,17 @@ import type {
   UsageView,
 } from '@agent-factory/cockpit';
 import {
+  CONFIGURATION_RELOAD_FAILED_EVENT,
+  CONFIGURATION_RELOADED_EVENT,
+  ConfigurationReloadedPayloadSchema,
+  ConfigurationReloadFailedPayloadSchema,
+  DAEMON_STARTED_EVENT,
   DAEMON_SUBJECT,
   SCHEDULER_PAUSED_EVENT,
   SCHEDULER_RESUMED_EVENT,
   SchedulerPausedPayloadSchema,
   SchedulerResumedPayloadSchema,
+  SETTINGS_SUBJECT,
   USAGE_READ_EVENT,
   USAGE_READ_FAILED_EVENT,
   USAGE_SUBJECT_PREFIX,
@@ -144,7 +150,24 @@ function models(config: AgentFactoryConfig): string[] {
   return [...new Set(named.filter((model) => model !== ''))].sort();
 }
 
-export function installationSettingsView(config: AgentFactoryConfig, environment: Readonly<Record<string, string | undefined>>): InstallationSettingsView {
+/** What the reloads since the factory started left pending: settings waiting for a restart, and a refused file newer than the last reload. */
+function configurationState(config: AgentFactoryConfig, records: readonly FactoryEventRecord[]): InstallationSettingsView['configuration'] {
+  const startedAt = records.findLastIndex((record) => record.subject === DAEMON_SUBJECT && record.type === DAEMON_STARTED_EVENT);
+  let restartRequired: readonly string[] = [];
+  let reloadFailure: InstallationSettingsView['configuration']['reloadFailure'] = null;
+  for (const record of records.slice(startedAt + 1)) {
+    if (record.subject !== SETTINGS_SUBJECT) continue;
+    if (record.type === CONFIGURATION_RELOADED_EVENT) {
+      restartRequired = ConfigurationReloadedPayloadSchema.parse(record.payload).restartRequired;
+      reloadFailure = null;
+    } else if (record.type === CONFIGURATION_RELOAD_FAILED_EVENT) {
+      reloadFailure = { at: iso(record.occurredAt), reason: ConfigurationReloadFailedPayloadSchema.parse(record.payload).reason };
+    }
+  }
+  return { path: config.configPath, restartRequired: [...restartRequired], reloadFailure };
+}
+
+export function installationSettingsView(config: AgentFactoryConfig, environment: Readonly<Record<string, string | undefined>>, records: readonly FactoryEventRecord[]): InstallationSettingsView {
   return {
     models: models(config),
     defaultRoles: roleSettings(config.defaultRoles),
@@ -155,6 +178,7 @@ export function installationSettingsView(config: AgentFactoryConfig, environment
     },
     notifications: config.notifications.channels.map((channel) => ({ kind: channel.kind, configured: isChannelConfigured(channel, environment) })),
     remoteAccess: config.server.remoteAccess.kind,
+    configuration: configurationState(config, records),
   };
 }
 

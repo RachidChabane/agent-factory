@@ -4,7 +4,7 @@ import type { AgentRunResult } from '../ports.ts';
 import { RecordingHarness } from '../runs/recording-harness.ts';
 import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT, runSubject } from '../runs/run-events.ts';
 import { agentRunRequest, InMemoryRunLogStore, SteppingClock } from '../runs/test-support.ts';
-import { CONFIGURATION_RELOADED_EVENT, SETTINGS_CHANGED_EVENT, SETTINGS_SUBJECT } from '../settings/settings-events.ts';
+import { CONFIGURATION_EDITED_EVENT, CONFIGURATION_RELOAD_FAILED_EVENT, CONFIGURATION_RELOADED_EVENT, SETTINGS_CHANGED_EVENT, SETTINGS_SUBJECT } from '../settings/settings-events.ts';
 import { InstallationDaemon, type InstallationReload, type InstallationTask, type ProjectScheduler } from './installation-daemon.ts';
 import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 
@@ -57,6 +57,7 @@ function setup(extraTasks: readonly InstallationTask[] = []) {
   const reloads: InstallationReload[] = [];
   const warnings: string[] = [];
   const tasksRun: string[] = [];
+  const refusal: { reason: string | null } = { reason: null };
   const daemon = new InstallationDaemon(
     {
       events,
@@ -66,6 +67,7 @@ function setup(extraTasks: readonly InstallationTask[] = []) {
       pauses,
       configuration: {
         reload: () => {
+          if (refusal.reason !== null) return Promise.reject(new Error(refusal.reason));
           const reload = { restartRequired: [], concurrencyByProject: new Map([['shop', 2], ['docs', 1]]) };
           reloads.push(reload);
           return Promise.resolve(reload);
@@ -76,7 +78,7 @@ function setup(extraTasks: readonly InstallationTask[] = []) {
     },
     { pollIntervalMs: 1 },
   );
-  return { events, clock, shop, docs, pauses, reloads, warnings, tasksRun, daemon };
+  return { events, clock, shop, docs, pauses, reloads, warnings, tasksRun, refusal, daemon };
 }
 
 describe('InstallationDaemon', () => {
@@ -167,6 +169,30 @@ describe('InstallationDaemon', () => {
     expect(reloads).toHaveLength(1);
     expect([shop.concurrency, docs.concurrency]).toEqual([2, 1]);
     expect(events.typesOf(SETTINGS_SUBJECT)).toEqual([SETTINGS_CHANGED_EVENT, CONFIGURATION_RELOADED_EVENT]);
+  });
+
+  it('reloads after a hand edit of the configuration file, as after a settings change', async () => {
+    const { events, reloads, daemon } = setup();
+    await events.append(CONFIGURATION_EDITED_EVENT, SETTINGS_SUBJECT, { digest: 'a1b2' });
+    await daemon.tick(new AbortController().signal);
+    await daemon.tick(new AbortController().signal);
+    expect(reloads).toHaveLength(1);
+    expect(events.typesOf(SETTINGS_SUBJECT)).toEqual([CONFIGURATION_EDITED_EVENT, CONFIGURATION_RELOADED_EVENT]);
+  });
+
+  it('records a file it cannot load once, keeps the settings it had, and reloads after the next edit', async () => {
+    const { events, reloads, refusal, warnings, daemon } = setup();
+    refusal.reason = 'projects.0.concurrency.issues: must not exceed concurrency.ceiling';
+    await events.append(CONFIGURATION_EDITED_EVENT, SETTINGS_SUBJECT, { digest: 'a1b2' });
+    await daemon.tick(new AbortController().signal);
+    await daemon.tick(new AbortController().signal);
+    expect(events.typesOf(SETTINGS_SUBJECT)).toEqual([CONFIGURATION_EDITED_EVENT, CONFIGURATION_RELOAD_FAILED_EVENT]);
+    expect(warnings).toEqual(['the configuration did not reload: projects.0.concurrency.issues: must not exceed concurrency.ceiling']);
+    refusal.reason = null;
+    await events.append(CONFIGURATION_EDITED_EVENT, SETTINGS_SUBJECT, { digest: 'c3d4' });
+    await daemon.tick(new AbortController().signal);
+    expect(reloads).toHaveLength(1);
+    expect(events.typesOf(SETTINGS_SUBJECT).at(-1)).toBe(CONFIGURATION_RELOADED_EVENT);
   });
 
   it('keeps ticking the other projects when one of them fails', async () => {

@@ -1,4 +1,5 @@
 import { InstallationDaemon, MachineSchedulingPauses, type FactoryDaemon, type InstallationTask, type PauseSet } from '@agent-factory/application';
+import { ConfigurationFileWatch } from './installation/configuration-watch.ts';
 import type { InstallationRuntime } from './installation/installation-runtime.ts';
 import { projectDaemon, projectScheduler } from './project/project-use-cases.ts';
 import { SystemSleeper } from './system.ts';
@@ -32,7 +33,7 @@ export function createDaemons(runtime: InstallationRuntime): RunningDaemons {
       log: runtime.log,
       pauses: new MachineSchedulingPauses({ events: runtime.events, admission: runtime.admission, budget: runtime.budget, notifications: runtime.notifications }),
       configuration: runtime.live,
-      tasks: [runtime.usage, ...healthTasks(runtime)],
+      tasks: [runtime.usage, new ConfigurationFileWatch(runtime.config.configPath, runtime.events), ...healthTasks(runtime)],
       projects: runtime.projects.flatMap((project) => {
         const daemon = daemons.get(project.id);
         return daemon === undefined ? [] : [projectScheduler(project, daemon)];
