@@ -20,8 +20,9 @@ same.
 
 Before the first start, `agent-factory validate` checks the configuration, every tool
 the installation needs (git, gh, claude, the sandbox), each project's clone, labels,
-prompts, knowledge, sandbox grants and tools, and runs each project's setup and gate
-commands on a clean checkout of its base (`--skip-gate-preflight` leaves that out).
+prompts, knowledge, reference snapshots (built when missing), sandbox grants and tools,
+and runs each project's setup and gate commands on a clean checkout of its base
+(`--skip-gate-preflight` leaves that out).
 
 ## The cockpit
 
@@ -36,7 +37,7 @@ commands on a clean checkout of its base (`--skip-gate-preflight` leaves that ou
 | Audits | changes that reached the base branch outside the factory, their verdict, and the changes of other automations |
 | Runs | every agent run with its live log |
 | Usage | each account's subscription limits with their reset times, and costs |
-| Settings | roles, budgets, resources, concurrency, tools, notifications, the configuration file |
+| Settings | roles, budgets, resources, concurrency, tools, notifications, the configuration file; per project, the reference repositories with their ref, resolved commit and snapshot state |
 
 Every value shows when it was read; an unknown value says so. Every button sends one
 command and shows the factory's answer, or the reason it refused.

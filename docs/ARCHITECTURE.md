@@ -71,6 +71,7 @@ stops the run and comes back to the agent with the answer.
 | `AgentHarness` | `ClaudeCodeHarness`: the `claude` CLI in stream-JSON, with generated settings, hooks and permissions |
 | `CommandSandbox` | `SeatbeltCommandSandbox` (macOS `sandbox-exec`), `BubblewrapCommandSandbox` (Linux `bwrap`), [ADR 0011](adr/0011-command-confinement.md) |
 | `WorktreePool`, `SourceControl`, `BaseCheckouts` | git worktrees of the project's clone, one queue of ref-changing operations per clone |
+| `ReferenceSnapshots` | `GitReferenceSnapshots`: the files of a local clone at a tag or a commit, extracted read-only into the project's directory ([ADR 0031](adr/0031-reference-repositories.md)) |
 | `ServiceProcesses` | `SpawnServiceProcesses`: the long-running services of a stack, each in its own process group ([ADR 0018](adr/0018-factory-owned-stacks.md)) |
 | `EventStore`, `IssueStateStore` | SQLite |
 | `UsageReportSource` | `claude -p /usage` per account ([ADR 0012](adr/0012-subscription-usage-source.md)) |
@@ -103,6 +104,12 @@ the cockpit parses what it receives.
   extra shell commands, the container engine
   ([ADR 0016](adr/0016-declared-sandbox-capabilities.md)), and a stack of services
   around the checks ([ADR 0018](adr/0018-factory-owned-stacks.md)).
+- What a specification cites in another repository is read from a snapshot of the
+  files at the cited tag or commit, never from the repository itself
+  ([ADR 0031](adr/0031-reference-repositories.md)). Every role of the project reads its
+  snapshots, in Claude Code's own sandbox and in the operating system's sandbox of the
+  commands; the acceptance author and the implementer copy from them with `cp` and
+  `cp -R`; nothing writes to one, and no other project reads them.
 
 ## A factory home
 
@@ -120,6 +127,7 @@ the cockpit parses what it receives.
     ├── evidence/            the evidence of each issue, served to the cockpit
     ├── requests/            product requests and their attachments
     ├── knowledge/           the project's knowledge pack
+    ├── references/          read-only snapshots of the repositories its specifications cite
     ├── logs/                gate, before-proof and stack logs per issue
     └── forge/               the local forge of a rehearsal project
 ```

@@ -50,6 +50,11 @@ better, an infrastructure change checked by a policy script). See
 
 - **Knowledge**: `knowledge` points at the documents agents should read: architecture,
   constraints, the product, its users.
+- **References**: when specifications cite another repository at a version (the legacy
+  application at its production tag), `references` gives every agent of the project a
+  read-only snapshot of its files, taken from a local clone, and lets the writing
+  agents copy from it. `agent-factory validate` builds the snapshots and names the
+  `git fetch --tags` that brings a missing tag in.
 - **Shell**: agents may always run the project's setup and gate commands; add others
   with `sandbox.shellCommands` (`go test *`, `npm view *`).
 - **Network**: `sandbox.allowedDomains` for read-only lookups (a package registry).
