@@ -40,6 +40,10 @@ export function versionOf(deployed: DeployedVersion): string {
   return deployed.refKind === 'tag' ? deployed.ref : deployed.sha.slice(0, SHORT_SHA_LENGTH);
 }
 
+export function isProductionLookingName(name: string): boolean {
+  return PRODUCTION_NAME_PATTERN.test(name);
+}
+
 export function isProductionTarget(environment: DeploymentEnvironment, targetName: string): boolean {
   return environment === PRODUCTION_ENVIRONMENT || PRODUCTION_NAME_PATTERN.test(targetName);
 }
