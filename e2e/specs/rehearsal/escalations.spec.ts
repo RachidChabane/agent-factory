@@ -1,10 +1,10 @@
 import { paths } from '../../../packages/cockpit/src/model/routes.ts';
-import { issueOf } from '../../support/api.ts';
+import { issueOf, runsOfIssue } from '../../support/api.ts';
 import { openCockpit } from '../../support/cockpit.ts';
 import { clickCommand } from '../../support/commands.ts';
 import { AGENT_WORK_TEST_TIMEOUT_MS, AGENT_WORK_TIMEOUT_MS } from '../../support/factory-activity.ts';
 import { firstOf } from '../../support/project-facts.ts';
-import { DECISION_REQUESTS } from '../../support/rehearsal-scenario.ts';
+import { DECISION_REQUESTS, REVIEW_BLOCKED_TITLE, REVIEW_REQUEST } from '../../support/rehearsal-scenario.ts';
 import { acceptSpec, findRunOfIssue, receiveChallengedRequest, runOfIssue, settled, whileAgentsAreHeld } from '../../support/scenes.ts';
 import { DISCOUNT_ROUNDING, STOREFRONT } from '../../support/story.ts';
 import { expect, test } from '../../support/test.ts';
@@ -98,5 +98,40 @@ test.describe('issues that wait for a human', () => {
     await factory.api.until(`issue #${issueNumber} to be abandoned`, (state) => issueOf(state, STOREFRONT, issueNumber).state === 'abandoned');
     await expect(page.getByRole('region', { name: 'Abandoned' })).toBeVisible();
     await expect(page.getByRole('main').getByRole('button', { name: 'Abandon', exact: true })).toHaveCount(0);
+  });
+});
+
+test.describe('an issue whose review keeps blocking an implementation that passed its gate', () => {
+  test('orders a new review of the same implementation, which runs again without a new implementer attempt', async ({ page, factory }) => {
+    test.setTimeout(AGENT_WORK_TEST_TIMEOUT_MS);
+    await settled(factory);
+    const request = await receiveChallengedRequest(factory, REVIEW_REQUEST);
+    const issueNumber = await acceptSpec(factory, request, REVIEW_BLOCKED_TITLE, true);
+    const escalated = await factory.api.until(
+      `issue #${issueNumber} to escalate on its review`,
+      (state) => {
+        const issue = issueOf(state, STOREFRONT, issueNumber);
+        return issue.state === 'needs-human' && issue.resumeTarget === 'reviewing';
+      },
+      { timeoutMs: AGENT_WORK_TIMEOUT_MS },
+    );
+    const runsOf = (state: typeof escalated, role: 'reviewer' | 'implementer') => runsOfIssue(state, STOREFRONT, issueNumber).filter((run) => run.role === role).length;
+    const reviews = runsOf(escalated, 'reviewer');
+    const implementations = runsOf(escalated, 'implementer');
+
+    await openCockpit(page, factory, paths.issue(STOREFRONT, issueNumber));
+    const outcome = await clickCommand(page, 'issue.resume', async () => {
+      await page.getByRole('main').getByRole('button', { name: 'Review again', exact: true }).click();
+    });
+    expect(outcome.effect).toMatch(new RegExp(`^Issue #${issueNumber} returned to reviewing; the implementation of attempt \\d+ is reviewed again`));
+
+    const again = await factory.api.until(
+      `the review of issue #${issueNumber} to run again`,
+      (state) => issueOf(state, STOREFRONT, issueNumber).state === 'needs-human' && runsOf(state, 'reviewer') > reviews,
+      { timeoutMs: AGENT_WORK_TIMEOUT_MS },
+    );
+    expect(runsOf(again, 'reviewer')).toBe(reviews + 1);
+    expect(runsOf(again, 'implementer')).toBe(implementations);
+    await settled(factory);
   });
 });
