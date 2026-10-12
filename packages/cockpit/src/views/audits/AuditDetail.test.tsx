@@ -303,9 +303,27 @@ describe('AuditsView issue draft', () => {
     expect(within(draft()).queryByText('No issue drafted')).not.toBeInTheDocument();
   });
 
-  it('names an issue published from an audit without a link when the factory does not list it', async () => {
+  it('links an issue published from an audit to its page on the forge when the factory does not list it', async () => {
     const snapshot = withProject(STOREFRONT, (view) => ({ ...view, issues: view.issues.filter((issue) => issue.number !== 75) }));
     await openAudit(AUDIT.httpClient, { snapshot });
+    const link = within(draft()).getByRole('link', { name: 'Published as issue #75' });
+    expect(link).toHaveAttribute('href', 'https://github.example.com/example-org/storefront/issues/75');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noreferrer');
+  });
+
+  it('links an issue published from an audit of a local forge to the page the factory serves for it', async () => {
+    const snapshot = withAudit(LEDGER, AUDIT.ledgerRewrite, (audit) => ({ ...audit, publishedIssueNumber: 93, publishedIssueUrl: '/api/projects/ledger/forge/issues/93.md' }));
+    await openAudit(AUDIT.ledgerRewrite, { snapshot }, LEDGER);
+    const link = within(draft()).getByRole('link', { name: 'Published as issue #93' });
+    expect(link).toHaveAttribute('href', '/api/projects/ledger/forge/issues/93.md');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('names an issue published from an audit without a link when the factory does not list it and the forge gives no page', async () => {
+    const snapshot = withAudit(STOREFRONT, AUDIT.httpClient, (audit) => ({ ...audit, publishedIssueUrl: null }));
+    const unlisted = withProject(STOREFRONT, (view) => ({ ...view, issues: view.issues.filter((issue) => issue.number !== 75) }), snapshot);
+    await openAudit(AUDIT.httpClient, { snapshot: unlisted });
     expect(within(draft()).getByText('Published as issue #75')).toBeInTheDocument();
     expect(within(draft()).queryByRole('link')).not.toBeInTheDocument();
   });

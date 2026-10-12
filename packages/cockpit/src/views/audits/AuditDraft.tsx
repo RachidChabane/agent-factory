@@ -10,13 +10,13 @@ const DRAFT_BODY_MAX_HEIGHT = 280;
 /** The follow-up issue the auditor drafted, and whether it has been published on the repository. */
 export function AuditDraft({ audit }: { readonly audit: AuditView }) {
   const { t } = useI18n();
-  const { draft, publishedIssueNumber } = audit;
+  const { draft, publishedIssueNumber, publishedIssueUrl } = audit;
   return (
     <Section
       title={t('audits.draft.title')}
       id="audit-draft"
       description={draft !== null && publishedIssueNumber === null ? t('audits.draft.unpublished') : undefined}
-      actions={publishedIssueNumber === null ? undefined : <PublishedIssueLink number={publishedIssueNumber} />}
+      actions={publishedIssueNumber === null ? undefined : <PublishedIssueLink number={publishedIssueNumber} url={publishedIssueUrl} />}
     >
       {draft === null ? (
         publishedIssueNumber === null ? <EmptyState compact title={t('audits.draft.none')} description={t('audits.draft.noneDescription')} /> : null

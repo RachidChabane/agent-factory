@@ -155,8 +155,11 @@ test.describe('the audits of the demonstration', () => {
     await expect(issueSection.getByText(`Published as issue #${issueNumber}`)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Publish the audit issue' })).toHaveCount(0);
     await expect(issueSection).toContainText(draft.title);
-    const listed = projectOf(await factory.api.state(), STOREFRONT).issues.some((issue) => issue.number === issueNumber);
-    await expect(issueSection.getByRole('link', { name: `Published as issue #${issueNumber}` })).toHaveCount(listed ? 1 : 0);
+    const state = await factory.api.state();
+    const issuePage = forgeFilePath(STOREFRONT, `issues/${issueNumber}.md`);
+    expect(auditOf(state, STOREFRONT, audit.id).publishedIssueUrl).toBe(issuePage);
+    const listed = projectOf(state, STOREFRONT).issues.some((issue) => issue.number === issueNumber);
+    await expect(issueSection.getByRole('link', { name: `Published as issue #${issueNumber}` })).toHaveAttribute('href', listed ? paths.issue(STOREFRONT, issueNumber) : issuePage);
   });
 
   test('asks for a note before marking an audit as resolved and sends nothing without it', async ({ page, factory }) => {

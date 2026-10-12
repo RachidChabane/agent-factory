@@ -59,16 +59,28 @@ describe('publishedIssueTarget', () => {
   const [listed] = storefront.issues;
   if (listed === undefined) throw new Error('the storefront of the fixture world lists no issue');
   const unlisted = Math.max(...storefront.issues.map((issue) => issue.number)) + 1;
+  const ISSUE_PAGE = `https://forge.example.com/example-org/shop/issues/${unlisted}`;
+  const SERVED_ISSUE = `/api/projects/shop/forge/issues/${unlisted}.md`;
 
-  it('leads to the page of the cockpit for an issue the factory lists', () => {
-    expect(publishedIssueTarget(storefront, listed.number)).toEqual({ kind: 'internal', to: `/projects/${STOREFRONT_ID}/issues/${listed.number}` });
+  it('leads to the page of the cockpit for an issue the factory lists, whatever address the forge gives', () => {
+    expect(publishedIssueTarget(storefront, listed.number, ISSUE_PAGE)).toEqual({ kind: 'internal', to: `/projects/${STOREFRONT_ID}/issues/${listed.number}` });
+    expect(publishedIssueTarget(storefront, listed.number, null)).toEqual({ kind: 'internal', to: `/projects/${STOREFRONT_ID}/issues/${listed.number}` });
   });
 
-  it('leads nowhere for an issue the factory does not list', () => {
-    expect(publishedIssueTarget(storefront, unlisted)).toEqual({ kind: 'unlinked' });
+  it('leads to the page the forge gives an issue the factory does not list', () => {
+    expect(publishedIssueTarget(storefront, unlisted, ISSUE_PAGE)).toEqual({ kind: 'forge', href: ISSUE_PAGE });
+  });
+
+  it('leads to the page a local forge serves, which is an address like another', () => {
+    expect(publishedIssueTarget({ id: 'ledger', issues: [] }, unlisted, SERVED_ISSUE)).toEqual({ kind: 'forge', href: SERVED_ISSUE });
+  });
+
+  it('leads nowhere when the forge gives no page, or an empty one', () => {
+    expect(publishedIssueTarget(storefront, unlisted, null)).toEqual({ kind: 'unlinked' });
+    expect(publishedIssueTarget(storefront, unlisted, '')).toEqual({ kind: 'unlinked' });
   });
 
   it('keeps the issues of the project apart from those of another that share a number', () => {
-    expect(publishedIssueTarget({ id: 'ledger', issues: [] }, listed.number)).toEqual({ kind: 'unlinked' });
+    expect(publishedIssueTarget({ id: 'ledger', issues: [] }, listed.number, null)).toEqual({ kind: 'unlinked' });
   });
 });
