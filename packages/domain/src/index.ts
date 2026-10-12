@@ -23,3 +23,5 @@ export * from './gate-preflight.ts';
 export * from './usage.ts';
 export * from './token-usage.ts';
 export * from './cost.ts';
+export * from './issue-types.ts';
+export * from './issue-type-presets.ts';
