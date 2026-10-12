@@ -200,6 +200,12 @@ describe('the agent-factory command line', () => {
     expect(captured.errors).toEqual(['Nothing was created. Re-run with --confirm to create it.']);
   });
 
+  it('lists the issues a new issue waits on in the preview of what it creates on GitHub', async () => {
+    await writeFile(join(home, 'spec.md'), SPEC_FILE);
+    expect(await runCli(['issue', 'create', 'spec.md', '--blocked-by', '12,14'], context())).toBe(5);
+    expect(captured.lines.slice(0, 4)).toEqual(['This creates an issue on GitHub acme/widgets:', 'Title: Serve the domain from the UI', 'Labels: factory, type:infra', 'Blocked by: #12, #14']);
+  });
+
   it('refuses a spec file that already carries the validated label', async () => {
     await writeFile(join(home, 'spec.md'), SPEC_FILE.replace('Labels: type:infra', 'Labels: type:infra, spec:validated'));
     expect(await runCli(['issue', 'create', join(home, 'spec.md'), '--confirm'], context())).toBe(1);

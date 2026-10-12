@@ -86,6 +86,15 @@ describe('rehearsal on a local forge', () => {
       expect(await runCli(['issue', 'create', 'spec.md', '--start'], context())).toBe(0);
       expect(captured.lines.at(-1)).toBe('gadgets#2 created on the local forge of acme/gadgets (' + `${home}/projects/gadgets/forge) [factory, type:infra] and validated: the factory takes it at its next tick`);
       expect(await readFile(`${home}/projects/gadgets/forge/issues/2.md`, 'utf8')).toContain('  - spec:validated');
+
+      expect(await runCli(['issue', 'create', 'spec.md', '--blocked-by', '1,2'], context())).toBe(0);
+      expect(captured.lines.at(-1)).toBe(
+        'gadgets#3 created on the local forge of acme/gadgets (' + `${home}/projects/gadgets/forge) [factory, type:infra, blocked by #1, #2]; validate it (spec:validated) once you have reviewed it`,
+      );
+      expect(await readFile(`${home}/projects/gadgets/forge/issues/3.md`, 'utf8')).toMatch(/blockedBy:\n\s+- 1\n\s+- 2/);
+      expect(await runCli(['issue', 'create', 'spec.md', '--blocked-by', '1,99', '--start'], context())).toBe(1);
+      expect(captured.errors.at(-1)).toContain('99');
+      await expect(readFile(`${home}/projects/gadgets/forge/issues/4.md`, 'utf8')).rejects.toThrow();
     },
     REAL_GIT_TEST_TIMEOUT_MS,
   );

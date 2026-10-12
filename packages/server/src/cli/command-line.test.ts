@@ -40,8 +40,13 @@ describe('parseCommandLine', () => {
     expect(parseCommandLine(['request', 'add', 'ask.md', '--images', 'shots', '--requester=Dana'])).toEqual(ok({ kind: 'request-add', path: 'ask.md', imagesDirectory: 'shots', requester: 'Dana' }));
     expect(parseCommandLine(['request', 'add', 'ask.md'])).toEqual(ok({ kind: 'request-add', path: 'ask.md', imagesDirectory: null, requester: 'unknown' }));
     expect(parseCommandLine(['request', 'challenge', 'req-3'])).toEqual(ok({ kind: 'request-challenge', requestId: 'req-3' }));
-    expect(parseCommandLine(['issue', 'create', 'spec.md', '--confirm'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', confirmed: true, start: false }));
-    expect(parseCommandLine(['issue', 'create', 'spec.md', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', confirmed: false, start: true }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--confirm'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [], confirmed: true, start: false }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [], confirmed: false, start: true }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by', '12, 14,12', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [12, 14], confirmed: false, start: true }));
+    expect(parseCommandLine(['issue', 'create', '--blocked-by=7', 'spec.md'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [7], confirmed: false, start: false }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by', '12,x'])).toEqual({ ok: false, error: '--blocked-by must list issue numbers separated by commas, got "12,x"' });
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by', '0'])).toEqual({ ok: false, error: '--blocked-by must list issue numbers separated by commas, got "0"' });
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by'])).toEqual({ ok: false, error: 'missing value for --blocked-by' });
     expect(parseCommandLine(['pr', 'feedback', '12', 'notes.md', '--author', 'Riley'])).toEqual(ok({ kind: 'pr-feedback', pullRequestNumber: 12, path: 'notes.md', author: 'Riley' }));
     expect(parseCommandLine(['pr', 'feedback', '12', 'notes.md'])).toEqual({ ok: false, error: 'missing --author <name>' });
     expect(parseCommandLine(['audit', '8d33a43', '38ab3a0'])).toEqual(ok({ kind: 'audit', commits: ['8d33a43', '38ab3a0'] }));

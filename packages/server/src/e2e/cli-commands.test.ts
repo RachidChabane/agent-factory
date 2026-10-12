@@ -19,7 +19,7 @@ describe('the factory commands of the example run', () => {
   });
 
   it('create an issue from a spec file and validate it at once', () => {
-    expect(commandOf(createStartedIssue(SPEC_PATH))).toEqual({ kind: 'issue-create', specPath: SPEC_PATH, confirmed: false, start: true });
+    expect(commandOf(createStartedIssue(SPEC_PATH))).toEqual({ kind: 'issue-create', specPath: SPEC_PATH, blockedBy: [], confirmed: false, start: true });
   });
 
   it('run an issue to its pull request', () => {
