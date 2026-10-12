@@ -10,8 +10,10 @@ import { BoundedTail, GatePolicySchema, isWithin, parseGateDecisionLog, type Gat
 import { buildChildEnvironment, credentialVariablesIn, type ChildEnvironment } from './child-environment.ts';
 import { buildClaudeArguments } from './claude-invocation.ts';
 import { launchCommand, type ClaudeHarnessConfig } from './claude-harness-config.ts';
+import { referencePromptSection } from './reference-access.ts';
 import { superviseProcess, type TerminationReason } from './process-supervisor.ts';
 import { decideOutcome, gateBlocksOf, type StopHookResponse } from './run-outcome.ts';
+import { ROLE_PERMISSIONS } from './role-permissions.ts';
 import { renderRunSettings, type RenderedRunSettings } from './run-settings.ts';
 import { appendedSystemPrompt } from './shell-policy-prompt.ts';
 import {
@@ -136,6 +138,7 @@ export class ClaudeCodeHarness implements AgentHarness {
       decisionLogPath: workspace.gateDecisionLogPath,
       decisionRequestFile: request.decisionRequestPath === null ? null : join(layout.worktree, request.decisionRequestPath),
     });
+    const references = await this.#config.references();
     const rendered = renderRunSettings({
       role: request.role,
       extraAllowedTools: request.allowedTools,
@@ -151,6 +154,7 @@ export class ClaudeCodeHarness implements AgentHarness {
       shellCommands: this.#config.shellCommands,
       unixSockets: this.#config.engineSockets(),
       socketsAllOrNothing: this.#config.platform === LINUX_PLATFORM,
+      references,
       writableDirectories: layout.writableDirectories,
       deniedReadPaths: this.#deniedReadPaths(layout.worktree),
       readablePaths: [join(this.#claudeConfigDirectory(request.account) ?? join(this.#config.home, DEFAULT_CLAUDE_CONFIG_DIRECTORY), SHELL_SNAPSHOTS_DIRECTORY)],
@@ -159,7 +163,10 @@ export class ClaudeCodeHarness implements AgentHarness {
       writeRunJson(workspace.gatePolicyPath, policy),
       writeRunJson(workspace.settingsPath, rendered.settings),
       writeRunJson(workspace.mcpConfigPath, { mcpServers: request.mcpServers }),
-      writeRunFile(workspace.appendSystemPromptPath, appendedSystemPrompt(request.appendSystemPrompt, rendered.allowedTools)),
+      writeRunFile(
+        workspace.appendSystemPromptPath,
+        appendedSystemPrompt(request.appendSystemPrompt, rendered.allowedTools, referencePromptSection(references, ROLE_PERMISSIONS[request.role].copiesReferences)),
+      ),
     ]);
     return { rendered, fingerprints, gateRequired };
   }

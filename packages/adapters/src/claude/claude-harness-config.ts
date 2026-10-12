@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { HOOK_SCRIPTS } from '@agent-factory/plugin';
 import { NO_ENGINE_SOCKETS, type EngineSockets } from '../sandbox/container-engine-sockets.ts';
 import { BUILT_IN_CREDENTIAL_PATHS } from '../sandbox/credential-paths.ts';
+import { NO_REFERENCE_MOUNTS, type ReferenceMounts } from './reference-access.ts';
 import type { HookScripts } from './run-settings.ts';
 
 export const CLAUDE_EXECUTABLE = 'claude';
@@ -38,6 +39,8 @@ export interface ClaudeHarnessConfig {
   readonly shellCommands: readonly string[];
   /** The container engine sockets a run's shell may connect to, read again for every run. */
   readonly engineSockets: EngineSockets;
+  /** The read-only snapshots of the project's reference repositories that are built, read again for every run. */
+  readonly references: ReferenceMounts;
   readonly platform: string;
   readonly hookRuntime: string;
   readonly hookScripts: HookScripts;
@@ -66,6 +69,7 @@ export function claudeHarnessConfig(settings: ClaudeHarnessSettings): ClaudeHarn
     sandboxAllowedDomains: [],
     shellCommands: [],
     engineSockets: NO_ENGINE_SOCKETS,
+    references: NO_REFERENCE_MOUNTS,
     platform: process.platform,
     hookRuntime: process.execPath,
     hookScripts: HOOK_SCRIPTS,

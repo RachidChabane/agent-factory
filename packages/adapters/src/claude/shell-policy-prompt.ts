@@ -31,8 +31,8 @@ export function shellPolicyPrompt(allowedTools: readonly string[]): string | nul
   return [SHELL_POLICY_HEADER, prefixes.map((prefix) => `- \`${prefix}\``).join(NEWLINE), SHELL_POLICY_RULES].join(PARAGRAPH);
 }
 
-export function appendedSystemPrompt(requested: string, allowedTools: readonly string[]): string {
-  return [requested.trim(), shellPolicyPrompt(allowedTools) ?? '']
+export function appendedSystemPrompt(requested: string, allowedTools: readonly string[], referenceSection: string | null = null): string {
+  return [requested.trim(), shellPolicyPrompt(allowedTools) ?? '', referenceSection ?? '']
     .filter((part) => part !== '')
     .join(PARAGRAPH);
 }

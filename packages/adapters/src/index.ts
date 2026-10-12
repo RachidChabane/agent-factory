@@ -39,6 +39,7 @@ export {
   type ClaudeHarnessSettings,
 } from './claude/claude-harness-config.ts';
 export { CLAUDE_PRINT_MODE_INVOCATION, CLAUDE_PROMPT_CHANNEL, PINNED_CLAUDE_VERSION } from './claude/claude-invocation.ts';
+export { NO_REFERENCE_MOUNTS, referenceCopyRules, referencePromptSection, type ReferenceMount, type ReferenceMounts } from './claude/reference-access.ts';
 export { ROLE_PERMISSIONS, type RolePermissions } from './claude/role-permissions.ts';
 export { inheritedEnvironment } from './claude/child-environment.ts';
 export { parseStreamLine, type ParsedStreamLine } from './claude/stream/stream-parser.ts';

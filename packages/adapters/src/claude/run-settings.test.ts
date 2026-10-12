@@ -38,6 +38,7 @@ function input(overrides: Partial<RunSettingsInput> = {}): RunSettingsInput {
     shellCommands: [],
     unixSockets: [],
     socketsAllOrNothing: false,
+    references: [],
     ...overrides,
   };
 }
@@ -208,6 +209,66 @@ describe('credential read denies', () => {
 
   it('denies the keychain command to every role', () => {
     for (const role of AGENT_ROLES) expect(renderRunSettings(input({ role })).settings.permissions.deny).toContain('Bash(security *)');
+  });
+});
+
+describe('reference snapshots', () => {
+  const SNAPSHOT = '/factory/projects/storefront/references/design-tokens@v1.0.0';
+  const OTHER_SNAPSHOT = '/factory/projects/storefront/references/icons@v2';
+  const MOUNTS = [
+    { name: 'design-tokens', repository: 'example-org/design-tokens', ref: 'v1.0.0', commit: 'c'.repeat(40), path: SNAPSHOT },
+    { name: 'icons', repository: 'example-org/icons', ref: 'v2', commit: 'd'.repeat(40), path: OTHER_SNAPSHOT },
+  ];
+  const COPY_RULES = [`Bash(cp ${SNAPSHOT}/*)`, `Bash(cp -R ${SNAPSHOT}/*)`, `Bash(cp ${OTHER_SNAPSHOT}/*)`, `Bash(cp -R ${OTHER_SNAPSHOT}/*)`];
+  const WRITING_ROLES = AGENT_ROLES.filter((role) => ROLE_PERMISSIONS[role].copiesReferences);
+  const READING_ROLES = AGENT_ROLES.filter((role) => !ROLE_PERMISSIONS[role].copiesReferences);
+
+  it('lets only the acceptance author and the implementer copy', () => {
+    expect(WRITING_ROLES).toEqual(['acceptance-author', 'implementer']);
+  });
+
+  it('allows every role to read the snapshots through the sandbox', () => {
+    for (const role of AGENT_ROLES) {
+      const { settings } = renderRunSettings(input({ role, references: MOUNTS }));
+      expect(settings.sandbox.filesystem.allowRead).toEqual(expect.arrayContaining([SNAPSHOT, OTHER_SNAPSHOT]));
+    }
+  });
+
+  it('allows the writing roles to copy from a snapshot with exactly the cp and cp -R forms', () => {
+    for (const role of WRITING_ROLES) {
+      const { settings, allowedTools } = renderRunSettings(input({ role, references: MOUNTS }));
+      expect(settings.permissions.allow.filter((rule) => rule.startsWith('Bash(cp '))).toEqual(COPY_RULES);
+      expect(allowedTools).toEqual(expect.arrayContaining(COPY_RULES));
+    }
+  });
+
+  it('gives the other roles no cp rule and no shell', () => {
+    for (const role of READING_ROLES) {
+      const { settings, availableTools } = renderRunSettings(input({ role, references: MOUNTS }));
+      expect(settings.permissions.allow.filter((rule) => rule.includes('cp '))).toEqual([]);
+      expect(availableTools).toEqual(['Read', 'Glob', 'Grep']);
+    }
+  });
+
+  it('adds no rule and no path without references', () => {
+    const { settings } = renderRunSettings(input());
+    expect(settings.permissions.allow.some((rule) => rule.startsWith('Bash(cp'))).toBe(false);
+    expect(settings.sandbox.filesystem.allowRead).toEqual([]);
+    expect(settings.sandbox.filesystem.denyWrite).not.toContain(SNAPSHOT);
+  });
+
+  it('forbids writing into a snapshot to the file tools and to the sandbox, every role alike', () => {
+    for (const role of AGENT_ROLES) {
+      const { settings } = renderRunSettings(input({ role, references: MOUNTS }));
+      expect(settings.permissions.deny).toEqual(expect.arrayContaining([`Edit(/${SNAPSHOT}/**)`, `Edit(/${OTHER_SNAPSHOT}/**)`]));
+      expect(settings.sandbox.filesystem.denyWrite).toEqual(expect.arrayContaining([SNAPSHOT, OTHER_SNAPSHOT]));
+      expect(settings.sandbox.filesystem.allowWrite).not.toContain(SNAPSHOT);
+    }
+  });
+
+  it('keeps the readable paths of the run next to the snapshots', () => {
+    const { settings } = renderRunSettings(input({ readablePaths: ['/home/operator/.claude/shell-snapshots'], references: MOUNTS }));
+    expect(settings.sandbox.filesystem.allowRead).toEqual(['/home/operator/.claude/shell-snapshots', SNAPSHOT, OTHER_SNAPSHOT]);
   });
 });
 

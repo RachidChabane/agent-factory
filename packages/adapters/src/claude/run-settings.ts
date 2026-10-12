@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import type { AgentRole } from '@agent-factory/domain';
 import { POLICY_ARGUMENT } from '@agent-factory/plugin';
+import { referenceCopyRules, type ReferenceMount } from './reference-access.ts';
 import { CLAUDE_TOOLS, ROLE_PERMISSIONS, bashRule, builtInToolsOf } from './role-permissions.ts';
 
 export const FROZEN_WRITE_TOOLS_MATCHER = 'Edit|Write|MultiEdit|NotebookEdit';
@@ -37,6 +38,8 @@ export interface RunSettingsInput {
   readonly unixSockets: readonly string[];
   /** Whether the platform's sandbox can only open every Unix socket or none, as on Linux. */
   readonly socketsAllOrNothing: boolean;
+  /** The reference snapshots of the project: every role reads them, the writing roles copy from them, none writes to them. */
+  readonly references: readonly ReferenceMount[];
 }
 
 export interface CommandHook {
@@ -81,7 +84,9 @@ export interface RenderedRunSettings {
 export function renderRunSettings(input: RunSettingsInput): RenderedRunSettings {
   const rolePermissions = ROLE_PERMISSIONS[input.role];
   const projectCommands = rolePermissions.runsProjectCommands ? input.shellCommands.map(bashRule) : [];
-  const allowedTools = unique([...rolePermissions.allow, ...projectCommands, ...input.extraAllowedTools]);
+  const referencePaths = input.references.map((mount) => mount.path);
+  const referenceCopies = rolePermissions.copiesReferences ? referenceCopyRules(input.references) : [];
+  const allowedTools = unique([...rolePermissions.allow, ...projectCommands, ...referenceCopies, ...input.extraAllowedTools]);
   const frozenFiles = input.frozenCheckPaths.map((path) => join(input.worktree, path));
   const protectedFiles = [...frozenFiles, ...PROJECT_SETTINGS_FILES.map((path) => join(input.worktree, path))];
   const deny = unique([
@@ -95,6 +100,7 @@ export function renderRunSettings(input: RunSettingsInput): RenderedRunSettings 
       absolutePathRule(CLAUDE_TOOLS.read, join(path, RECURSIVE_GLOB)),
     ]),
     ...protectedFiles.map((file) => absolutePathRule(CLAUDE_TOOLS.edit, file)),
+    ...referencePaths.map((path) => absolutePathRule(CLAUDE_TOOLS.edit, join(path, RECURSIVE_GLOB))),
   ]);
   return {
     settings: {
@@ -107,8 +113,8 @@ export function renderRunSettings(input: RunSettingsInput): RenderedRunSettings 
         filesystem: {
           allowWrite: input.writableDirectories,
           denyRead: unique([...input.protectedDirectories, ...input.deniedReadPaths]),
-          allowRead: unique([...input.readablePaths, ...input.unixSockets]),
-          denyWrite: unique([...input.protectedDirectories, ...protectedFiles]),
+          allowRead: unique([...input.readablePaths, ...input.unixSockets, ...referencePaths]),
+          denyWrite: unique([...input.protectedDirectories, ...protectedFiles, ...referencePaths]),
         },
         network: renderNetwork(input),
       },

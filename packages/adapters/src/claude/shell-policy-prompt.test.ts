@@ -40,6 +40,16 @@ describe('appendedSystemPrompt', () => {
     expect(appendedSystemPrompt('', ['Read'])).toBe(NO_SHELL_POLICY);
   });
 
+  it('appends the reference section last and lists the cp prefixes of the snapshots', () => {
+    const section = '# Reference repositories\n\nA section.';
+    const prompt = appendedSystemPrompt('Be brief.', ['Bash(cp /snap/*)', 'Bash(cp -R /snap/*)'], section);
+
+    expect(prompt.startsWith('Be brief.\n\n')).toBe(true);
+    expect(prompt.endsWith(section)).toBe(true);
+    expect(prompt).toContain('- `cp /snap/`');
+    expect(prompt).toContain('- `cp -R /snap/`');
+  });
+
   it('is the requested prompt alone when the shell is unrestricted', () => {
     expect(appendedSystemPrompt('Be brief.', ['Bash'])).toBe('Be brief.');
   });

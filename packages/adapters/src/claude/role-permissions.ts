@@ -49,10 +49,12 @@ export interface RolePermissions {
   readonly deny: readonly string[];
   /** Whether the role runs the shell commands the project declares for its agents. */
   readonly runsProjectCommands: boolean;
+  /** Whether the role copies files out of the reference snapshots of its project into its worktree. */
+  readonly copiesReferences: boolean;
 }
 
-const READ_ONLY_ROLE: RolePermissions = { allow: READ_ONLY_TOOLS, deny: OUTWARD_ACTION_DENY, runsProjectCommands: false };
-const WRITING_ROLE: RolePermissions = { allow: WRITING_ROLE_ALLOW, deny: OUTWARD_ACTION_DENY, runsProjectCommands: true };
+const READ_ONLY_ROLE: RolePermissions = { allow: READ_ONLY_TOOLS, deny: OUTWARD_ACTION_DENY, runsProjectCommands: false, copiesReferences: false };
+const WRITING_ROLE: RolePermissions = { allow: WRITING_ROLE_ALLOW, deny: OUTWARD_ACTION_DENY, runsProjectCommands: true, copiesReferences: true };
 
 export const ROLE_PERMISSIONS: Readonly<Record<AgentRole, RolePermissions>> = {
   challenger: READ_ONLY_ROLE,

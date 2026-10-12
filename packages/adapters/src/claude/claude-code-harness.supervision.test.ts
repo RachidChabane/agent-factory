@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ClaudeCodeHarness } from './claude-code-harness.ts';
 import { claudeHarnessConfig, type ClaudeHarnessSettings } from './claude-harness-config.ts';
+import type { ReferenceMount, ReferenceMounts } from './reference-access.ts';
 import { CLAUDE_PRINT_MODE_INVOCATION } from './claude-invocation.ts';
 import {
   FAKE_CLAUDE_SCRIPT,
@@ -170,6 +171,73 @@ describe('ClaudeCodeHarness supervision with a fake claude', () => {
     const appendedPrompt = await readFile(argv[argv.indexOf('--append-system-prompt-file') + 1] ?? '', 'utf8');
     expect(appendedPrompt.startsWith('Follow the repository rules.')).toBe(true);
     expect(appendedPrompt).toContain('- `uv run`');
+  });
+
+  describe('reference snapshots', () => {
+    const SNAPSHOT_COMMIT = '1d3e4a9ce003af09489551fd6398fc44c24069cc';
+
+    function mount(): ReferenceMount {
+      return { name: 'design-tokens', repository: 'example-org/design-tokens', ref: 'v1.0.0', commit: SNAPSHOT_COMMIT, path: join(root, 'references', 'design-tokens@v1.0.0') };
+    }
+
+    async function runWith(references: ReferenceMounts, overrides: Partial<AgentRunRequest> = {}) {
+      const events: AgentRunEvent[] = [];
+      await harness('echo', { references }).run(request(overrides), (event) => events.push(event), new AbortController().signal);
+      const invocation = rawLinesOf(events)
+        .map((line) => InvocationSchema.safeParse(JSON.parse(line)))
+        .find((parsed) => parsed.success)?.data;
+      const argv = invocation?.argv ?? [];
+      return {
+        prompt: await readFile(argv[argv.indexOf('--append-system-prompt-file') + 1] ?? '', 'utf8'),
+        settings: JSON.parse(await readFile(argv[argv.indexOf('--settings') + 1] ?? '', 'utf8')) as {
+          permissions: { allow: string[]; deny: string[] };
+          sandbox: { filesystem: { allowRead: string[]; denyWrite: string[] } };
+        },
+      };
+    }
+
+    it('lists the snapshots in the appended prompt and opens them in the settings of a writing role', async () => {
+      const { prompt, settings } = await runWith(() => Promise.resolve([mount()]));
+
+      expect(prompt).toContain('# Reference repositories');
+      expect(prompt).toContain(`\`example-org/design-tokens\` at \`v1.0.0\` (commit \`${SNAPSHOT_COMMIT}\`), read from \`${mount().path}\``);
+      expect(prompt).toContain(`- \`cp -R ${mount().path}/\``);
+      expect(settings.permissions.allow).toContain(`Bash(cp ${mount().path}/*)`);
+      expect(settings.permissions.deny).toContain(`Edit(/${mount().path}/**)`);
+      expect(settings.sandbox.filesystem.allowRead).toContain(mount().path);
+      expect(settings.sandbox.filesystem.denyWrite).toContain(mount().path);
+    });
+
+    it('lets a read-only role read the snapshots, and tells it nothing about copying', async () => {
+      const { prompt, settings } = await runWith(() => Promise.resolve([mount()]), { role: 'reviewer' });
+
+      expect(prompt).toContain('# Reference repositories');
+      expect(prompt).not.toContain('cp -R');
+      expect(settings.permissions.allow.some((rule) => rule.startsWith('Bash'))).toBe(false);
+      expect(settings.sandbox.filesystem.allowRead).toContain(mount().path);
+    });
+
+    it('says nothing of references when the project has none', async () => {
+      const { prompt, settings } = await runWith(() => Promise.resolve([]));
+
+      expect(prompt).not.toContain('Reference repositories');
+      expect(settings.permissions.allow.some((rule) => rule.startsWith('Bash(cp'))).toBe(false);
+    });
+
+    it('reads the snapshots again for every run', async () => {
+      let snapshots: readonly ReferenceMount[] = [];
+      const config = harness('echo', { references: () => Promise.resolve(snapshots) });
+      const promptOf = async (): Promise<string> => {
+        const events: AgentRunEvent[] = [];
+        await config.run(request(), (event) => events.push(event), new AbortController().signal);
+        const argv = rawLinesOf(events).map((line) => InvocationSchema.safeParse(JSON.parse(line))).find((parsed) => parsed.success)?.data?.argv ?? [];
+        return readFile(argv[argv.indexOf('--append-system-prompt-file') + 1] ?? '', 'utf8');
+      };
+
+      expect(await promptOf()).not.toContain('Reference repositories');
+      snapshots = [mount()];
+      expect(await promptOf()).toContain(`(commit \`${SNAPSHOT_COMMIT}\`)`);
+    });
   });
 
   it('runs under the configuration directory of the requested Claude account', async () => {
