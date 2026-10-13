@@ -6,7 +6,7 @@ import { fixtureSnapshot, renderRoute } from '../../test/render.tsx';
 
 const COLUMNS = ['Requests', 'Specs', 'Checks', 'Implementation', 'Pull requests', 'Needs a human', 'Delivered'] as const;
 
-async function openBoard(path = '/', options: Parameters<typeof renderRoute>[1] = {}) {
+async function openBoard(path = '/board', options: Parameters<typeof renderRoute>[1] = {}) {
   const view = await renderRoute(path, options);
   await screen.findByRole('region', { name: options.locale === 'fr' ? 'Implémentation' : 'Implementation' });
   return view;
@@ -98,7 +98,7 @@ describe('BoardView spec validation', () => {
   });
 
   it('writes the action in French', async () => {
-    await openBoard('/', { locale: 'fr' });
+    await openBoard('/board', { locale: 'fr' });
     expect(within(screen.getByRole('region', { name: 'Specs' })).getAllByRole('button', { name: 'Valider la spec' })).toHaveLength(2);
   });
 });
@@ -143,7 +143,7 @@ describe('BoardView cards', () => {
       ...project,
       pullRequests: project.pullRequests.map((pullRequest) => (pullRequest.number === 62 ? { ...pullRequest, checks: { value: null, readAt: null, error: null } } : pullRequest)),
     }));
-    await openBoard('/', { snapshot });
+    await openBoard('/board', { snapshot });
     expect(within(cardIn('Pull requests', /tell customers when a promo code has expired/)).getByText(/Checks not read/)).toBeInTheDocument();
   });
 
@@ -167,24 +167,24 @@ describe('BoardView project filter', () => {
   it('shows one project only, and keeps the choice in the address', async () => {
     const view = await openBoard();
     await view.user.click(screen.getByRole('radio', { name: 'Ledger' }));
-    await view.expectLocation('/?project=ledger');
+    await view.expectLocation('/board?project=ledger');
     expect(screen.getByRole('radio', { name: 'Ledger' })).toBeChecked();
     expect(screen.queryByRole('link', { name: /Filter the order history by status/ })).not.toBeInTheDocument();
     expect(cardIn('Specs', /Support credit notes/)).toBeInTheDocument();
     expect(within(cardIn('Specs', /Support credit notes/)).queryByText('Ledger')).not.toBeInTheDocument();
     await view.user.click(screen.getByRole('radio', { name: 'All projects' }));
-    await view.expectLocation('/');
+    await view.expectLocation('/board');
     expect(cardIn('Implementation', /Filter the order history by status/)).toBeInTheDocument();
   });
 
   it('starts on the project named in the address and ignores an unknown one', async () => {
-    await openBoard('/?project=storefront');
+    await openBoard('/board?project=storefront');
     expect(screen.getByRole('radio', { name: 'Storefront' })).toBeChecked();
     expect(screen.queryByRole('link', { name: /Support credit notes/ })).not.toBeInTheDocument();
   });
 
   it('shows every project when the address names an unknown one', async () => {
-    await openBoard('/?project=nowhere');
+    await openBoard('/board?project=nowhere');
     expect(screen.getByRole('radio', { name: 'All projects' })).toBeChecked();
     expect(screen.getByRole('link', { name: /Support credit notes/ })).toBeInTheDocument();
   });
@@ -270,7 +270,7 @@ describe('BoardView running agents', () => {
   });
 
   it('says that no agent is running for a project that has none', async () => {
-    await openBoard('/?project=ledger');
+    await openBoard('/board?project=ledger');
     expect(within(screen.getByRole('region', { name: 'Runs in progress' })).getByText('No agent is running.')).toBeInTheDocument();
   });
 });
@@ -287,7 +287,7 @@ describe('BoardView pauses', () => {
 
   it('shows no pause panel when nothing pauses the installation', async () => {
     const snapshot = fixtureSnapshot();
-    await openBoard('/', { snapshot: { ...snapshot, installation: { ...snapshot.installation, pauses: [] } } });
+    await openBoard('/board', { snapshot: { ...snapshot, installation: { ...snapshot.installation, pauses: [] } } });
     expect(screen.queryByRole('region', { name: 'Whole installation' })).not.toBeInTheDocument();
   });
 });
@@ -314,7 +314,7 @@ describe('BoardView new request', () => {
   });
 
   it('offers the project the board is filtered on first', async () => {
-    const view = await openBoard('/?project=ledger');
+    const view = await openBoard('/board?project=ledger');
     await view.user.click(screen.getByRole('button', { name: 'New request' }));
     expect(within(await screen.findByRole('dialog', { name: 'New request' })).getByLabelText('Project')).toHaveValue('ledger');
   });
@@ -352,7 +352,7 @@ describe('BoardView scheduling', () => {
 
   it('names a project whose pool of worktrees is full, with the issues that wait and the ones that hold the worktrees', async () => {
     const snapshot = mapProject(fixtureSnapshot(), 'ledger', (project) => ({ ...project, scheduler: { worktreeShortage: SHORTAGE } }));
-    await openBoard('/', { snapshot });
+    await openBoard('/board', { snapshot });
     const scope = screen.getByRole('region', { name: 'Ledger' });
     expect(within(scope).getByText('No free worktree')).toBeInTheDocument();
     expect(within(scope).getByRole('link', { name: '#31' })).toHaveAttribute('href', '/projects/ledger/issues/31');
@@ -362,7 +362,7 @@ describe('BoardView scheduling', () => {
 
   it('shows no worktree notice for a project the board is filtered away from', async () => {
     const snapshot = mapProject(fixtureSnapshot(), 'ledger', (project) => ({ ...project, scheduler: { worktreeShortage: SHORTAGE } }));
-    await openBoard('/?project=storefront', { snapshot });
+    await openBoard('/board?project=storefront', { snapshot });
     expect(screen.queryByText('No free worktree')).not.toBeInTheDocument();
   });
 
@@ -375,7 +375,7 @@ describe('BoardView scheduling', () => {
 describe('BoardView with a single project', () => {
   it('hides the project filter and the project tags', async () => {
     const snapshot = fixtureSnapshot();
-    await openBoard('/', { snapshot: { ...snapshot, projects: snapshot.projects.filter((project) => project.id === 'storefront'), runs: snapshot.runs.filter((run) => run.project !== 'ledger') } });
+    await openBoard('/board', { snapshot: { ...snapshot, projects: snapshot.projects.filter((project) => project.id === 'storefront'), runs: snapshot.runs.filter((run) => run.project !== 'ledger') } });
     expect(screen.queryByRole('radiogroup', { name: 'Project' })).not.toBeInTheDocument();
     expect(within(cardIn('Specs', /Show the stock level/)).queryByText('Storefront')).not.toBeInTheDocument();
   });
@@ -383,7 +383,7 @@ describe('BoardView with a single project', () => {
 
 describe('BoardView in French', () => {
   it('names the columns and the cards in French', async () => {
-    await openBoard('/', { locale: 'fr' });
+    await openBoard('/board', { locale: 'fr' });
     expect(screen.getByRole('region', { name: 'Demandes' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Intervention requise' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Livré' })).toBeInTheDocument();
@@ -394,7 +394,7 @@ describe('BoardView in French', () => {
 
   it('counts in French with the plural of the language', async () => {
     const snapshot = mapProject(fixtureSnapshot(), 'storefront', (project) => project);
-    await openBoard('/', { locale: 'fr', snapshot });
+    await openBoard('/board', { locale: 'fr', snapshot });
     expect(screen.getByText(/au total/)).toBeInTheDocument();
   });
 });

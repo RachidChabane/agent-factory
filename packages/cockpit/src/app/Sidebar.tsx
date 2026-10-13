@@ -115,7 +115,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       <div className="sidebar__groups">
         <NavigationGroup title={t('nav.group.workspace')}>
           {WORKSPACE_NAVIGATION.map((item) => (
-            <NavigationLink key={item.id} item={item} href={item.href(selected)} counts={counts} end={item.id === 'board'} onNavigate={onNavigate} />
+            <NavigationLink key={item.id} item={item} href={item.href(selected)} counts={counts} end={item.id === 'changes'} onNavigate={onNavigate} />
           ))}
         </NavigationGroup>
         {project === null ? (

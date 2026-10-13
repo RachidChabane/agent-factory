@@ -59,6 +59,7 @@ export class SyncController {
   private readonly deps: SyncDependencies;
   private stream: StreamSubscription | null = null;
   private stopped = false;
+  private connecting: Promise<void> | null = null;
   private attempt = 0;
   private retryHandle: ReturnType<typeof setTimeout> | null = null;
   private resyncHandle: ReturnType<typeof setTimeout> | null = null;
@@ -75,9 +76,13 @@ export class SyncController {
     this.deps = deps;
   }
 
+  /** Starting a controller that is connecting or already follows the stream changes nothing: one snapshot fetch, one stream. */
   start(): void {
     this.stopped = false;
-    void this.connect();
+    if (this.connecting !== null || this.stream !== null) return;
+    this.connecting = this.connect().finally(() => {
+      this.connecting = null;
+    });
   }
 
   stop(): void {

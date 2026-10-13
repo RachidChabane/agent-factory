@@ -69,6 +69,7 @@ export const frIssues = {
   'issues.action.startWaiting': 'Attend le merge de {issues}',
   'issues.action.resume': 'Reprendre',
   'issues.action.resumeEscalation': 'Reprendre à « {state} »',
+  'issues.action.reviewAgain': 'Relancer la revue',
   'issues.action.pause': 'Mettre en pause',
   'issues.action.rewrite': 'Réécrire un check',
   'issues.action.abandon': 'Abandonner',

@@ -1,6 +1,8 @@
 import { ACTIVE_PIPELINE_STATES, CHECK_REWRITABLE_STATES, ISSUE_ESCALATION_STATE, MERGED_OR_BEYOND_STATES } from '@agent-factory/domain';
 import type { AuditView, InstallationInfo, IssueView, ReleaseView, RequestView } from '../contract/index.ts';
 
+const REVIEWING_STATE = 'reviewing';
+
 /** Whether every issue this one waits for has been merged; a dependency the project no longer holds does not block. */
 export function dependenciesMerged(issue: Pick<IssueView, 'dependsOn'>, issues: readonly Pick<IssueView, 'number' | 'state'>[]): boolean {
   return issue.dependsOn.every((number) => {
@@ -20,6 +22,11 @@ export function canStartIssue(issue: Pick<IssueView, 'state' | 'dependsOn'>, pro
 /** An escalated issue resumes where it stopped. */
 export function canResumeEscalation(issue: Pick<IssueView, 'state' | 'resumeTarget'>): boolean {
   return issue.state === ISSUE_ESCALATION_STATE && issue.resumeTarget !== null;
+}
+
+/** An issue that escalated after its review can have the same implementation reviewed again; the factory refuses it when the gate had not passed. */
+export function canReviewAgain(issue: Pick<IssueView, 'state' | 'resumeTarget'>): boolean {
+  return issue.state === ISSUE_ESCALATION_STATE && issue.resumeTarget === REVIEWING_STATE;
 }
 
 export function canPauseIssue(issue: Pick<IssueView, 'state' | 'paused'>): boolean {

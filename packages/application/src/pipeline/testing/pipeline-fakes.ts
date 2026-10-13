@@ -31,6 +31,7 @@ import type {
   RunningProcess,
   SandboxScope,
   ServiceProcesses,
+  Sleeper,
   SourceControl,
   WorkspaceFiles,
   Worktree,
@@ -166,6 +167,11 @@ export class InMemorySourceControl implements SourceControl {
     const tree = this.tracked(worktree);
     const paths = new Set([...tree.keys(), ...this.baseFiles.keys()]);
     return Promise.resolve([...paths].filter((path) => tree.get(path) !== this.baseFiles.get(path)).sort());
+  }
+
+  untrackedFiles(worktree: Worktree): Promise<readonly string[]> {
+    const committed = this.head(worktree).snapshot;
+    return Promise.resolve([...this.tracked(worktree).keys()].filter((path) => !committed.has(path)).sort());
   }
 
   async diff(worktree: Worktree): Promise<string> {
@@ -681,3 +687,13 @@ export class ScriptedServiceProcesses implements ServiceProcesses {
   }
 }
 
+
+/** A sleeper that returns at once and remembers how long it was asked to wait. */
+export class RecordingSleeper implements Sleeper {
+  readonly naps: number[] = [];
+
+  sleep(milliseconds: number): Promise<void> {
+    this.naps.push(milliseconds);
+    return Promise.resolve();
+  }
+}

@@ -38,8 +38,10 @@ Option 3, per project, because specs cite references of their own project.
   and `validate` fails the project's `reference <name>` line, and both say how to bring
   it in (`git -C <source> fetch --tags`).
 - **Access.** Every role's sandbox may read the project's snapshots: seatbelt, bubblewrap
-  and Claude Code's own sandbox. The acceptance author and the implementer may also run
-  `cp` and `cp -R` from a snapshot into their worktree. No role may write to one.
+  and Claude Code's own sandbox, and every run opens them as added directories of its
+  session. The acceptance author and the implementer may also run `cp` and `cp -R` from a
+  snapshot into their worktree, and `mkdir -p` to create the destination directory. No role
+  may write to one.
 - **Prompts.** Each run's prompt lists the project's references with their repository,
   ref, commit and local path.
 - **Cockpit.** The settings list each reference with its ref, the commit it resolved

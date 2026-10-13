@@ -1,5 +1,5 @@
 import type { IssueSpec } from '@agent-factory/domain';
-import { criterionChecksOf, EVIDENCE_DIRECTORY } from '../../acceptance/acceptance-manifest.ts';
+import { criterionChecksOf, EVIDENCE_PREFIX } from '../../acceptance/acceptance-manifest.ts';
 import { targetedScore } from '../../acceptance/score-report.ts';
 import type { PullRequestRef, Worktree } from '../../ports.ts';
 import { evidenceCommitMessage, implementationCommitMessage, pullRequestTitle } from '../conventional-commit.ts';
@@ -21,8 +21,6 @@ import {
 import { PULL_REQUEST_OPENED_EVENT, pullRequestSubject } from '../../release/events.ts';
 import { ADVANCED, type PipelineStage, type StageContext, type StageResult } from './stage.ts';
 import { changeStat } from './stage-support.ts';
-
-const EVIDENCE_PREFIX = `${EVIDENCE_DIRECTORY}/`;
 
 const FIRST_SEQUENCE = 0;
 const NEWLINE = '\n';

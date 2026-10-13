@@ -83,9 +83,16 @@ afterEach(async () => {
 });
 
 describe('the cockpit as the browser boots it', () => {
+  it('lands on the changes at the root address', async () => {
+    serveFactory([]);
+    await bootCockpit();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Changes' })).toBeInTheDocument();
+  });
+
   it('loads the state of the factory, follows its events after the last one it holds and draws the board', async () => {
     const requests: RecordedRequest[] = [];
     serveFactory(requests);
+    window.history.pushState({}, '', '/board');
     await bootCockpit();
     expect(await screen.findByRole('region', { name: 'Implementation' })).toBeInTheDocument();
     expect(requests.map((request) => request.path)).toContain('/api/state');
@@ -110,6 +117,7 @@ describe('the cockpit as the browser boots it', () => {
   it('starts in the language the operator chose before and writes it on the page', async () => {
     serveFactory([]);
     window.localStorage.setItem('cockpit.language', 'fr');
+    window.history.pushState({}, '', '/board');
     await bootCockpit();
     expect(await screen.findByRole('region', { name: 'Implémentation' })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('fr');

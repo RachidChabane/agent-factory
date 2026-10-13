@@ -5,10 +5,39 @@ import { COMMAND_NAMES } from '../command-line.ts';
 import { EXIT_CODES } from '../output.ts';
 import { authorisedDelegate, recordDelegation } from './delegated-gestures.ts';
 import { runningFactory } from './factory-running.ts';
-import { itemName, nextCommand, selectedProject, withProjectSession } from './project-session.ts';
+import { itemName, nextCommand, selectedProject, withProjectSession, type SelectedProject } from './project-session.ts';
+
+export interface ResumeOptions {
+  /** The decision the implementer asked for. */
+  readonly answer: string | null;
+  /** Review the implementation the issue already has once more, instead of returning to the stage it left. */
+  readonly reviewAgain: boolean;
+  /** The delegate making the gesture; null when the operator resumes the issue themselves. */
+  readonly delegation: Delegation | null;
+}
+
+/** What happens next to an issue that waits for the factory to carry on. */
+async function continuation(selected: SelectedProject, issueNumber: number): Promise<string> {
+  const running = await runningFactory(selected.config);
+  return running === null
+    ? `Run "${nextCommand(selected, COMMAND_NAMES.runIssue, String(issueNumber))}" to continue, or start the factory.`
+    : `The factory running as process ${running} continues it at its next tick.`;
+}
+
+/** Orders a new review of the implementation the issue has. */
+async function reviewAgainCommand(issueNumber: number, requested: string | null, context: CliContext): Promise<number> {
+  const selected = await selectedProject(context, requested);
+  return withProjectSession(context, selected, async ({ installation, project }) => {
+    const ordered = await issueResumer(project).reviewAgain(issueNumber, installation.operator);
+    context.output.line(
+      `${itemName(project.config, issueNumber)} returned to reviewing: the implementation of attempt ${ordered.attempt + 1} will be reviewed again. ${await continuation(selected, issueNumber)}`,
+    );
+    return EXIT_CODES.ok;
+  });
+}
 
 /** Resumes an escalated issue, with the answer to its decision when it asked for one: the operator's gesture, or the delegate's when `--as` names it. */
-export async function resumeCommand(issueNumber: number, answer: string | null, delegation: Delegation | null, requested: string | null, context: CliContext): Promise<number> {
+async function returnCommand(issueNumber: number, answer: string | null, delegation: Delegation | null, requested: string | null, context: CliContext): Promise<number> {
   const selected = await selectedProject(context, requested);
   const authorisation = authorisedDelegate(selected.project, delegation, answer === null ? 'resume' : 'answer-decision');
   return withProjectSession(context, selected, async (session) => {
@@ -18,13 +47,14 @@ export async function resumeCommand(issueNumber: number, answer: string | null, 
     const checks = outcome.checksReauthored ? '; the acceptance checks will be written again from the base' : '';
     const decision = outcome.decisionAnswered ? '; the implementer will continue with the answer to its decision request' : '';
     const feedback = outcome.feedbackCycleGranted ? '; one fresh session on the escalation profile addresses the pending feedback' : '';
-    const running = await runningFactory(selected.config);
-    const next =
-      running === null
-        ? `Run "${nextCommand(selected, COMMAND_NAMES.runIssue, String(issueNumber))}" to continue, or start the factory.`
-        : `The factory running as process ${running} continues it at its next tick.`;
-    context.output.line(`${itemName(project.config, issueNumber)} resumed at ${outcome.resumedAt}: ${spec}${checks}${decision}${feedback}. ${next}`);
+    context.output.line(`${itemName(project.config, issueNumber)} resumed at ${outcome.resumedAt}: ${spec}${checks}${decision}${feedback}. ${await continuation(selected, issueNumber)}`);
     await recordDelegation(session, context, delegation, authorisation, { kind: 'issue', number: issueNumber, issueNumber });
     return EXIT_CODES.ok;
   });
+}
+
+export function resumeCommand(issueNumber: number, options: ResumeOptions, requested: string | null, context: CliContext): Promise<number> {
+  return options.reviewAgain
+    ? reviewAgainCommand(issueNumber, requested, context)
+    : returnCommand(issueNumber, options.answer, options.delegation, requested, context);
 }

@@ -127,10 +127,10 @@ describe('merging with films', () => {
     await services.queue.order(ORDER);
     scenario.github.checkRuns = [{ name: 'ci', conclusion: 'success', url: 'https://ci.example/1', durationMs: null }];
 
-    const merge = new MergeOnOrder(scenario.dependencies(), services.guard).merge({ pullRequestNumber: 100, expectedHeadSha: head });
+    const merge = new MergeOnOrder(scenario.dependencies(), scenario.headVisibility, services.guard).merge({ pullRequestNumber: 100, expectedHeadSha: head });
 
     await expect(merge).rejects.toBeInstanceOf(MergeRefusedError);
-    await expect(new MergeOnOrder(scenario.dependencies(), services.guard).merge({ pullRequestNumber: 100, expectedHeadSha: head })).rejects.toThrow(
+    await expect(new MergeOnOrder(scenario.dependencies(), scenario.headVisibility, services.guard).merge({ pullRequestNumber: 100, expectedHeadSha: head })).rejects.toThrow(
       `${FILMS_IN_PROGRESS_REASON}, expected around 12:20 on 2026-10-12 (UTC)`,
     );
     expect(scenario.github.merges).toEqual([]);
@@ -144,7 +144,7 @@ describe('merging with films', () => {
     await services.queue.order({ ...ORDER, scenario: 'broken' });
     await services.queue.fail({ ...ORDER, scenario: 'broken' }, 'no session');
 
-    const merged = await new MergeOnOrder(scenario.dependencies(), services.guard).merge({ pullRequestNumber: 100, expectedHeadSha: outcome.commitSha });
+    const merged = await new MergeOnOrder(scenario.dependencies(), scenario.headVisibility, services.guard).merge({ pullRequestNumber: 100, expectedHeadSha: outcome.commitSha });
 
     expect(merged.pullRequestNumber).toBe(100);
     expect(scenario.github.merges).toHaveLength(1);
@@ -155,7 +155,7 @@ describe('merging with films', () => {
     scenario.github.checkRuns = [{ name: 'ci', conclusion: 'success', url: 'https://ci.example/1', durationMs: null }];
     await scenario.events.append(PIPELINE_EVENTS.filmQueued, `issue/${ISSUE_NUMBER}`, { scenario: SCENARIO, operator: 'Alex Morgan' });
 
-    await new MergeOnOrder(scenario.dependencies(), null).merge({ pullRequestNumber: 100, expectedHeadSha: head });
+    await new MergeOnOrder(scenario.dependencies(), scenario.headVisibility, null).merge({ pullRequestNumber: 100, expectedHeadSha: head });
 
     expect(scenario.github.merges).toHaveLength(1);
   });

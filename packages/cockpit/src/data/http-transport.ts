@@ -11,6 +11,7 @@ import {
   pullRequestDiffPath,
   runLogPath,
 } from '../contract/index.ts';
+import { browserSharedStreamEnvironment, SharedStreamTransport } from './shared-stream-transport.ts';
 import type { CockpitTransport, StreamHandlers, StreamSubscription } from './transport.ts';
 import { TransportError } from './transport.ts';
 
@@ -118,10 +119,13 @@ export function pageCommandToken(page: Document): string | null {
   return content === null || content === '' ? null : content;
 }
 
-export function createBrowserTransport(): HttpTransport {
-  return new HttpTransport(
+/** The transport of the page: HTTP, with the event stream shared between the tabs of the browser when it can. */
+export function createBrowserTransport(): CockpitTransport {
+  const http = new HttpTransport(
     (input, init) => fetch(input, init),
     (url) => new EventSource(url),
     pageCommandToken(document),
   );
+  const environment = browserSharedStreamEnvironment();
+  return environment === null ? http : new SharedStreamTransport(http, environment);
 }

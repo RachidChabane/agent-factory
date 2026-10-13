@@ -59,6 +59,30 @@ describe('SyncController', () => {
     controller.stop();
   });
 
+  it('opens one snapshot fetch and one stream when it is started again while connecting', async () => {
+    const { transport, controller } = setup();
+    controller.start();
+    controller.stop();
+    controller.start();
+    controller.start();
+    await flush();
+    expect(transport.snapshotLoads).toBe(1);
+    expect(transport.openedAfter).toHaveLength(1);
+    controller.stop();
+    expect(transport.handlers).toBeNull();
+  });
+
+  it('does not fetch the snapshot again when a stream is already open', async () => {
+    const { transport, controller } = setup();
+    controller.start();
+    await flush();
+    controller.start();
+    await flush();
+    expect(transport.snapshotLoads).toBe(1);
+    expect(transport.openedAfter).toHaveLength(1);
+    controller.stop();
+  });
+
   it('adds an event to the activity feed and reloads the snapshot once for a burst of events', async () => {
     const { transport, store, controller } = setup();
     controller.start();

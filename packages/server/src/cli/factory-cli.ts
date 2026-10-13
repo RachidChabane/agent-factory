@@ -52,7 +52,7 @@ async function dispatch({ project, command }: CommandLine, context: CliContext):
     case 'run-issue':
       return runIssueCommand(command.issueNumber, project, context);
     case 'resume':
-      return resumeCommand(command.issueNumber, command.answer, command.delegation, project, context);
+      return resumeCommand(command.issueNumber, { answer: command.answer, reviewAgain: command.reviewAgain, delegation: command.delegation }, project, context);
     case 'merge':
       return mergeCommand(command.pullRequestNumber, command.expectedHeadSha, command.delegation, project, context);
     case 'rehearsal-init':

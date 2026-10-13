@@ -39,7 +39,8 @@ import { proofLogExcerpt } from '../projections/pull-request-views.ts';
 import { projectRuns, recordedRuns, type RecordedRun } from '../projections/run-views.ts';
 import { imageKey, logKey, type ForgePullRequest, type PendingIssue, type ProjectSnapshotContext, type RunLogSummary } from '../projections/snapshot-context.ts';
 import { projectView, type ProjectViewProjection } from '../projections/project-view.ts';
-import { CachedReading, CachedReadings, NEVER_READ, observedView, type Observed } from './cached-reading.ts';
+import { CachedReading, CachedReadings, COLD_READ_WAIT_MS, NEVER_READ, observedView, type Observed } from './cached-reading.ts';
+import { DeploymentCommits } from './deployment-commits.ts';
 import { ImageSizes } from './evidence-image-sizes.ts';
 import type { ImageSize } from './image-size.ts';
 
@@ -117,6 +118,10 @@ function splitByProject(records: readonly FactoryEventRecord[]): SplitRecords {
   return { installation, projects };
 }
 
+function hasUnmergedPullRequest(journals: ReturnType<typeof issueJournals>): boolean {
+  return [...journals.values()].some((journal) => journal.pullRequest !== null && journal.mergeSha === null);
+}
+
 function checksReadInterval(last: readonly CheckRunSummary[] | null): number {
   return last?.some((check) => check.conclusion === PENDING_CONCLUSION) === true ? PENDING_CHECKS_READ_INTERVAL_MS : FORGE_READ_INTERVAL_MS;
 }
@@ -133,7 +138,7 @@ class ProjectReadings {
   readonly knowledge: CachedReadings<number, readonly KnowledgeDocument[]>;
   readonly references: CachedReadings<string, ReferenceState>;
 
-  constructor(project: ProjectRuntime, runtime: InstallationRuntime) {
+  constructor(project: ProjectRuntime, runtime: InstallationRuntime, coldWaitMs: number) {
     const { clock } = runtime;
     const forge = project.forge;
     const { labels } = project.conventions;
@@ -150,9 +155,10 @@ class ProjectReadings {
       },
       FORGE_READ_INTERVAL_MS,
       clock,
+      coldWaitMs,
     );
-    this.checks = new CachedReadings((head) => forge.checks(head), checksReadInterval, clock);
-    this.baseChecks = new CachedReading(() => forge.baseBranchChecks(), FORGE_READ_INTERVAL_MS, clock);
+    this.checks = new CachedReadings((head) => forge.checks(head), checksReadInterval, clock, coldWaitMs);
+    this.baseChecks = new CachedReading(() => forge.baseBranchChecks(), FORGE_READ_INTERVAL_MS, clock, coldWaitMs);
     this.pullRequests = new CachedReadings(
       async (number) => {
         const details = await forge.pullRequestDetails(number);
@@ -160,14 +166,21 @@ class ProjectReadings {
       },
       FORGE_READ_INTERVAL_MS,
       clock,
+      coldWaitMs,
     );
+    const deliveredCommits = new DeploymentCommits(project.repository);
     this.deployments = new CachedReadings<string, EnvironmentDeployments>(
-      async (target) => ({ records: await forge.deployments(target, DEPLOYMENT_HISTORY_LIMIT), tags: new Set((await forge.listTags()).map((tag) => tag.name)) }),
+      async (target) => {
+        const [records, tags] = await Promise.all([forge.deployments(target, DEPLOYMENT_HISTORY_LIMIT), forge.listTags()]);
+        const [changes, pending] = await Promise.all([deliveredCommits.changes(records), deliveredCommits.pending(records)]);
+        return { records, tags: new Set(tags.map((tag) => tag.name)), changes, pending };
+      },
       FORGE_READ_INTERVAL_MS,
       clock,
+      coldWaitMs,
     );
-    this.workflows = new CachedReading(() => forge.workflowRuns(WORKFLOW_RUN_LIMIT), FORGE_READ_INTERVAL_MS, clock);
-    this.changedFiles = new CachedReadings(async (sha) => (await forge.commitDiff(sha)).changedFiles, CHANGED_FILES_READ_INTERVAL_MS, clock);
+    this.workflows = new CachedReading(() => forge.workflowRuns(WORKFLOW_RUN_LIMIT), FORGE_READ_INTERVAL_MS, clock, coldWaitMs);
+    this.changedFiles = new CachedReadings(async (sha) => (await forge.commitDiff(sha)).changedFiles, CHANGED_FILES_READ_INTERVAL_MS, clock, coldWaitMs);
     this.knowledge = new CachedReadings(
       (position) => {
         const source = project.config.knowledge[position];
@@ -175,6 +188,7 @@ class ProjectReadings {
       },
       KNOWLEDGE_READ_INTERVAL_MS,
       clock,
+      coldWaitMs,
     );
     this.references = new CachedReadings(
       (name) => {
@@ -184,8 +198,14 @@ class ProjectReadings {
       },
       REFERENCES_READ_INTERVAL_MS,
       clock,
+      coldWaitMs,
     );
   }
+}
+
+export interface SnapshotSourceOptions {
+  /** How long the snapshot waits for a reading nobody has completed yet; a later snapshot carries what the read brought. */
+  readonly coldReadWaitMs?: number;
 }
 
 /** Builds the cockpit's snapshot of an installation and the telemetry it streams between events. */
@@ -195,11 +215,13 @@ export class SnapshotSource {
   private readonly readings = new Map<string, ProjectReadings>();
   private readonly resources: CachedReading<ResourceSnapshot>;
   private readonly imageSizes = new ImageSizes();
+  private readonly coldReadWaitMs: number;
 
-  constructor(runtime: InstallationRuntime) {
+  constructor(runtime: InstallationRuntime, options: SnapshotSourceOptions = {}) {
     this.runtime = runtime;
-    this.resources = new CachedReading(() => runtime.resources.snapshot(), RESOURCES_READ_INTERVAL_MS, runtime.clock);
-    for (const project of runtime.projects) this.readings.set(project.id, new ProjectReadings(project, runtime));
+    this.coldReadWaitMs = options.coldReadWaitMs ?? COLD_READ_WAIT_MS;
+    this.resources = new CachedReading(() => runtime.resources.snapshot(), RESOURCES_READ_INTERVAL_MS, runtime.clock, this.coldReadWaitMs);
+    for (const project of runtime.projects) this.readings.set(project.id, new ProjectReadings(project, runtime, this.coldReadWaitMs));
   }
 
   async snapshot(): Promise<CockpitSnapshot> {
@@ -293,7 +315,7 @@ export class SnapshotSource {
   private projectReadings(project: ProjectRuntime): ProjectReadings {
     const readings = this.readings.get(project.id);
     if (readings !== undefined) return readings;
-    const created = new ProjectReadings(project, this.runtime);
+    const created = new ProjectReadings(project, this.runtime, this.coldReadWaitMs);
     this.readings.set(project.id, created);
     return created;
   }
@@ -308,22 +330,20 @@ export class SnapshotSource {
     const readings = this.projectReadings(project);
     const index = indexEvents(records);
     const journals = issueJournals(index);
-    const pending = await readings.pendingIssues.get(records.findLast((record) => PENDING_ISSUE_EVENTS.includes(record.type))?.occurredAt ?? null);
-    const checks = new Map<number, Observed<readonly CheckRunSummary[]>>();
-    const onForge = new Map<number, ForgePullRequest>();
-    for (const journal of journals.values()) {
-      const pullRequest = journal.pullRequest;
-      if (pullRequest === null) continue;
-      const reading = await readings.pullRequests.get(pullRequest.number);
-      if (reading.value !== null) onForge.set(pullRequest.number, reading.value);
-      if (journal.mergeSha !== null || (reading.value !== null && reading.value.state !== OPEN_ON_FORGE)) continue;
-      checks.set(pullRequest.number, await readings.checks.get(journal.evidenceRemoval?.headSha ?? journal.pushedHead ?? pullRequest.headSha));
-    }
-    const changedFiles = new Map<string, readonly string[]>();
-    for (const sha of auditsWithoutFiles(index, new Map())) {
-      const files = await readings.changedFiles.get(sha);
-      if (files.value !== null) changedFiles.set(sha, files.value);
-    }
+    const config = project.config;
+    const changedAt = records.findLast((record) => PENDING_ISSUE_EVENTS.includes(record.type))?.occurredAt ?? null;
+    const [pending, pullRequests, baseChecks, changedFiles, imageSizes, logs, deployments, workflows, knowledge, references] = await Promise.all([
+      readings.pendingIssues.get(changedAt),
+      this.pullRequestReadings(readings, journals),
+      hasUnmergedPullRequest(journals) ? readings.baseChecks.get() : Promise.resolve(NEVER_READ),
+      this.auditChangedFiles(readings, index),
+      this.evidenceImageSizes(project, journals),
+      this.logTails(project, journals),
+      this.deploymentReadings(project, readings),
+      this.workflowsView(readings),
+      this.knowledgeViews(project, readings),
+      this.referenceViews(project, readings),
+    ]);
     const context: ProjectSnapshotContext = {
       generatedAt,
       project: project.id,
@@ -336,29 +356,62 @@ export class SnapshotSource {
         pullRequest: (number) => this.pullRequestUrl(project, number),
       },
       pendingIssues: pending.value ?? [],
-      pullRequestChecks: checks,
-      baseChecks: checks.size === 0 ? NEVER_READ : await readings.baseChecks.get(),
-      pullRequestsOnForge: onForge,
-      imageSizes: await this.evidenceImageSizes(project, journals),
-      logs: await this.logTails(project, journals),
-      productionWorkflowUrl: productionWorkflowUrl(project.config),
+      pullRequestChecks: pullRequests.checks,
+      baseChecks: pullRequests.checks.size === 0 ? NEVER_READ : baseChecks,
+      pullRequestsOnForge: pullRequests.onForge,
+      imageSizes,
+      logs,
+      productionWorkflowUrl: productionWorkflowUrl(config),
       issueCosts: issueCosts(runs, project.id),
       changedFiles,
       films: project.films === null || forecast === null ? null : { forecast, presentation: project.films.presentation },
     };
-    const config = project.config;
-    const deployments = new Map<string, Observed<EnvironmentDeployments>>();
-    for (const environment of config.delivery.environments) {
-      if (environment.deployments.kind === 'github') deployments.set(environment.deployments.environment, await readings.deployments.get(environment.deployments.environment));
-    }
     return projectView(config, records, context, {
       forgeUrl: forgeUrl(config),
-      workflows: await this.workflowsView(readings),
+      workflows,
       deployments: (target) => deployments.get(target) ?? null,
-      knowledge: await this.knowledgeViews(project, readings),
-      references: await this.referenceViews(project, readings),
+      knowledge,
+      references,
       tools: toolViews(projectTools(config), latestToolChecks(records), latestToolSessions(records), 'project'),
     });
+  }
+
+  /** The state of every pull request on the forge and the checks of the open ones, each read concurrently. */
+  private async pullRequestReadings(
+    readings: ProjectReadings,
+    journals: ReturnType<typeof issueJournals>,
+  ): Promise<{ readonly onForge: ReadonlyMap<number, ForgePullRequest>; readonly checks: ReadonlyMap<number, Observed<readonly CheckRunSummary[]>> }> {
+    const onForge = new Map<number, ForgePullRequest>();
+    const checks = new Map<number, Observed<readonly CheckRunSummary[]>>();
+    await Promise.all(
+      [...journals.values()].map(async (journal) => {
+        const pullRequest = journal.pullRequest;
+        if (pullRequest === null) return;
+        const reading = await readings.pullRequests.get(pullRequest.number);
+        if (reading.value !== null) onForge.set(pullRequest.number, reading.value);
+        if (journal.mergeSha !== null || (reading.value !== null && reading.value.state !== OPEN_ON_FORGE)) return;
+        checks.set(pullRequest.number, await readings.checks.get(journal.evidenceRemoval?.headSha ?? journal.pushedHead ?? pullRequest.headSha));
+      }),
+    );
+    return { onForge, checks };
+  }
+
+  /** The files of the commits audits cover, read where the commit is known. */
+  private async auditChangedFiles(readings: ProjectReadings, index: ReturnType<typeof indexEvents>): Promise<ReadonlyMap<string, readonly string[]>> {
+    const changedFiles = new Map<string, readonly string[]>();
+    await Promise.all(
+      auditsWithoutFiles(index, new Map()).map(async (sha) => {
+        const files = await readings.changedFiles.get(sha);
+        if (files.value !== null) changedFiles.set(sha, files.value);
+      }),
+    );
+    return changedFiles;
+  }
+
+  /** The deployments of every environment that reads them from the forge, by deployment target. */
+  private async deploymentReadings(project: ProjectRuntime, readings: ProjectReadings): Promise<ReadonlyMap<string, Observed<EnvironmentDeployments>>> {
+    const targets = project.config.delivery.environments.flatMap((environment) => (environment.deployments.kind === 'github' ? [environment.deployments.environment] : []));
+    return new Map(await Promise.all(targets.map(async (target) => [target, await readings.deployments.get(target)] as const)));
   }
 
   /** The sizes of the evidence images of every issue with a pull request, by issue, phase and path. */

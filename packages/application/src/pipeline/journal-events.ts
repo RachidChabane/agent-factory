@@ -24,10 +24,12 @@ export const PIPELINE_EVENTS = {
   agentRunFinished: 'pipeline.agent-run-finished',
   acceptanceAuthored: 'pipeline.acceptance-authored',
   beforeProofRecorded: 'pipeline.before-proof-recorded',
+  authorScratchFilesRemoved: 'pipeline.author-scratch-files-removed',
   checksFrozen: 'pipeline.checks-frozen',
   implementerAttemptFinished: 'pipeline.implementer-attempt-finished',
   gateCompleted: 'pipeline.gate-completed',
   reviewCompleted: 'pipeline.review-completed',
+  reviewReordered: 'pipeline.review-reordered',
   retryDecided: 'pipeline.retry-decided',
   implementationCommitted: 'pipeline.implementation-committed',
   evidenceCommitted: 'pipeline.evidence-committed',
@@ -81,6 +83,10 @@ export const AuthoringRestartedSchema = z.object({
 
 export const WorkspacePreparedSchema = z.object({
   logName: z.string().min(1),
+});
+
+export const AuthorScratchFilesRemovedSchema = z.object({
+  paths: z.array(z.string().min(1)).min(1),
 });
 
 export const AgentRunStartedSchema = z.object({
@@ -245,6 +251,12 @@ export const ReviewCompletedSchema = z.object({
   attempt: z.number().int().nonnegative(),
   runId: z.string().min(1),
   findings: z.array(ReviewFindingSchema),
+});
+
+/** The operator ordered the review of an attempt again: the reviews recorded before the order no longer count. */
+export const ReviewReorderedSchema = z.object({
+  attempt: z.number().int().nonnegative(),
+  operator: z.string().min(1),
 });
 
 export const FAILURE_SOURCES = ['agent', 'gate', 'review'] as const;
@@ -414,6 +426,7 @@ export type ImplementerAttemptRecord = z.infer<typeof ImplementerAttemptFinished
 export type GateRecord = z.infer<typeof GateCompletedSchema>;
 export type FrozenCheckViolation = z.infer<typeof FrozenCheckViolationSchema>;
 export type ReviewRecord = z.infer<typeof ReviewCompletedSchema>;
+export type ReviewReorderRecord = z.infer<typeof ReviewReorderedSchema>;
 export type RetryRecord = z.infer<typeof RetryDecidedSchema>;
 export type DecisionAnswerRecord = z.infer<typeof DecisionAnsweredSchema>;
 export type BeforeProofCorrectionRecord = z.infer<typeof BeforeProofCorrectionRequestedSchema>;

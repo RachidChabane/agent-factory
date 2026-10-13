@@ -44,7 +44,7 @@ export default defineConfig(({ mode }) => {
     preview: { port: COCKPIT_DEV_SERVER_PORT },
     build: {
       target: 'es2022',
-      sourcemap: true,
+      sourcemap: 'hidden',
       chunkSizeWarningLimit: CHUNK_WARNING_KILOBYTES,
       rollupOptions: { output: { manualChunks: VENDOR_CHUNKS } },
     },

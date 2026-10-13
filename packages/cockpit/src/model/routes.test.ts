@@ -16,13 +16,14 @@ describe('paths', () => {
     expect(paths.delivery('ledger')).toBe('/projects/ledger/delivery');
     expect(paths.knowledge('ledger')).toBe('/projects/ledger/knowledge');
     expect(paths.projectSettings('ledger')).toBe('/projects/ledger/settings');
-    expect([paths.board(), paths.runs(), paths.usage(), paths.settings()]).toEqual(['/', '/runs', '/usage', '/settings']);
+    expect([paths.changes(), paths.board(), paths.runs(), paths.usage(), paths.settings()]).toEqual(['/', '/board', '/runs', '/usage', '/settings']);
     expect(paths.run('run_7f3a2c')).toBe('/runs/run_7f3a2c');
   });
 
   it('carries the project of the run list and of the board in the query', () => {
     expect(paths.runs('ledger')).toBe('/runs?project=ledger');
-    expect(paths.board('ledger')).toBe('/?project=ledger');
+    expect(paths.board('ledger')).toBe('/board?project=ledger');
+    expect(paths.changes('ledger')).toBe('/?project=ledger');
   });
 
   it('encodes identifiers', () => {

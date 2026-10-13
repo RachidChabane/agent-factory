@@ -199,6 +199,11 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
   }),
   'issue.resume': command(COMMAND_BODY_SCHEMAS['issue.resume'], async (body, context) => {
     const project = projectOf(context, body.project);
+    if (body.reviewAgain === true) {
+      const ordered = await issueResumer(project).reviewAgain(body.issueNumber, context.operator);
+      await setIssuePaused(project.dependencies.events, body.issueNumber, false, `new review ordered by ${context.operator}`);
+      return startedByDaemon(context, `Issue #${body.issueNumber} returned to reviewing; the implementation of attempt ${ordered.attempt + 1} is reviewed again`);
+    }
     const journal = await loadJournal(project.dependencies.events, body.issueNumber);
     const resumedAt = journal.state === ISSUE_ESCALATION_STATE ? (await issueResumer(project).resume(body.issueNumber)).resumedAt : null;
     await setIssuePaused(project.dependencies.events, body.issueNumber, false, `resumed by ${context.operator}`);

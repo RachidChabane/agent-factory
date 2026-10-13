@@ -47,6 +47,11 @@ Option 3.
 - The cockpit shows each environment with its current deployment, its history and its
   health series, each with its read time, and each release with the reasons its gate
   blocks.
+- Each deployment lists the commits it delivered, from the nearest older deployment that
+  landed to its own sha, and each environment lists the commits of the base branch that
+  wait behind its current deployment. The project's clone answers; a commit it lacks gives
+  an unknown list, never an empty one, and a commit that a pull request of the factory
+  merged links to that pull request through its recorded merge sha.
 - Production stays a human gesture: the factory links to the production workflow and
   never dispatches it.
 - A project without delivery declares nothing and loses nothing else.

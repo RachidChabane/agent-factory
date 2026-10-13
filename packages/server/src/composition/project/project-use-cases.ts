@@ -8,6 +8,7 @@ import {
   evaluateRelease,
   FactoryDaemon,
   FilmBehaviour,
+  headVisibilityPolicy,
   IssueJournalWriter,
   IssuePipeline,
   IssueStacks,
@@ -56,7 +57,7 @@ export function issuePipeline(project: ProjectRuntime, signal: AbortSignal): Iss
 
 /** Merges on the operator's order, once the films of the pull request are in or have failed. */
 export function mergeOnOrder(project: ProjectRuntime): MergeOnOrder {
-  return new MergeOnOrder(project.dependencies, project.films?.guard ?? null);
+  return new MergeOnOrder(project.dependencies, headVisibilityPolicy(new SystemSleeper(), new AbortController().signal), project.films?.guard ?? null);
 }
 
 export class FilmsNotConfiguredError extends Error {

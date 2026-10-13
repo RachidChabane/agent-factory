@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { renderApp } from '../test/render.tsx';
 
@@ -58,21 +58,28 @@ describe('ProjectSwitcher', () => {
     await view.expectLocation('/runs');
   });
 
-  it('goes back to the board of all projects from a project page', async () => {
+  it('goes back to the changes of all projects from a project page', async () => {
     const { view, list } = await openSwitcher('/projects/ledger/audits');
     await view.user.click(within(list).getByRole('link', { name: /All projects/ }));
-    await view.expectLocation('/');
+    await waitFor(() => expect(view.location().split('?')[0]).toBe('/'));
+  });
+
+  it('stays on the board when all projects are chosen there', async () => {
+    const { view, list } = await openSwitcher('/board?project=ledger');
+    await view.user.click(within(list).getByRole('link', { name: /All projects/ }));
+    await view.expectLocation('/board');
   });
 
   it('follows the project named in the address of the board and carries it to the pages of the workspace', async () => {
-    await renderApp('/?project=ledger');
+    await renderApp('/board?project=ledger');
     expect(within(sidebar()).getByRole('button', { name: 'Project: Ledger' })).toBeInTheDocument();
-    expect(within(sidebar()).getByRole('link', { name: /^Board/ })).toHaveAttribute('href', '/?project=ledger');
+    expect(within(sidebar()).getByRole('link', { name: /^Changes/ })).toHaveAttribute('href', '/?project=ledger');
+    expect(within(sidebar()).getByRole('link', { name: /^Board/ })).toHaveAttribute('href', '/board?project=ledger');
     expect(within(sidebar()).getByRole('link', { name: /^Runs/ })).toHaveAttribute('href', '/runs?project=ledger');
   });
 
   it('selects nothing for a project the installation does not know', async () => {
-    await renderApp('/?project=nowhere');
+    await renderApp('/board?project=nowhere');
     expect(within(sidebar()).getByRole('button', { name: 'Project: All projects' })).toBeInTheDocument();
   });
 

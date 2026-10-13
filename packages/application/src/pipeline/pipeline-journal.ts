@@ -39,6 +39,7 @@ import {
   PullRequestUpdatedSchema,
   RetryDecidedSchema,
   ReviewCompletedSchema,
+  ReviewReorderedSchema,
   SpecCapturedSchema,
   WorktreeAcquiredSchema,
   WorktreeReleasedSchema,
@@ -62,6 +63,7 @@ import {
   type ImplementerAttemptRecord,
   type RetryRecord,
   type ReviewRecord,
+  type ReviewReorderRecord,
 } from './journal-events.ts';
 
 const FIRST_SEQUENCE = 0;
@@ -122,6 +124,9 @@ export interface PipelineJournal {
   readonly attempts: readonly ImplementerAttemptRecord[];
   readonly gates: readonly GateRecord[];
   readonly reviews: readonly ReviewRecord[];
+  /** The reviews an operator's order replaced, kept for the history of the issue. */
+  readonly supersededReviews: readonly ReviewRecord[];
+  readonly reviewReorders: readonly ReviewReorderRecord[];
   readonly decisions: readonly RetryRecord[];
   readonly decisionAnswers: readonly DecisionAnswerRecord[];
   readonly agentRuns: readonly AgentRunFinished[];
@@ -170,6 +175,8 @@ function emptyJournal(issueNumber: number): Draft {
     attempts: [],
     gates: [],
     reviews: [],
+    supersededReviews: [],
+    reviewReorders: [],
     decisions: [],
     decisionAnswers: [],
     agentRuns: [],
@@ -293,6 +300,13 @@ const REDUCERS: Readonly<Record<string, Reducer>> = {
   },
   [PIPELINE_EVENTS.reviewCompleted]: (journal, event) => {
     journal.reviews = [...journal.reviews, parse(ReviewCompletedSchema, event)];
+  },
+  [PIPELINE_EVENTS.reviewReordered]: (journal, event) => {
+    const reorder = parse(ReviewReorderedSchema, event);
+    const superseded = journal.reviews.filter((record) => record.attempt === reorder.attempt);
+    journal.reviews = journal.reviews.filter((record) => record.attempt !== reorder.attempt);
+    journal.supersededReviews = [...journal.supersededReviews, ...superseded];
+    journal.reviewReorders = [...journal.reviewReorders, reorder];
   },
   [PIPELINE_EVENTS.retryDecided]: (journal, event) => {
     journal.decisions = [...journal.decisions, parse(RetryDecidedSchema, event)];

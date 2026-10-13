@@ -1,5 +1,5 @@
 import type { IssueSpec, IssueTypeDefinition } from '@agent-factory/domain';
-import { checkPaths, EVIDENCE_DIRECTORY, type AcceptanceManifest } from '../../acceptance/acceptance-manifest.ts';
+import { checkPaths, EVIDENCE_PREFIX, type AcceptanceManifest } from '../../acceptance/acceptance-manifest.ts';
 import type { Worktree } from '../../ports.ts';
 import { diffStat, type DiffStatEntry } from '../diff-stat.ts';
 import { EscalationRequiredError } from '../pipeline-errors.ts';
@@ -8,7 +8,6 @@ import type { FrozenRecord } from '../journal-events.ts';
 import type { StageContext } from './stage.ts';
 import type { PipelineRole, RoleProfile } from '../pipeline-settings.ts';
 
-const EVIDENCE_PREFIX = `${EVIDENCE_DIRECTORY}/`;
 const MISSING_CONTENT = '';
 
 export async function assertOnlyChecksChanged(

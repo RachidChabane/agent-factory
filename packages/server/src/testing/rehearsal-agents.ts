@@ -6,6 +6,14 @@ import type { AuditVerdict } from '@agent-factory/domain';
 const MANIFEST_PATH = '.factory/acceptance.json';
 const EMPTY_MANIFEST = { checks: [], command: null, evidence: [], score: null };
 const NO_FINDINGS = 'The change is sound.\n\n```json\n{ "findings": [] }\n```';
+const BLOCKING_FINDING = {
+  severity: 'blocking',
+  category: 'criteria-coverage',
+  file: null,
+  line: null,
+  summary: 'The page does not list the release owners.',
+};
+const BLOCKING_REVIEW = `The page lacks its subject.\n\n\`\`\`json\n${JSON.stringify({ findings: [BLOCKING_FINDING] })}\n\`\`\``;
 const USAGE = { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0, cacheCreationTokens: 0 };
 const RUN_COST_USD = 0.01;
 const RUN_DURATION_MS = 10;
@@ -32,6 +40,8 @@ export class RehearsalAgents implements AgentHarness {
   readonly requests: AgentRunRequest[] = [];
   auditVerdict: AuditVerdict = 'challenge';
   decisionsToAsk = 0;
+  /** How many of the next reviews report a blocking finding. */
+  blockingReviewsToGive = 0;
 
   async run(request: AgentRunRequest, onEvent: (event: AgentRunEvent) => void, signal: AbortSignal): Promise<AgentRunResult> {
     this.requests.push(request);
@@ -59,6 +69,12 @@ export class RehearsalAgents implements AgentHarness {
     };
   }
 
+  private review(): string {
+    if (this.blockingReviewsToGive === 0) return NO_FINDINGS;
+    this.blockingReviewsToGive -= 1;
+    return BLOCKING_REVIEW;
+  }
+
   private async act(request: AgentRunRequest): Promise<string> {
     switch (request.role) {
       case 'acceptance-author':
@@ -68,7 +84,7 @@ export class RehearsalAgents implements AgentHarness {
         await write(request.workingDirectory, `docs/issue-${request.context.subject.id}.md`, `# Issue ${request.context.subject.id}\n\nDocumented.\n`);
         return 'Documented.';
       case 'reviewer':
-        return NO_FINDINGS;
+        return this.review();
       case 'auditor':
         return verdictAnswer(this.auditVerdict);
       default:

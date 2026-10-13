@@ -1,10 +1,12 @@
 import { lazy, Suspense } from 'react';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { ROUTE_PATTERNS } from '../model/routes.ts';
 import { NotFoundView } from '../views/NotFoundView.tsx';
 import { PageFallback } from './PageFallback.tsx';
 import { ProjectRoute } from './ProjectRoute.tsx';
+import { ViewErrorBoundary } from './ViewErrorBoundary.tsx';
 
+const ChangesView = lazy(() => import('../views/changes/ChangesView.tsx').then((module) => ({ default: module.ChangesView })));
 const BoardView = lazy(() => import('../views/board/BoardView.tsx').then((module) => ({ default: module.BoardView })));
 const ProjectOverview = lazy(() => import('../views/overview/ProjectOverview.tsx').then((module) => ({ default: module.ProjectOverview })));
 const RequestsView = lazy(() => import('../views/requests/RequestsView.tsx').then((module) => ({ default: module.RequestsView })));
@@ -22,33 +24,37 @@ const RunsView = lazy(() => import('../views/runs/RunsView.tsx').then((module) =
 const UsageView = lazy(() => import('../views/usage/UsageView.tsx').then((module) => ({ default: module.UsageView })));
 
 export function AppRoutes() {
+  const { pathname } = useLocation();
   return (
-    <Suspense fallback={<PageFallback />}>
-      <Routes>
-        <Route path={ROUTE_PATTERNS.board} element={<BoardView />} />
-        <Route path={ROUTE_PATTERNS.project} element={<ProjectRoute />}>
-          <Route index element={<ProjectOverview />} />
-          <Route path={ROUTE_PATTERNS.requests} element={<RequestsView />} />
-          <Route path={ROUTE_PATTERNS.request} element={<RequestsView />} />
-          <Route path={ROUTE_PATTERNS.issues} element={<IssuesView />} />
-          <Route path={ROUTE_PATTERNS.issue} element={<IssuesView />} />
-          <Route path={ROUTE_PATTERNS.pullRequests} element={<PullRequestsView />} />
-          <Route path={ROUTE_PATTERNS.pullRequest} element={<PullRequestsView />} />
-          <Route path={ROUTE_PATTERNS.delivery} element={<DeliveryView />} />
-          <Route path={ROUTE_PATTERNS.releases} element={<ReleasesView />} />
-          <Route path={ROUTE_PATTERNS.release} element={<ReleasesView />} />
-          <Route path={ROUTE_PATTERNS.audits} element={<AuditsView />} />
-          <Route path={ROUTE_PATTERNS.audit} element={<AuditsView />} />
-          <Route path={ROUTE_PATTERNS.knowledge} element={<KnowledgeView />} />
-          <Route path={ROUTE_PATTERNS.projectSettings} element={<ProjectSettingsView />} />
+    <ViewErrorBoundary resetKey={pathname}>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path={ROUTE_PATTERNS.changes} element={<ChangesView />} />
+          <Route path={ROUTE_PATTERNS.board} element={<BoardView />} />
+          <Route path={ROUTE_PATTERNS.project} element={<ProjectRoute />}>
+            <Route index element={<ProjectOverview />} />
+            <Route path={ROUTE_PATTERNS.requests} element={<RequestsView />} />
+            <Route path={ROUTE_PATTERNS.request} element={<RequestsView />} />
+            <Route path={ROUTE_PATTERNS.issues} element={<IssuesView />} />
+            <Route path={ROUTE_PATTERNS.issue} element={<IssuesView />} />
+            <Route path={ROUTE_PATTERNS.pullRequests} element={<PullRequestsView />} />
+            <Route path={ROUTE_PATTERNS.pullRequest} element={<PullRequestsView />} />
+            <Route path={ROUTE_PATTERNS.delivery} element={<DeliveryView />} />
+            <Route path={ROUTE_PATTERNS.releases} element={<ReleasesView />} />
+            <Route path={ROUTE_PATTERNS.release} element={<ReleasesView />} />
+            <Route path={ROUTE_PATTERNS.audits} element={<AuditsView />} />
+            <Route path={ROUTE_PATTERNS.audit} element={<AuditsView />} />
+            <Route path={ROUTE_PATTERNS.knowledge} element={<KnowledgeView />} />
+            <Route path={ROUTE_PATTERNS.projectSettings} element={<ProjectSettingsView />} />
+            <Route path="*" element={<NotFoundView />} />
+          </Route>
+          <Route path={ROUTE_PATTERNS.runs} element={<RunsView />} />
+          <Route path={ROUTE_PATTERNS.run} element={<RunsView />} />
+          <Route path={ROUTE_PATTERNS.usage} element={<UsageView />} />
+          <Route path={ROUTE_PATTERNS.settings} element={<InstallationSettingsView />} />
           <Route path="*" element={<NotFoundView />} />
-        </Route>
-        <Route path={ROUTE_PATTERNS.runs} element={<RunsView />} />
-        <Route path={ROUTE_PATTERNS.run} element={<RunsView />} />
-        <Route path={ROUTE_PATTERNS.usage} element={<UsageView />} />
-        <Route path={ROUTE_PATTERNS.settings} element={<InstallationSettingsView />} />
-        <Route path="*" element={<NotFoundView />} />
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </ViewErrorBoundary>
   );
 }

@@ -29,7 +29,11 @@ export const CONTENT_TYPES: Readonly<Record<string, string>> = {
 };
 export const FALLBACK_CONTENT_TYPE = 'application/octet-stream';
 const PARENT_SEGMENT = '..';
-const HTTP = { ok: 200, partialContent: 206, unsatisfiableRange: 416 } as const;
+/** A file whose name carries a hash of its content never changes: the browser keeps it for good. */
+export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+/** Any other file is asked about again each time, and answers 304 while its entity tag still matches. */
+export const REVALIDATE_CACHE_CONTROL = 'no-cache';
+const HTTP = { ok: 200, partialContent: 206, notModified: 304, unsatisfiableRange: 416 } as const;
 const RANGE_UNIT = 'bytes=';
 const RANGE_PATTERN = /^(\d*)-(\d*)$/;
 const MULTIPLE_RANGES_SEPARATOR = ',';
@@ -115,10 +119,29 @@ function sendsBody(request: IncomingMessage, answer: RangedAnswer): answer is Ra
   return request.method !== HEAD && answer.window !== null;
 }
 
-/** Sends a file, or the part of it that was asked for, so that a video can be played and sought. */
-export async function sendFile(request: IncomingMessage, response: ServerResponse, path: string): Promise<void> {
-  const { size } = await stat(path);
-  const answer = answerRange(request, size, { 'content-type': contentTypeOf(path), 'x-content-type-options': 'nosniff' });
+/** A weak entity tag from the size and the modification time of a file. */
+export function entityTag(size: number, modifiedMs: number): string {
+  return `W/"${size.toString(16)}-${Math.trunc(modifiedMs).toString(16)}"`;
+}
+
+function matchesEntityTag(header: string | undefined, tag: string): boolean {
+  return header !== undefined && header.split(',').some((candidate) => candidate.trim() === tag);
+}
+
+/**
+ * Sends a file, or the part of it that was asked for, so that a video can be played and sought. The answer carries
+ * the cache policy and an entity tag; a request that already holds that tag gets 304 and no body.
+ */
+export async function sendFile(request: IncomingMessage, response: ServerResponse, path: string, cacheControl: string = REVALIDATE_CACHE_CONTROL): Promise<void> {
+  const { size, mtimeMs } = await stat(path);
+  const etag = entityTag(size, mtimeMs);
+  const headers = { 'content-type': contentTypeOf(path), 'x-content-type-options': 'nosniff', 'cache-control': cacheControl, etag };
+  if (matchesEntityTag(request.headers['if-none-match'], etag)) {
+    response.writeHead(HTTP.notModified, headers);
+    response.end();
+    return;
+  }
+  const answer = answerRange(request, size, headers);
   response.writeHead(answer.status, answer.headers);
   if (!sendsBody(request, answer)) {
     response.end();

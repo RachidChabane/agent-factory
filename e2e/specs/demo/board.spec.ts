@@ -6,7 +6,7 @@ import { expect, test } from '../../support/test.ts';
 
 test.describe('the board of the demonstration', () => {
   test.beforeEach(async ({ page, factory }) => {
-    await openCockpit(page, factory, '/');
+    await openCockpit(page, factory, paths.board());
     await expect(page.getByRole('heading', { level: 1, name: /^Board/ })).toBeVisible();
   });
 

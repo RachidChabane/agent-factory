@@ -99,6 +99,21 @@ interface ApiRequest {
   readonly headers?: Readonly<Record<string, string>>;
 }
 
+interface NamedCheckRun {
+  readonly id?: number | undefined;
+  readonly name: string;
+}
+
+/** A commit checked again lists every run of a check; the forge judges the most recent one, the highest id. */
+function latestRunPerName<Run extends NamedCheckRun>(runs: readonly Run[]): readonly Run[] {
+  const latest = new Map<string, Run>();
+  for (const run of runs) {
+    const kept = latest.get(run.name);
+    if (kept === undefined || (run.id ?? 0) > (kept.id ?? 0)) latest.set(run.name, run);
+  }
+  return [...latest.values()];
+}
+
 export class GhCliGateway implements GitHubGateway {
   private readonly runner: CommandRunner;
   private readonly settings: GhCliGatewaySettings;
@@ -292,14 +307,12 @@ export class GhCliGateway implements GitHubGateway {
       `commit statuses of ${ref}`,
       { paginate: true },
     );
-    const runs = runPages.flatMap((page) =>
-      page.check_runs.map((run) => ({
-        name: run.name,
-        conclusion: conclusionOfCheckRun(run.status, run.conclusion),
-        url: run.html_url ?? '',
-        durationMs: checkRunDuration(run.started_at ?? null, run.completed_at ?? null),
-      })),
-    );
+    const runs = latestRunPerName(runPages.flatMap((page) => page.check_runs)).map((run) => ({
+      name: run.name,
+      conclusion: conclusionOfCheckRun(run.status, run.conclusion),
+      url: run.html_url ?? '',
+      durationMs: checkRunDuration(run.started_at ?? null, run.completed_at ?? null),
+    }));
     const statuses = statusPages.flatMap((page) =>
       page.statuses.map((status) => ({
         name: status.context,

@@ -22,6 +22,8 @@ Report only gaps that affect correctness or the stated requirements:
 
 Do not report style preferences, naming opinions, optional refactors or tests for cases that cannot happen. A sound change has no findings; say so.
 
+Files under `.evidence/` are proofs the factory produces for earlier heads and regenerates after the review: never report a finding about them.
+
 You may read the repository to confirm a finding. You may not modify anything.
 
 End your answer with exactly one fenced JSON block:

@@ -4,10 +4,17 @@ import { authorOf, delegationFields, type Delegation } from '../autonomy/delegat
 import type { CheckConclusion, CheckRunSummary, EventStore, Worktree } from '../ports.ts';
 import type { FilmMergeGuard } from '../film/film-merge-guard.ts';
 import { evidenceRemovalCommitMessage } from './conventional-commit.ts';
-import { PIPELINE_EVENTS, PullRequestOpenedSchema } from './journal-events.ts';
+import { pollWithinBound, type HeadVisibilityPolicy } from './head-visibility.ts';
+import { PIPELINE_EVENTS, PullRequestOpenedSchema, type EvidenceRemovalRecord } from './journal-events.ts';
 import { IssueJournalWriter } from './journal-writer.ts';
 import type { PipelineDependencies } from './pipeline-dependencies.ts';
-import { MergeRefusedError, PullRequestNotFromFactoryError, WorktreeUnavailableError } from './pipeline-errors.ts';
+import {
+  MergeRefusedError,
+  PullRequestHeadMovedError,
+  PullRequestNotFromFactoryError,
+  PushedHeadNotVisibleError,
+  WorktreeUnavailableError,
+} from './pipeline-errors.ts';
 import { MERGEABLE_STATES } from './mergeable-states.ts';
 import { loadJournal, type PipelineJournal } from './pipeline-journal.ts';
 
@@ -86,11 +93,16 @@ function describeChecks(checks: readonly CheckRunSummary[]): string {
 
 export class MergeOnOrder {
   private readonly dependencies: MergeOnOrderDependencies;
+  private readonly headVisibility: HeadVisibilityPolicy;
   private readonly films: FilmMergeGuard | null;
 
-  /** `films` holds the merge while a film of the pull request is queued or recording; null when the project films nothing. */
-  constructor(dependencies: MergeOnOrderDependencies, films: FilmMergeGuard | null = null) {
+  /**
+   * `headVisibility` bounds the wait for the forge to show the head just pushed. `films` holds the merge while a
+   * film of the pull request is queued or recording; null when the project films nothing.
+   */
+  constructor(dependencies: MergeOnOrderDependencies, headVisibility: HeadVisibilityPolicy, films: FilmMergeGuard | null = null) {
     this.dependencies = dependencies;
+    this.headVisibility = headVisibility;
     this.films = films;
   }
 
@@ -119,12 +131,42 @@ export class MergeOnOrder {
     if (removal === null) throw new MergeRefusedError(order.pullRequestNumber, 'the evidence removal was not recorded');
     await this.dependencies.sourceControl.push(worktree);
     await this.advanceTo(journal, writer, order);
-    const mergeSha = await this.dependencies.github.squashMerge(order.pullRequestNumber, removal.headSha);
+    await this.awaitPushedHead(order, worktree.branch, removal.headSha);
+    const mergeSha = await this.squashMergeOnceVisible(order, removal);
     await writer.record(PIPELINE_EVENTS.pullRequestMerged, { mergeSha, ...delegationFields(order.delegation ?? null) });
     await writer.transition('merged', `pull request #${order.pullRequestNumber} squash-merged as ${mergeSha}`);
     await this.dependencies.pool.release(worktree);
     await writer.record(PIPELINE_EVENTS.worktreeReleased, { path: worktree.path });
     return { issueNumber, pullRequestNumber: order.pullRequestNumber, mergeSha };
+  }
+
+  /** Reads the pull request until the forge reports the pushed head, or gives up so that the same order can be sent again. */
+  private async awaitPushedHead(order: MergeOrder, branch: string, pushedHeadSha: string): Promise<void> {
+    const last: { reported: string | null } = { reported: null };
+    const seen = await pollWithinBound(this.headVisibility, async () => {
+      last.reported = (await this.dependencies.github.findOpenPullRequest(branch))?.headSha ?? null;
+      return last.reported === pushedHeadSha ? { done: true, value: true } : { done: false };
+    });
+    if (seen === null) throw new PushedHeadNotVisibleError(order.pullRequestNumber, pushedHeadSha, last.reported, this.headVisibility.attempts);
+  }
+
+  /**
+   * Merges the pushed head. A refusal that reports the head the operator reviewed is the forge merging from a stale
+   * read, so it is tried again within the same bound; a refusal that reports any other head is a real move.
+   */
+  private async squashMergeOnceVisible(order: MergeOrder, removal: EvidenceRemovalRecord): Promise<string> {
+    const last: { stale: PullRequestHeadMovedError | null } = { stale: null };
+    const mergeSha = await pollWithinBound(this.headVisibility, async () => {
+      try {
+        return { done: true, value: await this.dependencies.github.squashMerge(order.pullRequestNumber, removal.headSha) };
+      } catch (error) {
+        if (!(error instanceof PullRequestHeadMovedError) || error.actualHeadSha !== removal.reviewedHeadSha) throw error;
+        last.stale = error;
+        return { done: false };
+      }
+    });
+    if (mergeSha === null) throw last.stale ?? new PushedHeadNotVisibleError(order.pullRequestNumber, removal.headSha, null, this.headVisibility.attempts);
+    return mergeSha;
   }
 
   private async worktreeOf(journal: PipelineJournal): Promise<Worktree> {

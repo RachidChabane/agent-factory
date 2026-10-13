@@ -40,7 +40,7 @@ test.describe('the command palette of the demonstration', () => {
     await expect(palette.getByRole('group', { name: 'Projects' })).toBeVisible();
     await expect(palette.getByRole('group', { name: 'Actions' })).toBeVisible();
     await search(palette, 'go to');
-    for (const destination of ['Board', 'Runs', 'Usage and costs', 'Settings']) await expect(palette.getByRole('option', { name: `Go to ${destination}` })).toBeVisible();
+    for (const destination of ['Changes', 'Board', 'Runs', 'Usage and costs', 'Settings']) await expect(palette.getByRole('option', { name: `Go to ${destination}` })).toBeVisible();
     await search(palette, 'storefront');
     await expect(palette.getByRole('option', { name: 'Open project Storefront' })).toBeVisible();
     await expect(palette.getByRole('option', { name: 'Delivery of Storefront' })).toBeVisible();

@@ -43,7 +43,7 @@ describe('deployment.redeploy: when it is offered', () => {
   });
 
   it.each([
-    ['nothing was deployed yet', { value: { current: null, history: [] }, readAt: clock.minutesAgo(2), error: null }],
+    ['nothing was deployed yet', { value: { current: null, history: [], pending: null }, readAt: clock.minutesAgo(2), error: null }],
     ['the deployments were never read', { value: null, readAt: null, error: null }],
     ['there is no deployment source', null],
   ])('is not offered when %s, which says there is nothing to redeploy', async (_, deployments) => {
@@ -202,7 +202,7 @@ describe('deployment.redeploy: the confirmation', () => {
       const history = environment.deployments?.value;
       if (history === null || history === undefined || history.current === null) return environment;
       const next = { ...history.current, version: '1.9.0', ref: '1.9.0' };
-      return { ...environment, deployments: { value: { current: next, history: [next, ...history.history] }, readAt: clock.minutesAgo(1), error: null } };
+      return { ...environment, deployments: { value: { ...history, current: next, history: [next, ...history.history] }, readAt: clock.minutesAgo(1), error: null } };
     });
     act(() => view.services.store.replaceSnapshot(snapshot));
     await waitFor(() => expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Redeploy 1.9.0' })).toBeDisabled());

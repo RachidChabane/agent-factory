@@ -20,7 +20,8 @@ export {
 } from './git/errors.ts';
 export { GhCliGateway, type GhCliGatewaySettings } from './github/ghCliGateway.ts';
 export { GitHubFileLinks, gitHubRepositoryUrl } from './github/githubFileLinks.ts';
-export { filePatches, GitObjects, UnsafeObjectRequestError, type FilePatch } from './git/gitObjects.ts';
+export { DEFAULT_REMOTE_NAME } from './git/constants.ts';
+export { filePatches, GitObjects, UnsafeObjectRequestError, type FilePatch, type RepositoryCommit } from './git/gitObjects.ts';
 export { buildGhEnvironment } from './github/ghEnvironment.ts';
 export { CommitScanLimitError, GitHubCommandError, GitHubPayloadError, PullRequestHeadMovedError } from './github/errors.ts';
 export { ClaudeCodeHarness, UnknownClaudeAccountError } from './claude/claude-code-harness.ts';

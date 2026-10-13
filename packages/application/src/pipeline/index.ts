@@ -5,6 +5,7 @@ export * from './diff-stat.ts';
 export * from './evidence.ts';
 export * from './failure-summary.ts';
 export * from './gate-runner.ts';
+export * from './head-visibility.ts';
 export * from './issue-status.ts';
 export * from './journal-events.ts';
 export * from './journal-writer.ts';

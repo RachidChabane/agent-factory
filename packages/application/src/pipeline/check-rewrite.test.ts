@@ -205,7 +205,7 @@ describe('rewriting a frozen check on operator order', () => {
     const scenario = new PipelineScenario();
     const opened = await scenario.pipeline().runIssue(ISSUE_NUMBER);
     if (opened.kind !== 'pr-open') throw new Error('expected an open pull request');
-    await new MergeOnOrder(scenario.dependencies()).merge({ pullRequestNumber: PULL_REQUEST, expectedHeadSha: opened.pullRequest.headSha });
+    await new MergeOnOrder(scenario.dependencies(), scenario.headVisibility).merge({ pullRequestNumber: PULL_REQUEST, expectedHeadSha: opened.pullRequest.headSha });
     await expect(order(scenario)).rejects.toThrow('it is merged; a check is rewritten only while the issue waits on the operator or before its pull request is merged');
   });
 });

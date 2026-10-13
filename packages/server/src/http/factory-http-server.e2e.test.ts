@@ -30,6 +30,8 @@ import { createRehearsal, FIRST_PROJECT, SECOND_PROJECT, waitFor, type Rehearsal
 const TIMEOUT_MS = 60_000;
 const FAST_STREAM = { heartbeatMs: 200, pollMs: 100, telemetryMs: 150 };
 const SETTLE_MS = 500;
+/** Blocking reviews that spend the implementer's retry budget: two corrections in the session, one fresh restart, then a human. */
+const BLOCKING_REVIEWS_TO_SPEND_BUDGET = 4;
 const NORMAL_RESOURCES = { snapshot: () => Promise.resolve({ freeMemoryPercent: 70, pressure: 'normal' as const }) };
 const COCKPIT_PAGE = '<!doctype html><html><head><title>Cockpit</title></head><body></body></html>';
 const TOKEN_META = new RegExp(`<meta name="${COMMAND_TOKEN_META_NAME}" content="([0-9a-f]+)">`);
@@ -279,6 +281,38 @@ describe('the factory HTTP server end to end, with two projects', () => {
       );
       expect(blockers.map((blocker) => [blocker.kind, blocker.project, blocker.issue])).toEqual([['decision-pending', SECOND_PROJECT, issue]]);
       expect(blockers[0]?.detail).toContain(DECISION_QUESTION);
+    },
+    TIMEOUT_MS * 2,
+  );
+
+  it(
+    'orders a new review of an issue that escalated on its review, and carries it to a pull request',
+    async () => {
+      agents.blockingReviewsToGive = BLOCKING_REVIEWS_TO_SPEND_BUDGET;
+      const issue = await rehearsal.project(FIRST_PROJECT).addDocIssue('Document the release owners');
+      await waitFor(
+        async () => (projectIn(await state(), FIRST_PROJECT).issues.find((entry) => entry.number === issue)?.resumeTarget === 'reviewing' ? true : null),
+        TIMEOUT_MS,
+        'the issue to escalate on its review',
+      );
+      const implementerRuns = agents.requests.filter((request) => request.role === 'implementer').length;
+      const plain = await post('issue.resume', { project: FIRST_PROJECT, issueNumber: issue });
+      expect(plain.status).toBe(409);
+      expect(CommandRejectedSchema.parse(await plain.json()).error).toContain('the implementer retry budget is spent');
+
+      const ordered = await post('issue.resume', { project: FIRST_PROJECT, issueNumber: issue, reviewAgain: true });
+      expect(ordered.status).toBe(200);
+      expect(CommandAcceptedSchema.parse(await ordered.json()).effect).toContain(`Issue #${issue} returned to reviewing; the implementation of attempt ${BLOCKING_REVIEWS_TO_SPEND_BUDGET} is reviewed again`);
+      await waitFor(
+        async () => (projectIn(await state(), FIRST_PROJECT).issues.find((entry) => entry.number === issue)?.state === 'pr-open' ? true : null),
+        TIMEOUT_MS,
+        'the reviewed issue to open its pull request',
+      );
+      expect(agents.requests.filter((request) => request.role === 'implementer')).toHaveLength(implementerRuns);
+      expect(agents.requests.filter((request) => request.role === 'reviewer')).toHaveLength(BLOCKING_REVIEWS_TO_SPEND_BUDGET + 1);
+      const refused = await post('issue.resume', { project: FIRST_PROJECT, issueNumber: issue, reviewAgain: true });
+      expect(refused.status).toBe(409);
+      expect(CommandRejectedSchema.parse(await refused.json()).error).toContain('it is pr-open, not needs-human');
     },
     TIMEOUT_MS * 2,
   );

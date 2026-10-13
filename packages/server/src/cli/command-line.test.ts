@@ -11,9 +11,13 @@ describe('parseCommandLine', () => {
   it('parses every command', () => {
     expect(parseCommandLine(['run-issue', '42'])).toEqual(ok({ kind: 'run-issue', issueNumber: 42 }));
     expect(parseCommandLine(['status', '7'])).toEqual(ok({ kind: 'status', issueNumber: 7 }));
-    expect(parseCommandLine(['resume', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: null, delegation: null }));
-    expect(parseCommandLine(['resume', '7', '--answer', 'Use the module option.'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: 'Use the module option.', delegation: null }));
-    expect(parseCommandLine(['resume', '--answer=Yes', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: 'Yes', delegation: null }));
+    expect(parseCommandLine(['resume', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: false, delegation: null }));
+    expect(parseCommandLine(['resume', '7', '--answer', 'Use the module option.'])).toEqual(
+      ok({ kind: 'resume', issueNumber: 7, answer: 'Use the module option.', reviewAgain: false, delegation: null }),
+    );
+    expect(parseCommandLine(['resume', '--answer=Yes', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: 'Yes', reviewAgain: false, delegation: null }));
+    expect(parseCommandLine(['resume', '7', '--review-again'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: true, delegation: null }));
+    expect(parseCommandLine(['resume', '--review-again', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: true, delegation: null }));
     expect(parseCommandLine(['validate'])).toEqual(ok({ kind: 'validate', offline: false, gatePreflight: true }));
     expect(parseCommandLine(['validate', '--skip-gate-preflight'])).toEqual(ok({ kind: 'validate', offline: false, gatePreflight: false }));
     expect(parseCommandLine(['validate', '--quick'])).toEqual({ ok: false, error: 'unknown option --quick' });
@@ -131,10 +135,10 @@ describe('parseCommandLine', () => {
       ok({ kind: 'issue-validate', issueNumber: 12, delegation }),
     );
     expect(parseCommandLine(['resume', '7', '--as=orchestrator', '--reason=a documentation change with a clean review'])).toEqual(
-      ok({ kind: 'resume', issueNumber: 7, answer: null, delegation }),
+      ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: false, delegation }),
     );
     expect(parseCommandLine(['resume', '7', '--answer', 'Yes', '--as', 'orchestrator', '--reason', 'the spec answers it'])).toEqual(
-      ok({ kind: 'resume', issueNumber: 7, answer: 'Yes', delegation: { actor: 'orchestrator', reason: 'the spec answers it' } }),
+      ok({ kind: 'resume', issueNumber: 7, answer: 'Yes', reviewAgain: false, delegation: { actor: 'orchestrator', reason: 'the spec answers it' } }),
     );
     expect(parseCommandLine(['merge', '100', '--expected-head', SHA, '--as', 'orchestrator', '--reason', 'a documentation change with a clean review'])).toEqual(
       ok({ kind: 'merge', pullRequestNumber: 100, expectedHeadSha: SHA, delegation }),
@@ -188,6 +192,7 @@ describe('parseCommandLine', () => {
     expect(parseCommandLine(['merge', '100', '--force'])).toEqual({ ok: false, error: 'unknown option --force' });
     expect(parseCommandLine(['resume', '7', '--answer'])).toEqual({ ok: false, error: 'missing value for --answer' });
     expect(parseCommandLine(['resume', '7', '--answer', ' '])).toEqual({ ok: false, error: '--answer needs the text of the answer' });
+    expect(parseCommandLine(['resume', '7', '--review-again', '--answer', 'Yes'])).toEqual({ ok: false, error: '--review-again cannot be combined with --answer' });
     expect(parseCommandLine(['resume', '7', '--force'])).toEqual({ ok: false, error: 'unknown option --force' });
     expect(parseCommandLine(['deploy'])).toEqual({ ok: false, error: 'unknown command "deploy"' });
   });

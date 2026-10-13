@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { expectCommand } from '../test/commands.ts';
 import { withInstallation } from '../test/fixtures/mutate.ts';
@@ -33,6 +33,20 @@ describe('command palette navigation', () => {
     await view.user.keyboard('{Enter}');
     await view.expectLocation('/usage');
     expect(screen.queryByRole('dialog', { name: 'Command palette' })).not.toBeInTheDocument();
+  });
+
+  it('goes to the changes from another page', async () => {
+    const { view, palette } = await pick('changes', '/usage');
+    expect(within(palette).getAllByRole('option')[0]).toHaveTextContent('Go to Changes');
+    await view.user.keyboard('{Enter}');
+    await waitFor(() => expect(view.location().split('?')[0]).toBe('/'));
+  });
+
+  it('goes to the board, which is not the landing page', async () => {
+    const { view, palette } = await pick('board');
+    expect(within(palette).getAllByRole('option')[0]).toHaveTextContent('Go to Board');
+    await view.user.keyboard('{Enter}');
+    await view.expectLocation('/board');
   });
 
   it('goes to any page of any project', async () => {

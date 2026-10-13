@@ -25,6 +25,8 @@ export interface GitSourceControlSettings {
 }
 
 const LITERAL_PATHSPECS_ENVIRONMENT = { GIT_LITERAL_PATHSPECS: '1' } as const;
+/** `git ls-files --others` lists a directory that holds a repository of its own with a trailing slash. */
+const DIRECTORY_SUFFIX = '/';
 
 export class GitSourceControl implements SourceControl {
   private readonly git: GitCli;
@@ -47,8 +49,11 @@ export class GitSourceControl implements SourceControl {
 
   async changedFiles(worktree: Worktree): Promise<readonly string[]> {
     const tracked = await this.git.run(worktree.path, ['diff', '--name-only', '-z', worktree.baseSha]);
-    const untracked = await this.git.run(worktree.path, ['ls-files', '--others', '--exclude-standard', '-z']);
-    return [...new Set([...splitNul(tracked), ...splitNul(untracked)])].sort();
+    return [...new Set([...splitNul(tracked), ...(await this.listUntracked(worktree))])].sort();
+  }
+
+  async untrackedFiles(worktree: Worktree): Promise<readonly string[]> {
+    return (await this.listUntracked(worktree)).filter((path) => !path.endsWith(DIRECTORY_SUFFIX)).sort();
   }
 
   async diff(worktree: Worktree): Promise<string> {
@@ -143,6 +148,10 @@ export class GitSourceControl implements SourceControl {
       await rm(indexDirectory, { recursive: true, force: true });
     }
     return destination;
+  }
+
+  private async listUntracked(worktree: Worktree): Promise<readonly string[]> {
+    return splitNul(await this.git.run(worktree.path, ['ls-files', '--others', '--exclude-standard', '-z']));
   }
 }
 

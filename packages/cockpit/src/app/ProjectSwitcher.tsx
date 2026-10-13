@@ -14,7 +14,7 @@ import { useProjectSummaries, useSelectedProject } from './derived.ts';
  */
 export function projectTarget(project: string | null, pathname: string): string {
   const section: ProjectSection | null = sectionOfPath(pathname);
-  if (project === null) return pathname.startsWith('/runs') ? paths.runs() : paths.board();
+  if (project === null) return pathname.startsWith('/runs') ? paths.runs() : pathname.startsWith('/board') ? paths.board() : paths.changes();
   if (pathname.startsWith('/runs')) return paths.runs(project);
   return section === null ? paths.project(project) : paths.section(project, section);
 }

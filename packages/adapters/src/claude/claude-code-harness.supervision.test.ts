@@ -167,6 +167,7 @@ describe('ClaudeCodeHarness supervision with a fake claude', () => {
         .find((parsed) => parsed.success)?.data;
       const argv = invocation?.argv ?? [];
       return {
+        argv,
         prompt: await readFile(argv[argv.indexOf('--append-system-prompt-file') + 1] ?? '', 'utf8'),
         settings: JSON.parse(await readFile(argv[argv.indexOf('--settings') + 1] ?? '', 'utf8')) as {
           permissions: { allow: string[]; deny: string[] };
@@ -176,31 +177,36 @@ describe('ClaudeCodeHarness supervision with a fake claude', () => {
     }
 
     it('lists the snapshots in the appended prompt and opens them in the settings of a writing role', async () => {
-      const { prompt, settings } = await runWith(() => Promise.resolve([mount()]));
+      const { prompt, settings, argv } = await runWith(() => Promise.resolve([mount()]));
 
       expect(prompt).toContain('# Reference repositories');
       expect(prompt).toContain(`\`example-org/design-tokens\` at \`v1.0.0\` (commit \`${SNAPSHOT_COMMIT}\`), read from \`${mount().path}\``);
       expect(prompt).toContain(`- \`cp -R ${mount().path}/\``);
       expect(settings.permissions.allow).toContain(`Bash(cp ${mount().path}/*)`);
+      expect(settings.permissions.allow).toContain('Bash(mkdir -p *)');
+      expect(argv.slice(argv.indexOf('--add-dir'), argv.indexOf('--add-dir') + 2)).toEqual(['--add-dir', mount().path]);
       expect(settings.permissions.deny).toEqual(expect.arrayContaining([`Edit(/${mount().path}/**)`, `Write(/${mount().path}/**)`]));
       expect(settings.sandbox.filesystem.allowRead).toContain(mount().path);
       expect(settings.sandbox.filesystem.denyWrite).toContain(mount().path);
     });
 
     it('lets a read-only role read the snapshots, and tells it nothing about copying', async () => {
-      const { prompt, settings } = await runWith(() => Promise.resolve([mount()]), { role: 'reviewer' });
+      const { prompt, settings, argv } = await runWith(() => Promise.resolve([mount()]), { role: 'reviewer' });
 
       expect(prompt).toContain('# Reference repositories');
       expect(prompt).not.toContain('cp -R');
       expect(settings.permissions.allow.some((rule) => rule.startsWith('Bash'))).toBe(false);
+      expect(argv.slice(argv.indexOf('--add-dir'), argv.indexOf('--add-dir') + 2)).toEqual(['--add-dir', mount().path]);
       expect(settings.sandbox.filesystem.allowRead).toContain(mount().path);
     });
 
     it('says nothing of references when the project has none', async () => {
-      const { prompt, settings } = await runWith(() => Promise.resolve([]));
+      const { prompt, settings, argv } = await runWith(() => Promise.resolve([]));
 
       expect(prompt).not.toContain('Reference repositories');
       expect(settings.permissions.allow.some((rule) => rule.startsWith('Bash(cp'))).toBe(false);
+      expect(settings.permissions.allow).not.toContain('Bash(mkdir -p *)');
+      expect(argv).not.toContain('--add-dir');
     });
 
     it('reads the snapshots again for every run', async () => {

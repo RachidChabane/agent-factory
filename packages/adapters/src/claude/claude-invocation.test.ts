@@ -72,6 +72,18 @@ describe('buildClaudeArguments', () => {
   });
 });
 
+describe('buildClaudeArguments additional directories', () => {
+  it('adds no --add-dir without directories', () => {
+    expect(buildClaudeArguments(REQUEST, FILES, TOOLS)).not.toContain('--add-dir');
+  });
+
+  it('passes one --add-dir per directory', () => {
+    const args = buildClaudeArguments(REQUEST, FILES, TOOLS, ['/refs/design-tokens@v1', '/refs/icons@v2']);
+    const directories = args.flatMap((arg, index) => (arg === '--add-dir' ? [args[index + 1]] : []));
+    expect(directories).toEqual(['/refs/design-tokens@v1', '/refs/icons@v2']);
+  });
+});
+
 describe('launchCommand', () => {
   it('lowers the scheduling priority when a niceness is configured', () => {
     expect(launchCommand({ command: ['claude'], niceness: 10 })).toEqual(['nice', '-n', '10', 'claude']);

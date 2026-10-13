@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { HEAD_VISIBILITY_ATTEMPTS, HEAD_VISIBILITY_DELAY_MS } from './head-visibility.ts';
 import { checksBlockingMerge, failingOnBase } from './merge-on-order.ts';
-import { MergeRefusedError, PullRequestNotFromFactoryError } from './pipeline-errors.ts';
+import { MergeRefusedError, PullRequestHeadMovedError, PullRequestNotFromFactoryError, PushedHeadNotVisibleError } from './pipeline-errors.ts';
 import { ISSUE_NUMBER, PipelineScenario } from './testing/pipeline-scenario.ts';
 
 async function scenarioWithOpenPullRequest(): Promise<{ scenario: PipelineScenario; head: string }> {
@@ -8,6 +9,18 @@ async function scenarioWithOpenPullRequest(): Promise<{ scenario: PipelineScenar
   const outcome = await scenario.pipeline().runIssue(ISSUE_NUMBER);
   if (outcome.kind !== 'pr-open') throw new Error(`expected an open pull request, got ${outcome.kind}`);
   return { scenario, head: outcome.pullRequest.headSha };
+}
+
+/** The forge keeps reporting the reviewed head for `staleReads` reads (forever when null) after the evidence removal was pushed. */
+function showHeadAfterReads(scenario: PipelineScenario, staleReads: number | null, staleHead: string): void {
+  const find = scenario.github.findOpenPullRequest.bind(scenario.github);
+  let removalReads = 0;
+  scenario.github.findOpenPullRequest = async (branch) => {
+    const found = await find(branch);
+    if (found === null || found.headSha === staleHead) return found;
+    removalReads += 1;
+    return staleReads === null || removalReads <= staleReads ? { ...found, headSha: staleHead } : found;
+  };
 }
 
 describe('MergeOnOrder', () => {
@@ -114,6 +127,73 @@ describe('MergeOnOrder', () => {
     expect(outcome.mergeSha.startsWith('merge-of-')).toBe(true);
     const removals = scenario.sourceControl.history(worktree).filter((commit) => commit.message.includes('remove proof'));
     expect(removals).toHaveLength(1);
+  });
+
+  it('waits for the forge to report the pushed head before merging', async () => {
+    const { scenario, head } = await scenarioWithOpenPullRequest();
+    showHeadAfterReads(scenario, 2, head);
+
+    await scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head });
+
+    expect(scenario.github.merges).toHaveLength(1);
+    expect(scenario.sleeper.naps).toEqual([HEAD_VISIBILITY_DELAY_MS, HEAD_VISIBILITY_DELAY_MS]);
+  });
+
+  it('fails retryably without merging when the forge never reports the pushed head', async () => {
+    const { scenario, head } = await scenarioWithOpenPullRequest();
+    showHeadAfterReads(scenario, null, head);
+
+    await expect(scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head })).rejects.toBeInstanceOf(PushedHeadNotVisibleError);
+    await expect(scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head })).rejects.toThrow('is not visible yet');
+
+    expect(scenario.github.merges).toEqual([]);
+    expect(scenario.sleeper.naps).toHaveLength(2 * (HEAD_VISIBILITY_ATTEMPTS - 1));
+    expect((await scenario.journal()).state).toBe('ready-to-merge');
+  });
+
+  it('merges a re-sent order after a visibility failure without removing the evidence again', async () => {
+    const { scenario, head } = await scenarioWithOpenPullRequest();
+    const worktree = scenario.worktree();
+    const find = scenario.github.findOpenPullRequest.bind(scenario.github);
+    let hidden = true;
+    scenario.github.findOpenPullRequest = async (branch) => {
+      const found = await find(branch);
+      return hidden && found !== null ? { ...found, headSha: head } : found;
+    };
+    await expect(scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head })).rejects.toBeInstanceOf(PushedHeadNotVisibleError);
+    hidden = false;
+
+    const outcome = await scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head });
+
+    expect(outcome.mergeSha.startsWith('merge-of-')).toBe(true);
+    expect(scenario.sourceControl.history(worktree).filter((commit) => commit.message.includes('remove proof'))).toHaveLength(1);
+    expect(scenario.github.merges).toHaveLength(1);
+  });
+
+  it('retries the merge while the forge still reports the reviewed head', async () => {
+    const { scenario, head } = await scenarioWithOpenPullRequest();
+    const squash = scenario.github.squashMerge.bind(scenario.github);
+    let staleReads = 2;
+    scenario.github.squashMerge = (number, sha) => {
+      if (staleReads > 0) {
+        staleReads -= 1;
+        return Promise.reject(new PullRequestHeadMovedError(number, sha, head));
+      }
+      return squash(number, sha);
+    };
+
+    await scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head });
+
+    expect(scenario.github.merges).toHaveLength(1);
+    expect(scenario.sleeper.naps).toEqual([HEAD_VISIBILITY_DELAY_MS, HEAD_VISIBILITY_DELAY_MS]);
+  });
+
+  it('does not retry a merge whose head moved to an unrelated commit', async () => {
+    const { scenario, head } = await scenarioWithOpenPullRequest();
+    scenario.github.squashMerge = (number, sha) => Promise.reject(new PullRequestHeadMovedError(number, sha, 'someone-elses-commit'));
+
+    await expect(scenario.mergeOnOrder().merge({ pullRequestNumber: 100, expectedHeadSha: head })).rejects.toBeInstanceOf(PullRequestHeadMovedError);
+    expect(scenario.sleeper.naps).toEqual([]);
   });
 
   it('refuses a pull request the factory did not open', async () => {

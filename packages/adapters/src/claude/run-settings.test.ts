@@ -219,6 +219,7 @@ describe('reference snapshots', () => {
     { name: 'design-tokens', repository: 'example-org/design-tokens', ref: 'v1.0.0', commit: 'c'.repeat(40), path: SNAPSHOT },
     { name: 'icons', repository: 'example-org/icons', ref: 'v2', commit: 'd'.repeat(40), path: OTHER_SNAPSHOT },
   ];
+  const MKDIR_RULE = 'Bash(mkdir -p *)';
   const COPY_RULES = [`Bash(cp ${SNAPSHOT}/*)`, `Bash(cp -R ${SNAPSHOT}/*)`, `Bash(cp ${OTHER_SNAPSHOT}/*)`, `Bash(cp -R ${OTHER_SNAPSHOT}/*)`];
   const WRITING_ROLES = AGENT_ROLES.filter((role) => ROLE_PERMISSIONS[role].copiesReferences);
   const READING_ROLES = AGENT_ROLES.filter((role) => !ROLE_PERMISSIONS[role].copiesReferences);
@@ -238,7 +239,8 @@ describe('reference snapshots', () => {
     for (const role of WRITING_ROLES) {
       const { settings, allowedTools } = renderRunSettings(input({ role, references: MOUNTS }));
       expect(settings.permissions.allow.filter((rule) => rule.startsWith('Bash(cp '))).toEqual(COPY_RULES);
-      expect(allowedTools).toEqual(expect.arrayContaining(COPY_RULES));
+      expect(allowedTools).toEqual(expect.arrayContaining([MKDIR_RULE, ...COPY_RULES]));
+      expect(settings.permissions.allow).toContain(MKDIR_RULE);
     }
   });
 
@@ -246,6 +248,7 @@ describe('reference snapshots', () => {
     for (const role of READING_ROLES) {
       const { settings, availableTools } = renderRunSettings(input({ role, references: MOUNTS }));
       expect(settings.permissions.allow.filter((rule) => rule.includes('cp '))).toEqual([]);
+      expect(settings.permissions.allow).not.toContain(MKDIR_RULE);
       expect(availableTools).toEqual(['Read', 'Glob', 'Grep']);
     }
   });
@@ -253,6 +256,7 @@ describe('reference snapshots', () => {
   it('adds no rule and no path without references', () => {
     const { settings } = renderRunSettings(input());
     expect(settings.permissions.allow.some((rule) => rule.startsWith('Bash(cp'))).toBe(false);
+    expect(settings.permissions.allow).not.toContain(MKDIR_RULE);
     expect(settings.sandbox.filesystem.allowRead).toEqual([]);
     expect(settings.sandbox.filesystem.denyWrite).not.toContain(SNAPSHOT);
   });

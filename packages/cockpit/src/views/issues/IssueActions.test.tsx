@@ -197,6 +197,39 @@ describe('issue.resume', () => {
   });
 });
 
+describe('issue.resume with a new review', () => {
+  const escalatedOnReview = () => withIssue(STOREFRONT, ISSUE.promoSavingsSummary, (issue) => ({ ...issue, resumeTarget: 'reviewing' as const }));
+
+  it('orders the review of the same implementation again, next to the plain resume', async () => {
+    const view = await openIssue(ISSUE.promoSavingsSummary, { snapshot: escalatedOnReview() });
+    expect(buttonsOf(TITLE_49)).toEqual(['Resume at “Review”', 'Review again', 'Rewrite a check', 'Abandon']);
+    await clickAndExpectCommand(view.user, screen.getByRole('button', { name: 'Review again' }), view.transport, 'issue.resume', { ...target(ISSUE.promoSavingsSummary), reviewAgain: true });
+  });
+
+  it('names the button in the language of the page', async () => {
+    await openIssue(ISSUE.promoSavingsSummary, { snapshot: escalatedOnReview(), locale: 'fr' });
+    expect(screen.getByRole('button', { name: 'Relancer la revue' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['escalated at another stage', ISSUE.promoSavingsSummary],
+    ['at work', ISSUE.orderHistoryStatusFilter],
+  ])('is not offered for an issue that is %s', async (_state, number) => {
+    await openIssue(number);
+    expect(screen.queryByRole('button', { name: 'Review again' })).not.toBeInTheDocument();
+  });
+
+  it('shows what the factory did, and its refusal', async () => {
+    const view = await openIssue(ISSUE.promoSavingsSummary, { snapshot: escalatedOnReview() });
+    view.transport.effects.set('issue.resume', 'Issue #49 returned to reviewing; the implementation of attempt 4 is reviewed again');
+    await view.user.click(screen.getByRole('button', { name: 'Review again' }));
+    expect(await within(screen.getByRole('status')).findByText('Issue #49 returned to reviewing; the implementation of attempt 4 is reviewed again')).toBeInTheDocument();
+    view.transport.commandFailure = 'Issue #49 cannot be resumed: the gate of the latest attempt did not pass, so there is no implementation to review';
+    await view.user.click(screen.getByRole('button', { name: 'Review again' }));
+    expect(await within(screen.getByRole('alert')).findByText(/the gate of the latest attempt did not pass/)).toBeInTheDocument();
+  });
+});
+
 describe('issue.pause', () => {
   it('stops the agent run of an issue at work only after the operator confirmed', async () => {
     const view = await openIssue(ISSUE.orderHistoryStatusFilter);

@@ -26,7 +26,7 @@ import type { RemoteAccessConfig } from '../config/agent-factory-config.ts';
 import { EventStreamConnection, runLogJson, type EventStreamSettings } from './event-stream.ts';
 import { identify } from './identity.ts';
 import { CommandToken } from './command-token.ts';
-import { contentTypeOf, isFile, resolveInside, sendBytes, sendFile } from './static-files.ts';
+import { contentTypeOf, IMMUTABLE_CACHE_CONTROL, isFile, resolveInside, sendBytes, sendFile } from './static-files.ts';
 
 export const INDEX_FILE = 'index.html';
 export const MAX_COMMAND_BODY_BYTES = 32 * 1024 * 1024;
@@ -41,6 +41,7 @@ const POST = 'POST';
 const HEAD = 'HEAD';
 const API_PREFIX = '/api/';
 const PATH_SEPARATOR = '/';
+const ASSETS_PREFIX = '/assets/';
 const NO_SEQUENCE = 0;
 const COCKPIT_NOT_BUILT = 'the cockpit is not built; run "pnpm --filter @agent-factory/cockpit build"';
 const INTEGER = /^\d+$/;
@@ -326,7 +327,11 @@ export class FactoryHttpServer {
     }
     const asset = path === PATH_SEPARATOR ? null : resolveInside(this.settings.cockpitDirectory, path.slice(1));
     if (asset !== null && (await isFile(asset)) && asset !== index) {
-      await sendFile(request, response, asset);
+      await sendFile(request, response, asset, path.startsWith(ASSETS_PREFIX) ? IMMUTABLE_CACHE_CONTROL : undefined);
+      return;
+    }
+    if (path.startsWith(ASSETS_PREFIX)) {
+      sendJson(response, HTTP.notFound, { error: `no asset at ${path}` });
       return;
     }
     const page = await readFile(index, 'utf8');

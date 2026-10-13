@@ -25,7 +25,7 @@ description: Find the agent-factory verb, option and cockpit address for what yo
 | | `agent-factory issue create <spec.md> [--blocked-by <n>[,<n>]] [--confirm] [--start]` | creates an issue from a spec file; `--start` validates it |
 | | `agent-factory issue validate <issue>` | validates the spec of a drafted issue, so the factory takes it |
 | | `agent-factory issue abandon <issue> --reason <text>` | frees the worktree of an escalated issue; refused while the factory runs |
-| | `agent-factory resume <issue> [--answer <text>]` | returns an escalated issue to the stage it left, with the answer to its question |
+| | `agent-factory resume <issue> [--answer <text> \| --review-again]` | returns an escalated issue to the stage it left, with the answer to its question; `--review-again` has the same implementation reviewed once more after a review escalation whose gate passed |
 | | `agent-factory merge <pull-request> --expected-head <sha>` | squash-merges the reviewed head |
 | | `agent-factory pr feedback <pull-request> <file> --author <name>` | records review feedback and starts a new cycle |
 | | `agent-factory audit <commit> [<commit>...]` | audits commits of the base branch; queued for the running factory |

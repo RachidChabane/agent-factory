@@ -586,6 +586,21 @@ export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;
 
 // ---------------------------------------------------------------- delivery
 
+/** A commit of the base branch that a deployment brought, or that an environment still waits for. */
+export const DeliveredCommitSchema = z.object({
+  sha: z.string(),
+  /** The first line of the commit's message. */
+  headline: z.string(),
+  /** Who made the commit, as the repository records it. */
+  author: z.string(),
+  committedAt: IsoDateTimeSchema,
+  /** The pull request of the factory that was squash-merged as this commit; null for any other commit. */
+  pullRequestNumber: IssueNumberSchema.nullable(),
+  /** The issue that pull request closes. */
+  issueNumber: IssueNumberSchema.nullable(),
+});
+export type DeliveredCommit = z.infer<typeof DeliveredCommitSchema>;
+
 export const DeploymentSchema = z.object({
   id: z.string(),
   version: z.string(),
@@ -596,6 +611,8 @@ export const DeploymentSchema = z.object({
   actor: z.string().nullable(),
   outcome: z.enum(DEPLOYMENT_OUTCOMES),
   workflowUrl: z.string().nullable(),
+  /** The commits this deployment brought, read from the project's clone; null when the clone cannot say, an empty list when it brought none. */
+  changes: z.array(DeliveredCommitSchema).nullable(),
 });
 export type Deployment = z.infer<typeof DeploymentSchema>;
 
@@ -623,7 +640,14 @@ export const EnvironmentViewSchema = z.object({
   promotion: z.enum(PROMOTION_POLICIES),
   status: z.enum(ENVIRONMENT_STATUSES),
   /** Null when the project declares no deployment source for this environment. */
-  deployments: readingOf(z.object({ current: DeploymentSchema.nullable(), history: z.array(DeploymentSchema) })).nullable(),
+  deployments: readingOf(
+    z.object({
+      current: DeploymentSchema.nullable(),
+      history: z.array(DeploymentSchema),
+      /** The commits of the base branch the current deployment lacks; null when nothing is deployed or the clone cannot say. */
+      pending: z.array(DeliveredCommitSchema).nullable(),
+    }),
+  ).nullable(),
   health: z.array(HealthCheckViewSchema),
   redeployable: z.boolean(),
   workflowUrl: z.string().nullable(),

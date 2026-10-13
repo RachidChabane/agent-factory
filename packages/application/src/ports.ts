@@ -99,6 +99,8 @@ export interface WorktreePool {
 export interface SourceControl {
   headSha(worktree: Worktree): Promise<string>;
   changedFiles(worktree: Worktree): Promise<readonly string[]>;
+  /** The files that no commit holds and no ignore rule hides: the ones an agent created and left behind. */
+  untrackedFiles(worktree: Worktree): Promise<readonly string[]>;
   diff(worktree: Worktree): Promise<string>;
   isClean(worktree: Worktree): Promise<boolean>;
   commitAll(worktree: Worktree, message: string): Promise<string>;

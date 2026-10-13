@@ -7,6 +7,7 @@ import { ACCEPTANCE_REPORT_DIRECTORY } from '../../acceptance/structured-command
 import type { AgentRunRequest, IssueRecord, Worktree } from '../../ports.ts';
 import { MarkdownSpecReader } from '../../spec/markdown-spec-reader.ts';
 import { renderSpecBody } from '../../spec/render-spec-body.ts';
+import { HEAD_VISIBILITY_ATTEMPTS, HEAD_VISIBILITY_DELAY_MS, type HeadVisibilityPolicy } from '../head-visibility.ts';
 import { MergeOnOrder } from '../merge-on-order.ts';
 import { ResumeIssue } from '../resume-issue.ts';
 import type { PipelineDependencies } from '../pipeline-dependencies.ts';
@@ -28,6 +29,7 @@ import {
   ScriptedCommandRunner,
   ScriptedServiceProcesses,
   RecordingSandbox,
+  RecordingSleeper,
   ScriptedRoleHarness,
   SequentialIds,
   StaticSecrets,
@@ -154,6 +156,13 @@ export class PipelineScenario {
   readonly logs = new InMemoryLogArchive();
   readonly resources = new AdjustableResources();
   readonly ids = new SequentialIds();
+  readonly sleeper = new RecordingSleeper();
+  readonly headVisibility: HeadVisibilityPolicy = {
+    sleeper: this.sleeper,
+    signal: new AbortController().signal,
+    attempts: HEAD_VISIBILITY_ATTEMPTS,
+    delayMs: HEAD_VISIBILITY_DELAY_MS,
+  };
   readonly sandbox = new RecordingSandbox();
   readonly secrets = new StaticSecrets();
   readonly baseWorkspaces = new InMemoryBaseWorkspaces(this.sourceControl, this.workspace);
@@ -210,7 +219,7 @@ export class PipelineScenario {
   }
 
   mergeOnOrder(): MergeOnOrder {
-    return new MergeOnOrder(this.dependencies());
+    return new MergeOnOrder(this.dependencies(), this.headVisibility);
   }
 
   journal(): Promise<PipelineJournal> {

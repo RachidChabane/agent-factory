@@ -15,13 +15,13 @@ const TOKENS: ReferenceMount = { name: 'design-tokens', repository: 'example-org
 const ICONS: ReferenceMount = { name: 'icons', repository: 'example-org/icons', ref: 'v2', commit: 'a'.repeat(40), path: '/factory/projects/storefront/references/icons@v2' };
 
 describe('referenceCopyRules', () => {
-  it('allows cp and cp -R from the snapshot directory and nothing broader', () => {
-    expect(referenceCopyRules([TOKENS])).toEqual([`Bash(cp ${TOKENS.path}/*)`, `Bash(cp -R ${TOKENS.path}/*)`]);
+  it('allows cp and cp -R from the snapshot directory, and mkdir -p for the destination, nothing broader', () => {
+    expect(referenceCopyRules([TOKENS])).toEqual(['Bash(mkdir -p *)', `Bash(cp ${TOKENS.path}/*)`, `Bash(cp -R ${TOKENS.path}/*)`]);
   });
 
-  it('renders two rules per reference, in order, and none without a reference', () => {
-    expect(referenceCopyRules([TOKENS, ICONS])).toHaveLength(4);
-    expect(referenceCopyRules([TOKENS, ICONS])[2]).toBe(`Bash(cp ${ICONS.path}/*)`);
+  it('renders one mkdir rule and two copy rules per reference, in order, and none without a reference', () => {
+    expect(referenceCopyRules([TOKENS, ICONS])).toHaveLength(5);
+    expect(referenceCopyRules([TOKENS, ICONS])[3]).toBe(`Bash(cp ${ICONS.path}/*)`);
     expect(referenceCopyRules([])).toEqual([]);
   });
 });
@@ -33,9 +33,9 @@ describe('referenceCopyRules, whatever the snapshots', () => {
     fc.assert(
       fc.property(fc.uniqueArray(snapshotPath, { maxLength: 5 }), (paths) => {
         const rules = referenceCopyRules(paths.map((path) => ({ ...TOKENS, path })));
-        expect(rules).toHaveLength(paths.length * 2);
+        expect(rules).toHaveLength(paths.length === 0 ? 0 : 1 + paths.length * 2);
         paths.forEach((path, index) => {
-          expect(rules.slice(index * 2, index * 2 + 2)).toEqual([`Bash(cp ${path}/*)`, `Bash(cp -R ${path}/*)`]);
+          expect(rules.slice(1 + index * 2, 3 + index * 2)).toEqual([`Bash(cp ${path}/*)`, `Bash(cp -R ${path}/*)`]);
         });
       }),
     );
@@ -61,6 +61,7 @@ describe('referencePromptSection', () => {
 
     expect(section).toContain(REFERENCE_COPY_RULE);
     expect(section).toContain('A copy keeps the read-only mode of the original.');
+    expect(section).toContain('Create a missing destination directory with `mkdir -p <directory>` first.');
     expect(section.endsWith(REFERENCE_READ_ONLY_RULE)).toBe(true);
   });
 

@@ -49,7 +49,7 @@ export function withCurrentDeployment(project: string, name: string, update: (de
       if (reading === null || history === null || history === undefined || history.current === null) return environment;
       const currentId = history.current.id;
       const entries = history.history.map((deployment) => (deployment.id === currentId ? update(deployment) : deployment));
-      return { ...environment, deployments: { ...reading, value: { current: update(history.current), history: entries } } };
+      return { ...environment, deployments: { ...reading, value: { ...history, current: update(history.current), history: entries } } };
     },
     snapshot,
   );

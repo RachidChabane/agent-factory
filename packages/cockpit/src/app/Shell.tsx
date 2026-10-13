@@ -36,6 +36,7 @@ export function pageTitleKey(pathname: string): MessageKey | null {
     const section = sectionOfPath(pathname);
     return section === null ? 'nav.overview' : SECTION_LABELS[section];
   }
+  if (pathname.startsWith('/board')) return 'nav.board';
   if (pathname.startsWith('/runs')) return 'nav.runs';
   if (pathname.startsWith('/usage')) return 'nav.usage';
   if (pathname.startsWith('/settings')) return 'nav.settings';

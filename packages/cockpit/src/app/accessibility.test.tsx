@@ -8,6 +8,7 @@ const INTERACTIVE =
 
 const PAGES = [
   '/',
+  '/board',
   '/projects/storefront',
   '/projects/storefront/requests/R-15',
   '/projects/storefront/issues',

@@ -6,6 +6,7 @@ import { frReadings } from './readings.ts';
 import { frWidgets } from './widgets.ts';
 import { frShell } from './shell.ts';
 import { frBoard } from './board.ts';
+import { frChanges } from './changes.ts';
 import { frCommands } from './commands.ts';
 import { frRequests } from './requests.ts';
 import { frIssues } from './issues.ts';
@@ -27,6 +28,7 @@ export const frFragments = {
   widgets: frWidgets,
   shell: frShell,
   board: frBoard,
+  changes: frChanges,
   commands: frCommands,
   requests: frRequests,
   issues: frIssues,
@@ -49,6 +51,7 @@ export const fr = {
   ...frWidgets,
   ...frShell,
   ...frBoard,
+  ...frChanges,
   ...frCommands,
   ...frRequests,
   ...frIssues,

@@ -1,3 +1,4 @@
+import { diffWithoutEvidence } from '../diff-evidence.ts';
 import { agentFailureSummary, reviewFailureSummary } from '../failure-summary.ts';
 import { blockingFindings, readReviewFindings } from '../../review/review-findings.ts';
 import { PIPELINE_EVENTS } from '../journal-events.ts';
@@ -34,7 +35,7 @@ export class ReviewingStage implements PipelineStage {
     const { dependencies, settings } = toolkit;
     const spec = requireSpec(journal);
     const worktree = await leasedWorktree(context);
-    const diff = await dependencies.sourceControl.diff(worktree);
+    const diff = diffWithoutEvidence(await dependencies.sourceControl.diff(worktree));
     const checks = await readCheckContents(context, worktree, requireFrozen(journal));
     const profile = profileOf(context, 'reviewer');
     const result = await toolkit.agents.run(writer, {

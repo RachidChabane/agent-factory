@@ -36,6 +36,8 @@ Option 2, in `packages/cockpit/src/contract`.
   on the factory.
 - Large or rarely needed data is read on demand rather than carried in the snapshot:
   run logs, a pull request's diff, a commit's file.
+- The page the cockpit lands on is the changes since a moment the operator chooses and
+  the browser remembers; the board is a page of its own.
 
 ## Consequences
 

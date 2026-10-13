@@ -65,7 +65,8 @@ function decisionAttempt(question: string): ScenarioAttempt {
   return { steps: [{ write: { path: DECISION_REQUEST_PATH, content: `${question}\n` } }], final: question };
 }
 
-function workEntries(title: string, work: StoryWork): readonly ScenarioEntry[] {
+/** The scripted agents of one piece of work, selected by the title of its spec. */
+export function workEntries(title: string, work: StoryWork): readonly ScenarioEntry[] {
   return [
     { role: 'acceptance-author', when: title, attempts: [checksAttempt(work.checks)] },
     {
