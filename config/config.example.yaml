@@ -145,7 +145,8 @@ projects:
     # only a command you trust. It writes into {output}: report.json ({ "status": "recorded" | "skipped", "reason",
     # "facts": [{ "label", "value" }], "keyFrames": [paths] }), one video (.mp4 .webm .mov .mkv) and screenshots.
     # A video that is not an MP4 is turned into one with ffmpeg. {replay} is the replayFile of the first recording,
-    # given to the second one after an option such as --replay.
+    # given to the second one after an option such as --replay. The tokens reach the program as they are, without a
+    # shell: ~ and variables are not expanded in them (workingDirectory is expanded).
     evidence:
       films:
         command: [node, record-film.mjs, --ref, "{ref}", --out, "{output}", --scenario, "{scenario}", --replay, "{replay}"]

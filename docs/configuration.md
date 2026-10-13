@@ -128,10 +128,16 @@ runs.
 | `replayFile` | `replay.json` | the file the recording of the base writes in `{output}`; `{replay}` is its path in the recording of the head |
 | `timeZone` | the machine's | the zone of the expected arrival times in the pull request body and the cockpit |
 
+The tokens of `command` reach the program as they are, without a shell: `~` and
+variables such as `$HOME` are not expanded in them (`workingDirectory` is). The program
+is the first token: an absolute path, a path relative to `workingDirectory`, or a name
+found on the `PATH` of your environment with `environment` on top.
+
 The command runs **outside the sandbox**, with your environment and your sessions
 (containers, secrets, cloud and browser logins): declare only a command you trust like
 your own scripts. `agent-factory validate` says so on the project's `films` line, checks
-the working directory, and warns when `ffmpeg` is missing.
+the working directory and that the program resolves to an executable file, and warns
+when `ffmpeg` is missing.
 
 A recording writes into `{output}`:
 
