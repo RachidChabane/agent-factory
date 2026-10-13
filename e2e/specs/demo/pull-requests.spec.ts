@@ -215,6 +215,8 @@ test.describe('the pull requests of the demonstration', () => {
     await openPullRequest(page, factory, STOREFRONT, pullRequest);
     const notice = page.getByRole('region', { name: 'Ready notice', exact: true });
     await expect(notice).toContainText(`for head ${shortSha(readyNotice.headSha)}`);
+    await expect(notice.getByRole('time')).toHaveAttribute('datetime', readyNotice.sentAt);
+    await expect(notice.getByRole('time')).toHaveAttribute('title', english.absolute(readyNotice.sentAt));
     expect(readyNotice.links.map((link) => link.label)).toEqual(expect.arrayContaining([expect.stringMatching(/ · before · film\.mp4$/), expect.stringMatching(/ · after · film\.mp4$/)]));
     expect(readyNotice.failures, 'every file of the pull request was uploaded').toEqual([]);
     const links = notice.getByRole('list', { name: 'Links in the notice' });
