@@ -318,6 +318,50 @@ describe('the factory HTTP server end to end, with two projects', () => {
   );
 
   it(
+    'takes the operator’s feedback on a pull request whose issue had spent its retry budget, and starts a cycle with the whole budget',
+    async () => {
+      agents.blockingReviewsToGive = BLOCKING_REVIEWS_TO_SPEND_BUDGET;
+      const issue = await rehearsal.project(FIRST_PROJECT).addDocIssue('Document the release owners');
+      await waitFor(
+        async () => (projectIn(await state(), FIRST_PROJECT).issues.find((entry) => entry.number === issue)?.resumeTarget === 'reviewing' ? true : null),
+        TIMEOUT_MS,
+        'the issue to escalate on its review',
+      );
+      expect((await post('issue.resume', { project: FIRST_PROJECT, issueNumber: issue, reviewAgain: true })).status).toBe(200);
+      const pullRequest = await waitFor(
+        async () => {
+          const view = projectIn(await state(), FIRST_PROJECT);
+          return view.issues.find((entry) => entry.number === issue)?.state === 'pr-open' ? (view.pullRequests.find((entry) => entry.issueNumber === issue) ?? null) : null;
+        },
+        TIMEOUT_MS,
+        'the reviewed issue to await review at its pull request',
+      );
+      const implementerRuns = agents.requests.filter((request) => request.role === 'implementer').length;
+
+      const sent = await post('pr.feedback', { project: FIRST_PROJECT, number: pullRequest.number, author: 'Dana Reyes', body: 'Name the owners by team.' });
+
+      expect(sent.status).toBe(200);
+      expect(CommandAcceptedSchema.parse(await sent.json()).effect).toContain(`Feedback recorded; issue #${issue} starts attempt ${BLOCKING_REVIEWS_TO_SPEND_BUDGET}`);
+      await waitFor(
+        async () => {
+          const view = projectIn(await state(), FIRST_PROJECT);
+          return view.issues.find((entry) => entry.number === issue)?.state === 'pr-open' && agents.requests.filter((request) => request.role === 'implementer').length > implementerRuns
+            ? view.pullRequests.find((entry) => entry.number === pullRequest.number) ?? null
+            : null;
+        },
+        TIMEOUT_MS,
+        'the implementer to answer the feedback and the pull request to await review again',
+      );
+      const answering = agents.requests.filter((request) => request.role === 'implementer').at(-1);
+      expect(answering?.resumeSessionId).not.toBeNull();
+      expect(answering?.prompt).toContain('Dana Reyes: Name the owners by team.');
+      const view = projectIn(await state(), FIRST_PROJECT);
+      expect(view.pullRequests.find((entry) => entry.number === pullRequest.number)?.externalFeedback).toMatchObject([{ author: 'Dana Reyes', cycleStarted: true }]);
+    },
+    TIMEOUT_MS * 2,
+  );
+
+  it(
     'abandons an escalated issue from the cockpit and never starts it again',
     async () => {
       agents.decisionsToAsk = 1;
