@@ -47,15 +47,26 @@ export class CheckRewriteStage implements PipelineStage {
 
   async advance(context: StageContext): Promise<StageResult> {
     const rewrite = requireRewrite(context);
-    const { journal, writer } = context;
     const worktree = await leasedWorktree(context);
     const path = rewrite.order.path;
     if (rewrite.fingerprint === null) {
       await this.assertOtherChecksFrozen(context, worktree, path);
       const changed = await context.toolkit.dependencies.sourceControl.changedFiles(worktree);
-      await writer.record(PIPELINE_EVENTS.checkRewriteStarted, { path, fingerprint: await fingerprintOf(context, worktree, [...changed, path]) });
+      await context.writer.record(PIPELINE_EVENTS.checkRewriteStarted, { path, fingerprint: await fingerprintOf(context, worktree, [...changed, path]) });
       return ADVANCED;
     }
+    try {
+      return await this.rewrite(context, worktree, rewrite, rewrite.fingerprint);
+    } catch (error) {
+      // A rewrite that ends without being frozen leaves the check as it was frozen, so that the next rewrite finds every frozen check intact.
+      if (error instanceof EscalationRequiredError) await context.toolkit.dependencies.sourceControl.discardPaths(worktree, [path]);
+      throw error;
+    }
+  }
+
+  private async rewrite(context: StageContext, worktree: Worktree, rewrite: CheckRewriteProgress, fingerprint: readonly FileFingerprint[]): Promise<StageResult> {
+    const { journal, writer } = context;
+    const path = rewrite.order.path;
     if (rewrite.authored === null) {
       await this.author(context, worktree, rewrite);
       return ADVANCED;
@@ -64,7 +75,7 @@ export class CheckRewriteStage implements PipelineStage {
       throw new EscalationRequiredError(agentFailureSummary('acceptance-author', rewrite.authored.outcome, `the rewrite of ${path} did not finish`));
     }
     if (!rewrite.proved) {
-      await this.assertLimitedToCheck(context, worktree, rewrite.fingerprint, path);
+      await this.assertLimitedToCheck(context, worktree, fingerprint, path);
       const beforeProof = await this.proveOnBase(context, worktree, requireSpec(journal), requireManifest(journal));
       await writer.record(PIPELINE_EVENTS.checkRewriteProved, { path, beforeProof });
       return ADVANCED;

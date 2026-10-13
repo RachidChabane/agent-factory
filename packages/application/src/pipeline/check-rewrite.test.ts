@@ -138,6 +138,39 @@ describe('rewriting a frozen check on operator order', () => {
     expect((await scenario.journal()).checkRewrites).toHaveLength(1);
   });
 
+  it('puts the frozen content of a check back when its rewrite fails, so that a rewrite of another check is accepted', async () => {
+    const scenario = new PipelineScenario();
+    const otherCheck = 'app/e2e/link-target.spec.ts';
+    const manifest = { ...MANIFEST, checks: [MANIFEST.checks[0], { criterion: 2, paths: [CHECK_PATH, otherCheck], description: 'the link opens the conversation' }] };
+    scenario.harness.script('acceptance-author', {
+      effect: (request) => {
+        scenario.authorChecks(request, manifest);
+        scenario.workspace.write(request.workingDirectory, otherCheck, "test('the link opens the conversation', async () => {});\n");
+      },
+    });
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+    const frozenContent = scenario.workspace.read(scenario.worktree().path, CHECK_PATH);
+    scenario.harness.script('acceptance-author', {
+      effect: (request) => {
+        scenario.workspace.write(request.workingDirectory, CHECK_PATH, REWRITTEN);
+        scenario.acceptancePassesOnBase = true;
+      },
+    });
+    await order(scenario);
+    expect(await scenario.pipeline().runIssue(ISSUE_NUMBER)).toMatchObject({ kind: 'needs-human' });
+    expect(scenario.workspace.read(scenario.worktree().path, CHECK_PATH)).toBe(frozenContent);
+
+    scenario.harness.script('acceptance-author', {
+      effect: (request) => {
+        scenario.workspace.write(request.workingDirectory, otherCheck, "test('the link opens the conversation in a new panel', async () => {});\n");
+        scenario.acceptancePassesOnBase = false;
+      },
+    });
+    await order(scenario, otherCheck);
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+    expect((await scenario.journal()).checkRewrites.map((rewrite) => rewrite.path)).toEqual([otherCheck]);
+  });
+
   it('never re-freezes another frozen check that drifted, and leaves the frozen set as it was', async () => {
     const scenario = new PipelineScenario();
     const otherCheck = 'app/e2e/link-target.spec.ts';
