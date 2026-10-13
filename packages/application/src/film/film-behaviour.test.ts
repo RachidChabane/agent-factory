@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { EvidenceLimits } from '@agent-factory/domain';
 import { PIPELINE_EVENTS } from '../pipeline/journal-events.ts';
 import { loadJournal } from '../pipeline/pipeline-journal.ts';
 import { ISSUE_NUMBER, type PipelineScenario } from '../pipeline/testing/pipeline-scenario.ts';
@@ -256,6 +257,112 @@ describe('FilmBehaviour', () => {
 
     expect(outcome.kind).toBe('finished');
     expect(scenario.sourceControl.pushes.map((push) => push.headSha)).toContain(sha);
+  });
+});
+
+describe('FilmBehaviour and the limits of the evidence of a pull request', () => {
+  const AFTER_VIDEO = `${BRANCH_DIRECTORY}/after.mp4`;
+  const BEFORE_VIDEO = `${BRANCH_DIRECTORY}/before.mp4`;
+  const bytes = (size: number): string => 'v'.repeat(size);
+
+  async function filmWith(limits: EvidenceLimits) {
+    const world = await openPullRequest();
+    world.recorder.videoPath = MP4_VIDEO;
+    return { ...world, behaviour: behaviourOf(world.scenario, world, REPLAY_FILE, limits) };
+  }
+
+  async function committedBytes(world: Awaited<ReturnType<typeof openPullRequest>>): Promise<number> {
+    const bundle = (await loadJournal(world.scenario.events, ISSUE_NUMBER)).evidence?.bundle;
+    const tree = world.scenario.workspace.tree(world.scenario.worktree().path);
+    return (bundle?.files ?? []).reduce((total, file) => total + Buffer.byteLength(tree.get(file.bundlePath) ?? ''), 0);
+  }
+
+  it('leaves a video over the file limit off the branch, tells so in the body and the record, and still finishes the film', async () => {
+    const { scenario, recorder, behaviour } = await filmWith({ maxFileBytes: 100, maxTotalBytes: 1_000_000 });
+    recorder.videoContent = (ref) => (ref === scenario.worktree().baseSha ? bytes(40) : bytes(150));
+
+    const outcome = await behaviour.film(ORDER, SIGNAL);
+
+    expect(outcome.kind).toBe('finished');
+    const tree = scenario.workspace.tree(scenario.worktree().path);
+    expect(tree.has(BEFORE_VIDEO)).toBe(true);
+    expect(tree.has(AFTER_VIDEO)).toBe(false);
+    expect(tree.has(`${BRANCH_DIRECTORY}/after-report.json`)).toBe(true);
+    const film = (await loadJournal(scenario.events, ISSUE_NUMBER)).films[0];
+    expect(film?.after.omitted).toEqual([{ path: AFTER_VIDEO, bytes: 150, reason: 'file-limit', limitBytes: 100 }]);
+    expect(film?.before.omitted).toEqual([]);
+    expect(film?.after.storeVideo).toBe(`films/${SCENARIO}/after/${MP4_VIDEO}`);
+    const body = scenario.github.bodyUpdates.at(-1)?.body ?? '';
+    expect(body).toContain('Left out of the pull request: `after.mp4`, 150 B, over the limit of 100 B per file (evidence.maxFileBytes).');
+    expect(body).toContain('[Watch the recording]');
+  });
+
+  it('leaves out the heaviest files first while the films would take the pull request past the total limit', async () => {
+    const { scenario, recorder, behaviour } = await filmWith({ maxFileBytes: 1_000, maxTotalBytes: 250 });
+    recorder.screenshots = [FINAL_SCREENSHOT];
+    recorder.videoContent = (ref) => (ref === scenario.worktree().baseSha ? bytes(120) : bytes(200));
+    recorder.screenshotContent = () => bytes(30);
+
+    await behaviour.film(ORDER, SIGNAL);
+
+    const film = (await loadJournal(scenario.events, ISSUE_NUMBER)).films[0];
+    expect(film?.after.omitted).toEqual([{ path: AFTER_VIDEO, bytes: 200, reason: 'total-limit', limitBytes: 250 }]);
+    expect(film?.before.omitted).toEqual([]);
+  });
+
+  it('counts the evidence the pull request already holds: its bundle and the films of the other scenarios', async () => {
+    const world = await filmWith({ maxFileBytes: 1_000, maxTotalBytes: 1_000_000 });
+    const held = await committedBytes(world);
+    expect(held).toBeGreaterThan(0);
+    const limits = { maxFileBytes: 1_000, maxTotalBytes: held + 190 };
+    const behaviour = behaviourOf(world.scenario, world, REPLAY_FILE, limits);
+    world.recorder.videoContent = () => bytes(60);
+
+    await behaviour.film(ORDER, SIGNAL);
+    await behaviour.film({ ...ORDER, scenario: 'order-history' }, SIGNAL);
+
+    const films = (await loadJournal(world.scenario.events, ISSUE_NUMBER)).films;
+    expect(films[0]?.after.omitted).toEqual([]);
+    expect(films[1]?.before.omitted).toEqual([]);
+    expect(films[1]?.after.omitted).toEqual([
+      { path: `.evidence/${ISSUE_NUMBER}/films/order-history/after.mp4`, bytes: 60, reason: 'total-limit', limitBytes: limits.maxTotalBytes },
+    ]);
+  });
+
+  it('never leaves a report out, whatever the limits', async () => {
+    const { scenario, behaviour } = await filmWith({ maxFileBytes: 1, maxTotalBytes: 1 });
+
+    const outcome = await behaviour.film(ORDER, SIGNAL);
+
+    expect(outcome.kind).toBe('finished');
+    const tree = scenario.workspace.tree(scenario.worktree().path);
+    expect(tree.has(`${BRANCH_DIRECTORY}/before-report.json`)).toBe(true);
+    expect(tree.has(BEFORE_VIDEO)).toBe(false);
+    expect(tree.has(AFTER_VIDEO)).toBe(false);
+  });
+
+  it('removes from the branch what an earlier film of the scenario left where a file is now kept off', async () => {
+    const world = await filmWith({ maxFileBytes: 100, maxTotalBytes: 1_000_000 });
+    const { scenario, recorder, behaviour } = world;
+    recorder.videoContent = () => bytes(50);
+    await behaviour.film(ORDER, SIGNAL);
+    const worktree = scenario.worktree();
+    expect(scenario.workspace.tree(worktree.path).has(AFTER_VIDEO)).toBe(true);
+
+    recorder.videoContent = (ref) => (ref === worktree.baseSha ? bytes(50) : bytes(150));
+    const outcome = await behaviour.film(ORDER, SIGNAL);
+
+    expect(outcome.kind).toBe('finished');
+    expect(scenario.workspace.tree(worktree.path).has(AFTER_VIDEO)).toBe(false);
+    expect(scenario.sourceControl.history(worktree).at(-1)?.snapshot.has(AFTER_VIDEO)).toBe(false);
+  });
+
+  it('keeps every file when they all fit', async () => {
+    const { scenario, behaviour } = await filmWith({ maxFileBytes: 1_000_000, maxTotalBytes: 1_000_000 });
+    await behaviour.film(ORDER, SIGNAL);
+    const film = (await loadJournal(scenario.events, ISSUE_NUMBER)).films[0];
+    expect([film?.before.omitted, film?.after.omitted]).toEqual([[], []]);
+    expect(scenario.github.bodyUpdates.at(-1)?.body).not.toContain('Left out');
   });
 });
 

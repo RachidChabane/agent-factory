@@ -360,6 +360,8 @@ export interface WorkspaceFiles {
   readText(root: string, relativePath: string): Promise<string | null>;
   writeText(root: string, relativePath: string, content: string): Promise<void>;
   exists(root: string, relativePath: string): Promise<boolean>;
+  /** The size in bytes of a file inside the root; null when it is no file there. */
+  sizeOf(root: string, relativePath: string): Promise<number | null>;
   copyFile(fromRoot: string, fromRelativePath: string, toRoot: string, toRelativePath: string): Promise<boolean>;
   remove(root: string, relativePath: string): Promise<void>;
   /** Creates the directory and its parents inside the root, for a tool that writes into it without creating it. */

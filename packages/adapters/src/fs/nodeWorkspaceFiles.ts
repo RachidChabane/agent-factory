@@ -69,6 +69,18 @@ export class NodeWorkspaceFiles implements WorkspaceFiles {
     }
   }
 
+  async sizeOf(root: string, relativePath: string): Promise<number | null> {
+    const target = await containedExisting(root, relativePath);
+    if (target === null) return null;
+    try {
+      const entry = await stat(target);
+      return entry.isFile() ? entry.size : null;
+    } catch (error) {
+      if (isMissing(error)) return null;
+      throw error;
+    }
+  }
+
   async copyFile(fromRoot: string, fromRelativePath: string, toRoot: string, toRelativePath: string): Promise<boolean> {
     resolveInside(toRoot, toRelativePath);
     const source = await containedExisting(fromRoot, fromRelativePath);

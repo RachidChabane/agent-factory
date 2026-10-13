@@ -156,6 +156,7 @@ describe('SourcesKnowledgePack', () => {
       },
       writeText: () => Promise.reject(new Error('read only')),
       exists: () => Promise.resolve(true),
+      sizeOf: () => Promise.resolve(null),
       copyFile: () => Promise.resolve(false),
       remove: () => Promise.resolve(),
       makeDirectory: () => Promise.reject(new Error('read only')),

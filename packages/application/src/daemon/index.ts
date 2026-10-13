@@ -10,3 +10,4 @@ export * from './worktree-shortage.ts';
 export * from './installation-daemon.ts';
 export * from './scheduling-hold.ts';
 export * from './film-lane.ts';
+export * from './restart-hazards.ts';

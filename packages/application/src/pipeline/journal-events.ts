@@ -6,6 +6,7 @@ import {
   FAILURE_KINDS,
   GATE_STEP_OUTCOMES,
   ISSUE_STATES,
+  OMISSION_REASONS,
   TEST_OUTCOMES,
   TEST_RUNNERS,
 } from '@agent-factory/domain';
@@ -291,6 +292,21 @@ export const EvidenceFileSchema = z.object({
   caption: z.string().min(1),
 });
 
+/** What says why a file of the evidence is not on the pull request: how heavy it is and the limit it passed. */
+const OmissionFields = {
+  bytes: z.number().int().nonnegative(),
+  reason: z.enum(OMISSION_REASONS),
+  limitBytes: z.number().int().positive(),
+};
+
+/** A file the checks produced as evidence that the limits of the pull request keep off it. */
+export const OmittedEvidenceFileSchema = z.object({
+  phase: z.enum(EVIDENCE_PHASES),
+  sourcePath: z.string().min(1),
+  caption: z.string().min(1),
+  ...OmissionFields,
+});
+
 export const EvidenceBundleSchema = z.object({
   directory: z.string().min(1),
   beforeLogPath: z.string().min(1).nullable(),
@@ -299,6 +315,7 @@ export const EvidenceBundleSchema = z.object({
   acceptanceTestsPath: z.string().min(1).nullable().default(null),
   files: z.array(EvidenceFileSchema),
   missing: z.array(z.object({ phase: z.enum(EVIDENCE_PHASES), sourcePath: z.string().min(1) })),
+  omitted: z.array(OmittedEvidenceFileSchema).default([]),
 });
 
 export const ChangedFileStatSchema = z.object({
@@ -379,6 +396,9 @@ export const FilmFailedSchema = z.object({ scenario: z.string().min(1), reason: 
 
 export const FilmFactSchema = z.object({ label: z.string().min(1), value: z.string() });
 
+/** A file of a recording that the limits of the pull request keep off the branch, by the path it would have there. */
+export const OmittedFilmFileSchema = z.object({ path: z.string().min(1), ...OmissionFields });
+
 /** What one recording left on the branch, and where its files stand in the factory's film store. */
 const FilmPhaseRecordSchema = z.object({
   video: z.string().min(1),
@@ -388,6 +408,8 @@ const FilmPhaseRecordSchema = z.object({
   facts: z.array(FilmFactSchema),
   storeVideo: z.string().min(1),
   storeScreenshots: z.array(z.string().min(1)),
+  /** The video and screenshots above that are not on the branch. */
+  omitted: z.array(OmittedFilmFileSchema).default([]),
 });
 
 export const FilmFinishedSchema = z.object({
@@ -418,6 +440,8 @@ export type PullRequestReadyAnnouncedRecord = z.infer<typeof PullRequestReadyAnn
 export type MediaLinkRecord = z.infer<typeof MediaLinkSchema>;
 export type MediaFailureRecord = z.infer<typeof MediaFailureSchema>;
 export type FilmPhaseRecord = z.infer<typeof FilmPhaseRecordSchema>;
+export type OmittedFilmFile = z.infer<typeof OmittedFilmFileSchema>;
+export type OmittedEvidenceFile = z.infer<typeof OmittedEvidenceFileSchema>;
 export type FilmStartedRecord = z.infer<typeof FilmStartedSchema>;
 
 export type AgentRunFinished = z.infer<typeof AgentRunFinishedSchema>;

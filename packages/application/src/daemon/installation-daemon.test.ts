@@ -243,6 +243,30 @@ describe('InstallationDaemon', () => {
     expect((await activePauses(events)).has('drain')).toBe(false);
   });
 
+  describe('whether a restart would cut nothing short', () => {
+    it('is calm when no project works, no film records and no task runs', () => {
+      expect(setup().daemon.isCalm()).toBe(true);
+    });
+
+    it('is not while a project works', () => {
+      const { shop, daemon } = setup();
+      shop.busy = true;
+      expect(daemon.isCalm()).toBe(false);
+    });
+
+    it('is not while a film records', () => {
+      const films: InstallationFilms = { isRecording: () => true, tick: () => Promise.resolve(SLOTS_FREE), settle: () => Promise.resolve() };
+      expect(setup([], films).daemon.isCalm()).toBe(false);
+    });
+
+    it('is not while a task of the installation still runs', async () => {
+      const slow: InstallationTask = { name: 'reading the usage', run: () => new Promise<void>(() => undefined) };
+      const { daemon } = setup([slow]);
+      await daemon.tick(new AbortController().signal);
+      expect(daemon.isCalm()).toBe(false);
+    });
+  });
+
   it('finds a project by its id', () => {
     const { shop, daemon } = setup();
     expect(daemon.project('shop')).toBe(shop);

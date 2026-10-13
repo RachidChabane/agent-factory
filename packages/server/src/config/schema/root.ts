@@ -18,6 +18,15 @@ export const AgentFactoryConfigSchema = z
       for (const tool of project.tools.filter((candidate) => defaultTools.has(candidate.name))) {
         context.addIssue({ code: 'custom', path: ['projects', index, 'tools'], message: `tool ${tool.name} is already declared for the whole installation` });
       }
+      const declared = new Set([...defaultTools, ...project.tools.map((tool) => tool.name)]);
+      (project.evidence.films?.tools ?? []).forEach((name, position) => {
+        if (declared.has(name)) return;
+        context.addIssue({
+          code: 'custom',
+          path: ['projects', index, 'evidence', 'films', 'tools', position],
+          message: `tool ${name} is not declared: declare it in tools, of the installation or of the project`,
+        });
+      });
     });
   });
 export type RawAgentFactoryConfig = z.infer<typeof AgentFactoryConfigSchema>;

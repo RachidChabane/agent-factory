@@ -21,9 +21,21 @@ Add `Films: <scenario>[, <scenario>…]` right after `Labels:` in the spec file 
 - Once the pull request is open, the factory orders every declared scenario. The pull request opens at once and never waits for a film.
 - The film command runs twice in its working directory: first on the issue's base commit, then on the pull request head. Each run writes a video, screenshots and a report with facts; the pull request shows a Before and an After.
 - Films run one at a time across the installation, when no agent run is open and the machine has memory to spare. An operator pause holds them; a subscription budget pause does not.
-- The merge is refused while a film of the pull request is queued or running, with its expected arrival. A failed film, with its reason, does not hold the merge.
+- A project lists the tools its film command needs in `evidence.films.tools`. While one of them fails its check, the project's films stay queued and none fails; the operator is told which login to run, and `agent-factory status` names the tool and the command. The films start by themselves once every tool passes: do not order them again.
+- The merge is refused while a film of the pull request is queued or running, with its expected arrival, or with the tool the films wait for. A failed film, with its reason, does not hold the merge.
 - New feedback or a rewritten check drops the recorded films and orders the declared scenarios again for the new head. Merge only the head that holds the films.
 
 ## Order another film
 
 `agent-factory film <issue> --scenario <name>` orders a scenario once the pull request is open. A scenario already queued or running is not queued twice. After a failed film, read its reason on the pull request, fix the cause, and order it again.
+
+## Write or review a scenario
+
+These rules are for whoever writes or reviews a scenario of the product's own film tooling: the code the film command runs.
+
+- **Fetch what is missing.** The command is given a commit by its sha. When the checkout it records from lacks that commit, it fetches the commit by that sha before it checks it out.
+- **Bound every gesture.** Every click and every input has a time limit. A disabled button fails the scenario at once, naming the element, instead of holding it until the timeout of the whole recording.
+- **Target within the panel.** Find an element inside the panel, dialog or region that holds it, never across the whole page: the same label can appear in several places, such as a "Save" in a dialog and another in the toolbar.
+- **Answer an idle turn by rule.** An assistant can end a turn waiting for a confirmation without asking a question. The scenario answers such a turn with a rule specific to the scenario, such as replying "yes, book it" when the assistant offers to book the table, and answers at most a few times. A generic "continue" in a loop hides a conversation that is stuck.
+- **Make each detector specific.** A detector of an outcome matches that outcome and nothing near it. A link to an upload form is not a link to a stored file: match the address of the stored file, not any link that mentions it.
+- **Report what masks a change.** The report says when the environment hides a difference the film should show, such as a font installed on the recording machine, a cached asset or a seeded account. The report counts the actions the scenario made: a request that a client library sends again after a reset is one action, not a duplicate.

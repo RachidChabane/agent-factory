@@ -12,6 +12,7 @@ import {
 } from '@agent-factory/application';
 import { ConfigurationFileWatch } from './installation/configuration-watch.ts';
 import type { InstallationRuntime } from './installation/installation-runtime.ts';
+import { filmLaneTools } from './project/film-tools.ts';
 import { filmRunner, projectDaemon, projectScheduler } from './project/project-use-cases.ts';
 import { SystemSleeper } from './system.ts';
 
@@ -36,9 +37,10 @@ function healthTasks(runtime: InstallationRuntime): readonly InstallationTask[] 
 function installationFilms(runtime: InstallationRuntime): InstallationFilms | null {
   const projects = runtime.projects.flatMap((project): FilmLaneProject[] => {
     const films = filmRunner(project, runtime);
-    return films === null ? [] : [{ projectId: project.id, films, notifications: project.notifications, log: project.log, pauses: () => activePauses(project.dependencies.events) }];
+    if (films === null) return [];
+    return [{ projectId: project.id, films, notifications: project.notifications, log: project.log, tools: filmLaneTools(runtime, project), pauses: () => activePauses(project.dependencies.events) }];
   });
-  return projects.length === 0 ? null : new FilmLane(projects);
+  return projects.length === 0 ? null : new FilmLane(projects, { clock: runtime.clock });
 }
 
 const INSTALLATION_SCOPE = 'the installation';

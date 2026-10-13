@@ -83,6 +83,8 @@ const SUMMARIES: Readonly<Record<string, Summarizer>> = {
   'scheduler.resumed': () => 'scheduling resumed',
   'scheduler.worktrees-full': (_id, fields) => `${numbers(fields, 'waiting').map((waiting) => `#${waiting}`).join(', ') || 'issues'} wait: every worktree of the pool is held`,
   'scheduler.worktrees-free': () => 'a worktree is free again',
+  'films.tools-unavailable': (_id, fields) => `the films wait for ${text(fields, 'tool') ?? 'a tool'}: ${text(fields, 'status') ?? 'its check fails'}`,
+  'films.tools-available': () => 'every tool the films need passes its check',
   'settings.changed': (_id, fields) => `settings changed by ${text(fields, 'operator') ?? 'the operator'}`,
   'settings.configuration-reloaded': () => 'the configuration was reloaded',
   'settings.tool-checked': (_id, fields) => `${text(fields, 'tool') ?? 'a tool'} was checked: ${text(fields, 'status') ?? 'done'}`,

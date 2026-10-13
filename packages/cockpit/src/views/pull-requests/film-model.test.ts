@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { FilmOrderView, FilmView, ProjectView, PullRequestView } from '../../contract/index.ts';
+import type { FilmOrderView, FilmToolWaitView, FilmView, ProjectView, PullRequestView } from '../../contract/index.ts';
 import { createFormatters } from '../../i18n/formatters.ts';
-import { canOrderFilm, expectedArrival, failedFilms, filmTimeZone, hasFilmsToShow, isPendingFilm, isRecorded, pendingFilms } from './film-model.ts';
+import { canOrderFilm, expectedArrival, failedFilms, filmTimeZone, hasFilmsToShow, isPendingFilm, isRecorded, pendingFilms, waitOfQueuedFilms } from './film-model.ts';
 
 const MOMENT = '2026-10-12T10:00:00.000Z';
 
@@ -14,8 +14,12 @@ function film(scenario: string): FilmView {
   return { scenario, recordedAt: MOMENT, before: phase, after: phase };
 }
 
-const FILMING: Pick<ProjectView, 'settings'> = { settings: { films: { timeZone: 'UTC', timeoutMinutes: 20 } } as ProjectView['settings'] };
-const NOT_FILMING: Pick<ProjectView, 'settings'> = { settings: { films: null } as ProjectView['settings'] };
+function projectFilming(films: ProjectView['settings']['films']): Pick<ProjectView, 'settings'> {
+  return { settings: { films } as ProjectView['settings'] };
+}
+
+const FILMING = projectFilming({ timeZone: 'UTC', timeoutMinutes: 20, tools: [] });
+const NOT_FILMING = projectFilming(null);
 
 describe('the films of a pull request', () => {
   const orders = [order('a', 'queued'), order('b', 'recording-base'), order('c', 'recording-head'), order('d', 'committing'), order('e', 'finished'), order('f', 'failed', 'the session expired')];
@@ -47,13 +51,32 @@ describe('the films of a pull request', () => {
   });
 });
 
+describe('the tool the films of a pull request wait for', () => {
+  const wait: FilmToolWaitView = { tool: 'vault', scope: 'installation', status: 'unauthenticated', detail: '', loginCommand: null, fixCommand: null, since: MOMENT, checkedAt: MOMENT };
+  const waiting = { filmToolWait: wait };
+
+  it('is the tool the project says its films wait for, while a film of the pull request is queued', () => {
+    expect(waitOfQueuedFilms(waiting, pendingFilms({ filmOrders: [order('a', 'queued'), order('b', 'recording-head')] }))).toBe(wait);
+  });
+
+  it('is none when no film of the pull request is queued: one that records, or has ended, waits for no tool', () => {
+    expect(waitOfQueuedFilms(waiting, pendingFilms({ filmOrders: [order('a', 'recording-base')] }))).toBeNull();
+    expect(waitOfQueuedFilms(waiting, pendingFilms({ filmOrders: [order('a', 'finished'), order('b', 'failed')] }))).toBeNull();
+    expect(waitOfQueuedFilms(waiting, [])).toBeNull();
+  });
+
+  it('is none when the films of the project wait for no tool', () => {
+    expect(waitOfQueuedFilms({ filmToolWait: null }, pendingFilms({ filmOrders: [order('a', 'queued')] }))).toBeNull();
+  });
+});
+
 describe('the time a film is expected', () => {
   const reader = createFormatters('en', { justNow: 'just now' }, 'America/Los_Angeles');
   const INSTANT = '2026-10-12T21:11:00.000Z';
   const clock = (text: string) => text.replace(/\s/g, ' ');
 
   it('is told in the zone of the project, whatever zone the reader is in', () => {
-    expect(filmTimeZone({ settings: { films: { timeZone: 'Europe/Paris', timeoutMinutes: 20 } } as ProjectView['settings'] })).toBe('Europe/Paris');
+    expect(filmTimeZone(projectFilming({ timeZone: 'Europe/Paris', timeoutMinutes: 20, tools: [] }))).toBe('Europe/Paris');
     expect(clock(expectedArrival(reader, INSTANT, 'Europe/Paris'))).toBe('Oct 12, 2026, 11:11 PM (Europe/Paris)');
   });
 

@@ -53,6 +53,8 @@ export const frSettings = {
   'settings.films.none': 'Aucune commande de tournage n’est déclarée pour ce projet.',
   'settings.films.timeZone': 'Fuseau horaire des arrivées prévues',
   'settings.films.timeout': 'Enregistrement le plus long',
+  'settings.films.tools': 'Outils contrôlés avant un tournage',
+  'settings.films.toolsNone': 'Aucun : un tournage démarre sans contrôler d’outil.',
   'settings.conventions.title': 'Conventions',
   'settings.conventions.factoryLabel': 'Label de l’usine',
   'settings.conventions.validatedLabel': 'Label de validation',

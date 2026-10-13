@@ -243,7 +243,10 @@ export function projectSettingsView(project: ProjectConfig): ProjectSettingsView
     branchPrefix: conventions.branchPrefix,
     automations: project.audits.ignore.map((automation) => ({ name: automation.name, branches: [...automation.branches], authors: [...automation.authors] })),
     releaseModel: project.delivery.release.kind,
-    films: project.evidence.films === null ? null : { timeZone: project.evidence.films.timeZone, timeoutMinutes: Math.round(project.evidence.films.timeoutMs / MILLISECONDS_PER_MINUTE) },
+    films:
+      project.evidence.films === null
+        ? null
+        : { timeZone: project.evidence.films.timeZone, timeoutMinutes: Math.round(project.evidence.films.timeoutMs / MILLISECONDS_PER_MINUTE), tools: [...project.evidence.films.tools] },
     autonomy: autonomyView(project.autonomy),
   };
 }

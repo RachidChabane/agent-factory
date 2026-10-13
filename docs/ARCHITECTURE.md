@@ -65,7 +65,9 @@ A film is evidence added to an open pull request, not a stage
 scenarios the spec declares; the installation's daemon films them one at a time, across
 projects, while nothing else runs: the base, then the head, committed on the branch in
 one evidence commit and announced in the pull request body. The merge waits for the
-films of its pull request.
+films of its pull request. A project may list the tools its film command needs: while one
+fails its check, its films stay queued and hold no slot, and the operator is told which
+login to run.
 
 Once per head of an open pull request, the project daemon tells the operator that it is ready
 ([ADR 0034](adr/0034-notification-media.md)): every check reported on its head has completed and none

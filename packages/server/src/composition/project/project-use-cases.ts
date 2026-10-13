@@ -85,6 +85,7 @@ export function filmBehaviour(project: ProjectRuntime, installation: Installatio
       fileLinks: settings.fileLinks,
       evidenceCacheDirectory: settings.evidenceCacheDirectory,
       resources: settings.resources,
+      evidenceLimits: settings.evidenceLimits,
       replayFile: replaysFirstRecording(films.settings.command) ? films.settings.replayFile : null,
     },
   );

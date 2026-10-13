@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CostsViewSchema, ProjectViewSchema, RunViewSchema } from '@agent-factory/cockpit';
-import { WorktreeAcquiredSchema, auditSubject, type FactoryEventRecord } from '@agent-factory/application';
+import { FilmLedger, WorktreeAcquiredSchema, auditSubject, type EventStore, type FactoryEventRecord, type FilmToolWait } from '@agent-factory/application';
 import { projectCosts } from './cost-views.ts';
 import { indexEvents } from './event-index.ts';
 import { issueJournals } from './issue-views.ts';
@@ -8,9 +8,23 @@ import { projectView, type ProjectReadingsView } from './project-view.ts';
 import { proofLogExcerpt } from './pull-request-views.ts';
 import { pendingQuestions, projectRuns, recordedRuns } from './run-views.ts';
 import { imageKey, type ProjectSnapshotContext } from './snapshot-context.ts';
-import { COST_SETTINGS, GENERATED_AT, PROJECT, projectContext, projectHistory, type ProjectHistory } from './testing/project-history.ts';
+import { COST_SETTINGS, GENERATED_AT, PROJECT, PROJECT_ID, projectContext, projectHistory, type ProjectHistory } from './testing/project-history.ts';
 
 const READINGS: ProjectReadingsView = { forgeUrl: 'https://github.com/acme/widgets', workflows: null, deployments: () => null, knowledge: [], references: [], tools: [] };
+
+const FILM_FALLBACK_DURATION_MS = 20 * 60_000;
+/** The forecast is made from records already read, so the ledger never reads this log. */
+const UNUSED_LOG: EventStore = {
+  append: () => Promise.reject(new Error('not used')),
+  read: () => Promise.resolve([]),
+  subscribe: () => () => undefined,
+};
+
+function filmsWaitingFor(history: ProjectHistory, toolWait: FilmToolWait | null): ProjectSnapshotContext['films'] {
+  const ledger = FilmLedger.ofInstallation(UNUSED_LOG, [PROJECT_ID], { now: () => GENERATED_AT }, FILM_FALLBACK_DURATION_MS);
+  const forecast = ledger.forecastFrom(new Map([[PROJECT_ID, history.project]]));
+  return { forecast, presentation: { fallbackDurationMs: FILM_FALLBACK_DURATION_MS, timeZone: 'UTC', cockpitUrl: null }, toolWait };
+}
 
 function viewOf(history: ProjectHistory = projectHistory(), context = projectContext(history)) {
   return projectView(PROJECT, history.project, context, READINGS);
@@ -40,6 +54,28 @@ describe('the view of one project', () => {
     expect(cited.references).toEqual(references);
     expect(ProjectViewSchema.safeParse(cited).error?.issues ?? []).toEqual([]);
     expect(view.references).toEqual([]);
+  });
+
+  it('carries the tool the films of the project wait for, and none while they wait for no tool', () => {
+    const history = projectHistory();
+    const wait: FilmToolWait = {
+      tool: 'vault',
+      scope: 'installation',
+      status: 'unauthenticated',
+      detail: 'token expired',
+      loginCommand: 'vault login -method=oidc',
+      fixCommand: null,
+      since: new Date(GENERATED_AT.getTime() - 30 * 60_000),
+      checkedAt: new Date(GENERATED_AT.getTime() - 2 * 60_000),
+    };
+
+    const waiting = viewOf(history, projectContext(history, { films: filmsWaitingFor(history, wait) })).view;
+    const free = viewOf(history, projectContext(history, { films: filmsWaitingFor(history, null) })).view;
+
+    expect(waiting.filmToolWait).toEqual({ ...wait, since: wait.since.toISOString(), checkedAt: wait.checkedAt.toISOString() });
+    expect(ProjectViewSchema.safeParse(waiting).error?.issues ?? []).toEqual([]);
+    expect(free.filmToolWait).toBeNull();
+    expect(view.filmToolWait).toBeNull();
   });
 
   it('carries the state of every work item the project events describe', () => {

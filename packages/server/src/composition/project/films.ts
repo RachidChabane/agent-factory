@@ -3,6 +3,7 @@ import {
   FilmMergeGuard,
   FilmQueue,
   filmPresentationOf,
+  LoggedFilmToolWait,
   type FilmPresentation,
   type FilmSettings,
   type PipelineDependencies,
@@ -33,5 +34,5 @@ export function openProjectFilms(
   if (film === null || ledger === null) return null;
   const presentation = filmPresentationOf(film, cockpitUrl);
   const bodies = new FilmBodies(dependencies, { projectId: config.id, fileLinks: settings.fileLinks, presentation }, ledger);
-  return { settings: film, presentation, bodies, queue: new FilmQueue(dependencies, bodies), guard: new FilmMergeGuard(ledger, config.id, presentation) };
+  return { settings: film, presentation, bodies, queue: new FilmQueue(dependencies, bodies), guard: new FilmMergeGuard(ledger, config.id, presentation, new LoggedFilmToolWait(dependencies.events, film.tools)) };
 }

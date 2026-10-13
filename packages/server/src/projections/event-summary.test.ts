@@ -9,6 +9,12 @@ describe('the one-line summary of an event', () => {
     expect(summarizeEvent({ type: 'scheduler.worktrees-free', subject: 'daemon', payload: {} })).toBe('a worktree is free again');
   });
 
+  it('names the tool the films wait for, and says when every tool passes its check', () => {
+    expect(summarizeEvent({ type: 'films.tools-unavailable', subject: 'films', payload: { tool: 'vault', status: 'unauthenticated' } })).toBe('the films wait for vault: unauthenticated');
+    expect(summarizeEvent({ type: 'films.tools-unavailable', subject: 'films', payload: {} })).toBe('the films wait for a tool: its check fails');
+    expect(summarizeEvent({ type: 'films.tools-available', subject: 'films', payload: {} })).toBe('every tool the films need passes its check');
+  });
+
   it('says who made a gesture of the operator: the delegate when the event names one', () => {
     expect(summarizeEvent({ type: 'issue.spec-validated', subject: 'issue/12', payload: { operator: 'alex' } })).toBe('the spec of issue #12 was validated by alex');
     expect(summarizeEvent({ type: 'issue.spec-validated', subject: 'issue/12', payload: { operator: 'alex', actor: 'orchestrator', reason: 'the spec follows the template' } })).toBe(

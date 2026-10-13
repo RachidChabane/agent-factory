@@ -26,6 +26,24 @@ describe('closeOrphanFilms', () => {
     expect((await loadJournal(log.project('storefront'), 2)).filmOrders[0]?.status).toBe('finished');
   });
 
+  it('says in the reason that the factory stopped before the film ended', () => {
+    expect(ORPHAN_FILM_REASON).toBe('the factory stopped before the film ended');
+  });
+
+  it('keeps a film that waits in its place in the queue, behind the one it fails', async () => {
+    const log = new FilmLog();
+    await log.openPullRequest('storefront', 1);
+    await log.queue('storefront', 1, 'recording');
+    await log.start('storefront', 1, 'recording');
+    await log.queue('storefront', 1, 'waiting');
+    const before = (await loadJournal(log.project('storefront'), 1)).filmOrders.find((order) => order.scenario === 'waiting');
+
+    await closeOrphanFilms(log.project('storefront'));
+
+    const after = (await loadJournal(log.project('storefront'), 1)).filmOrders.find((order) => order.scenario === 'waiting');
+    expect(after).toMatchObject({ status: 'queued', queuedSequence: before?.queuedSequence, queuedAt: before?.queuedAt });
+  });
+
   it('closes only the films of the project it is given', async () => {
     const log = new FilmLog();
     await log.openPullRequest('ledger', 1);

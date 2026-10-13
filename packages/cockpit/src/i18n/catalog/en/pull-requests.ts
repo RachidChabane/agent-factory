@@ -169,6 +169,7 @@ export const enPullRequests = {
   'pullRequests.films.screenshot': '{phase}, scenario {scenario}, screenshot {position}',
   'pullRequests.films.facts': 'Facts of the {phase} recording',
   'pullRequests.films.state.queued': 'Queued',
+  'pullRequests.films.state.waiting-for-tool': 'Waiting for {tool}',
   'pullRequests.films.state.recording-base': 'Recording the base',
   'pullRequests.films.state.recording-head': 'Recording the head',
   'pullRequests.films.state.committing': 'Committing the recordings',
@@ -211,6 +212,10 @@ export const enPullRequests = {
   'pullRequests.ready.hold.films-pending': {
     one: 'The film of scenario {scenarios} is queued or recording.',
     other: 'The films of scenarios {scenarios} are queued or recording.',
+  },
+  'pullRequests.ready.hold.films-waiting': {
+    one: 'The film of scenario {scenarios} waits for the tool {tool}.',
+    other: 'The films of scenarios {scenarios} wait for the tool {tool}.',
   },
   'pullRequests.ready.hold.films-failed': {
     one: 'The film of scenario {scenarios} failed: order it again, or merge without it.',

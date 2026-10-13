@@ -138,6 +138,7 @@ export function buildStorefront(clock: FixtureClock, runs: RunWorld): ProjectVie
     baseBranch: 'main',
     pauses: [],
     scheduler: { worktreeShortage: null },
+    filmToolWait: null,
     issueTypes: issueTypeInfos(null),
     requests: newestFirst(storefrontRequests(clock, runs), (request) => request.receivedAt),
     issues: oldestFirstByNumber(delegated.issues),

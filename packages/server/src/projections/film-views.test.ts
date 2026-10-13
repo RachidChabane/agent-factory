@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PullRequestViewSchema } from '@agent-factory/cockpit';
-import { FilmLedger, PIPELINE_EVENTS, type EventStore, type FactoryEventRecord, type FilmPresentation } from '@agent-factory/application';
+import { FilmLedger, PIPELINE_EVENTS, type EventStore, type FactoryEventRecord, type FilmPresentation, type FilmToolWait } from '@agent-factory/application';
 import { indexEvents } from './event-index.ts';
 import { issueJournals } from './issue-views.ts';
 import { projectPullRequests } from './pull-request-views.ts';
@@ -69,10 +69,10 @@ function withFilms(history: ProjectHistory, ...events: readonly FilmEvent[]): Pr
   return { ...history, project: [...history.project, ...extra] };
 }
 
-function pullRequestOf(history: ProjectHistory, others: ReadonlyMap<string, readonly FactoryEventRecord[]> = new Map()) {
+function pullRequestOf(history: ProjectHistory, others: ReadonlyMap<string, readonly FactoryEventRecord[]> = new Map(), toolWait: FilmToolWait | null = null) {
   const ledger = FilmLedger.ofInstallation(UNUSED_LOG, [PROJECT_ID, ...others.keys()], { now: () => GENERATED_AT }, PRESENTATION.fallbackDurationMs);
   const forecast = ledger.forecastFrom(new Map([[PROJECT_ID, history.project], ...others]));
-  const context = projectContext(history, { films: { forecast, presentation: PRESENTATION } });
+  const context = projectContext(history, { films: { forecast, presentation: PRESENTATION, toolWait } });
   const index = indexEvents(history.project);
   const [pullRequest] = projectPullRequests(issueJournals(index), index, context);
   if (pullRequest === undefined) throw new Error('the history has no pull request');
@@ -104,6 +104,23 @@ describe('the films of a pull request in the cockpit', () => {
     ]);
     expect(pullRequest.mergeable).toBe(false);
     expect(pullRequest.mergeBlockers).toEqual(['films in progress, expected around 12:20 on 2026-10-09 (UTC)']);
+  });
+
+  it('hold the merge for the tool the films wait for, in place of an arrival no one can expect', () => {
+    const wait: FilmToolWait = {
+      tool: 'vault',
+      scope: 'installation',
+      status: 'unauthenticated',
+      detail: 'token expired',
+      loginCommand: null,
+      fixCommand: null,
+      since: new Date(GENERATED_AT.getTime() - 30 * MINUTE_MS),
+      checkedAt: new Date(GENERATED_AT.getTime() - 2 * MINUTE_MS),
+    };
+    const pullRequest = pullRequestOf(withFilms(projectHistory(), queued('checkout-flow', -5)), new Map(), wait);
+    expect(pullRequest.mergeable).toBe(false);
+    expect(pullRequest.mergeBlockers).toEqual(['films in progress, waiting for the tool vault']);
+    expect(pullRequest.filmOrders[0]).toMatchObject({ state: 'queued' });
   });
 
   it('show the stage of a scenario that records, counted from its start', () => {

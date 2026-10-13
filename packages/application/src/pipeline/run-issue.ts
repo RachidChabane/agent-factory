@@ -92,7 +92,7 @@ export class IssuePipeline {
         options.signal ?? new AbortController().signal,
       ),
       gate: new OrchestratorGate(dependencies.sourceControl, dependencies.files, shell, settings.gate, settings.setupCommands),
-      evidence: new EvidenceCollector(dependencies.files, settings.evidenceCacheDirectory),
+      evidence: new EvidenceCollector(dependencies.files, settings.evidenceCacheDirectory, settings.evidenceLimits),
       bodies: new PullRequestBodyRenderer(),
       stacks: new IssueStacks({ services: dependencies.services, logs: dependencies.logs, slots: dependencies.stackSlots }, settings.stack, shell),
       films: options.films ?? null,

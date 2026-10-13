@@ -6,6 +6,7 @@ import { attributionRules, type ProjectConventions } from '../conventions/projec
 import { scanNewMerges, seedMergeCursor } from '../audit/watch-merges.ts';
 import { BudgetExhaustedError } from '../budget/budget-governor.ts';
 import { NOTICES, type OperatorNotifications } from '../notifications/operator-notifications.ts';
+import { evidenceIsComplete } from '../pipeline/evidence.ts';
 import { issueStates } from '../pipeline/pipeline-capacity.ts';
 import { PipelineAbortedError } from '../pipeline/pipeline-errors.ts';
 import { loadJournal } from '../pipeline/pipeline-journal.ts';
@@ -405,7 +406,7 @@ export class FactoryDaemon {
     switch (outcome.kind) {
       case 'pr-open': {
         const journal = await loadJournal(events, outcome.issueNumber);
-        const evidenceComplete = journal.evidence?.bundle.missing.length === 0;
+        const evidenceComplete = journal.evidence !== null && evidenceIsComplete(journal.evidence.bundle);
         await notifications.send(
           journal.feedback.length > 0
             ? NOTICES.pullRequestUpdated(outcome.issueNumber, outcome.pullRequest.number)

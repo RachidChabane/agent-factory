@@ -170,6 +170,7 @@ export const frPullRequests = {
   'pullRequests.films.screenshot': '{phase}, scénario {scenario}, capture {position}',
   'pullRequests.films.facts': 'Faits de l’enregistrement {phase}',
   'pullRequests.films.state.queued': 'En file d’attente',
+  'pullRequests.films.state.waiting-for-tool': 'En attente de {tool}',
   'pullRequests.films.state.recording-base': 'Enregistrement de la base',
   'pullRequests.films.state.recording-head': 'Enregistrement de la tête',
   'pullRequests.films.state.committing': 'Ajout des enregistrements à la branche',
@@ -212,6 +213,10 @@ export const frPullRequests = {
   'pullRequests.ready.hold.films-pending': {
     one: 'Le film du scénario {scenarios} est en attente ou en cours.',
     other: 'Les films des scénarios {scenarios} sont en attente ou en cours.',
+  },
+  'pullRequests.ready.hold.films-waiting': {
+    one: 'Le film du scénario {scenarios} attend l’outil {tool}.',
+    other: 'Les films des scénarios {scenarios} attendent l’outil {tool}.',
   },
   'pullRequests.ready.hold.films-failed': {
     one: 'Le film du scénario {scenarios} a échoué : commandez-le de nouveau, ou mergez sans lui.',

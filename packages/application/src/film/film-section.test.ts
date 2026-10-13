@@ -18,6 +18,7 @@ const FILM: FilmFinishedRecord = {
     facts: [{ label: 'Items in the cart', value: '0' }],
     storeVideo: 'films/checkout-flow/before/film.mp4',
     storeScreenshots: [],
+    omitted: [],
   },
   after: {
     video: '.evidence/42/films/checkout-flow/after.mp4',
@@ -26,6 +27,7 @@ const FILM: FilmFinishedRecord = {
     facts: [],
     storeVideo: 'films/checkout-flow/after/film.mp4',
     storeScreenshots: [],
+    omitted: [],
   },
 };
 
@@ -44,6 +46,39 @@ describe('film section', () => {
     const block = renderFinishedFilm(LINKS, FILM);
     expect(block).toContain('- Items in the cart: 0');
     expect(block.split('#### After')[1]).not.toContain('- ');
+  });
+
+  describe('a recording whose files the limits of the pull request keep off the branch', () => {
+    const BEFORE_VIDEO = '.evidence/42/films/checkout-flow/before.mp4';
+    const BEFORE_FRAME = '.evidence/42/films/checkout-flow/before-frame-1.png';
+    const leftOut: FilmFinishedRecord = {
+      ...FILM,
+      before: {
+        ...FILM.before,
+        omitted: [
+          { path: BEFORE_VIDEO, bytes: 12_400_000, reason: 'file-limit', limitBytes: 5_000_000 },
+          { path: BEFORE_FRAME, bytes: 3_000_000, reason: 'total-limit', limitBytes: 40_000_000 },
+        ],
+      },
+    };
+
+    it('names each file left out with its size and the limit, in place of a link to it', () => {
+      const before = renderFinishedFilm(LINKS, leftOut).split('#### After')[0] ?? '';
+      expect(before).toContain('Left out of the pull request: `before.mp4`, 12.4 MB, over the limit of 5 MB per file (evidence.maxFileBytes).');
+      expect(before).toContain('Left out of the pull request: `before-frame-1.png`, 3 MB, the evidence of the pull request would pass its limit of 40 MB in total (evidence.maxTotalBytes).');
+      expect(before).not.toContain('Watch the recording');
+      expect(before).not.toContain('before-frame-1.png?raw=true');
+    });
+
+    it('keeps linking the files that are on the branch', () => {
+      const before = renderFinishedFilm(LINKS, leftOut).split('#### After')[0] ?? '';
+      expect(before).toContain('![Before](https://forge.example.test/example-org/storefront/blob/3333333ccccccc/.evidence/42/films/checkout-flow/before.svg?raw=true)');
+      expect(renderFinishedFilm(LINKS, leftOut)).toContain('[Watch the recording](https://forge.example.test/example-org/storefront/blob/3333333ccccccc/.evidence/42/films/checkout-flow/after.mp4)');
+    });
+
+    it('says nothing of the limits for a recording that fits', () => {
+      expect(renderFinishedFilm(LINKS, FILM)).not.toContain('Left out');
+    });
   });
 
   it('puts the heading first and one block per scenario after it', () => {

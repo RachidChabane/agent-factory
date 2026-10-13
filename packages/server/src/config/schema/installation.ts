@@ -160,8 +160,11 @@ const NotificationsSchema = z
   })
   .prefault({});
 
+/** The name a tool is declared under and listed by. */
+export const ToolNameSchema = z.string().regex(/^[a-z][a-z0-9-]*$/, 'must be lowercase letters, digits and dashes');
+
 export const ToolCheckSchema = z.strictObject({
-  name: z.string().regex(/^[a-z][a-z0-9-]*$/, 'must be lowercase letters, digits and dashes'),
+  name: ToolNameSchema,
   description: NonEmptyString.optional(),
   /** The read-only command that succeeds when the tool is installed and logged in. */
   check: z.array(NonEmptyString).min(1),
