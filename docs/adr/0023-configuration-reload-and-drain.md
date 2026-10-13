@@ -38,4 +38,10 @@ Option 3.
 
 - An edit never takes effect silently half way: the cockpit says what applied, what
   waits for a restart and what was refused.
-- A planned restart loses no agent run.
+- A planned restart loses no agent run. The drain waits for every agent run, for the film
+  that is recording, and for every issue the factory is driving, whichever stage it is in,
+  including the stages it runs by itself (freezing the checks, the gate, the evidence).
+  `agent-factory status` says whether the moment is calm, that is, whether nothing of this
+  is going on.
+- A film recording that a stop cuts short is failed with a reason that says so, and the
+  films that wait stay queued, in their place, for the next start.

@@ -8,7 +8,7 @@ and keeping it healthy.
 
 ```sh
 agent-factory start            # the factory and its cockpit, on http://127.0.0.1:7430
-agent-factory status           # the installation at a glance, in a terminal
+agent-factory status           # the installation at a glance, in a terminal, and whether the moment is calm
 agent-factory stop             # drain: no new work, exit once running work is done
 agent-factory stop --now       # stop now, agents included
 ```
@@ -17,6 +17,14 @@ agent-factory stop --now       # stop now, agents included
 works too). The factory refuses to start twice on the same home. Before a restart,
 prefer the drain: nothing in flight is cut short. The cockpit's **Drain** does the
 same.
+
+A moment is **calm** when a restart would cut nothing short: no agent run is open, no film
+is recording, and no issue is in a stage the factory runs by itself (freezing the checks,
+the gate, the evidence). `agent-factory status` prints `Calm: yes`, or `Calm: no` and one
+line for each thing going on. The drain waits for all of it, then the factory exits, so a
+restart at a moment that is not calm only takes longer. A film that is recording when the
+factory is stopped anyway fails with a reason that says so, and you order it again; a film
+that waits stays queued, in its place, for the next start.
 
 Before the first start, `agent-factory validate` checks the configuration, every tool
 the installation needs (git, gh, claude, the sandbox), each project's clone, labels,
