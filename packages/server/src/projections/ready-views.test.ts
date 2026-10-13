@@ -33,7 +33,7 @@ function withEvents(history: ProjectHistory, ...events: readonly Pick<FactoryEve
 
 function pullRequestOf(history: ProjectHistory, overrides: Partial<ProjectSnapshotContext> = {}, filming = true): PullRequestView {
   const films = filming
-    ? { forecast: FilmLedger.ofInstallation(UNUSED_LOG, [PROJECT_ID], { now: () => GENERATED_AT }, PRESENTATION.fallbackDurationMs).forecastFrom(new Map([[PROJECT_ID, history.project]])), presentation: PRESENTATION }
+    ? { forecast: FilmLedger.ofInstallation(UNUSED_LOG, [PROJECT_ID], { now: () => GENERATED_AT }, PRESENTATION.fallbackDurationMs).forecastFrom(new Map([[PROJECT_ID, history.project]])), presentation: PRESENTATION, toolWait: null }
     : null;
   const context = projectContext(history, { films, ...overrides });
   const index = indexEvents(history.project);

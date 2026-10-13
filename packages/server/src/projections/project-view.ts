@@ -1,6 +1,5 @@
 import type { KnowledgeSourceView, ProjectView, ReferenceView, RequestView, ToolView } from '@agent-factory/cockpit';
-import { healthSamplesSince, type CheckedTool, type FactoryEventRecord } from '@agent-factory/application';
-import type { ToolName } from '@agent-factory/domain';
+import { healthSamplesSince, type FactoryEventRecord } from '@agent-factory/application';
 import type { ProjectConfig } from '../config/agent-factory-config.ts';
 import type { Observed } from '../snapshot/cached-reading.ts';
 import { projectAudits, projectSkippedChanges } from './audit-views.ts';
@@ -27,8 +26,6 @@ export interface ProjectReadingsView {
   readonly knowledge: KnowledgeSourceView[];
   readonly references: ReferenceView[];
   readonly tools: ToolView[];
-  /** The latest check of each tool the installation declares, which the films of a project may wait for. */
-  readonly installationToolChecks: ReadonlyMap<ToolName, CheckedTool>;
 }
 
 export interface ProjectViewProjection {
@@ -61,7 +58,7 @@ export function projectView(project: ProjectConfig, records: readonly FactoryEve
     baseBranch: project.baseBranch,
     pauses: pauseViews(records, 'project'),
     scheduler: schedulerView(records),
-    filmToolWait: filmToolWaitView(records, (project.evidence.films?.tools.length ?? 0) > 0, readings.installationToolChecks),
+    filmToolWait: filmToolWaitView(context.films?.toolWait ?? null),
     issueTypes: project.issueTypes.map((type) => ({
       id: type.id,
       label: type.label,

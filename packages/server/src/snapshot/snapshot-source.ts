@@ -6,6 +6,7 @@ import type { CockpitSnapshot, KnowledgeSourceView, ProjectView, ReferenceView, 
 import { evidencePath, forgeFilePath, requestAttachmentPath } from '@agent-factory/cockpit';
 import {
   acceptanceCommand,
+  currentFilmToolWait,
   EVIDENCE_CACHE_ISSUE_PREFIX,
   latestToolChecks,
   latestToolSessions,
@@ -371,7 +372,7 @@ export class SnapshotSource {
       productionWorkflowUrl: productionWorkflowUrl(config),
       issueCosts: issueCosts(runs, project.id),
       changedFiles,
-      films: project.films === null || forecast === null ? null : { forecast, presentation: project.films.presentation },
+      films: project.films === null || forecast === null ? null : { forecast, presentation: project.films.presentation, toolWait: currentFilmToolWait(records, installationToolChecks, project.films.settings.tools) },
     };
     return projectView(config, records, context, {
       forgeUrl: forgeUrl(config),
@@ -380,7 +381,6 @@ export class SnapshotSource {
       knowledge,
       references,
       tools: toolViews(projectTools(config), latestToolChecks(records), latestToolSessions(records), 'project'),
-      installationToolChecks,
     });
   }
 

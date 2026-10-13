@@ -1,6 +1,5 @@
 import type { FilmOrderView, FilmToolWaitView, FilmView } from '@agent-factory/cockpit';
-import { FACTORY_FILM_OPERATOR, filmMergeBlocker, currentFilmToolWait, isFilmPending, unorderedDeclaredFilms, PIPELINE_EVENTS, FilmFinishedSchema, type CheckedTool, type FactoryEventRecord, type FilmForecast, type FilmOrderState, type FilmPhaseRecord, type FilmPresentation, type PipelineJournal } from '@agent-factory/application';
-import type { ToolName } from '@agent-factory/domain';
+import { FACTORY_FILM_OPERATOR, filmMergeBlocker, isFilmPending, unorderedDeclaredFilms, PIPELINE_EVENTS, FilmFinishedSchema, type FactoryEventRecord, type FilmForecast, type FilmOrderState, type FilmPhaseRecord, type FilmPresentation, type FilmToolWait, type PipelineJournal } from '@agent-factory/application';
 import { iso } from './event-index.ts';
 import type { ProjectSnapshotContext } from './snapshot-context.ts';
 
@@ -8,6 +7,8 @@ import type { ProjectSnapshotContext } from './snapshot-context.ts';
 export interface ProjectFilmContext {
   readonly forecast: FilmForecast;
   readonly presentation: FilmPresentation;
+  /** The tool the films of the project wait for while its check fails; null when they wait for none. */
+  readonly toolWait: FilmToolWait | null;
 }
 
 function phaseView(journal: PipelineJournal, sha: string, phase: FilmPhaseRecord, context: ProjectSnapshotContext): FilmView['before'] {
@@ -69,15 +70,11 @@ export function filmOrderViews(journal: PipelineJournal, context: ProjectSnapsho
 /** Why the merge waits for the films of the pull request, or null when it does not. */
 export function filmMergeReason(journal: PipelineJournal, context: ProjectSnapshotContext): string | null {
   const films = context.films;
-  return films === null ? null : filmMergeBlocker(journal, films.forecast, context.project, films.presentation);
+  return films === null ? null : filmMergeBlocker(journal, films.forecast, context.project, films.presentation, films.toolWait);
 }
 
-/**
- * The tool the films of a project wait for, while its check fails; null when they wait for none, or the project lists no
- * tool. The tool was last read at the latest check the log records, the installation's checks being those of its own tools.
- */
-export function filmToolWaitView(records: readonly FactoryEventRecord[], listsTools: boolean, installationChecks: ReadonlyMap<ToolName, CheckedTool>): FilmToolWaitView | null {
-  const wait = listsTools ? currentFilmToolWait(records, installationChecks) : null;
+/** The tool the films of a project wait for, as the cockpit shows it; null when they wait for none. */
+export function filmToolWaitView(wait: FilmToolWait | null): FilmToolWaitView | null {
   if (wait === null) return null;
   const { tool, scope, status, detail, loginCommand, fixCommand } = wait;
   return { tool, scope, status, detail, loginCommand, fixCommand, since: iso(wait.since), checkedAt: iso(wait.checkedAt) };

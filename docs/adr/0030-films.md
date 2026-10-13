@@ -88,9 +88,10 @@ request never waits for a film, and no issue state is added.
   each film ahead and for this one. A typical film is the median of the last five
   successful films, or `timeoutMinutes` while there are none.
 - **Merge.** The merge is refused while a film of the pull request is queued or running,
-  with the expected arrival. A failed film does not hold the merge. New feedback and a
-  rewritten check drop the recorded films and their orders. The declared scenarios are
-  ordered again for the new head.
+  with the expected arrival, or with the tool the films wait for when no arrival can be
+  expected. A failed film does not hold the merge. New feedback and a rewritten check
+  drop the recorded films and their orders. The declared scenarios are ordered again
+  for the new head.
 - **Confinement.** The film command is the one command the factory runs outside the
   sandbox, with the operator's environment plus `environment`. The product's tool
   needs the operator's container engine, secrets, cloud and browser sessions. It runs

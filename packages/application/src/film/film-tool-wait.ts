@@ -49,13 +49,44 @@ export function filmToolWaitOf(records: readonly FactoryEventRecord[]): FilmTool
   return wait;
 }
 
+/** The wait in force when the films of a project list these tools; a wait for any other tool stands for nothing. */
+export function filmToolWaitFor(records: readonly FactoryEventRecord[], listed: readonly ToolName[]): FilmToolWait | null {
+  const wait = filmToolWaitOf(records);
+  return wait !== null && listed.includes(wait.tool) ? wait : null;
+}
+
+function waitRecords(events: EventStore): Promise<readonly FactoryEventRecord[]> {
+  return events.read(FILM_TOOLS_SUBJECT, FIRST_SEQUENCE);
+}
+
+/** What the merge asks of the films that wait for a tool. */
+export interface FilmToolWaitReading {
+  /** The wait in force; null when the films wait for no tool. */
+  current(): Promise<FilmToolWait | null>;
+}
+
+/** Reads the wait in the log of a project whose films list these tools. */
+export class LoggedFilmToolWait implements FilmToolWaitReading {
+  private readonly events: EventStore;
+  private readonly listed: readonly ToolName[];
+
+  constructor(events: EventStore, listed: readonly ToolName[]) {
+    this.events = events;
+    this.listed = listed;
+  }
+
+  async current(): Promise<FilmToolWait | null> {
+    return filmToolWaitFor(await waitRecords(this.events), this.listed);
+  }
+}
+
 /**
- * The wait in force, with the time its tool was last read: the log's latest check of the tool when it is newer than the
- * record of the wait, whoever ran it. A tool of the installation is checked in the installation's log, a tool of the
- * project in the project's.
+ * The wait in force when the films of the project list these tools, with the time its tool was last read: the log's latest
+ * check of the tool when it is newer than the record of the wait, whoever ran it. A tool of the installation is checked in
+ * the installation's log, a tool of the project in the project's.
  */
-export function currentFilmToolWait(projectRecords: readonly FactoryEventRecord[], installationChecks: ReadonlyMap<ToolName, CheckedTool>): FilmToolWait | null {
-  const wait = filmToolWaitOf(projectRecords);
+export function currentFilmToolWait(projectRecords: readonly FactoryEventRecord[], installationChecks: ReadonlyMap<ToolName, CheckedTool>, listed: readonly ToolName[]): FilmToolWait | null {
+  const wait = filmToolWaitFor(projectRecords, listed);
   if (wait === null) return null;
   const checks = wait.scope === 'project' ? latestToolChecks(projectRecords) : installationChecks;
   const checkedAt = checks.get(wait.tool)?.checkedAt;
@@ -95,7 +126,7 @@ export class FilmToolWaitReporter implements FilmToolWaitRecord {
   }
 
   async current(): Promise<FilmToolWait | null> {
-    return filmToolWaitOf(await this.dependencies.events.read(FILM_TOOLS_SUBJECT, FIRST_SEQUENCE));
+    return filmToolWaitOf(await waitRecords(this.dependencies.events));
   }
 
   async unavailable({ tool, status, detail, fixCommand }: FilmToolFinding): Promise<void> {

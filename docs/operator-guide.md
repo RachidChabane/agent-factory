@@ -210,8 +210,8 @@ queues the order, a stopped one records it at once.
   pull request page and `agent-factory status` show the tool, the command and since when, and the films
   start by themselves, with a notice, once every tool passes.
 - **Merge** waits while a film of the pull request is queued or recording, and says
-  when it is expected. A film that failed does not hold the merge; its reason stands in
-  the body and in the cockpit, and you order it again.
+  when it is expected, or which tool the films wait for. A film that failed does not hold
+  the merge; its reason stands in the body and in the cockpit, and you order it again.
 - Each film adds one evidence commit to the branch, so the head to merge is the one the
   cockpit shows after the film.
 

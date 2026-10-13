@@ -40,14 +40,13 @@ function issuesByState(index: ReturnType<typeof indexEvents>): ReadonlyMap<Issue
 }
 
 function projectOverview(project: ProjectConfig, records: readonly FactoryEventRecord[], installationChecks: ReadonlyMap<ToolName, CheckedTool>): ProjectOverview {
-  const listsTools = (project.evidence.films?.tools.length ?? 0) > 0;
   return {
     id: project.id,
     name: project.name,
     forge: forgeName(project),
     issuesByState: issuesByState(indexEvents(records)),
     pauses: pauseViews(records, 'project'),
-    filmToolWait: listsTools ? currentFilmToolWait(records, installationChecks) : null,
+    filmToolWait: currentFilmToolWait(records, installationChecks, project.evidence.films?.tools ?? []),
   };
 }
 
