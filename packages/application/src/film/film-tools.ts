@@ -7,6 +7,12 @@ import type { FilmToolWaitRecord } from './film-tool-wait.ts';
  */
 export const FILM_TOOL_RECHECK_INTERVAL_MS = 5 * 60_000;
 
+/**
+ * A film starts on a reading of its tools no older than this: a start that is put off, for memory or for an agent run
+ * the daemons do not know, does not read the tools again at every tick.
+ */
+export const FILM_TOOL_FRESHNESS_MS = 60_000;
+
 export const FILM_TOOL_SCOPES = ['installation', 'project'] as const;
 export type FilmToolScope = (typeof FILM_TOOL_SCOPES)[number];
 

@@ -82,7 +82,7 @@ export const frWidgets = {
   'filmWait.status': 'Son contrôle indique : {status}.',
   'filmWait.noCommand': 'L’outil ne déclare ni connexion ni commande de réparation : rétablissez-le à la main.',
   'filmWait.queued': 'Les tournages en file restent en file et aucun n’échoue. Ils démarrent d’eux-mêmes dès que chaque outil réussit son contrôle.',
-  'filmWait.since': 'Les tournages attendent depuis {when}.',
+  'filmWait.since': 'L’attente a commencé {when}.',
   'tools.login': 'Se connecter',
   'tools.loginLabel': 'Se connecter à {tool}',
   'tools.loginHint': 'Lance {command} sur la machine de l’usine.',

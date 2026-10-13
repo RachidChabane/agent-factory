@@ -1,6 +1,6 @@
 import { isToolFailure, type ToolProbeResult, type ToolStatus } from '@agent-factory/domain';
 import type { Clock } from '../ports.ts';
-import { FILM_TOOL_RECHECK_INTERVAL_MS, type FilmTool, type FilmToolChecks } from './film-tools.ts';
+import { FILM_TOOL_FRESHNESS_MS, FILM_TOOL_RECHECK_INTERVAL_MS, type FilmTool, type FilmToolChecks } from './film-tools.ts';
 
 /** A tool the films of a project need, with what checks it. */
 export interface WantedTool {
@@ -15,7 +15,7 @@ export interface ToolReading {
   readonly readAt: number;
 }
 
-/** When a tool is read: what is missing or older than the recheck interval, or everything not read in this round. */
+/** When a tool is read: what is missing or older than the recheck interval, or what is about to be relied on and is not fresh. */
 export type ReadRule = 'due' | 'now';
 
 /** A reading known only from the record of a wait is due at once. */
@@ -23,7 +23,8 @@ const SEEDED_AT = Number.NEGATIVE_INFINITY;
 
 /**
  * The latest reading of each tool the films wait for. A tool is read at most once per recheck interval while nothing
- * asks for more, and again when a film is about to start; the tools asked for are read at once. A tool that fails is
+ * asks for more, and again when a film is about to start unless it was read within the last minute; the tools asked
+ * for are read at once. A tool that fails is
  * also compared with the checks the log records: the one the operator ran from the cockpit after a login is a newer
  * reading than the factory's own.
  */
@@ -91,8 +92,8 @@ export class FilmToolReadings {
   }
 
   private isToRead(key: string, rule: ReadRule, now: number): boolean {
-    if (rule === 'now') return !this.readInThisRound.has(key);
     const reading = this.readings.get(key);
+    if (rule === 'now') return !this.readInThisRound.has(key) && (reading === undefined || now - reading.readAt >= FILM_TOOL_FRESHNESS_MS);
     return reading === undefined || now - reading.readAt >= FILM_TOOL_RECHECK_INTERVAL_MS;
   }
 }

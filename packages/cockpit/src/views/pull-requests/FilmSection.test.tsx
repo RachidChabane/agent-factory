@@ -168,7 +168,8 @@ describe('the videos of a pull request that wait for a tool', () => {
     expect(within(notice).getByText(/^Its check reports: Not signed in\./)).toHaveTextContent('Its check reports: Not signed in. token expired');
     expect(within(notice).getByText(VAULT_LOGIN)).toBeInTheDocument();
     expect(within(notice).getByText(/^The queued films stay queued and none fails\./)).toBeInTheDocument();
-    expect(within(notice).getByText(/^The films have waited since/).querySelector('time')).toHaveAttribute('datetime', minutesAgo(125));
+    expect(within(notice).getByText(/^Waiting began/)).toHaveTextContent('Waiting began 2 hr. ago.');
+    expect(within(notice).getByText(/^Waiting began/).querySelector('time')).toHaveAttribute('datetime', minutesAgo(125));
     expect(within(notice).getByText(/^Checked /)).toHaveAttribute('datetime', minutesAgo(4));
   });
 
@@ -262,6 +263,7 @@ describe('the videos of a pull request that wait for a tool', () => {
     const notice = within(screen.getByRole('region', { name: 'Vidéos' })).getByRole('region', { name: 'Tournages en attente de vault' });
     expect(within(notice).getByText('Les tournages attendent vault')).toBeInTheDocument();
     expect(within(notice).getByText(/^Son contrôle indique : Non connecté\./)).toBeInTheDocument();
+    expect(within(notice).getByText(/^L’attente a commencé/)).toHaveTextContent(/^L’attente a commencé il y a 2 h/);
     expect(within(notice).getByRole('button', { name: 'Se connecter à vault' })).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Vidéos' })).getByText('En attente de vault · scénario checkout-flow')).toBeInTheDocument();
   });

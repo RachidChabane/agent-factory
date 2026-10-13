@@ -81,7 +81,7 @@ export const enWidgets = {
   'filmWait.status': 'Its check reports: {status}.',
   'filmWait.noCommand': 'The tool declares no login or fix command: restore it by hand.',
   'filmWait.queued': 'The queued films stay queued and none fails. They start by themselves once every tool passes its check.',
-  'filmWait.since': 'The films have waited since {when}.',
+  'filmWait.since': 'Waiting began {when}.',
   'tools.login': 'Log in',
   'tools.loginLabel': 'Log in to {tool}',
   'tools.loginHint': 'Starts {command} on the factory’s machine.',

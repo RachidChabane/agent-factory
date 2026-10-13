@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import type { ToolProbeResult, ToolStatus } from '@agent-factory/domain';
 import { InMemoryEventStore } from '../audit/testing/fakes.ts';
 import { FILM_TOOLS_AVAILABLE_EVENT, FILM_TOOLS_SUBJECT, FILM_TOOLS_UNAVAILABLE_EVENT, filmToolWaitOf, FilmToolWaitReporter } from '../film/film-tool-wait.ts';
-import { FILM_TOOL_RECHECK_INTERVAL_MS, type FilmTool, type FilmToolChecks, type LoggedToolReading } from '../film/film-tools.ts';
+import { FILM_TOOL_FRESHNESS_MS, FILM_TOOL_RECHECK_INTERVAL_MS, type FilmTool, type FilmToolChecks, type LoggedToolReading } from '../film/film-tools.ts';
 import { OperatorNotifications } from '../notifications/operator-notifications.ts';
 import type { Notifier } from '../ports.ts';
 import { SteppingClock } from '../runs/test-support.ts';
 import { FilmLane, type FilmLaneProject, type FilmTick } from './film-lane.ts';
 import { SLOTS_FREE, SLOTS_HELD } from './scheduling-hold.ts';
 import type { PauseSet } from './scheduling-pauses.ts';
+import { FilmDeferredError } from '../film/film-errors.ts';
 import { order, ScriptedFilms } from './testing/scripted-films.ts';
 
 const START = new Date('2026-10-12T08:00:00.000Z');
@@ -386,11 +387,33 @@ describe('the films of a project that needs tools', () => {
     expect(await lane.tick(RUNNING, SIGNAL)).toBe(SLOTS_HELD);
 
     context.checks.say('vault', 'unauthenticated', 'token expired');
+    context.advance(FILM_TOOL_FRESHNESS_MS);
     expect(await lane.tick(IDLE, SIGNAL)).toBe(SLOTS_FREE);
 
     expect(context.checks.calls).toEqual(['vault', 'vault']);
     expect(context.filmsOf('storefront').filmed).toEqual([]);
     expect(await context.waitOf('storefront')).toMatchObject({ tool: 'vault' });
+  });
+
+  it('does not read the tools again at every tick while the start of the film is put off', async () => {
+    const context = world();
+    const storefront = context.project('storefront', [VAULT]);
+    const films = context.filmsOf('storefront');
+    queue(films, 1, 'checkout-flow', 1);
+    films.prepareError = new FilmDeferredError(1, 'resources', 'machine resources are short');
+    const lane = new FilmLane([storefront], { clock: context.clock });
+
+    for (let tick = 0; tick < 5; tick += 1) {
+      expect(await lane.tick(IDLE, SIGNAL)).toBe(SLOTS_FREE);
+      context.advance(10_000);
+    }
+    expect(context.checks.calls).toEqual(['vault']);
+
+    context.advance(FILM_TOOL_FRESHNESS_MS);
+    films.prepareError = null;
+    expect(await lane.tick(IDLE, SIGNAL)).toBe(SLOTS_HELD);
+    expect(context.checks.calls).toEqual(['vault', 'vault']);
+    expect(films.filmed).toEqual([order(1, 'checkout-flow')]);
   });
 
   it('reads the tools of a film once in a round, whether it waits for work or starts', async () => {
