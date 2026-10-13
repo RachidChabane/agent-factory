@@ -8,6 +8,7 @@ import { FilmMergeGuard } from '../film-merge-guard.ts';
 import type { FilmFact, FilmRecorder, FilmRecording, FilmRequest, VideoTranscoder } from '../film-ports.ts';
 import { FilmQueue } from '../film-queue.ts';
 import type { FilmPresentation } from '../film-settings.ts';
+import { LoggedFilmToolWait } from '../film-tool-wait.ts';
 
 export const MINUTE_MS = 60_000;
 export const PROJECT_ID = 'storefront';
@@ -18,6 +19,8 @@ export const FILM_PRESENTATION: FilmPresentation = {
   timeZone: 'UTC',
   cockpitUrl: 'https://factory.example.test/projects/storefront',
 };
+/** The tools the films of the scenario's project list. */
+export const FILM_TOOLS: readonly string[] = ['vault'];
 export const SOURCE_VIDEO = 'run-1/film.webm';
 export const MP4_VIDEO = 'run-1/film.mp4';
 export const FINAL_SCREENSHOT = 'screens/z-final.svg';
@@ -42,7 +45,7 @@ export function filmServices(scenario: PipelineScenario, presentation: FilmPrese
   const dependencies = scenario.dependencies();
   const ledger = new FilmLedger([{ projectId: PROJECT_ID, events: scenario.events }], scenario.clock, presentation.fallbackDurationMs);
   const bodies = new FilmBodies(dependencies, { projectId: PROJECT_ID, fileLinks: scenario.settings.fileLinks, presentation }, ledger);
-  return { ledger, bodies, queue: new FilmQueue(dependencies, bodies), guard: new FilmMergeGuard(ledger, PROJECT_ID, presentation) };
+  return { ledger, bodies, queue: new FilmQueue(dependencies, bodies), guard: new FilmMergeGuard(ledger, PROJECT_ID, presentation, new LoggedFilmToolWait(scenario.events, FILM_TOOLS)) };
 }
 
 export type RecorderBehaviour = (request: FilmRequest, call: number) => Promise<void> | void;
@@ -57,6 +60,7 @@ export class FakeFilmRecorder implements FilmRecorder {
   facts: readonly FilmFact[] = FACTS;
   reportText = REPORT_TEXT;
   screenshotContent: (ref: string, path: string) => string = (ref, path) => `image:${ref}:${path}`;
+  videoContent: (ref: string) => string = (ref) => `video:${ref}`;
   private readonly workspace: InMemoryWorkspace;
   private readonly storeRoot: string;
 
@@ -72,7 +76,7 @@ export class FakeFilmRecorder implements FilmRecorder {
     const relative = request.outputDirectory.slice(this.storeRoot.length + 1);
     this.workspace.write(this.storeRoot, `${relative}/report.json`, this.reportText);
     if (this.wroteReplay) this.workspace.write(this.storeRoot, `${relative}/${REPLAY_FILE}`, REPLAY_TEXT);
-    this.workspace.write(this.storeRoot, `${relative}/${this.videoPath}`, `video:${request.ref}`);
+    this.workspace.write(this.storeRoot, `${relative}/${this.videoPath}`, this.videoContent(request.ref));
     for (const screenshot of this.screenshots) this.workspace.write(this.storeRoot, `${relative}/${screenshot}`, this.screenshotContent(request.ref, screenshot));
     return { facts: this.facts, videoPath: this.videoPath, screenshotPaths: this.screenshots, wroteReplay: this.wroteReplay };
   }

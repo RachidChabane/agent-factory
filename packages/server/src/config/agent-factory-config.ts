@@ -285,6 +285,7 @@ function filmSettings(raw: NonNullable<RawProject['evidence']['films']>, at: (pa
     timeoutMs: minutes(raw.timeoutMinutes),
     replayFile: raw.replayFile,
     timeZone: raw.timeZone ?? machineTimeZone(),
+    tools: raw.tools,
   };
 }
 

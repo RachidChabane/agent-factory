@@ -52,6 +52,8 @@ export const enSettings = {
   'settings.films.none': 'No film command is declared for this project.',
   'settings.films.timeZone': 'Time zone of the expected arrivals',
   'settings.films.timeout': 'Longest recording',
+  'settings.films.tools': 'Tools checked before a film',
+  'settings.films.toolsNone': 'None: a film starts without checking any tool.',
   'settings.conventions.title': 'Conventions',
   'settings.conventions.factoryLabel': 'Factory label',
   'settings.conventions.validatedLabel': 'Validated label',

@@ -253,6 +253,7 @@ describe('the configuration of a project', () => {
         timeoutMs: 20 * 60_000,
         replayFile: 'replay.json',
         timeZone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
+        tools: [],
       });
     });
 
@@ -284,6 +285,47 @@ describe('the configuration of a project', () => {
     it('refuses a replay placeholder that follows no option', () => {
       const command = ['node', 'record-film.mjs', '{ref}', '{output}', '{scenario}', '{replay}'];
       expect(configProblems(document({}, [films({ command })]))).toEqual(['projects.0.evidence.films.command: {replay} must follow an option such as --replay']);
+    });
+
+    describe('the tools its films wait for', () => {
+      const VAULT = { name: 'vault', check: ['vault', 'token', 'lookup'], login: 'vault login -method=oidc' };
+      const CLOUD = { name: 'cloud', check: ['cloud', 'auth', 'status'] };
+
+      function withTools(listed: readonly string[], declared: { readonly installation?: readonly Record<string, unknown>[]; readonly project?: readonly Record<string, unknown>[] }) {
+        return document({ tools: declared.installation ?? [] }, [minimalProject({ tools: declared.project ?? [], evidence: { films: { ...FILMS, tools: listed } } })]);
+      }
+
+      it('are none unless the project lists some', () => {
+        expect(projectOf(parse(document({}, [films()])), 'storefront').evidence.films?.tools).toEqual([]);
+      });
+
+      it('are tools the installation declares, or the project declares', () => {
+        const config = parse(withTools(['vault', 'cloud'], { installation: [VAULT], project: [CLOUD] }));
+        expect(projectOf(config, 'storefront').evidence.films?.tools).toEqual(['vault', 'cloud']);
+      });
+
+      it('refuse a name that no tool of the installation or of the project carries, naming it and where to declare it', () => {
+        expect(configProblems(withTools(['vault', 'registry'], { installation: [VAULT] }))).toEqual([
+          'projects.0.evidence.films.tools.1: tool registry is not declared: declare it in tools, of the installation or of the project',
+        ]);
+      });
+
+      it('refuse a built-in tool, which nothing declares', () => {
+        expect(configProblems(withTools(['git'], {}))).toEqual([expect.stringContaining('projects.0.evidence.films.tools.0: tool git is not declared')]);
+      });
+
+      it('refuse a tool that another project declares', () => {
+        const ledger = minimalProject({ id: 'ledger', name: 'Ledger', tools: [CLOUD] });
+        expect(configProblems(document({}, [films({ tools: ['cloud'] }), ledger]))).toEqual([expect.stringContaining('projects.0.evidence.films.tools.0: tool cloud is not declared')]);
+      });
+
+      it('refuse a tool listed twice', () => {
+        expect(configProblems(withTools(['vault', 'vault'], { installation: [VAULT] }))).toEqual(['projects.0.evidence.films.tools: tool vault is listed twice']);
+      });
+
+      it('refuse a name that is not the name of a tool', () => {
+        expect(configProblems(withTools(['Vault Token'], { installation: [VAULT] }))).toContain('projects.0.evidence.films.tools.0: must be lowercase letters, digits and dashes');
+      });
     });
 
     it('refuses a time zone that does not exist, a replay file that is a path, and an unknown key', () => {

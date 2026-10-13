@@ -16,12 +16,12 @@ description: Tell the operator what the factory did, what waits for them, what i
    ```
 
 4. The open pull requests, reviewed as `merge-and-release` says.
-5. `agent-factory watch --once`: what blocks work now. For each issue it names, `agent-factory status <issue>`.
+5. `agent-factory watch --once --all`: every blocker present now. For each issue it names, `agent-factory status <issue>`.
 6. Your notes of the gestures you made with `--as orchestrator`, each with its reason.
 
 ## Write
 
-Five sections, in this order, each a list of one-line items. An empty section says `none`.
+Five sections, in this order. Each is a list of one-line items, except `Waiting for you`, whose entries are the reviews that `merge-and-release` lays out. An empty section says `none`.
 
 ```markdown
 # Factory report, 2026-10-13
@@ -30,7 +30,17 @@ Five sections, in this order, each a list of one-line items. An empty section sa
 - storefront#12 pull request 31: show the cart total in the header badge
 
 ## Waiting for you
-- storefront#14 pull request 33, filter the catalogue by category: 3 of 3 criteria proven, review clean; the layout needs your eye. Merge: agent-factory merge 33 --expected-head <sha>
+### storefront#14 pull request 33: filter the catalogue by category
+Actions
+- Merge once the layout looks right: `agent-factory merge 33 --expected-head <sha>`
+- Sort the non-blocking finding: keep, fix in a follow-up issue, dismiss.
+
+Screenshots
+- Category filter: /tmp/review-33-filter.png
+
+Details
+- 3 of 3 criteria proven; checks green.
+- Non-blocking: catalogue/filter.ts:41 matches the category case-sensitively.
 
 ## Blocked
 - ledger#7: the reviewer's blocking finding stands after two attempts. Needs: a decision on rounding, yours.
@@ -44,6 +54,6 @@ Five sections, in this order, each a list of one-line items. An empty section sa
 
 - Name work as `<project>#<issue>` and `pull request <number>`.
 - A blocked item states its cause and who must act.
-- A waiting item carries the command that merges it.
+- A waiting entry is a review: the actions first, each with its command, then a screenshot per visible change, then the details apart.
 - Copy each usage figure with its reset time and its reading time.
 - Add the pauses and the factory's state to the first line of `Blocked` when the factory is stopped or paused.

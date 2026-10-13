@@ -87,6 +87,7 @@ const INPUT: PullRequestBodyInput = {
       { phase: 'after', sourcePath: 'app/test-results/trace.zip', bundlePath: '.evidence/42/after/app/test-results/trace.zip', caption: 'trace.zip' },
     ],
     missing: [{ phase: 'before', sourcePath: 'app/test-results/trace.zip' }],
+    omitted: [],
   },
   diffStat: [
     { path: 'app/e2e/mockup-link.spec.ts', added: 24, removed: 0 },
@@ -126,6 +127,18 @@ describe('PullRequestBodyRenderer', () => {
     expect(body).toContain('**Before** on base `1111111`: 2 acceptance tests fail on an assertion (playwright).');
     expect(body).toContain('| 2 | `app/e2e/conversation.spec.ts > opens at the producing message` | red (assertion) | green |');
     expect(body).toContain('[acceptance tests](https://github.com/acme/widgets/blob/2222222bbbbbbb/.evidence/42/acceptance-tests.json)');
+  });
+
+  it('names the evidence the limits keep off the pull request, in its table row and among the risks', () => {
+    const bundle = {
+      ...INPUT.bundle,
+      files: INPUT.bundle.files.filter((file) => file.bundlePath !== '.evidence/42/after/app/test-results/header.png'),
+      omitted: [{ phase: 'after' as const, sourcePath: 'app/test-results/header.png', caption: 'header.png', bytes: 6_200_000, reason: 'file-limit' as const, limitBytes: 5_000_000 }],
+    };
+    const body = new PullRequestBodyRenderer().render({ ...INPUT, bundle });
+    expect(body).toContain('left out: 6.2 MB, over the limit of 5 MB per file (evidence.maxFileBytes) |');
+    expect(body).toContain('- Evidence `app/test-results/header.png` (after the change) was left out of the pull request: 6.2 MB, over the limit of 5 MB per file (evidence.maxFileBytes).');
+    expect(body).not.toContain('header.png, after');
   });
 
   it('keeps a test id with a pipe inside its table cell', () => {

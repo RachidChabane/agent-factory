@@ -1,5 +1,6 @@
 export const COCKPIT_PATHS = {
   board: '/',
+  settings: '/settings',
   issue: (number: number): string => `/issues/${number}`,
   pullRequest: (number: number): string => `/pull-requests/${number}`,
   audit: (id: string): string => `/audits/${encodeURIComponent(id)}`,

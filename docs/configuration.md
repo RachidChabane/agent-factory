@@ -44,7 +44,7 @@ applies at the next tick, and the cockpit lists what waits for a restart.
 | `daemon.pollIntervalSeconds` | `30` | how often the daemon looks for work |
 | `daemon.mergeWatchIntervalMinutes` | `10` | how often merged and outside changes are read from the forges |
 | `daemon.issueRefreshSeconds` | `120` | how often the forges' issues are read |
-| `daemon.checksSettleSeconds` | `120` | how long a forge may take to register the checks of a head before an empty list counts as passed; a pull request is announced as ready only once its required checks passed |
+| `daemon.checksSettleSeconds` | `120` | how long a forge may take to register the checks of a head before an empty list counts as passed; a pull request is announced as ready only once every check of its head has completed without failing |
 | `notifications.channels` | `[]` | `system`, `slack` (`webhookUrl`), `google-chat` (`webhookUrl`), `webhook` (`url`, `headers`); secrets as `{ fromEnvironment: NAME }` |
 | `notifications.dedupeWindowMinutes` | `30` | identical notices within this window are sent once |
 | `notifications.media` | none | the command that makes a pull request's films and images reachable from its notices; see [Media in notices](#media-in-notices) |
@@ -82,7 +82,7 @@ applies at the next tick, and the cockpit lists what waits for a restart.
 | `prompts` | the built-in prompts | a file per role whose text replaces the built-in prompt |
 | `knowledge` | `[]` | sources of the knowledge pack given to agents: `{ path }` (a file or directory) or `{ repository: <path in the repo> }` |
 | `references` | `[]` | other repositories the specifications cite, read as snapshots: `{ name, repository, ref, source }`; see [References](#references) |
-| `evidence.maxFileBytes` / `maxTotalBytes` | 5 MB / 40 MB | limits of the evidence committed to a pull request |
+| `evidence.maxFileBytes` / `maxTotalBytes` | 5 MB / 40 MB | limits of the evidence committed to a pull request; see [Evidence limits](#evidence-limits) |
 | `evidence.films` | none | the command that films a pull request; see [Films](#films) |
 | `autonomy` | nothing delegated | what the orchestrator may do for the operator; see [Autonomy](#autonomy) |
 | `delivery` | none | see [Delivery](#delivery) |
@@ -127,11 +127,18 @@ runs.
 | `timeoutMinutes` | `20` | the bound of one recording; the command's process group is stopped when it expires, and with the factory |
 | `replayFile` | `replay.json` | the file the recording of the base writes in `{output}`; `{replay}` is its path in the recording of the head |
 | `timeZone` | the machine's | the zone of the expected arrival times in the pull request body and the cockpit |
+| `tools` | `[]` | the names of the [tools](#tools) whose checks must pass before a film starts, declared in the installation's `tools` or in the project's own; see [Films and their tools](#films-and-their-tools) |
+
+The tokens of `command` reach the program as they are, without a shell: `~` and
+variables such as `$HOME` are not expanded in them (`workingDirectory` is). The program
+is the first token: an absolute path, a path relative to `workingDirectory`, or a name
+found on the `PATH` of your environment with `environment` on top.
 
 The command runs **outside the sandbox**, with your environment and your sessions
 (containers, secrets, cloud and browser logins): declare only a command you trust like
 your own scripts. `agent-factory validate` says so on the project's `films` line, checks
-the working directory, and warns when `ffmpeg` is missing.
+the working directory and that the program resolves to an executable file, and warns
+when `ffmpeg` is missing.
 
 A recording writes into `{output}`:
 
@@ -151,6 +158,51 @@ operator orders any other with `agent-factory film <issue> --scenario <name>` or
 pull request page. A scenario name is letters, digits, dots, dashes and underscores, at
 most 45 characters. Films wait in one queue for the whole installation, one at a time,
 while nothing else runs: see [ADR 0030](adr/0030-films.md).
+
+### Films and their tools
+
+The credentials a film command needs, such as a secrets vault token or a cloud login, can expire while the factory
+runs unattended. `evidence.films.tools` lists the tools the command needs, by their names in `tools` (the
+installation's, or the project's own; see [Tools](#tools)). A name that no `tools` declares is refused.
+
+Before a film of the project starts, the factory runs the check of each listed tool, all at once, each within its
+own `timeoutSeconds`.
+
+- While a check fails, the film does not start and does not fail: it stays queued, and so do the other films of the
+  project. They hold no slot, so issues go on and the films of the other projects go on.
+- The operator is told once when the films begin to wait. The notice names the tool, why its check fails, and the
+  command to run: the tool's `login`, or its `fix` when it declares no login. The cockpit shows the waiting films with
+  the tool, the command and since when; `agent-factory status` says the same, and `agent-factory validate` names the
+  listed tools on the project's `films` line.
+- The factory reads the failing tool again every 5 minutes, whether or not other work runs. Once every tool passes, the
+  films start and the operator is told once that they resume. A tool is also read right before its film starts
+  (unless it was read within the last minute), and every 5 minutes while the film waits for running work to end.
+- A check you run yourself counts as a reading: when **Check** or **Log in** on the tool in the cockpit, or `agent-factory
+  tool`, finds it connected, the films start at the next tick of the factory instead of at the next reading.
+- A wait the factory recorded before a restart is read again at once.
+
+A passing check does not guarantee the film: a film that fails for another reason fails, with its reason in the
+pull request body.
+
+### Evidence limits
+
+`evidence.maxFileBytes` (default 5 000 000) and `evidence.maxTotalBytes` (default 40 000 000) bound the
+evidence the factory commits to a pull request: the files the acceptance checks declare as evidence, and the
+videos and screenshots of films. Sizes are decimal: 1 MB is 1 000 000 bytes. Reports, logs and the list of
+acceptance tests are not weighed.
+
+- A file over `maxFileBytes` is left out.
+- While the evidence of the pull request weighs more than `maxTotalBytes`, the largest file is left out. The
+  weight counts what the pull request already holds: its evidence and the films already committed.
+- Each file left out is named, with its size and the limit it passed, in the pull request body: in the
+  evidence table and the risks for the checks' evidence, in the block of the recording for a film. `agent-factory
+  film` says so too.
+- Evidence left out makes the evidence of the pull request incomplete: the cockpit lists the files and does not
+  offer the merge, and the release gate counts the pull request. A film's files left out do not: the film is
+  recorded, and its video and screenshots stay in the factory's own store, where the cockpit plays them.
+
+A recording of more than a few seconds passes 5 MB: raise `maxFileBytes` for a project that films. Both
+settings apply after a restart.
 
 ### Autonomy
 
@@ -182,8 +234,9 @@ in one sentence, per project, what is delegated to whom.
 ### Media in notices
 
 When a pull request is ready to merge, the factory tells you once per head ([ADR 0034](adr/0034-notification-media.md)):
-its required checks passed (the rule that gates its merge), and none of its films is queued or recording. A failed film
-holds the notice until a later film of that scenario succeeds. The notice links the pull request in the cockpit and on
+every check reported on its head has completed and none failed, required or not (skipped and neutral checks pass), and
+none of its films is queued or recording. A check that fails on the base branch too holds the notice, though not the
+merge. A failed film holds the notice until a later film of that scenario succeeds. The notice links the pull request in the cockpit and on
 the forge. With `notifications.media`, it also lists a link for the film of each scenario before and after, its final
 screenshot, and each image of the pull request's evidence, labelled by scenario, phase and file name.
 

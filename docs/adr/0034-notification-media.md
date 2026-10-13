@@ -43,3 +43,6 @@ and its `timeoutSeconds`.
 - The factory holds no storage credential; the declared command uses the operator's
   login.
 - Without `notifications.media`, notices link the cockpit and the forge.
+- The notice waits for every check reported on the head, required or not: a check that
+  failed or has not completed holds it, and the cockpit names each one. The merge keeps
+  its own rule, which excuses a failure the base branch has too.

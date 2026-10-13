@@ -1,9 +1,9 @@
 import { decideNextAttempt } from '@agent-factory/domain';
 import type { AttemptHistory, EffortLevel, RetryDecision } from '@agent-factory/domain';
 import { distilFailures } from './failure-summary.ts';
-import type { AttemptMode, FailureSource, ImplementerAttemptRecord } from './journal-events.ts';
+import type { AttemptMode, FailureSource, ImplementerAttemptRecord, RetryRecord } from './journal-events.ts';
 import { PIPELINE_EVENTS } from './journal-events.ts';
-import { attemptRecord, decisionAfter, decisionsOfEpoch, type PipelineJournal } from './pipeline-journal.ts';
+import { attemptRecord, decisionAfter, decisionsOfEpoch, decisionsSinceRewrite, type PipelineJournal } from './pipeline-journal.ts';
 import type { RoleProfile } from './pipeline-settings.ts';
 import type { StageContext } from './stages/stage.ts';
 
@@ -36,10 +36,18 @@ export function attemptHistory(journal: PipelineJournal): AttemptHistory {
   };
 }
 
+/**
+ * The decision the attempt follows. An attempt that starts a cycle follows none, since the failures before it no longer
+ * count, unless the operator's feedback started the cycle: the work then goes on from where the feedback found it.
+ */
+function decisionLeadingTo(journal: PipelineJournal, attempt: number): RetryRecord | null {
+  const decision = decisionAfter(journal, attempt - 1);
+  return attempt === journal.attemptEpoch && decision?.opensCycle !== true ? null : decision;
+}
+
 export function planAttempt(journal: PipelineJournal, attempt: number, profile: RoleProfile): AttemptPlan {
-  const opensEpoch = attempt === journal.attemptEpoch;
-  const previousDecision = opensEpoch ? null : decisionAfter(journal, attempt - 1);
-  const previousAttempt = opensEpoch ? null : attemptRecord(journal, attempt - 1);
+  const previousDecision = decisionLeadingTo(journal, attempt);
+  const previousAttempt = previousDecision === null ? null : attemptRecord(journal, attempt - 1);
   if (previousDecision === null || previousDecision.decision.action === 'needs-human') {
     return { attempt, mode: 'initial', model: profile.model, effort: profile.effort, resumeSessionId: null, correction: null, earlierFailures: null };
   }
@@ -52,7 +60,7 @@ export function planAttempt(journal: PipelineJournal, attempt: number, profile: 
       effort: decision.profile.effort,
       resumeSessionId: null,
       correction: null,
-      earlierFailures: distilFailures(decisionsOfEpoch(journal).filter((record) => record.afterAttempt < attempt)),
+      earlierFailures: distilFailures(decisionsSinceRewrite(journal).filter((record) => record.afterAttempt < attempt)),
     };
   }
   const model = previousAttempt?.model ?? profile.model;

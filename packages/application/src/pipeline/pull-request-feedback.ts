@@ -1,5 +1,5 @@
-import { decideNextAttempt, FEEDBACK_STATES } from '@agent-factory/domain';
-import type { EscalationProfile, ReviewFinding } from '@agent-factory/domain';
+import { FEEDBACK_STATES } from '@agent-factory/domain';
+import type { ReviewFinding } from '@agent-factory/domain';
 import type { Clock } from '../ports.ts';
 import { reviewFailureSummary } from './failure-summary.ts';
 import { PIPELINE_EVENTS, type ExternalFeedbackRecord } from './journal-events.ts';
@@ -7,7 +7,6 @@ import { IssueJournalWriter } from './journal-writer.ts';
 import { issueOfPullRequest } from './merge-on-order.ts';
 import type { PipelineDependencies } from './pipeline-dependencies.ts';
 import { currentAttempt, loadJournal } from './pipeline-journal.ts';
-import { attemptHistory } from './retry.ts';
 
 export const FEEDBACK_FINDING_CATEGORY = 'correctness';
 export const BLOCKING = 'blocking';
@@ -21,9 +20,11 @@ export interface ExternalFeedbackInput {
   readonly body: string;
 }
 
-export type FeedbackOutcome =
-  | { readonly kind: 'cycle-started'; readonly issueNumber: number; readonly attempt: number }
-  | { readonly kind: 'needs-human'; readonly issueNumber: number; readonly reason: string };
+export interface FeedbackOutcome {
+  readonly issueNumber: number;
+  /** The attempt the feedback starts, counted from zero. */
+  readonly attempt: number;
+}
 
 export class FeedbackRefusedError extends Error {
   constructor(pullRequestNumber: number, reason: string) {
@@ -36,13 +37,16 @@ export function feedbackFindings(author: string, body: string): readonly ReviewF
   return [{ severity: BLOCKING, category: FEEDBACK_FINDING_CATEGORY, file: null, line: null, summary: `${author}: ${body.trim()}` }];
 }
 
+/**
+ * The operator's feedback on a pull request that awaits review. It sends the issue back to its implementer, who goes on in
+ * the session the pull request came from, and it opens a cycle with the whole failure budget: feedback is a gesture of
+ * the operator, never a failure, so the failures before it do not refuse it and it spends none of the budget.
+ */
 export class PullRequestFeedback {
   private readonly dependencies: PullRequestFeedbackDependencies;
-  private readonly escalation: EscalationProfile;
 
-  constructor(dependencies: PullRequestFeedbackDependencies, escalation: EscalationProfile) {
+  constructor(dependencies: PullRequestFeedbackDependencies) {
     this.dependencies = dependencies;
-    this.escalation = escalation;
   }
 
   async record(input: ExternalFeedbackInput): Promise<FeedbackOutcome> {
@@ -54,8 +58,6 @@ export class PullRequestFeedback {
     }
     const attempt = currentAttempt(journal);
     const findings = feedbackFindings(input.author, input.body);
-    const decision = decideNextAttempt(attemptHistory(journal), this.escalation);
-    const cycleStarted = decision.action !== 'needs-human';
     const writer = new IssueJournalWriter(events, states, issueNumber);
     const record: ExternalFeedbackRecord = {
       id: ids.next(),
@@ -66,22 +68,18 @@ export class PullRequestFeedback {
       pullRequestNumber: input.pullRequestNumber,
       afterAttempt: attempt,
       findings: [...findings],
-      cycleStarted,
+      cycleStarted: true,
     };
     await writer.record(PIPELINE_EVENTS.externalFeedbackReceived, record);
+    await writer.record(PIPELINE_EVENTS.retryDecided, {
+      afterAttempt: attempt,
+      failure: { source: 'review', summary: reviewFailureSummary(findings) },
+      decision: { action: 'resume-same-session' },
+      opensCycle: true,
+    });
     const reason = `${input.author} reviewed pull request #${input.pullRequestNumber} and asked for changes`;
     if (journal.state === 'pr-open') await writer.transition('ci', reason);
     await writer.transition('implementing', reason);
-    if (cycleStarted) {
-      await writer.record(PIPELINE_EVENTS.retryDecided, {
-        afterAttempt: attempt,
-        failure: { source: 'review', summary: reviewFailureSummary(findings) },
-        decision,
-      });
-      return { kind: 'cycle-started', issueNumber, attempt: attempt + 1 };
-    }
-    const escalation = `${reason}, but the implementer retry budget is spent; "factory resume ${issueNumber}" grants one fresh session on the escalation profile to address it:\n${reviewFailureSummary(findings)}`;
-    await writer.escalate(escalation);
-    return { kind: 'needs-human', issueNumber, reason: escalation };
+    return { issueNumber, attempt: attempt + 1 };
   }
 }

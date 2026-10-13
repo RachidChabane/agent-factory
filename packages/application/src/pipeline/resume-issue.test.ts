@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { renderSpecBody } from '../spec/render-spec-body.ts';
 import { ResumeRefusedError, SpecNotValidatedError } from './pipeline-errors.ts';
 import { DECISION_REQUEST_PATH } from './decision-request.ts';
+import { currentAttempt } from './pipeline-journal.ts';
+import { attemptHistory } from './retry.ts';
+import type { AgentRunRequest } from '../ports.ts';
 import { CHECK_PATH, ISSUE_NUMBER, issueRecord, NO_FINDINGS, PipelineScenario, SCENARIO_CONVENTIONS, SPEC } from './testing/pipeline-scenario.ts';
 
 const AMBIGUITY = 'Criterion 2 is ambiguous: "opens" may mean a new tab or the same tab. Tell me which reading to use.';
@@ -11,6 +14,16 @@ const OPERATOR_ANSWER = 'Yes, write the guard in app/middleware and keep it unde
 
 function decisionAsker(scenario: PipelineScenario): void {
   scenario.harness.script('implementer', {
+    outcome: 'decision-requested',
+    effect: (request) => scenario.workspace.write(request.workingDirectory, DECISION_REQUEST_PATH, `${DECISION_QUESTION}\n`),
+  });
+}
+
+/** Three gate failures spend the whole budget: two corrections, then the fresh session, which asks for a decision. */
+function decisionAskedAfterSpentBudget(scenario: PipelineScenario): void {
+  scenario.lintFailuresLeft = 3;
+  const implement = { effect: (request: AgentRunRequest) => scenario.implement(request) };
+  scenario.harness.script('implementer', implement, implement, implement, {
     outcome: 'decision-requested',
     effect: (request) => scenario.workspace.write(request.workingDirectory, DECISION_REQUEST_PATH, `${DECISION_QUESTION}\n`),
   });
@@ -50,7 +63,6 @@ describe('ResumeIssue', () => {
       specChanged: true,
       checksReauthored: true,
       decisionAnswered: false,
-      feedbackCycleGranted: false,
     });
     const journal = await scenario.journal();
     expect(journal).toMatchObject({ state: 'authoring-checks', workspacePrepared: false, manifest: null, beforeProof: null, frozen: null });
@@ -119,7 +131,6 @@ describe('ResumeIssue', () => {
       specChanged: false,
       checksReauthored: false,
       decisionAnswered: true,
-      feedbackCycleGranted: false,
     });
     expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
     const [asking, answered] = scenario.harness.requestsOf('implementer');
@@ -127,6 +138,40 @@ describe('ResumeIssue', () => {
     expect(answered?.prompt).toContain(OPERATOR_ANSWER);
     expect(answered?.prompt).not.toContain(DECISION_QUESTION);
     expect(staleRequest).toBeUndefined();
+  });
+
+  it('accepts the answer to a decision request after failures spent the budget, and counts it as no correction', async () => {
+    const scenario = new PipelineScenario();
+    decisionAskedAfterSpentBudget(scenario);
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('needs-human');
+    expect(attemptHistory(await scenario.journal())).toEqual({ inSessionCorrections: 2, freshRestarts: 1 });
+
+    expect(await scenario.resumer().resume(ISSUE_NUMBER, OPERATOR_ANSWER)).toMatchObject({ resumedAt: 'implementing', decisionAnswered: true });
+
+    const answered = await scenario.journal();
+    expect(answered.attemptEpoch).toBe(3);
+    expect(currentAttempt(answered)).toBe(3);
+    expect(attemptHistory(answered)).toEqual({ inSessionCorrections: 0, freshRestarts: 0 });
+  });
+
+  it('gives a failure after the answer the whole budget, whatever the failures before the question spent', async () => {
+    const scenario = new PipelineScenario();
+    decisionAskedAfterSpentBudget(scenario);
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    await scenario.resumer().resume(ISSUE_NUMBER, OPERATOR_ANSWER);
+    scenario.lintFailuresLeft = 2;
+
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+
+    const journal = await scenario.journal();
+    expect(journal.decisions.map((record) => [record.afterAttempt, record.decision.action])).toEqual([
+      [0, 'resume-same-session'],
+      [1, 'resume-same-session'],
+      [2, 'fresh-session-escalated'],
+      [3, 'resume-same-session'],
+      [4, 'resume-same-session'],
+    ]);
+    expect(journal.attempts.map((record) => record.attempt)).toEqual([0, 1, 2, 3, 3, 4, 5]);
   });
 
   it('records the delegate and its reason on the answer and on the transition when the delegate resumes the issue', async () => {
@@ -169,6 +214,24 @@ describe('ResumeIssue', () => {
     expect(answered?.resumeSessionId).toBeNull();
     expect(answered?.prompt).toContain(DECISION_QUESTION);
     expect(answered?.prompt).toContain(OPERATOR_ANSWER);
+  });
+
+  it('tells the fresh session that follows failures after the answer the question and the answer', async () => {
+    const scenario = new PipelineScenario();
+    decisionAsker(scenario);
+    const implement = { effect: (request: AgentRunRequest) => scenario.implement(request) };
+    scenario.harness.script('implementer', implement, implement, implement, implement);
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    await scenario.resumer().resume(ISSUE_NUMBER, OPERATOR_ANSWER);
+    scenario.lintFailuresLeft = 3;
+
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+
+    const fresh = scenario.harness.requestsOf('implementer').at(-1);
+    expect(fresh?.resumeSessionId).toBeNull();
+    expect(fresh?.prompt).toContain('# Earlier attempts');
+    expect(fresh?.prompt).toContain(DECISION_QUESTION);
+    expect(fresh?.prompt).toContain(OPERATOR_ANSWER);
   });
 
   it('refuses to resume a decision request without an answer, and an answer when no decision is pending', async () => {

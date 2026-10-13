@@ -82,7 +82,7 @@ describe('rewriting a frozen check on operator order', () => {
     const scenario = new PipelineScenario();
     scenario.lintFailuresLeft = 4;
     expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('needs-human');
-    await expect(scenario.resumer(SETTINGS.implementerEscalation).resume(ISSUE_NUMBER)).rejects.toThrow('retry budget is spent');
+    await expect(scenario.resumer().resume(ISSUE_NUMBER)).rejects.toThrow('retry budget is spent');
     scriptRewrite(scenario);
     await order(scenario);
     expect(await scenario.pipeline().runIssue(ISSUE_NUMBER)).toMatchObject({ kind: 'pr-open' });

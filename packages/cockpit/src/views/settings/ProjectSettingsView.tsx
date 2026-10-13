@@ -54,7 +54,7 @@ export function ProjectSettingsView() {
         <EnvironmentVariables names={settings.environmentVariables} />
       </Section>
       <Section title={t('settings.films.title')} id={SECTION_IDS.films} description={t('settings.films.description')}>
-        <ProjectFilms films={settings.films} />
+        <ProjectFilms project={project.id} films={settings.films} wait={project.filmToolWait} />
       </Section>
       <Section title={t('settings.conventions.title')} id={SECTION_IDS.conventions}>
         <ProjectConventions settings={settings} />

@@ -18,7 +18,7 @@ description: Find the agent-factory verb, option and cockpit address for what yo
 | | `agent-factory tool login <name>` | starts the login the tool declares, then checks it |
 | Run | `agent-factory start [--port <port>]` | runs the factory and serves the cockpit; it does not return until the factory stops |
 | | `agent-factory stop [--now]` | drains: no new work, exit once running work is done; `--now` also stops the agents |
-| | `agent-factory watch [--interval <seconds>] [--once] [--json] [--port <port>]` | prints each blocker as it appears or clears |
+| | `agent-factory watch [--interval <seconds>] [--once] [--all] [--json] [--port <port>]` | prints each blocker as it appears or clears since the last watch reported; `--all` prints every blocker present; `--once` reads once and records nothing |
 | | `agent-factory run-issue <issue>` | drives a validated issue by itself; refused while the factory runs |
 | Work | `agent-factory request add <file> [--images <dir>] [--requester <name>]` | stores a product request |
 | | `agent-factory request challenge <id>` | challenges a request and drafts its specs; queued for the running factory |
@@ -32,7 +32,7 @@ description: Find the agent-factory verb, option and cockpit address for what yo
 | | `agent-factory film <issue> --scenario <name>` | orders a film of the open pull request of an issue (`declare-films`) |
 | Set up | `agent-factory init [<repository>]`, `agent-factory schema`, `agent-factory rehearsal init <source-clone>`, `agent-factory rehearsal reset <source-clone>`, `agent-factory rehearsal add-issue <spec.md>` | the configuration and the rehearsal on a local forge; the operator's |
 
-A gesture the operator delegated (`issue create --start`, `issue validate`, `resume`, `resume --answer`, `merge`) takes `--as orchestrator --reason "<why>"` after its other options when you take it on your own judgement; both options go together. The factory checks the project's autonomy policy before it does anything else and refuses what the policy does not delegate, naming the missing rule (exit 1). It records each gesture it accepts with your reason, and tells the operator. A gesture the operator orders is made without `--as`. `resume --review-again` is the operator's alone: with `--as` it is refused whatever the policy allows.
+A gesture the operator delegated (`issue create --start`, `issue validate`, `resume`, `resume --answer`, `merge`) takes `--as orchestrator --reason "<why>"` after its other options when you take it on your own judgement; both options go together. The factory checks the project's autonomy policy before it does anything else and refuses what the policy does not delegate, naming the missing rule (exit 1). It records each gesture it accepts with your reason, and tells the operator. A gesture the operator orders is made without `--as`. `resume --review-again` is the operator's alone: with `--as` it is refused whatever the policy allows. So is `pr feedback`: no policy delegates it, so prepare the feedback file and give the operator the command (`merge-and-release`).
 
 Exit codes: 0 done, 1 failed or refused, 2 wrong command line, 3 the issue needs a person, 4 the issue waits on others, 5 the command needs `--confirm`.
 

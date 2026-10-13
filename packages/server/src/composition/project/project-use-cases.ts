@@ -85,6 +85,7 @@ export function filmBehaviour(project: ProjectRuntime, installation: Installatio
       fileLinks: settings.fileLinks,
       evidenceCacheDirectory: settings.evidenceCacheDirectory,
       resources: settings.resources,
+      evidenceLimits: settings.evidenceLimits,
       replayFile: replaysFirstRecording(films.settings.command) ? films.settings.replayFile : null,
     },
   );
@@ -210,7 +211,7 @@ export function environmentRedeployer(project: ProjectRuntime): RedeployEnvironm
 }
 
 export function issueResumer(project: ProjectRuntime): ResumeIssue {
-  return new ResumeIssue(project.dependencies, { conventions: project.conventions, escalation: project.settings.implementerEscalation });
+  return new ResumeIssue(project.dependencies, { conventions: project.conventions });
 }
 
 export function requestDecisionSettings(project: ProjectRuntime): RequestDecisionSettings {

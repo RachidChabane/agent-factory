@@ -103,6 +103,25 @@ describe('what blocks work in a snapshot', () => {
       }
     });
 
+    it('is waiting, not stalled, while a film of its open pull request is queued or recording', () => {
+      const withFilm = (state: WatchedFilmOrder['state'], pullRequest: Partial<WatchedPullRequest> = {}) =>
+        watchedSnapshot({
+          projects: [projectView('storefront', { issues: [silent(45, { state: 'rewriting-check' })], pullRequests: [pullRequestView(31, 12, { filmOrders: [filmOrderView('checkout-flow', { state })], ...pullRequest })] })],
+        });
+      for (const state of ['queued', 'recording-base', 'recording-head', 'committing'] as const) expect(kindsOf(withFilm(state)), state).toEqual([]);
+      for (const state of ['finished', 'failed'] as const) expect(kindsOf(withFilm(state)), state).toEqual(['stalled', ...(state === 'failed' ? ['film-failed'] : [])]);
+      for (const state of ['merged', 'closed'] as const) expect(kindsOf(withFilm('queued', { state })), state).toEqual(['stalled']);
+    });
+
+    it('stays stalled when the film queued belongs to the pull request of another issue', () => {
+      const snapshot = watchedSnapshot({
+        projects: [
+          projectView('storefront', { issues: [silent(45)], pullRequests: [pullRequestView(31, 13, { filmOrders: [filmOrderView('checkout-flow', { state: 'queued' })] })] }),
+        ],
+      });
+      expect(kindsOf(snapshot)).toEqual(['stalled']);
+    });
+
     it('is explained by a pause of the issue, of its project or of the factory', () => {
       const pause = { scope: 'project' as const, cause: 'operator' as const, reason: 'paused by Alex Morgan', since: minutesBefore(2), resumesAt: null };
       expect(kindsOf(storefrontWith([silent(45, { paused: true })]))).toEqual([]);

@@ -65,6 +65,7 @@ describe('CommandFilmRecorder', () => {
       timeoutMs: GENEROUS_TIMEOUT_MS,
       replayFile: REPLAY_FILE,
       timeZone: 'UTC',
+      tools: [],
       ...overrides,
     };
   }

@@ -61,7 +61,7 @@ describe('AbandonIssue', () => {
     const scenario = new PipelineScenario();
     expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
     const pullRequest = (await scenario.journal()).pullRequest;
-    await scenario.states.transition(ISSUE_NUMBER, 'needs-human', 'external feedback exhausted the retry budget');
+    await scenario.states.transition(ISSUE_NUMBER, 'needs-human', 'the implementer retry budget is spent');
 
     const outcome = await new AbandonIssue(scenario.dependencies()).abandon({ issueNumber: ISSUE_NUMBER, operator: OPERATOR, reason: REASON });
 

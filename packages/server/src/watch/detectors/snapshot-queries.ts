@@ -1,5 +1,7 @@
+import { PENDING_FILM_STATES } from '@agent-factory/cockpit';
 import type { WatchedProject, WatchedRun, WatchedSnapshot } from '../watched-snapshot.ts';
 
+export const OPEN_PULL_REQUEST_STATE = 'open';
 const DETAIL_LIMIT = 300;
 const ELLIPSIS = '…';
 const WHITESPACE = /\s+/g;
@@ -23,6 +25,16 @@ export function runsOfIssue(snapshot: WatchedSnapshot, project: string, issueNum
 /** Whether an agent of this project waits for an answer about this issue. */
 export function awaitsAnswer(snapshot: WatchedSnapshot, project: string, issueNumber: number): boolean {
   return runsOfIssue(snapshot, project, issueNumber).some((run) => run.pendingQuestion !== null);
+}
+
+/** Whether a film of the open pull request of this issue is queued or recording: the issue waits for the film. */
+export function awaitsFilm(project: WatchedProject, issueNumber: number): boolean {
+  return project.pullRequests.some(
+    (pullRequest) =>
+      pullRequest.issueNumber === issueNumber &&
+      pullRequest.state === OPEN_PULL_REQUEST_STATE &&
+      pullRequest.filmOrders.some((order) => PENDING_FILM_STATES.includes(order.state)),
+  );
 }
 
 export function isProjectPaused(snapshot: WatchedSnapshot, project: WatchedProject): boolean {

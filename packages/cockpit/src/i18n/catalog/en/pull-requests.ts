@@ -169,6 +169,7 @@ export const enPullRequests = {
   'pullRequests.films.screenshot': '{phase}, scenario {scenario}, screenshot {position}',
   'pullRequests.films.facts': 'Facts of the {phase} recording',
   'pullRequests.films.state.queued': 'Queued',
+  'pullRequests.films.state.waiting-for-tool': 'Waiting for {tool}',
   'pullRequests.films.state.recording-base': 'Recording the base',
   'pullRequests.films.state.recording-head': 'Recording the head',
   'pullRequests.films.state.committing': 'Committing the recordings',
@@ -192,7 +193,7 @@ export const enPullRequests = {
   'pullRequests.films.order.error': 'This is not a scenario name. {rule}',
 
   'pullRequests.ready.title': 'Ready notice',
-  'pullRequests.ready.description': 'The message sent to your channels once the required checks passed and no film is queued, recording or failed. It goes out once per head of the pull request.',
+  'pullRequests.ready.description': 'The message sent to your channels once every check of the head completed without failing and no film is queued, recording or failed. It goes out once per head of the pull request.',
   'pullRequests.ready.sent': 'Sent {when} for head {sha}.',
   'pullRequests.ready.links': 'Links in the notice',
   'pullRequests.ready.linksNone': 'The notice carried no link: the installation declares no upload command, or no file could be uploaded.',
@@ -201,11 +202,22 @@ export const enPullRequests = {
   'pullRequests.ready.failure': '{label}: {reason}',
   'pullRequests.ready.held': 'Not sent yet',
   'pullRequests.ready.holds': 'What holds the notice',
-  'pullRequests.ready.hold.checks-running': 'The required checks have not finished.',
-  'pullRequests.ready.hold.checks-failed': 'A required check failed.',
+  'pullRequests.ready.hold.checks-unreported': 'No check of this head is known yet.',
+  'pullRequests.ready.hold.checks-running': {
+    one: 'The check {checks} has not finished.',
+    other: 'The checks {checks} have not finished.',
+  },
+  'pullRequests.ready.hold.checks-failed': {
+    one: 'The check {checks} failed.',
+    other: 'The checks {checks} failed.',
+  },
   'pullRequests.ready.hold.films-pending': {
     one: 'The film of scenario {scenarios} is queued or recording.',
     other: 'The films of scenarios {scenarios} are queued or recording.',
+  },
+  'pullRequests.ready.hold.films-waiting': {
+    one: 'The film of scenario {scenarios} waits for the tool {tool}.',
+    other: 'The films of scenarios {scenarios} wait for the tool {tool}.',
   },
   'pullRequests.ready.hold.films-failed': {
     one: 'The film of scenario {scenarios} failed: order it again, or merge without it.',

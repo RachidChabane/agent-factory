@@ -6,17 +6,28 @@ import { expectedArrival, type PendingFilmOrder } from './film-model.ts';
 
 const ICON_SIZE = 16;
 
-/** A film that waits for its turn or records now: where it stands since when, behind how many films, and when it is expected in the zone of the project's films. */
-export function QueuedFilm({ order, timeZone }: { readonly order: PendingFilmOrder; readonly timeZone: string | null }) {
+interface QueuedFilmProps {
+  readonly order: PendingFilmOrder;
+  readonly timeZone: string | null;
+  /** The tool whose check fails and keeps the film queued; null when nothing but its turn keeps it. */
+  readonly waitingForTool: string | null;
+}
+
+/**
+ * A film that waits for its turn or records now: where it stands since when, behind how many films, and when it is
+ * expected in the zone of the project's films. A film that waits for a tool has no arrival to expect: the tool is named instead.
+ */
+export function QueuedFilm({ order, timeZone, waitingForTool }: QueuedFilmProps) {
   const { t, rich, fmt } = useI18n();
-  const state = t(`pullRequests.films.state.${order.state}`);
+  const waiting = waitingForTool !== null && order.state === 'queued';
+  const state = waiting ? t('pullRequests.films.state.waiting-for-tool', { tool: waitingForTool }) : t(`pullRequests.films.state.${order.state}`);
   return (
-    <section className="callout callout--running" aria-label={t('pullRequests.films.queueLabel', { scenario: order.scenario })}>
+    <section className={`callout callout--${waiting ? 'waiting' : 'running'}`} aria-label={t('pullRequests.films.queueLabel', { scenario: order.scenario })}>
       <Loader size={ICON_SIZE} aria-hidden="true" />
       <div className="callout__body">
         <p className="callout__title">{t('pullRequests.films.queueTitle', { state, scenario: order.scenario })}</p>
-        {order.state === 'queued' && order.filmsAhead > 0 ? <p>{t('pullRequests.films.ahead', { count: order.filmsAhead })}</p> : null}
-        {order.expectedAt === null ? null : <p>{t('pullRequests.films.expected', { when: expectedArrival(fmt, order.expectedAt, timeZone) })}</p>}
+        {waiting || order.state !== 'queued' || order.filmsAhead === 0 ? null : <p>{t('pullRequests.films.ahead', { count: order.filmsAhead })}</p>}
+        {waiting || order.expectedAt === null ? null : <p>{t('pullRequests.films.expected', { when: expectedArrival(fmt, order.expectedAt, timeZone) })}</p>}
         <p className="subtle">{t('pullRequests.films.orderedBy', { operator: order.operator })}</p>
         <p className="subtle">{rich('pullRequests.films.since', { when: <Time iso={order.since} /> })}</p>
       </div>

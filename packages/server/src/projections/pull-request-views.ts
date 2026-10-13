@@ -10,7 +10,9 @@ import {
   criterionChecksOf,
   isImagePath,
   stripAnsi,
+  evidenceIsComplete,
   failingOnBase,
+  incompleteEvidenceLines,
   MERGEABLE_STATES,
   PIPELINE_EVENTS,
   pullRequestTitle,
@@ -198,8 +200,8 @@ export function projectPullRequests(
     const merged = firstOf(records, PIPELINE_EVENTS.pullRequestMerged);
     const checks = context.pullRequestChecks.get(pullRequest.number) ?? NEVER_READ;
     const preExisting = failingOnBase(checks.value ?? [], context.baseChecks.value ?? []);
-    const missing = journal.evidence?.bundle.missing.map((entry) => `${entry.sourcePath} (${entry.phase})`) ?? [];
-    const evidenceComplete = journal.evidence !== null && missing.length === 0;
+    const missing = journal.evidence === null ? [] : [...incompleteEvidenceLines(journal.evidence.bundle)];
+    const evidenceComplete = journal.evidence !== null && evidenceIsComplete(journal.evidence.bundle);
     const onForge = context.pullRequestsOnForge.get(pullRequest.number);
     const state = stateOf(journal, onForge);
     const blockers = state === 'open' ? mergeBlockers(journal, checks, preExisting, evidenceComplete, filmMergeReason(journal, context)) : [];
@@ -220,7 +222,7 @@ export function projectPullRequests(
       evidence: evidenceOf(journal, context, records),
       films: filmViews(journal, records, context),
       filmOrders: filmOrderViews(journal, context),
-      readyNotice: readyNoticeView(journal, state === 'open', { checks, baseChecks: context.baseChecks, filming: context.films !== null }),
+      readyNotice: readyNoticeView(journal, state === 'open', { checks, filming: context.films !== null }),
       delegated: pullRequestDecisions(delegatedDecisionViews(records), pullRequest.number),
       reviewRounds: reviewRounds(journal, index),
       externalFeedback: feedbackOf(journal),

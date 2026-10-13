@@ -14,11 +14,16 @@ import {
 const FIRST_SEQUENCE = 0;
 export const ORPHAN_RUN_DETAIL = 'the factory stopped before the run ended';
 
+/** The runs these records show started and not ended. */
+export function openRunStartsIn(records: readonly FactoryEventRecord[]): readonly FactoryEventRecord[] {
+  const runs = records.filter((record) => record.subject.startsWith(RUN_SUBJECT_PREFIX));
+  const finished = new Set(runs.filter((record) => record.type === RUN_FINISHED_EVENT).map((record) => record.subject));
+  return runs.filter((record) => record.type === RUN_STARTED_EVENT && !finished.has(record.subject));
+}
+
 /** The runs the log shows started and not ended. */
 export async function openRunStarts(events: EventStore): Promise<readonly FactoryEventRecord[]> {
-  const records = await events.read(RUN_SUBJECT_PREFIX, FIRST_SEQUENCE);
-  const finished = new Set(records.filter((record) => record.type === RUN_FINISHED_EVENT).map((record) => record.subject));
-  return records.filter((record) => record.type === RUN_STARTED_EVENT && !finished.has(record.subject));
+  return openRunStartsIn(await events.read(RUN_SUBJECT_PREFIX, FIRST_SEQUENCE));
 }
 
 export async function closeOrphanRuns(events: EventStore, clock: Clock): Promise<readonly string[]> {

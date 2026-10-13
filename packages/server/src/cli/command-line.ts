@@ -71,6 +71,7 @@ export const NAME_OPTION = '--name';
 export const PORT_OPTION = '--port';
 export const INTERVAL_OPTION = '--interval';
 export const ONCE_FLAG = '--once';
+export const ALL_FLAG = '--all';
 export const JSON_FLAG = '--json';
 const MAX_PORT = 65_535;
 export const DEFAULT_REQUESTER = 'unknown';
@@ -95,9 +96,10 @@ export const USAGE = [
   '  start [--demo] [--port <port>]               run the factory and serve the cockpit; --demo plays fictional projects with no account',
   '  status [<issue>]                             the installation at a glance, or the state of one issue',
   '  usage [--refresh]                            subscription usage by account and limit; --refresh reads it now',
-  '  watch [--interval <seconds>] [--once] [--json] [--port <port>]',
-  '                                               poll the running factory (every 20 s by default) and print one line for each blocker that appears or clears;',
-  '                                               --once prints the blockers present now and exits 1 when there are any; --json prints one JSON object per line',
+  '  watch [--interval <seconds>] [--once] [--all] [--json] [--port <port>]',
+  '                                               poll the running factory (every 20 s by default) and print one line for each blocker that appears or clears since',
+  '                                               the last watch reported; --all reports every blocker present first; --once prints that report once, keeps what the',
+  '                                               watches reported as it was and exits 1 when anything blocks work now; --json prints one JSON object per line',
   '  tool check <name>                            check a connected tool now, as validate does',
   '  tool login <name>                            start the login the tool declares (no terminal needed), then check it',
   '  stop [--now]                                 stop the running factory once its running work finishes; --now stops its agents too',
@@ -139,7 +141,7 @@ export type CliCommand =
   | { readonly kind: 'start'; readonly demo: boolean; readonly port: number | null }
   | { readonly kind: 'status'; readonly issueNumber: number | null }
   | { readonly kind: 'usage'; readonly refresh: boolean }
-  | { readonly kind: 'watch'; readonly intervalSeconds: number; readonly once: boolean; readonly json: boolean; readonly port: number | null }
+  | { readonly kind: 'watch'; readonly intervalSeconds: number; readonly once: boolean; readonly all: boolean; readonly json: boolean; readonly port: number | null }
   | { readonly kind: 'stop'; readonly now: boolean }
   | { readonly kind: 'run-issue'; readonly issueNumber: number }
   | { readonly kind: 'resume'; readonly issueNumber: number; readonly answer: string | null; readonly reviewAgain: boolean; readonly delegation: Delegation | null }
@@ -284,13 +286,15 @@ function parseStart(rest: readonly string[]): ParsedCommand {
 }
 
 function parseWatch(rest: readonly string[]): ParsedCommand {
-  return withOptions(rest, [INTERVAL_OPTION, PORT_OPTION], [ONCE_FLAG, JSON_FLAG], ({ positional, values, flags }) => {
+  return withOptions(rest, [INTERVAL_OPTION, PORT_OPTION], [ONCE_FLAG, ALL_FLAG, JSON_FLAG], ({ positional, values, flags }) => {
     if (positional.length > 0) return failure(`unexpected arguments: ${positional.join(' ')}`);
     const requested = values.get(INTERVAL_OPTION);
     const interval = requested === undefined ? DEFAULT_WATCH_INTERVAL_SECONDS : positiveInteger(requested, 'interval');
     if (typeof interval === 'string') return failure(`${INTERVAL_OPTION} must be a whole number of seconds, 1 or more, got "${requested}"`);
     const port = portOf(values);
-    return typeof port === 'string' ? failure(port) : done({ kind: 'watch', intervalSeconds: interval, once: flags.has(ONCE_FLAG), json: flags.has(JSON_FLAG), port });
+    return typeof port === 'string'
+      ? failure(port)
+      : done({ kind: 'watch', intervalSeconds: interval, once: flags.has(ONCE_FLAG), all: flags.has(ALL_FLAG), json: flags.has(JSON_FLAG), port });
   });
 }
 

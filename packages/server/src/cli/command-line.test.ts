@@ -109,9 +109,10 @@ describe('parseCommandLine', () => {
   });
 
   it('parses the watch of the running factory', () => {
-    expect(parseCommandLine(['watch'])).toEqual(ok({ kind: 'watch', intervalSeconds: 20, once: false, json: false, port: null }));
-    expect(parseCommandLine(['watch', '--once', '--json'])).toEqual(ok({ kind: 'watch', intervalSeconds: 20, once: true, json: true, port: null }));
-    expect(parseCommandLine(['watch', '--interval', '5', '--port=7445'])).toEqual(ok({ kind: 'watch', intervalSeconds: 5, once: false, json: false, port: 7445 }));
+    expect(parseCommandLine(['watch'])).toEqual(ok({ kind: 'watch', intervalSeconds: 20, once: false, all: false, json: false, port: null }));
+    expect(parseCommandLine(['watch', '--once', '--json'])).toEqual(ok({ kind: 'watch', intervalSeconds: 20, once: true, all: false, json: true, port: null }));
+    expect(parseCommandLine(['watch', '--once', '--all'])).toEqual(ok({ kind: 'watch', intervalSeconds: 20, once: true, all: true, json: false, port: null }));
+    expect(parseCommandLine(['watch', '--interval', '5', '--port=7445'])).toEqual(ok({ kind: 'watch', intervalSeconds: 5, once: false, all: false, json: false, port: 7445 }));
     expect(parseCommandLine(['watch', '--interval=0'])).toEqual({ ok: false, error: '--interval must be a whole number of seconds, 1 or more, got "0"' });
     expect(parseCommandLine(['watch', '--interval', 'often'])).toEqual({ ok: false, error: '--interval must be a whole number of seconds, 1 or more, got "often"' });
     expect(parseCommandLine(['watch', '--interval'])).toEqual({ ok: false, error: 'missing value for --interval' });

@@ -8,7 +8,7 @@ and keeping it healthy.
 
 ```sh
 agent-factory start            # the factory and its cockpit, on http://127.0.0.1:7430
-agent-factory status           # the installation at a glance, in a terminal
+agent-factory status           # the installation at a glance, in a terminal, and whether the moment is calm
 agent-factory stop             # drain: no new work, exit once running work is done
 agent-factory stop --now       # stop now, agents included
 ```
@@ -17,6 +17,14 @@ agent-factory stop --now       # stop now, agents included
 works too). The factory refuses to start twice on the same home. Before a restart,
 prefer the drain: nothing in flight is cut short. The cockpit's **Drain** does the
 same.
+
+A moment is **calm** when a restart would cut nothing short: no agent run is open, no film
+is recording, and no issue is in a stage the factory runs by itself (freezing the checks,
+the gate, the evidence). `agent-factory status` prints `Calm: yes`, or `Calm: no` and one
+line for each thing going on. The drain waits for all of it, then the factory exits, so a
+restart at a moment that is not calm only takes longer. A film that is recording when the
+factory is stopped anyway fails with a reason that says so, and you order it again; a film
+that waits stays queued, in its place, for the next start.
 
 Before the first start, `agent-factory validate` checks the configuration, every tool
 the installation needs (git, gh, claude, the sandbox), each project's clone, labels,
@@ -123,7 +131,8 @@ reviews and opens the pull request with its evidence. You do nothing unless it a
   that blocks again escalates the issue again.
 - **A decision**: an agent asked a question only a person can answer (a product
   choice, a constraint of the repository). Answer it from the issue page, or with
-  `agent-factory resume <issue> --answer "<text>"`; the agent continues with it.
+  `agent-factory resume <issue> --answer "<text>"`; the agent continues with it. An
+  answer is not a failure: the agent gets the whole retry budget again.
 - **Rewrite a check**: when a frozen check is wrong, order its rewrite from the issue
   page with an instruction; the acceptance author rewrites it and the proof runs again.
 - **Pause** an issue, a project or the whole factory, and **Resume** it.
@@ -144,17 +153,21 @@ of the reading. Nothing is printed while nothing changes.
 | `needs-human` | an issue the factory stopped, with the reason it gave |
 | `decision-pending` | an agent run that asked a question and waits for the answer |
 | `run-failed` | the latest run of an issue still in the pipeline failed in the last hour |
-| `stalled` | an issue in a stage that owes an agent run has had no run and no activity for 10 minutes |
+| `stalled` | an issue in a stage that owes an agent run has had no run and no activity for 10 minutes; a film of its pull request that is queued or recording explains the wait, so it is not reported |
 | `paused` | the operator, the budget or the machine's resources paused the factory or a project for over 10 minutes |
 | `no-free-worktree` | validated issues wait because every worktree of the project's pool is held |
 | `film-failed` | the latest recording of a film of an open pull request failed, with the scenario and the reason it gave; it does not hold the merge |
 | `cockpit-unreachable` | the factory does not answer, until it does |
 
-The first reading prints every blocker present. `--once` prints the blockers present now
-and exits 1 when there are any, 0 when there are none. `--json` prints one JSON object
-per line. `--port <port>` names a factory started on another port; the host and port
-otherwise come from `server` in the configuration, and a server on port `0` cannot be
-watched.
+A watch keeps the blockers it reported, with the time each was first reported, in
+`watch-blockers.json` of the installation's state directory, and replaces the file in one step.
+A watch that starts compares its first reading with it, so a restart prints only what appeared
+or cleared since; with no file, the first reading prints every blocker present. `--all` prints
+every blocker present whatever the file holds. `--once` reads the file, prints what a watch
+would, leaves the file as it was, and exits 1 when anything blocks work now, 0 when nothing
+does. `--json` prints one JSON object per line. `--port <port>` names a factory started on
+another port; the host and port otherwise come from `server` in the configuration, and a
+server on port `0` cannot be watched.
 
 Each running issue, each open pull request and each issue waiting for a person keeps a
 worktree (`worktrees.size`, 5 by default). When all are held, validated issues wait: the
@@ -168,9 +181,13 @@ the concurrency ceiling.
 
 A pull request is merged on your order only: **Merge** (or `agent-factory merge <pr>
 --expected-head <sha>`) removes the evidence folder and squash-merges the head you
-reviewed. A check that also fails on the base branch is shown but does not block.
+reviewed. A check that also fails on the base branch is shown but does not block the merge; it
+still holds the ready notice, which waits for every check of the head.
 Review feedback from people goes back to the factory with **Send feedback** (or
-`agent-factory pr feedback <pr> <file> --author <name>`), which starts a new cycle.
+`agent-factory pr feedback <pr> <file> --author <name>`), which starts a new cycle in the
+implementer's session. The retry budget counts the failures of one cycle (two corrections, then
+one fresh session, then a person), so feedback gets all of it, whatever failures came before, and
+is refused only when the issue does not await review.
 
 A check that fails on every pull request and on the base branch is the repository's
 problem, not the change's: the cockpit marks it as failing on the base and the merge
@@ -197,9 +214,13 @@ queues the order, a stopped one records it at once.
   and its place in the queue, and replaces the announcement with the videos and
   screenshots when they land. The cockpit's **Videos** section shows the same, with
   the state of each film.
+- A project whose film command needs logins lists their tools in `evidence.films.tools`. While one of
+  their checks fails, its films stay queued and none fails: you are told once which login to run, the
+  pull request page and `agent-factory status` show the tool, the command and since when, and the films
+  start by themselves, with a notice, once every tool passes.
 - **Merge** waits while a film of the pull request is queued or recording, and says
-  when it is expected. A film that failed does not hold the merge; its reason stands in
-  the body and in the cockpit, and you order it again.
+  when it is expected, or which tool the films wait for. A film that failed does not hold
+  the merge; its reason stands in the body and in the cockpit, and you order it again.
 - Each film adds one evidence commit to the branch, so the head to merge is the one the
   cockpit shows after the film.
 
@@ -234,9 +255,10 @@ issue.
   what applied, what waits for a restart, and what was refused.
 - **Notifications** reach the declared channels when something needs you: a decision,
   an issue that needs a person, a pull request ready to merge, a release gate, a
-  pause. A pull request is announced once per head, when its required checks passed and
-  none of its films is queued or recording; a film that failed holds the notice, and the
-  pull request page says why. With `notifications.media`, the notice lists links to the
+  pause. A pull request is announced once per head, when every check reported on its head
+  has completed and none failed, required or not, and none of its films is queued or
+  recording; a failed check or film holds the notice, and the pull request page names each
+  failing or running check and each film that holds it. With `notifications.media`, the notice lists links to the
   films (before and after), their final screenshots and the evidence images, made
   reachable by the upload command you declare ([ADR 0034](adr/0034-notification-media.md)).
 
@@ -261,12 +283,15 @@ and its skills.
 
 The orchestrator keeps `agent-factory watch` running and reacts to each line. It turns
 requests into specs and issues, answers what the repository and your earlier
-instructions answer, merges what needs no judgement, and prepares a one-line review of
-the rest. It never edits the factory's event log, its worktrees or the forge, changes
-`config.yaml` only for a cause that grants nothing new, and takes no step that widens
-what agents may reach unless you ask. It reports each morning: what merged, what waits
-for you, what is blocked and why, what it decided for you, and the subscription limits
-with their reset times.
+instructions answer, merges what needs no judgement, and prepares a short review of the
+rest: what you must decide or do first, each with its command, then a cropped screenshot of
+each visible change, then the details. It lists the non-blocking findings of a review for
+you to sort, and turns the findings of a failing quality check into a feedback file for you
+to record with `agent-factory pr feedback`. It never edits the factory's event log, its
+worktrees or the forge, changes `config.yaml` only for a cause that grants nothing new,
+and takes no step that widens what agents may reach unless you ask. It reports each
+morning: what merged, what waits for you, what is blocked and why, what it decided for
+you, and the subscription limits with their reset times.
 
 What it may do alone is yours to declare, per project, in `autonomy` ([ADR
 0033](adr/0033-autonomy-policy.md)): validating specs, answering decisions, resuming

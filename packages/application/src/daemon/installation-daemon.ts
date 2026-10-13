@@ -17,7 +17,7 @@ import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 const FIRST_SEQUENCE = 0;
 const NO_PAUSES: PauseSet = new Map();
 const STOP_REASON = 'the installation stopped';
-const DRAINED_REASON = 'the installation stopped once its running work finished, as the operator asked';
+export const DRAINED_REASON = 'the installation stopped once its running work finished, as the operator asked';
 const DRAIN_CAUSE = 'drain';
 
 /** What an installation needs from the daemon of one project. */
@@ -118,7 +118,7 @@ export class InstallationDaemon {
     try {
       while (!signal.aborted && !drained) {
         await this.tick(signal);
-        drained = this.pausesNow.has(DRAIN_CAUSE) && projects.every((project) => project.isIdle()) && this.inFlight.size === 0 && !this.filmRecording();
+        drained = this.pausesNow.has(DRAIN_CAUSE) && this.isCalm();
         if (!drained) await sleeper.sleep(this.settings.pollIntervalMs, signal);
       }
     } finally {
@@ -141,6 +141,11 @@ export class InstallationDaemon {
 
   private filmRecording(): boolean {
     return this.dependencies.films?.isRecording() ?? false;
+  }
+
+  /** Whether a restart would cut nothing short: no project works, no film records and no task of the installation runs. */
+  isCalm(): boolean {
+    return this.dependencies.projects.every((project) => project.isIdle()) && this.inFlight.size === 0 && !this.filmRecording();
   }
 
   /** Lets the films take their turn; the slots they hold are kept from every project. */

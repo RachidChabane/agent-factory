@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { clickAndExpectCommand, expectCommand } from '../../test/commands.ts';
+import { mapProject } from '../../test/fixtures/mutate.ts';
 import { renderApp, renderRoute } from '../../test/render.tsx';
 import { LEDGER, openProjectSettings, replaceText, roleForm, STOREFRONT, withProjectSettings } from './settings-test-support.ts';
 
@@ -42,7 +43,7 @@ describe('ProjectSettingsView films', () => {
   });
 
   it('says where the film command runs, in which zone the arrivals are told and how long a recording may take', async () => {
-    const snapshot = withProjectSettings(STOREFRONT, (settings) => ({ ...settings, films: { timeZone: 'Europe/Paris', timeoutMinutes: 20 } }));
+    const snapshot = withProjectSettings(STOREFRONT, (settings) => ({ ...settings, films: { timeZone: 'Europe/Paris', timeoutMinutes: 20, tools: [] } }));
     await openProjectSettings(STOREFRONT, { snapshot });
     const films = section('Films');
     expect(within(films).getByText('That command runs outside the sandbox', { exact: false })).toBeInTheDocument();
@@ -54,6 +55,37 @@ describe('ProjectSettingsView films', () => {
   it('is shown in French', async () => {
     await openProjectSettings(STOREFRONT, { locale: 'fr' });
     expect(within(section('Tournages')).getByText('Aucune commande de tournage n’est déclarée pour ce projet.')).toBeInTheDocument();
+  });
+
+  describe('the tools its films wait for', () => {
+    const films = (tools: readonly string[]) => withProjectSettings(STOREFRONT, (settings) => ({ ...settings, films: { timeZone: 'Europe/Paris', timeoutMinutes: 20, tools: [...tools] } }));
+
+    it('are named, in the order the configuration lists them', async () => {
+      await openProjectSettings(STOREFRONT, { snapshot: films(['vault', 'cloud']) });
+      const row = within(section('Films')).getByText('Tools checked before a film').nextElementSibling;
+      expect(row).toHaveTextContent('vault and cloud');
+      expect(row?.querySelectorAll('code')).toHaveLength(2);
+    });
+
+    it('are none for a project whose films start without checking any tool', async () => {
+      await openProjectSettings(STOREFRONT, { snapshot: films([]) });
+      expect(within(section('Films')).getByText('None: a film starts without checking any tool.')).toBeInTheDocument();
+      expect(within(section('Films')).queryByRole('region', { name: /^Films waiting for/ })).not.toBeInTheDocument();
+    });
+
+    it('come with the tool the films wait for, and the commands that check it and log in', async () => {
+      const wait = { tool: 'vault', scope: 'installation' as const, status: 'unauthenticated' as const, detail: 'token expired', loginCommand: 'vault login -method=oidc', fixCommand: null, since: '2026-10-12T07:55:00.000Z', checkedAt: '2026-10-12T09:56:00.000Z' };
+      const snapshot = mapProject(films(['vault']), STOREFRONT, (project) => ({ ...project, filmToolWait: wait }));
+      const view = await openProjectSettings(STOREFRONT, { snapshot });
+      const notice = within(section('Films')).getByRole('region', { name: 'Films waiting for vault' });
+      expect(within(notice).getByText('vault login -method=oidc')).toBeInTheDocument();
+      await clickAndExpectCommand(view.user, within(notice).getByRole('button', { name: 'Log in to vault' }), view.transport, 'tools.login', { project: null, tool: 'vault' });
+    });
+
+    it('are shown in French', async () => {
+      await openProjectSettings(STOREFRONT, { snapshot: films(['vault']), locale: 'fr' });
+      expect(within(section('Tournages')).getByText('Outils contrôlés avant un tournage').nextElementSibling).toHaveTextContent('vault');
+    });
   });
 });
 

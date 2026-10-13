@@ -14,6 +14,9 @@ export const ACTIVE_PIPELINE_STATES: readonly IssueState[] = [
   'ci',
 ];
 
+/** The states in which the factory works on an issue by itself, with no agent: freezing the checks, the gate, the evidence. */
+export const DETERMINISTIC_PIPELINE_STATES: readonly IssueState[] = ['checks-frozen', 'gating', 'producing-evidence'];
+
 export const MERGED_OR_BEYOND_STATES: readonly IssueState[] = [
   'merged',
   'in-dev',

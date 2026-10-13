@@ -12,6 +12,8 @@ export const FILM_STATUSES = ['recorded', 'skipped'] as const;
 const WHITESPACE = /\s+/g;
 const SINGLE_SPACE = ' ';
 const CURRENT_DIRECTORY_PREFIX = /^\.\//;
+const VIOLATION_SEPARATOR = '; ';
+const MAX_FOUND_CHARACTERS = 40;
 
 const FactSchema = z.looseObject({
   label: z.string(),
@@ -24,6 +26,20 @@ const ReportSchema = z.looseObject({
   facts: z.array(z.unknown()).optional(),
   keyFrames: z.array(z.unknown()).optional(),
 });
+
+/** The fields of a report, in the order their rules are told. */
+const REPORT_FIELDS = ['status', 'reason', 'facts', 'keyFrames'] as const;
+type ReportField = (typeof REPORT_FIELDS)[number];
+
+/** What each field of a report must be, in the words a film command's author reads in the failure. */
+const FIELD_RULES: Readonly<Record<ReportField, string>> = {
+  status: `status must be ${FILM_STATUSES.join(' or ')}`,
+  reason: 'reason must be a string, the reason a skipped scenario gives',
+  facts: 'facts must be a list of { "label": text, "value": text, number or true/false }',
+  keyFrames: 'keyFrames must be a list of paths relative to the output directory',
+};
+
+const NOT_AN_OBJECT = 'the report must be a JSON object with a status';
 
 export class ReportUnreadableError extends Error {
   constructor(file: string, detail: string) {
@@ -63,6 +79,30 @@ function keyFramesOf(entries: readonly unknown[] | undefined): readonly string[]
   return [...new Set(frames)].slice(0, MAX_KEY_FRAMES);
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** What a field holds, briefly, so that the author sees the difference from what it must be. */
+function foundIn(value: unknown): string {
+  if (value === undefined) return 'missing';
+  if (value === null) return 'found null';
+  if (Array.isArray(value)) return 'found a list';
+  if (typeof value === 'string') return `found ${JSON.stringify(oneLine(value, MAX_FOUND_CHARACTERS))}`;
+  if (typeof value === 'object') return 'found an object';
+  return `found ${typeof value === 'number' ? 'a number' : 'a boolean'}`;
+}
+
+function isReportField(key: PropertyKey | undefined): key is ReportField {
+  return typeof key === 'string' && REPORT_FIELDS.some((field) => field === key);
+}
+
+/** Every field of the report that breaks its rule, in the order of the rules, each with what it holds. */
+function violationsOf(report: Readonly<Record<string, unknown>>, issues: z.ZodError['issues']): readonly string[] {
+  const broken = new Set(issues.map((issue) => issue.path[0]).filter(isReportField));
+  return REPORT_FIELDS.filter((field) => broken.has(field)).map((field) => `${FIELD_RULES[field]} (${foundIn(report[field])})`);
+}
+
 /** Reads a film report. A fact that is not a label and a scalar value is left out rather than failing the film. */
 export function parseReport(text: string, file: string): ParsedReport {
   let json: unknown;
@@ -71,8 +111,9 @@ export function parseReport(text: string, file: string): ParsedReport {
   } catch (error) {
     throw new ReportUnreadableError(file, error instanceof Error ? error.message : String(error));
   }
+  if (!isRecord(json)) throw new ReportUnreadableError(file, `${NOT_AN_OBJECT} (${foundIn(json)})`);
   const parsed = ReportSchema.safeParse(json);
-  if (!parsed.success) throw new ReportUnreadableError(file, `status must be ${FILM_STATUSES.join(' or ')}`);
+  if (!parsed.success) throw new ReportUnreadableError(file, violationsOf(json, parsed.error.issues).join(VIOLATION_SEPARATOR));
   const reason = parsed.data.reason === undefined ? '' : oneLine(parsed.data.reason, MAX_FACT_VALUE_CHARACTERS);
   return {
     status: parsed.data.status,

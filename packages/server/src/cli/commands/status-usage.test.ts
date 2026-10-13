@@ -1,13 +1,14 @@
-import { mkdtemp, realpath, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventSourcedIssueStateStore } from '@agent-factory/adapters';
 import { ProjectEventStore, type UsageReportSource } from '@agent-factory/application';
-import type { AccountIdentity, UsageReading } from '@agent-factory/domain';
+import type { AccountIdentity, IssueState, UsageReading } from '@agent-factory/domain';
 import type { AgentFactoryConfig } from '../../config/agent-factory-config.ts';
 import { openEventLog } from '../../composition/installation/event-log.ts';
 import { openInstallation, type InstallationOverrides } from '../../composition/installation/installation-runtime.ts';
+import { factoryLockPath } from '../../composition/runtime.ts';
 import type { CliContext } from '../cli-context.ts';
 import { runCli } from '../factory-cli.ts';
 import { capturedOutput, cliContext, configText, NOW, parseConfig, type CapturedOutput } from '../testing/cli-harness.ts';
@@ -100,9 +101,10 @@ describe('status and usage of the whole installation', () => {
     eventLog.close();
 
     expect(await runCli(['status'], context())).toBe(0);
-    expect(captured.lines.slice(0, 4)).toEqual([
+    expect(captured.lines.slice(0, 5)).toEqual([
       `Installation ${home} (configuration ${home}/config.yaml)`,
       'Factory: not running',
+      'Calm: yes (the factory is not running)',
       'Agent runs at a time: at most 1',
       'Pauses: none',
     ]);
@@ -113,5 +115,37 @@ describe('status and usage of the whole installation', () => {
       `  gadgets (Gadgets) on the local forge of acme/gadgets (${home}/projects/gadgets/forge)`,
       '    no issue taken by the factory yet',
     ]);
+  });
+
+  describe('whether a restart would cut work short', () => {
+    async function recordIssueStates(project: string, issueNumber: number, ...states: readonly IssueState[]): Promise<void> {
+      const eventLog = openEventLog(config.directories.state);
+      const store = new EventSourcedIssueStateStore(new ProjectEventStore(eventLog.events, project));
+      for (const state of states) await store.transition(issueNumber, state, `to ${state}`);
+      eventLog.close();
+    }
+    async function runningFactoryLock(): Promise<void> {
+      await mkdir(config.directories.state, { recursive: true });
+      await writeFile(factoryLockPath(config.directories.state), `${process.ppid}\n`);
+    }
+
+    it('is calm for a running factory with nothing in flight', async () => {
+      await runningFactoryLock();
+      expect(await runCli(['status'], context())).toBe(0);
+      expect(captured.lines.slice(1, 3)).toEqual([`Factory: running as process ${process.ppid}, cockpit at ${config.server.publicUrl}`, 'Calm: yes']);
+    });
+
+    it('is not calm while a running factory works by itself on an issue, and says which', async () => {
+      await runningFactoryLock();
+      await recordIssueStates('widgets', 3, 'spec-draft', 'spec-validated', 'authoring-checks', 'checks-frozen', 'implementing', 'gating');
+      expect(await runCli(['status'], context())).toBe(0);
+      expect(captured.lines.slice(2, 4)).toEqual(['Calm: no', '  issue in a stage the factory runs by itself: widgets#3 is gating']);
+    });
+
+    it('is calm for a stopped factory, though its log still shows the stage it was in', async () => {
+      await recordIssueStates('widgets', 3, 'spec-draft', 'spec-validated', 'authoring-checks', 'checks-frozen', 'implementing', 'gating');
+      expect(await runCli(['status'], context())).toBe(0);
+      expect(captured.lines.slice(1, 3)).toEqual(['Factory: not running', 'Calm: yes (the factory is not running)']);
+    });
   });
 });

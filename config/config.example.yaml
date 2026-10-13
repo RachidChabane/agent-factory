@@ -52,7 +52,7 @@ daemon:
   mergeWatchIntervalMinutes: 10
   issueRefreshSeconds: 120
   # How long a forge may take to register the checks of a head before an empty list counts as passed: a pull request
-  # is announced as ready only once its required checks passed.
+  # is announced as ready only once every check of its head has completed without failing.
   checksSettleSeconds: 120
 
 notifications:
@@ -145,7 +145,8 @@ projects:
     # only a command you trust. It writes into {output}: report.json ({ "status": "recorded" | "skipped", "reason",
     # "facts": [{ "label", "value" }], "keyFrames": [paths] }), one video (.mp4 .webm .mov .mkv) and screenshots.
     # A video that is not an MP4 is turned into one with ffmpeg. {replay} is the replayFile of the first recording,
-    # given to the second one after an option such as --replay.
+    # given to the second one after an option such as --replay. The tokens reach the program as they are, without a
+    # shell: ~ and variables are not expanded in them (workingDirectory is expanded).
     evidence:
       films:
         command: [node, record-film.mjs, --ref, "{ref}", --out, "{output}", --scenario, "{scenario}", --replay, "{replay}"]
@@ -154,6 +155,9 @@ projects:
         timeoutMinutes: 20
         replayFile: replay.json
         timeZone: Europe/Paris
+        # Tools (declared in `tools`) whose checks must pass before a film starts. While one fails, the films of
+        # the project stay queued, nothing fails, and the operator is told which login to run.
+        tools: [vault]
     # What confined code may reach beyond its worktree. Agents may always run the setup and gate commands above.
     sandbox:
       # Lets the agents look package versions up; registry credentials stay unreadable.

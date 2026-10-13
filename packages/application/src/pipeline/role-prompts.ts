@@ -141,6 +141,10 @@ export function withAddendum(prompt: string, addendum: string | null): string {
   return addendum === null ? prompt : `${prompt.trimEnd()}${PARAGRAPH}${addendum}`;
 }
 
+export function withAddenda(prompt: string, addenda: readonly (string | null)[]): string {
+  return addenda.reduce<string>((text, addendum) => withAddendum(text, addendum), prompt);
+}
+
 export function manifestCorrectionPrompt(problems: readonly string[]): string {
   return [
     `The factory cannot use ${inlineCode(ACCEPTANCE_MANIFEST_PATH)}:`,

@@ -70,7 +70,7 @@ export function storefrontReadyNotices(clock: FixtureClock): ReadonlyMap<number,
         failures: [{ label: 'search-by-colour · after · final.png', reason: 'the upload command exited with 3: the storage quota is spent' }],
       },
     ],
-    [PULL_REQUEST.checkoutScreenReader, { status: 'held', holds: [{ kind: 'checks-running' }], checksReadAt: clock.minutesAgo(3) }],
+    [PULL_REQUEST.checkoutScreenReader, { status: 'held', holds: [{ kind: 'checks-running', checks: ['e2e-checkout'] }], checksReadAt: clock.minutesAgo(3) }],
     [PULL_REQUEST.expiredPromoMessage, { status: 'held', holds: [{ kind: 'films-failed', scenarios: ['expired-promo'] }], checksReadAt: clock.minutesAgo(3) }],
   ]);
 }

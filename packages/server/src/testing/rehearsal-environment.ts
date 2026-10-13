@@ -36,6 +36,8 @@ export interface RehearsalOptions {
   readonly projects?: readonly string[];
   /** Settings a project declares besides its identity and forge, such as its delivery environments. */
   readonly projectSettings?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  /** The tools the installation declares (`tools`); none when absent. */
+  readonly tools?: readonly Record<string, unknown>[];
   /** The upload command of the media of the notices (`notifications.media`); none when absent. */
   readonly media?: Readonly<Record<string, unknown>>;
   /** How long an empty list of checks is waited on, in seconds; a local forge that runs no check has nothing to wait for. */
@@ -63,6 +65,7 @@ export function rehearsalConfigText(options: RehearsalOptions = {}): string {
     claude: { niceness: null, ...(options.claudeCommand === undefined ? {} : { command: options.claudeCommand }) },
     ...(options.minimumFreeMemoryPercent === undefined ? {} : { resources: { minimumFreeMemoryPercent: options.minimumFreeMemoryPercent } }),
     daemon: { pollIntervalSeconds: 0.05, mergeWatchIntervalMinutes: 0.002, issueRefreshSeconds: 0.05, checksSettleSeconds: options.checksSettleSeconds ?? 0 },
+    ...(options.tools === undefined ? {} : { tools: options.tools }),
     notifications: {
       dedupeWindowMinutes: 1,
       channels: [{ kind: 'google-chat', webhookUrl: { fromEnvironment: TEST_WEBHOOK_VARIABLE } }],

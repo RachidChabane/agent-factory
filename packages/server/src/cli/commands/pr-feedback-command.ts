@@ -19,13 +19,9 @@ export async function prFeedbackCommand(pullRequestNumber: number, path: string,
     const controller = new AbortController();
     const releaseSignals = abortOnShutdown(controller, context.output);
     try {
-      const feedback = new PullRequestFeedback({ ...project.dependencies, clock: installation.clock }, project.settings.implementerEscalation);
+      const feedback = new PullRequestFeedback({ ...project.dependencies, clock: installation.clock });
       const outcome = await feedback.record({ pullRequestNumber, author, source: CLI_SOURCE, body });
       const issue = itemName(project.config, outcome.issueNumber);
-      if (outcome.kind === 'needs-human') {
-        context.output.error(`${issue} needs a human: ${outcome.reason}`);
-        return EXIT_CODES.needsHuman;
-      }
       context.output.line(`Feedback from ${author} recorded on pull request #${pullRequestNumber}; ${issue} re-enters the implementer (attempt ${outcome.attempt + 1})`);
       const running = await runningFactory(selected.config);
       if (running !== null) {

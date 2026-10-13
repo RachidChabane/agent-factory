@@ -1,5 +1,5 @@
-import { issueStatus, loadJournal, ProjectEventStore, type EventStore } from '@agent-factory/application';
-import type { IssueState } from '@agent-factory/domain';
+import { currentFilmToolWait, issueStatus, latestToolChecks, loadJournal, ProjectEventStore, restartHazards, type CheckedTool, type FactoryEventRecord } from '@agent-factory/application';
+import type { IssueState, ToolName } from '@agent-factory/domain';
 import type { AgentFactoryConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
 import { costBasis } from '../../projections/cost-views.ts';
 import { indexEvents } from '../../projections/event-index.ts';
@@ -39,9 +39,15 @@ function issuesByState(index: ReturnType<typeof indexEvents>): ReadonlyMap<Issue
   return counts;
 }
 
-async function projectOverview(events: EventStore, project: ProjectConfig): Promise<ProjectOverview> {
-  const records = await events.read(EVERY_SUBJECT, FIRST_SEQUENCE);
-  return { id: project.id, name: project.name, forge: forgeName(project), issuesByState: issuesByState(indexEvents(records)), pauses: pauseViews(records, 'project') };
+function projectOverview(project: ProjectConfig, records: readonly FactoryEventRecord[], installationChecks: ReadonlyMap<ToolName, CheckedTool>): ProjectOverview {
+  return {
+    id: project.id,
+    name: project.name,
+    forge: forgeName(project),
+    issuesByState: issuesByState(indexEvents(records)),
+    pauses: pauseViews(records, 'project'),
+    filmToolWait: currentFilmToolWait(records, installationChecks, project.evidence.films?.tools ?? []),
+  };
 }
 
 async function overviewCommand(context: CliContext): Promise<number> {
@@ -49,17 +55,20 @@ async function overviewCommand(context: CliContext): Promise<number> {
   const installation = await context.openInstallation(config, { projects: [] });
   try {
     const records = await installation.events.read(EVERY_SUBJECT, FIRST_SEQUENCE);
-    const projects: ProjectOverview[] = [];
-    for (const project of config.projects) projects.push(await projectOverview(new ProjectEventStore(installation.events, project.id), project));
+    const recordsByProject = new Map<string, readonly FactoryEventRecord[]>();
+    for (const project of config.projects) recordsByProject.set(project.id, await new ProjectEventStore(installation.events, project.id).read(EVERY_SUBJECT, FIRST_SEQUENCE));
+    const installationChecks = latestToolChecks(records);
+    const factoryProcess = await runningFactory(config);
     const overview = {
       home: config.home,
       configPath: config.configPath,
-      factoryProcess: await runningFactory(config),
+      factoryProcess,
       cockpitUrl: config.server.publicUrl,
+      hazards: factoryProcess === null ? [] : restartHazards({ installation: records, projects: recordsByProject }),
       maxConcurrentRuns: config.resources.maxConcurrentRuns,
       pauses: pauseViews(records, 'installation'),
       usage: usageView(config, await installation.budget.usage(), records),
-      projects,
+      projects: config.projects.map((project) => projectOverview(project, recordsByProject.get(project.id) ?? [], installationChecks)),
     };
     for (const line of renderOverview(overview, context.clock.now())) context.output.line(line);
     return EXIT_CODES.ok;

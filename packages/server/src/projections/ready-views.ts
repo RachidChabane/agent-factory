@@ -4,7 +4,7 @@ import {
   failedFilmScenarios,
   isAwaitingMerge,
   pendingFilmScenarios,
-  requiredChecksVerdict,
+  readinessChecksOf,
   type CheckRunSummary,
   type PipelineJournal,
   type ReadyAnnouncement,
@@ -14,7 +14,7 @@ import { iso } from './event-index.ts';
 import type { Observed } from '../snapshot/cached-reading.ts';
 
 function holdView(blocker: ReadinessBlocker): ReadyHoldView {
-  return blocker.kind === 'films-pending' || blocker.kind === 'films-failed' ? { kind: blocker.kind, scenarios: [...blocker.scenarios] } : { kind: blocker.kind };
+  return blocker.kind === 'films-pending' || blocker.kind === 'films-failed' ? { kind: blocker.kind, scenarios: [...blocker.scenarios] } : { kind: blocker.kind, checks: [...blocker.checks] };
 }
 
 function sentView(announcement: ReadyAnnouncement): ReadyNoticeView {
@@ -30,8 +30,6 @@ function sentView(announcement: ReadyAnnouncement): ReadyNoticeView {
 export interface ReadyNoticeReadings {
   /** The checks of the head of the pull request, as last read from the forge. */
   readonly checks: Observed<readonly CheckRunSummary[]>;
-  /** The checks of the base branch, against which a failure the change did not cause is told apart. */
-  readonly baseChecks: Observed<readonly CheckRunSummary[]>;
   /** Whether the project films: a film its specs declare only holds a pull request when it can be recorded. */
   readonly filming: boolean;
 }
@@ -49,7 +47,7 @@ export function readyNoticeView(journal: PipelineJournal, open: boolean, reading
   if (current !== undefined) return sentView(current);
   const films = readings.filming;
   const readiness = evaluatePullRequestReadiness({
-    checks: requiredChecksVerdict(readings.checks.value ?? [], readings.baseChecks.value ?? [], false),
+    ...readinessChecksOf(readings.checks.value ?? [], false),
     pendingFilms: films ? pendingFilmScenarios(journal) : [],
     failedFilms: films ? failedFilmScenarios(journal) : [],
   });

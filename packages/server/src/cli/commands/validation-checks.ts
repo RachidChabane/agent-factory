@@ -9,7 +9,7 @@ import {
   NonLocalRemoteError,
   RemoteLocalityGuard,
 } from '@agent-factory/adapters';
-import { PIPELINE_ROLES, requiredLabels, worktreesBesideRuns, type CommandRunner, type ReferenceSource, type ToolProber } from '@agent-factory/application';
+import { FILM_TOOL_RECHECK_INTERVAL_MS, PIPELINE_ROLES, requiredLabels, worktreesBesideRuns, type CommandRunner, type ReferenceSource, type ToolProber } from '@agent-factory/application';
 import { admitAgentRun, describeAutonomy, REQUIRED_TOOLS, type ToolProbeResult } from '@agent-factory/domain';
 import { z } from 'zod';
 import type { AgentFactoryConfig, NotificationChannelConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
@@ -20,6 +20,7 @@ import { projectEngineSockets } from '../../composition/project/confinement.ts';
 import { openReferenceSnapshots } from '../../composition/project/references.ts';
 import { projectGitEnvironment, rehearsalRepositories } from '../../composition/project/forge.ts';
 import { projectConventions } from '../../composition/project/project-settings.ts';
+import { resolveExecutable, unresolvedProgramDetail, type CommandEnvironment } from './film-executable.ts';
 
 export const VALIDATION_TIMEOUT_MS = 30_000;
 const EXIT_CODE_OK = 0;
@@ -296,12 +297,22 @@ export function mergeOutcome(project: ProjectConfig): CheckOutcome {
 }
 
 /** The film command of a project, with what it is allowed: everything the operator is, outside the sandbox. */
-export async function filmsOutcome(project: ProjectConfig): Promise<CheckOutcome> {
+export async function filmsOutcome(project: ProjectConfig, environment: CommandEnvironment): Promise<CheckOutcome> {
   const films = project.evidence.films;
   if (films === null) return { ok: true, detail: 'no film command declared' };
   if (!(await isDirectory(films.workingDirectory))) return { ok: false, detail: `the working directory ${films.workingDirectory} does not exist` };
+  const [program = ''] = films.command;
+  const executable = await resolveExecutable(program, films.workingDirectory, { ...environment, ...films.environment });
+  if (executable === null) return { ok: false, detail: unresolvedProgramDetail(program, films.workingDirectory) };
   const timeout = Math.round(films.timeoutMs / MILLISECONDS_PER_MINUTE);
-  return { ok: true, detail: `${films.command.join(' ')} ${FILM_CONSEQUENCE}; it runs from ${films.workingDirectory} and stops after ${timeout} minutes` };
+  const running = `${films.command.join(' ')} ${FILM_CONSEQUENCE}; the program is ${executable}; it runs from ${films.workingDirectory} and stops after ${timeout} minutes`;
+  return { ok: true, detail: films.tools.length === 0 ? running : `${running}; ${toolsWaitDetail(films.tools)}` };
+}
+
+/** What a project that lists tools for its films says of them: they are checked before a film starts, and a failing one holds the films. */
+export function toolsWaitDetail(tools: readonly string[]): string {
+  const recheck = FILM_TOOL_RECHECK_INTERVAL_MS / MILLISECONDS_PER_MINUTE;
+  return `before a film starts it checks ${tools.join(', ')} and keeps the films queued while one fails, reading it again every ${recheck} minutes`;
 }
 
 async function ffmpegOutcome(settings: ValidationSettings, cwd: string): Promise<CheckOutcome> {
@@ -335,7 +346,7 @@ export function projectChecks(config: AgentFactoryConfig, project: ProjectConfig
     ...(project.evidence.films === null
       ? []
       : [
-          { name: 'films', severity: 'required', runsCommands: false, run: () => guarded(() => filmsOutcome(project)) } satisfies ValidationCheck,
+          { name: 'films', severity: 'required', runsCommands: false, run: () => guarded(() => filmsOutcome(project, settings.environment)) } satisfies ValidationCheck,
           { name: 'films ffmpeg', severity: 'optional', runsCommands: true, run: () => guarded(() => ffmpegOutcome(settings, cwd)) } satisfies ValidationCheck,
         ]),
     ...project.tools.map((tool) => toolCheck(prober, tool.name, 'optional', `tool ${tool.name}`)),

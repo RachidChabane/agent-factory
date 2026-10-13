@@ -16,6 +16,7 @@ import {
   AGENT_ROLES,
   COMMIT_KINDS,
   DEFAULT_DELEGATE_ACTOR,
+  DEFAULT_EVIDENCE_LIMITS,
   DEFAULT_ISSUE_TYPES,
   DEFAULT_TYPE_LABEL_PREFIX,
   DELEGATE_ACTOR_RULE,
@@ -47,7 +48,7 @@ import {
   RoleOverrideSchema,
   uniqueBy,
 } from './common.ts';
-import { CheckEnvironmentSchema, SandboxSettingsSchema, ToolChecksSchema } from './installation.ts';
+import { CheckEnvironmentSchema, SandboxSettingsSchema, ToolChecksSchema, ToolNameSchema } from './installation.ts';
 
 export const DEFAULT_BASE_BRANCH = 'main';
 export const DEFAULT_CLONE_DIRECTORY = 'clone';
@@ -65,8 +66,8 @@ export const DEFAULT_HEALTH_INTERVAL_MINUTES = 5;
 export const DEFAULT_WAKE_UP_SECONDS = 90;
 export const DEFAULT_STACK_READY_TIMEOUT_SECONDS = 120;
 export const DEFAULT_STACK_STOP_GRACE_SECONDS = 10;
-export const DEFAULT_EVIDENCE_MAX_FILE_BYTES = 5_000_000;
-export const DEFAULT_EVIDENCE_MAX_TOTAL_BYTES = 40_000_000;
+export const DEFAULT_EVIDENCE_MAX_FILE_BYTES = DEFAULT_EVIDENCE_LIMITS.maxFileBytes;
+export const DEFAULT_EVIDENCE_MAX_TOTAL_BYTES = DEFAULT_EVIDENCE_LIMITS.maxTotalBytes;
 export const FORGE_KINDS = ['github', 'local'] as const;
 export type ForgeKind = (typeof FORGE_KINDS)[number];
 export const DEPLOYMENT_SOURCE_KINDS = ['github', 'none'] as const;
@@ -254,9 +255,15 @@ const FilmsSchema = z
     replayFile: z.string().regex(REPLAY_FILE_NAME, 'must be a file name').default(DEFAULT_FILM_REPLAY_FILE),
     /** The zone of the expected arrival times; the machine's zone when absent. */
     timeZone: NonEmptyString.refine(isTimeZone, { message: 'is not a time zone name such as Europe/Paris' }).optional(),
+    /**
+     * The tools whose checks must pass before a film starts, by their names in `tools` (of the installation or of the
+     * project): while one fails, the films of the project stay queued.
+     */
+    tools: z.array(ToolNameSchema).default([]),
   })
   .superRefine((films, context) => {
     for (const problem of filmCommandProblems(films.command)) context.addIssue({ code: 'custom', path: ['command'], message: problem });
+    for (const name of uniqueBy(films.tools, (tool) => tool)) context.addIssue({ code: 'custom', path: ['tools'], message: `tool ${name} is listed twice` });
   });
 
 /** Lets the delegate merge the pull requests of some issue types, once the conditions hold. */

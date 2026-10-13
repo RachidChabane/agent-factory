@@ -309,10 +309,15 @@ const REDUCERS: Readonly<Record<string, Reducer>> = {
     journal.reviewReorders = [...journal.reviewReorders, reorder];
   },
   [PIPELINE_EVENTS.retryDecided]: (journal, event) => {
-    journal.decisions = [...journal.decisions, parse(RetryDecidedSchema, event)];
+    const decided = parse(RetryDecidedSchema, event);
+    journal.decisions = [...journal.decisions, decided];
+    if (decided.opensCycle) journal.attemptEpoch = decided.afterAttempt + 1;
   },
   [PIPELINE_EVENTS.decisionAnswered]: (journal, event) => {
-    journal.decisionAnswers = [...journal.decisionAnswers, parse(DecisionAnsweredSchema, event)];
+    const answered = parse(DecisionAnsweredSchema, event);
+    journal.decisionAnswers = [...journal.decisionAnswers, answered];
+    const asking = journal.attempts.findLast((record) => record.runId === answered.runId);
+    if (asking !== undefined) journal.attemptEpoch = Math.max(journal.attemptEpoch, asking.attempt);
   },
   [PIPELINE_EVENTS.implementationCommitted]: (journal, event) => {
     const { sha } = parse(CommitRecordedSchema, event);
@@ -454,8 +459,23 @@ export function isAnnouncedReady(journal: PipelineJournal, headSha: string): boo
   return journal.readyAnnouncements.some((announcement) => announcement.headSha === headSha);
 }
 
+/**
+ * The decisions of the current cycle, which the failure budget counts. A cycle begins with the first attempt and again
+ * with each check the operator had rewritten, each feedback the operator recorded on the pull request and each answer
+ * the operator gave to a decision request: these gestures never spend the budget, and the failures before them stop
+ * counting.
+ */
 export function decisionsOfEpoch(journal: PipelineJournal): readonly RetryRecord[] {
   return journal.decisions.filter((record) => record.afterAttempt >= journal.attemptEpoch);
+}
+
+/**
+ * The decisions since the operator last had a frozen check rewritten: what a fresh session is told was rejected. Failures
+ * reported against the checks before the rewrite tell it nothing; the operator's feedback and answers do not end it.
+ */
+export function decisionsSinceRewrite(journal: PipelineJournal): readonly RetryRecord[] {
+  const rewrittenAt = journal.checkRewrites.at(-1)?.nextAttempt ?? 0;
+  return journal.decisions.filter((record) => record.afterAttempt >= rewrittenAt);
 }
 
 export function currentAttempt(journal: PipelineJournal): number {
@@ -478,14 +498,9 @@ export function reviewRecord(journal: PipelineJournal, attempt: number): ReviewR
   return journal.reviews.findLast((record) => record.attempt === attempt) ?? null;
 }
 
+/** The latest decision that followed the attempt: a review ordered again, or feedback on its pull request, can add one to an earlier decision. */
 export function decisionAfter(journal: PipelineJournal, attempt: number): RetryRecord | null {
-  return journal.decisions.find((record) => record.afterAttempt === attempt) ?? null;
-}
-
-export function pendingFeedback(journal: PipelineJournal): ExternalFeedbackRecord | null {
-  const latest = journal.feedback.at(-1);
-  if (latest === undefined || latest.cycleStarted) return null;
-  return decisionAfter(journal, latest.afterAttempt) === null ? latest : null;
+  return journal.decisions.findLast((record) => record.afterAttempt === attempt) ?? null;
 }
 
 export function totalCostUsd(journal: PipelineJournal): number {

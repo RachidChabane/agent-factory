@@ -65,11 +65,13 @@ A film is evidence added to an open pull request, not a stage
 scenarios the spec declares; the installation's daemon films them one at a time, across
 projects, while nothing else runs: the base, then the head, committed on the branch in
 one evidence commit and announced in the pull request body. The merge waits for the
-films of its pull request.
+films of its pull request. A project may list the tools its film command needs: while one
+fails its check, its films stay queued and hold no slot, and the operator is told which
+login to run.
 
 Once per head of an open pull request, the project daemon tells the operator that it is ready
-([ADR 0034](adr/0034-notification-media.md)): its required checks passed, by the rule that gates its
-merge, and none of its films is queued or recording; a failed film holds the notice. The scan runs
+([ADR 0034](adr/0034-notification-media.md)): every check reported on its head has completed and none
+failed, required or not, and none of its films is queued or recording; a failed check or film holds the notice. The scan runs
 beside the daemon's tick and never holds it. It uploads the films, their final screenshots and the
 evidence images with the operator's command, at most once per content, and records the notice with the
 links it carried. A failed upload leaves its link out; the notice still goes out.
@@ -83,8 +85,10 @@ rule that allowed it. The delegate's own events carry its name too, and a merge 
 The policy is not a security boundary: the delegate runs with the operator's account.
 
 Failures retry within bounds: two corrections in the same session, then one fresh
-restart, then `needs-human` with the reason. A decision only a person can take
-stops the run and comes back to the agent with the answer.
+restart, then `needs-human` with the reason. The bounds count the failures of one
+cycle: the operator's feedback on a pull request, the answer to a decision and a
+rewritten check each open a cycle with the whole budget. A decision only a person can
+take stops the run and comes back to the agent with the answer.
 
 ## Ports and adapters
 
@@ -139,6 +143,10 @@ How the cockpit loads, caches and shares its stream:
   waited for at most three seconds; past that the snapshot carries it empty (`null`,
   never a stand-in) and the read ends in the background. The factory builds the first
   snapshot as it starts.
+- **A range of commits is read once.** The commits a deployment delivered, and those waiting behind the
+  current one, come from the project's clone. A range between two shas never changes, so the server keeps it
+  by those two shas, up to a bound on the entries, and runs git only for a range it has not read. The commits
+  waiting behind a deployment end at the head of the base branch, so each head gives a range of its own.
 - **Errors never blank the page.** Every view and the application sit in an error
   boundary that shows the message with a retry. A lazy chunk that fails to load offers
   a document reload, because the browser caches a rejected dynamic import.

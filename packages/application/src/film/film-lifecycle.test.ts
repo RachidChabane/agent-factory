@@ -53,7 +53,7 @@ describe('the films a spec declares', () => {
     expect(landed).not.toContain(PLACEHOLDER);
     expect(landed).toContain('[Watch the recording](');
 
-    const feedback = new PullRequestFeedback({ ...scenario.dependencies(), clock: scenario.clock }, scenario.settings.implementerEscalation);
+    const feedback = new PullRequestFeedback({ ...scenario.dependencies(), clock: scenario.clock });
     await feedback.record({ pullRequestNumber: 100, author: 'Dana Reyes', source: 'cockpit', body: 'The total is wrong.' });
 
     const journal = await loadJournal(scenario.events, ISSUE_NUMBER);

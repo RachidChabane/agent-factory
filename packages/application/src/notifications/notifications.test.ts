@@ -84,7 +84,7 @@ describe('operator notifications', () => {
     const media = [{ label: 'checkout-flow · after · film.mp4', url: 'https://files.example.test/after' }];
     expect(NOTICES.pullRequestReady({ issueNumber: 12, pullRequest: { number: 31, url: 'https://forge.example.test/pull/31', headSha: 'abc' }, title: 'feat(cart): show the badge', films: ['checkout-flow'], media })).toEqual({
       title: 'Pull request #31 is ready to merge',
-      body: 'feat(cart): show the badge (issue #12). Its required checks passed. Films recorded: checkout-flow. https://forge.example.test/pull/31',
+      body: 'feat(cart): show the badge (issue #12). Every check of its head passed. Films recorded: checkout-flow. https://forge.example.test/pull/31',
       path: '/pull-requests/31',
       media,
     });

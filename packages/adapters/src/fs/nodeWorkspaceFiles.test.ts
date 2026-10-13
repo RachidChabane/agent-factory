@@ -36,6 +36,18 @@ describe('NodeWorkspaceFiles', () => {
     expect(await files.copyFile(root, 'shots/none.png', other, 'after/none.png')).toBe(false);
   });
 
+  it('tells the size of a file in bytes, and nothing of what is no file inside the root', async () => {
+    await files.writeText(root, 'shots/header.png', 'twelve bytes');
+    await files.writeText(root, 'shots/empty.png', '');
+    await writeFile(join(other, 'credentials.db'), 'operator secret');
+    await symlink(join(other, 'credentials.db'), join(root, 'shots/linked.png'));
+    expect(await files.sizeOf(root, 'shots/header.png')).toBe(12);
+    expect(await files.sizeOf(root, 'shots/empty.png')).toBe(0);
+    expect(await files.sizeOf(root, 'shots')).toBeNull();
+    expect(await files.sizeOf(root, 'shots/missing.png')).toBeNull();
+    expect(await files.sizeOf(root, 'shots/linked.png')).toBeNull();
+  });
+
   it('removes files and directories and tolerates missing ones', async () => {
     await files.writeText(root, '.factory/acceptance.json', '{}');
     await files.remove(root, '.factory');

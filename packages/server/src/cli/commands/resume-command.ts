@@ -47,8 +47,7 @@ async function returnCommand(issueNumber: number, answer: string | null, delegat
     const spec = outcome.specChanged ? 'the clarified spec was recorded' : 'the spec is unchanged';
     const checks = outcome.checksReauthored ? '; the acceptance checks will be written again from the base' : '';
     const decision = outcome.decisionAnswered ? '; the implementer will continue with the answer to its decision request' : '';
-    const feedback = outcome.feedbackCycleGranted ? '; one fresh session on the escalation profile addresses the pending feedback' : '';
-    context.output.line(`${itemName(project.config, issueNumber)} resumed at ${outcome.resumedAt}: ${spec}${checks}${decision}${feedback}. ${await continuation(selected, issueNumber)}`);
+    context.output.line(`${itemName(project.config, issueNumber)} resumed at ${outcome.resumedAt}: ${spec}${checks}${decision}. ${await continuation(selected, issueNumber)}`);
     await recordDelegation(session, context, delegation, authorisation, { kind: 'issue', number: issueNumber, issueNumber });
     return EXIT_CODES.ok;
   });

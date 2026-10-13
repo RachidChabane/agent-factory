@@ -5,7 +5,8 @@ import { SHORT_SHA_LENGTH } from '../audit/audit-issue-renderer.ts';
 import { describeFinding } from '../review/review-findings.ts';
 import type { AcceptanceTestRow } from './acceptance-test-table.ts';
 import type { DiffStatEntry } from './diff-stat.ts';
-import type { BeforeProofRecord, EvidenceBundle, EvidenceFile, EvidencePhase } from './journal-events.ts';
+import { describeOmission } from './evidence-omission.ts';
+import type { BeforeProofRecord, EvidenceBundle, EvidenceFile, EvidencePhase, OmittedEvidenceFile } from './journal-events.ts';
 import { inlineCode, tableCell } from './markdown.ts';
 import type { AttemptCounts } from './pipeline-journal.ts';
 import type { ForgeFileLinks } from './pipeline-settings.ts';
@@ -27,6 +28,7 @@ const NEWLINE = '\n';
 const LINK_SEPARATOR = ' · ';
 const NO_RISK = 'None reported.';
 const NOT_PRODUCED = 'not produced';
+const LEFT_OUT = 'left out';
 
 export interface PullRequestBodyInput {
   readonly fileLinks: ForgeFileLinks;
@@ -93,8 +95,8 @@ function afterSentence(input: PullRequestBodyInput): string {
   return `**After** on ${inlineCode(shortSha(input.evidenceSha))}: the gate passes (${steps.join(', ')})${score}.`;
 }
 
-function evidenceCell(input: PullRequestBodyInput, file: EvidenceFile | undefined, phase: EvidencePhase): string {
-  if (file === undefined) return NOT_PRODUCED;
+function evidenceCell(input: PullRequestBodyInput, file: EvidenceFile | undefined, omission: OmittedEvidenceFile | undefined, phase: EvidencePhase): string {
+  if (file === undefined) return omission === undefined ? NOT_PRODUCED : `${LEFT_OUT}: ${tableCell(describeOmission(omission))}`;
   const alt = `${file.caption}, ${phase}`;
   return isImagePath(file.sourcePath)
     ? `![${alt}](${input.fileLinks.rawFile(input.evidenceSha, file.bundlePath)})`
@@ -105,10 +107,10 @@ function evidenceTable(input: PullRequestBodyInput): string | null {
   if (input.manifest.evidence.length === 0) return null;
   const find = (phase: EvidencePhase, path: string): EvidenceFile | undefined =>
     input.bundle.files.find((file) => file.phase === phase && file.sourcePath === path);
-  const rows = input.manifest.evidence.map(
-    (path) =>
-      `| ${inlineCode(path)} | ${evidenceCell(input, find('before', path), 'before')} | ${evidenceCell(input, find('after', path), 'after')} |`,
-  );
+  const leftOut = (phase: EvidencePhase, path: string): OmittedEvidenceFile | undefined =>
+    input.bundle.omitted.find((entry) => entry.phase === phase && entry.sourcePath === path);
+  const cell = (phase: EvidencePhase, path: string): string => evidenceCell(input, find(phase, path), leftOut(phase, path), phase);
+  const rows = input.manifest.evidence.map((path) => `| ${inlineCode(path)} | ${cell('before', path)} | ${cell('after', path)} |`);
   return ['| Evidence | Before | After |', '|---|---|---|', ...rows].join(NEWLINE);
 }
 
@@ -163,6 +165,7 @@ function risks(input: PullRequestBodyInput): string {
   const lines = [
     ...input.reviewFindings.map((finding) => `- ${describeFinding(finding)}`),
     ...input.bundle.missing.map((entry) => `- Evidence ${inlineCode(entry.sourcePath)} was not produced ${entry.phase} the change.`),
+    ...input.bundle.omitted.map((entry) => `- Evidence ${inlineCode(entry.sourcePath)} (${entry.phase} the change) was left out of the pull request: ${describeOmission(entry)}.`),
   ];
   return [`## ${PULL_REQUEST_SECTIONS.risks}`, lines.length === 0 ? NO_RISK : lines.join(NEWLINE)].join(PARAGRAPH);
 }

@@ -30,6 +30,6 @@ describe('the films of the demonstration', () => {
 
   it('name a command and a working directory that exist, and pass the films check of validate', async () => {
     await expect(access(DEMO_FILM_COMMAND_MAIN)).resolves.toBeUndefined();
-    await expect(filmsOutcome(storefront)).resolves.toMatchObject({ ok: true });
+    await expect(filmsOutcome(storefront, process.env)).resolves.toMatchObject({ ok: true });
   });
 });

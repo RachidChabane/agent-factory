@@ -42,6 +42,7 @@ import {
   requestDecisionSettings,
 } from '../composition/project/project-use-cases.ts';
 import { DECISION_QUESTION_PREFIX } from '../projections/run-views.ts';
+import { drainEffect } from './drain-effect.ts';
 import type { SequenceCursor } from './sequence-cursor.ts';
 
 export const UNKNOWN_COMMAND = 'unknown-command';
@@ -261,15 +262,13 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
   }),
   'pr.feedback': command(COMMAND_BODY_SCHEMAS['pr.feedback'], async (body, context) => {
     const project = projectOf(context, body.project);
-    const outcome = await new PullRequestFeedback({ ...project.dependencies, clock: context.runtime.clock }, project.settings.implementerEscalation).record({
+    const outcome = await new PullRequestFeedback({ ...project.dependencies, clock: context.runtime.clock }).record({
       pullRequestNumber: body.number,
       author: body.author,
       source: COCKPIT_CHANNEL,
       body: body.body,
     });
-    return outcome.kind === 'cycle-started'
-      ? startedByDaemon(context, `Feedback recorded; issue #${outcome.issueNumber} starts attempt ${outcome.attempt}`)
-      : `Feedback recorded; issue #${outcome.issueNumber} needs a human: ${outcome.reason}`;
+    return startedByDaemon(context, `Feedback recorded; issue #${outcome.issueNumber} starts attempt ${outcome.attempt}`);
   }),
   'pr.film': command(COMMAND_BODY_SCHEMAS['pr.film'], async (body, context) => {
     const project = projectOf(context, body.project);
@@ -315,7 +314,7 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
     const daemons = requireDaemons(context);
     await requestDrain(context.runtime.events, context.operator);
     const running = context.runtime.projects.reduce((count, project) => count + (daemons.project(project.id)?.runningIssues().length ?? 0), 0);
-    return running === 0 ? 'No new work starts; the factory stops at its next tick' : `No new work starts; the factory stops once its ${running} running issue(s) finish`;
+    return drainEffect({ runningIssues: running, calm: daemons.installation.isCalm() });
   }),
   'scheduler.resume': command(COMMAND_BODY_SCHEMAS['scheduler.resume'], async (body, context) => {
     const scope = scopeEvents(context, body.project);

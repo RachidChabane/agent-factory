@@ -5,6 +5,7 @@ import type { PullRequestRef, Worktree } from '../../ports.ts';
 import { evidenceCommitMessage, implementationCommitMessage, pullRequestTitle } from '../conventional-commit.ts';
 import { acceptanceTestRows, type AcceptanceTestRow } from '../acceptance-test-table.ts';
 import { renderDiffStat } from '../diff-stat.ts';
+import { evidenceIsComplete } from '../evidence.ts';
 import { PIPELINE_EVENTS, type EvidenceRecord } from '../journal-events.ts';
 import { EscalationRequiredError } from '../pipeline-errors.ts';
 import { OutboundSecretScan } from '../outbound-secret-scan.ts';
@@ -120,7 +121,7 @@ export class ProducingEvidenceStage implements PipelineStage {
     if (announced) return;
     await events.append(PULL_REQUEST_OPENED_EVENT, subject, {
       number: pullRequest.number,
-      evidenceComplete: evidence.bundle.missing.length === 0,
+      evidenceComplete: evidenceIsComplete(evidence.bundle),
       issueNumber: context.journal.issueNumber,
       headSha: pullRequest.headSha,
     });

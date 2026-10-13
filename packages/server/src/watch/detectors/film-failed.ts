@@ -1,7 +1,6 @@
 import { BLOCKER_KINDS, blockerKey, type Blocker, type BlockerDetector } from '../blocker.ts';
-import { oneLine } from './snapshot-queries.ts';
+import { OPEN_PULL_REQUEST_STATE, oneLine } from './snapshot-queries.ts';
 
-const OPEN_PULL_REQUEST_STATE = 'open';
 const FAILED_FILM_STATE = 'failed';
 const NO_REASON = 'no reason recorded';
 
