@@ -1,6 +1,6 @@
 import { constants } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
-import { delimiter, join, resolve } from 'node:path';
+import { delimiter, isAbsolute, join, resolve } from 'node:path';
 
 const PATH_VARIABLE = 'PATH';
 const DIRECTORY_SEPARATOR = '/';
@@ -41,6 +41,7 @@ export function unresolvedProgramDetail(program: string, workingDirectory: strin
   if (program.startsWith(HOME_MARKER)) {
     return `the program ${program} starts with ${HOME_MARKER}, which no shell expands: the tokens of the command reach the program as they are, so write the absolute path`;
   }
+  if (isAbsolute(program)) return `the program ${program} is not an executable file`;
   if (program.includes(DIRECTORY_SEPARATOR)) {
     return `the program ${program} is not an executable file (looked for ${resolve(workingDirectory, program)}, relative to the working directory)`;
   }

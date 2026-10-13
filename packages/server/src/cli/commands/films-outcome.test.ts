@@ -124,6 +124,12 @@ describe('the films line of validate', () => {
       }
     });
 
+    it('fails without a working directory in its message when its absolute path is no executable file', async () => {
+      const program = join(directory, 'scripts', 'plain-absolute.sh');
+      await writeProgram(program, PLAIN_MODE);
+      expect(await filmsOutcome(projectWith(filmCommand(program), directory), environment)).toEqual({ ok: false, detail: `the program ${program} is not an executable file` });
+    });
+
     it('fails, saying that no shell expands it, when it starts with a tilde', async () => {
       const outcome = await filmsOutcome(projectWith(filmCommand('~/tools/record-film'), directory), environment);
       expect(outcome.ok).toBe(false);
