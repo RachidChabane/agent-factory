@@ -1,5 +1,7 @@
 import type { PauseView, UsageView } from '@agent-factory/cockpit';
+import type { RestartHazard } from '@agent-factory/application';
 import { ISSUE_STATES, type IssueState } from '@agent-factory/domain';
+import { renderCalm } from './calm-view.ts';
 import { readingTime } from './time-text.ts';
 import { renderUsage } from './usage-view.ts';
 
@@ -20,6 +22,8 @@ export interface InstallationOverview {
   /** The process of the running factory, or null when none runs. */
   readonly factoryProcess: number | null;
   readonly cockpitUrl: string;
+  /** What a restart would cut short; only a running factory has any. */
+  readonly hazards: readonly RestartHazard[];
   readonly maxConcurrentRuns: number;
   readonly pauses: readonly PauseView[];
   readonly usage: UsageView;
@@ -52,6 +56,7 @@ export function renderOverview(overview: InstallationOverview, now: Date): reado
   return [
     `Installation ${overview.home} (configuration ${overview.configPath})`,
     `Factory: ${factory}`,
+    ...renderCalm(overview.factoryProcess !== null, overview.hazards, now),
     `Agent runs at a time: at most ${overview.maxConcurrentRuns}`,
     overview.pauses.length === 0 ? 'Pauses: none' : 'Pauses:',
     ...overview.pauses.map((pause) => pauseLine(pause, now, PAUSE_INDENT)),

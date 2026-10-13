@@ -17,7 +17,7 @@ import type { PauseSet, SchedulingPauses } from './scheduling-pauses.ts';
 const FIRST_SEQUENCE = 0;
 const NO_PAUSES: PauseSet = new Map();
 const STOP_REASON = 'the installation stopped';
-const DRAINED_REASON = 'the installation stopped once its running work finished, as the operator asked';
+export const DRAINED_REASON = 'the installation stopped once its running work finished, as the operator asked';
 const DRAIN_CAUSE = 'drain';
 
 /** What an installation needs from the daemon of one project. */
