@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import { API_COMMANDS_PATH } from '../../packages/cockpit/src/contract/index.ts';
+import { API_COMMANDS_PATH, API_STATE_PATH, CockpitSnapshotSchema, type CockpitSnapshot } from '../../packages/cockpit/src/contract/index.ts';
 import type { RunningFactory } from './factory.ts';
 
 /** The cockpit's own navigation and pages, by the names the operator reads. */
@@ -35,4 +35,36 @@ export function recordCommandsSent(page: Page): string[] {
     if (request.method() === 'POST' && pathname.startsWith(`${API_COMMANDS_PATH}/`)) sent.push(pathname);
   });
   return sent;
+}
+
+/** The snapshots a page receives: the last one is what the page shows. */
+export interface SnapshotTrail {
+  latest(): CockpitSnapshot;
+}
+
+/**
+ * Follows the snapshots the page receives from now on. A value the factory estimates from its clock, such as the
+ * arrival of a film, moves with every snapshot, so a spec compares the page with the snapshot the page holds.
+ */
+export function followSnapshots(page: Page): SnapshotTrail {
+  let latest: CockpitSnapshot | null = null;
+  let unreadable: unknown = null;
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname !== API_STATE_PATH) return;
+    void response
+      .json()
+      .then((body: unknown) => {
+        latest = CockpitSnapshotSchema.parse(body);
+      })
+      .catch((error: unknown) => {
+        unreadable = error;
+      });
+  });
+  return {
+    latest: () => {
+      if (unreadable !== null) throw new Error('the page received a snapshot that does not parse', { cause: unreadable });
+      if (latest === null) throw new Error('the page has received no snapshot yet');
+      return latest;
+    },
+  };
 }

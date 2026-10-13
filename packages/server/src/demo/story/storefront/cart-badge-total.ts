@@ -4,7 +4,7 @@ import { CART_BADGE_TOTAL_CHECK, LABELS_MODULE, RENDER_TEST_WITH_BADGE, RENDER_W
 
 const HEADER_IMAGE = 'test-results/cart-badge.svg';
 /** The journey the pull request shows on video: a customer from the cart to the payment. */
-const CHECKOUT_FLOW_SCENARIO = 'checkout-flow';
+export const CHECKOUT_FLOW_SCENARIO = 'checkout-flow';
 
 export const CART_BADGE_TOTAL: StoryIssue = {
   key: 'cart-badge-total',
