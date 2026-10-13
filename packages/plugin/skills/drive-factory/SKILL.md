@@ -18,7 +18,7 @@ description: Find the agent-factory verb, option and cockpit address for what yo
 | | `agent-factory tool login <name>` | starts the login the tool declares, then checks it |
 | Run | `agent-factory start [--port <port>]` | runs the factory and serves the cockpit; it does not return until the factory stops |
 | | `agent-factory stop [--now]` | drains: no new work, exit once running work is done; `--now` also stops the agents |
-| | `agent-factory watch [--interval <seconds>] [--once] [--json] [--port <port>]` | prints each blocker as it appears or clears |
+| | `agent-factory watch [--interval <seconds>] [--once] [--all] [--json] [--port <port>]` | prints each blocker as it appears or clears since the last watch reported; `--all` prints every blocker present; `--once` reads once and records nothing |
 | | `agent-factory run-issue <issue>` | drives a validated issue by itself; refused while the factory runs |
 | Work | `agent-factory request add <file> [--images <dir>] [--requester <name>]` | stores a product request |
 | | `agent-factory request challenge <id>` | challenges a request and drafts its specs; queued for the running factory |

@@ -16,7 +16,7 @@ description: Tell the operator what the factory did, what waits for them, what i
    ```
 
 4. The open pull requests, reviewed as `merge-and-release` says.
-5. `agent-factory watch --once`: what blocks work now. For each issue it names, `agent-factory status <issue>`.
+5. `agent-factory watch --once --all`: every blocker present now. For each issue it names, `agent-factory status <issue>`.
 6. Your notes of the gestures you made with `--as orchestrator`, each with its reason.
 
 ## Write

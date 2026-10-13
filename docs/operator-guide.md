@@ -145,17 +145,21 @@ of the reading. Nothing is printed while nothing changes.
 | `needs-human` | an issue the factory stopped, with the reason it gave |
 | `decision-pending` | an agent run that asked a question and waits for the answer |
 | `run-failed` | the latest run of an issue still in the pipeline failed in the last hour |
-| `stalled` | an issue in a stage that owes an agent run has had no run and no activity for 10 minutes |
+| `stalled` | an issue in a stage that owes an agent run has had no run and no activity for 10 minutes; a film of its pull request that is queued or recording explains the wait, so it is not reported |
 | `paused` | the operator, the budget or the machine's resources paused the factory or a project for over 10 minutes |
 | `no-free-worktree` | validated issues wait because every worktree of the project's pool is held |
 | `film-failed` | the latest recording of a film of an open pull request failed, with the scenario and the reason it gave; it does not hold the merge |
 | `cockpit-unreachable` | the factory does not answer, until it does |
 
-The first reading prints every blocker present. `--once` prints the blockers present now
-and exits 1 when there are any, 0 when there are none. `--json` prints one JSON object
-per line. `--port <port>` names a factory started on another port; the host and port
-otherwise come from `server` in the configuration, and a server on port `0` cannot be
-watched.
+A watch keeps the blockers it reported, with the time each was first reported, in
+`watch-blockers.json` of the installation's state directory, and replaces the file in one step.
+A watch that starts compares its first reading with it, so a restart prints only what appeared
+or cleared since; with no file, the first reading prints every blocker present. `--all` prints
+every blocker present whatever the file holds. `--once` reads the file, prints what a watch
+would, leaves the file as it was, and exits 1 when anything blocks work now, 0 when nothing
+does. `--json` prints one JSON object per line. `--port <port>` names a factory started on
+another port; the host and port otherwise come from `server` in the configuration, and a
+server on port `0` cannot be watched.
 
 Each running issue, each open pull request and each issue waiting for a person keeps a
 worktree (`worktrees.size`, 5 by default). When all are held, validated issues wait: the
