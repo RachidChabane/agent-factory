@@ -261,15 +261,13 @@ export const COMMAND_HANDLERS: Readonly<Record<CommandName, Handler>> = {
   }),
   'pr.feedback': command(COMMAND_BODY_SCHEMAS['pr.feedback'], async (body, context) => {
     const project = projectOf(context, body.project);
-    const outcome = await new PullRequestFeedback({ ...project.dependencies, clock: context.runtime.clock }, project.settings.implementerEscalation).record({
+    const outcome = await new PullRequestFeedback({ ...project.dependencies, clock: context.runtime.clock }).record({
       pullRequestNumber: body.number,
       author: body.author,
       source: COCKPIT_CHANNEL,
       body: body.body,
     });
-    return outcome.kind === 'cycle-started'
-      ? startedByDaemon(context, `Feedback recorded; issue #${outcome.issueNumber} starts attempt ${outcome.attempt}`)
-      : `Feedback recorded; issue #${outcome.issueNumber} needs a human: ${outcome.reason}`;
+    return startedByDaemon(context, `Feedback recorded; issue #${outcome.issueNumber} starts attempt ${outcome.attempt}`);
   }),
   'pr.film': command(COMMAND_BODY_SCHEMAS['pr.film'], async (body, context) => {
     const project = projectOf(context, body.project);

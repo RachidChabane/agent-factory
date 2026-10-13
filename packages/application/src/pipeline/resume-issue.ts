@@ -1,9 +1,8 @@
 import { isDeepStrictEqual } from 'node:util';
 import { ISSUE_CHECK_REWRITE_STATE, ISSUE_ESCALATION_STATE } from '@agent-factory/domain';
-import type { EscalationProfile, IssueState } from '@agent-factory/domain';
+import type { IssueState } from '@agent-factory/domain';
 import { authorOf, delegationFields, type Delegation } from '../autonomy/delegation.ts';
 import type { ProjectConventions } from '../conventions/project-conventions.ts';
-import { reviewFailureSummary } from './failure-summary.ts';
 import { isSpecValidated } from '../spec/markdown-spec-reader.ts';
 import { issueBranchName } from './branch-name.ts';
 import { pendingDecisionRequest } from './decision-request.ts';
@@ -11,7 +10,7 @@ import { PIPELINE_EVENTS } from './journal-events.ts';
 import { IssueJournalWriter } from './journal-writer.ts';
 import type { PipelineDependencies } from './pipeline-dependencies.ts';
 import { ResumeRefusedError, SpecNotValidatedError } from './pipeline-errors.ts';
-import { currentAttempt, decisionAfter, decisionsOfEpoch, gateRecord, loadJournal, pendingFeedback, type PipelineJournal } from './pipeline-journal.ts';
+import { currentAttempt, decisionAfter, decisionsOfEpoch, gateRecord, loadJournal, type PipelineJournal } from './pipeline-journal.ts';
 
 export const STATES_BEFORE_FROZEN_CHECKS: readonly IssueState[] = ['spec-draft', 'spec-validated', 'blocked', 'authoring-checks'];
 export const AUTHORING_STATE: IssueState = 'authoring-checks';
@@ -19,7 +18,6 @@ const REVIEW_AGAIN_REASON = 'the operator ordered a new review of the same imple
 
 const SPENT_RETRY_BUDGET = 'the implementer retry budget is spent, so the issue would escalate again; the change needs a human';
 const FROZEN_CHECKS_VIOLATED = 'a frozen acceptance check was modified or deleted; only the operator can have the checks rewritten';
-const NO_ESCALATION_PROFILE = 'external feedback waits for a fresh session but no escalation profile was given';
 const ANSWER_REQUIRED = 'the implementer asked for a decision, so the resume needs the operator\'s answer';
 const NOTHING_TO_ANSWER = 'it does not wait on a decision, so there is nothing to answer';
 const REVIEW_AGAIN_FROM_REVIEW = 'the escalation did not come from the review stage, so there is no review to run again';
@@ -49,7 +47,6 @@ export interface ResumeOutcome {
   readonly resumedAt: IssueState;
   readonly specChanged: boolean;
   readonly checksReauthored: boolean;
-  readonly feedbackCycleGranted: boolean;
   readonly decisionAnswered: boolean;
 }
 
@@ -60,19 +57,15 @@ export interface ReviewAgainOutcome {
 
 export interface ResumeIssueSettings {
   readonly conventions: ProjectConventions;
-  /** The profile of the fresh session that answers external feedback; without one such a resume is refused. */
-  readonly escalation: EscalationProfile | null;
 }
 
 export class ResumeIssue {
   private readonly dependencies: ResumeIssueDependencies;
   private readonly conventions: ProjectConventions;
-  private readonly escalation: EscalationProfile | null;
 
   constructor(dependencies: ResumeIssueDependencies, settings: ResumeIssueSettings) {
     this.dependencies = dependencies;
     this.conventions = settings.conventions;
-    this.escalation = settings.escalation;
   }
 
   /**
@@ -110,8 +103,6 @@ export class ResumeIssue {
     const operatorAnswer = answer?.trim() ?? '';
     if (decision !== null && operatorAnswer === '') throw new ResumeRefusedError(issueNumber, ANSWER_REQUIRED);
     if (decision === null && operatorAnswer !== '') throw new ResumeRefusedError(issueNumber, NOTHING_TO_ANSWER);
-    const feedback = pendingFeedback(journal);
-    if (feedback !== null && this.escalation === null) throw new ResumeRefusedError(issueNumber, NO_ESCALATION_PROFILE);
     const writer = new IssueJournalWriter(events, states, issueNumber);
     if (decision !== null) await writer.record(PIPELINE_EVENTS.decisionAnswered, { runId: decision.runId, answer: operatorAnswer, ...delegationFields(delegation) });
     let specChanged = false;
@@ -134,13 +125,6 @@ export class ResumeIssue {
       await writer.record(PIPELINE_EVENTS.authoringRestarted, { reason: `${authorOf(delegation)} resumed the issue before its checks were frozen` });
       await writer.record(PIPELINE_EVENTS.worktreeAcquired, await pool.acquire(issueNumber, branch));
     }
-    if (feedback !== null && this.escalation !== null) {
-      await writer.record(PIPELINE_EVENTS.retryDecided, {
-        afterAttempt: feedback.afterAttempt,
-        failure: { source: 'review', summary: reviewFailureSummary(feedback.findings) },
-        decision: { action: 'fresh-session-escalated', profile: this.escalation },
-      });
-    }
     await writer.transition(target, `${authorOf(delegation)} resumed the issue`);
     return {
       issueNumber,
@@ -148,7 +132,6 @@ export class ResumeIssue {
       specChanged,
       checksReauthored,
       decisionAnswered: decision !== null,
-      feedbackCycleGranted: feedback !== null,
     };
   }
 }

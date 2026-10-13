@@ -1,4 +1,4 @@
-import { DEFAULT_ISSUE_TYPES, IssueTypology, type EscalationProfile, type IssueSpec } from '@agent-factory/domain';
+import { DEFAULT_ISSUE_TYPES, IssueTypology, type IssueSpec } from '@agent-factory/domain';
 import { DEFAULT_PROJECT_CONVENTIONS, type ProjectConventions } from '../../conventions/project-conventions.ts';
 import { ISSUE_OPENED_AT, StubPromptCatalog } from '../../audit/testing/fakes.ts';
 import { SteppingClock } from '../../runs/test-support.ts';
@@ -213,9 +213,9 @@ export class PipelineScenario {
     return new IssuePipeline(this.dependencies(), this.settings, options);
   }
 
-  /** Resumes issues of this scenario; external feedback gets a fresh session only with an escalation profile. */
-  resumer(escalation: EscalationProfile | null = null): ResumeIssue {
-    return new ResumeIssue(this.dependencies(), { conventions: this.settings.conventions, escalation });
+  /** Resumes issues of this scenario. */
+  resumer(): ResumeIssue {
+    return new ResumeIssue(this.dependencies(), { conventions: this.settings.conventions });
   }
 
   mergeOnOrder(): MergeOnOrder {

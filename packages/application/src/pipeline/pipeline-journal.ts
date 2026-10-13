@@ -309,10 +309,15 @@ const REDUCERS: Readonly<Record<string, Reducer>> = {
     journal.reviewReorders = [...journal.reviewReorders, reorder];
   },
   [PIPELINE_EVENTS.retryDecided]: (journal, event) => {
-    journal.decisions = [...journal.decisions, parse(RetryDecidedSchema, event)];
+    const decided = parse(RetryDecidedSchema, event);
+    journal.decisions = [...journal.decisions, decided];
+    if (decided.opensCycle) journal.attemptEpoch = decided.afterAttempt + 1;
   },
   [PIPELINE_EVENTS.decisionAnswered]: (journal, event) => {
-    journal.decisionAnswers = [...journal.decisionAnswers, parse(DecisionAnsweredSchema, event)];
+    const answered = parse(DecisionAnsweredSchema, event);
+    journal.decisionAnswers = [...journal.decisionAnswers, answered];
+    const asking = journal.attempts.findLast((record) => record.runId === answered.runId);
+    if (asking !== undefined) journal.attemptEpoch = Math.max(journal.attemptEpoch, asking.attempt);
   },
   [PIPELINE_EVENTS.implementationCommitted]: (journal, event) => {
     const { sha } = parse(CommitRecordedSchema, event);
@@ -454,6 +459,12 @@ export function isAnnouncedReady(journal: PipelineJournal, headSha: string): boo
   return journal.readyAnnouncements.some((announcement) => announcement.headSha === headSha);
 }
 
+/**
+ * The decisions of the current cycle, which the failure budget counts. A cycle begins with the first attempt and again
+ * with each check the operator had rewritten, each feedback the operator recorded on the pull request and each answer
+ * the operator gave to a decision request: these gestures never spend the budget, and the failures before them stop
+ * counting.
+ */
 export function decisionsOfEpoch(journal: PipelineJournal): readonly RetryRecord[] {
   return journal.decisions.filter((record) => record.afterAttempt >= journal.attemptEpoch);
 }
@@ -480,12 +491,6 @@ export function reviewRecord(journal: PipelineJournal, attempt: number): ReviewR
 
 export function decisionAfter(journal: PipelineJournal, attempt: number): RetryRecord | null {
   return journal.decisions.find((record) => record.afterAttempt === attempt) ?? null;
-}
-
-export function pendingFeedback(journal: PipelineJournal): ExternalFeedbackRecord | null {
-  const latest = journal.feedback.at(-1);
-  if (latest === undefined || latest.cycleStarted) return null;
-  return decisionAfter(journal, latest.afterAttempt) === null ? latest : null;
 }
 
 export function totalCostUsd(journal: PipelineJournal): number {

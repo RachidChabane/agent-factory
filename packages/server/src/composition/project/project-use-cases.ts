@@ -210,7 +210,7 @@ export function environmentRedeployer(project: ProjectRuntime): RedeployEnvironm
 }
 
 export function issueResumer(project: ProjectRuntime): ResumeIssue {
-  return new ResumeIssue(project.dependencies, { conventions: project.conventions, escalation: project.settings.implementerEscalation });
+  return new ResumeIssue(project.dependencies, { conventions: project.conventions });
 }
 
 export function requestDecisionSettings(project: ProjectRuntime): RequestDecisionSettings {

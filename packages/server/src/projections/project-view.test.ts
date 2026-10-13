@@ -74,6 +74,31 @@ describe('the view of one project', () => {
     ]);
   });
 
+  it('lists the attempts of an issue once, in order, across the cycles that the operator’s feedback and answers open', () => {
+    const at = (minutes: number) => new Date(GENERATED_AT.getTime() - minutes * 60_000);
+    const issue = 'issue/42';
+    const attempt = (number: number, runId: string, outcome: string, extra: object = {}) => ({
+      type: 'pipeline.implementer-attempt-finished',
+      subject: issue,
+      payload: { attempt: number, mode: 'resumed', model: 'sonnet', effort: 'high', runId, sessionId: `session-${runId}`, outcome, gateBlocks: 0, finalTextTail: '', ...extra },
+    });
+    const history = withProjectEvents(projectHistory(), ...[
+      { type: 'pipeline.external-feedback-received', subject: issue, payload: { id: 'feedback-1', author: 'Dana', source: 'cli', body: 'Rename the link.', receivedAt: at(9).toISOString(), pullRequestNumber: 100, afterAttempt: 0, findings: [], cycleStarted: true } },
+      { type: 'pipeline.retry-decided', subject: issue, payload: { afterAttempt: 0, failure: { source: 'review', summary: 'Dana: Rename the link.' }, decision: { action: 'resume-same-session' }, opensCycle: true } },
+      attempt(1, 'run-feedback', 'decision-requested', { decisionRequest: 'Which name?' }),
+      { type: 'pipeline.decision-answered', subject: issue, payload: { runId: 'run-feedback', answer: 'Call it Conversation.' } },
+      attempt(1, 'run-answered', 'success'),
+    ].map((event, index) => ({ ...event, occurredAt: at(8 - index) })));
+
+    const attempts = viewOf(history).view.issues[0]?.attempts;
+
+    expect(attempts?.map((entry) => [entry.index, entry.kind, entry.runId])).toEqual([
+      [0, 'session', 'run-implementer'],
+      [1, 'correction', 'run-answered'],
+    ]);
+    expect(attempts?.[0]?.summary).toContain('Dana: Rename the link.');
+  });
+
   it('shows an issue the factory opened as a draft until the operator validates it, dated by the forge', () => {
     const history = projectHistory();
     const [waiting] = projectContext(history).pendingIssues;

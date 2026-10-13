@@ -275,6 +275,8 @@ export const RetryDecidedSchema = z.object({
   afterAttempt: z.number().int().nonnegative(),
   failure: z.object({ source: z.enum(FAILURE_SOURCES), summary: z.string() }),
   decision: RetryDecisionSchema,
+  /** Whether the decision answers the operator's feedback rather than a failure: the cycle it opens counts its failures afresh. */
+  opensCycle: z.boolean().default(false),
 });
 
 export const CommitRecordedSchema = z.object({ sha: z.string().min(1) });
