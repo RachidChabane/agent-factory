@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { FILMS_IN_PROGRESS_REASON } from '../../../packages/application/src/film/film-merge-guard.ts';
-import type { FilmToolWaitView } from '../../../packages/cockpit/src/contract/index.ts';
+import { PENDING_FILM_STATES, type FilmToolWaitView } from '../../../packages/cockpit/src/contract/index.ts';
 import type { I18n } from '../../../packages/cockpit/src/i18n/create-i18n.ts';
 import type { Locale } from '../../../packages/cockpit/src/i18n/locale.ts';
 import { paths } from '../../../packages/cockpit/src/model/routes.ts';
@@ -13,7 +13,9 @@ import { clickCommand } from '../../support/commands.ts';
 import { AGENT_WORK_TEST_TIMEOUT_MS, AGENT_WORK_TIMEOUT_MS } from '../../support/factory-activity.ts';
 import type { RunningFactory } from '../../support/factory.ts';
 import { factValue } from '../../support/facts.ts';
+import { submitFilmOrder } from '../../support/film-orders.ts';
 import { isLater } from '../../support/instants.ts';
+import { holdWords } from '../../support/ready-holds.ts';
 import { settled, untilPullRequestIsOpen } from '../../support/scenes.ts';
 import { specFileOf } from '../../support/spec-file.ts';
 import { CART_BADGE_TOTAL, CATALOG_ADMIN, CHECKOUT_FLOW_SCENARIO, STOREFRONT } from '../../support/story.ts';
@@ -24,6 +26,8 @@ const SPEC_DIRECTORY = 'specs';
 const SPEC_FILE = 'cart-badge-total.md';
 const ISSUE_CREATED = /#(\d+) created/;
 const FRENCH: Locale = 'fr';
+/** A scenario the operator orders from the page while the first film waits. */
+const ORDERED_SCENARIO = 'guest-checkout';
 
 /** The issue whose declared film waits for the catalogue tool, and the pull request it opened. */
 interface Scene {
@@ -73,7 +77,7 @@ async function expectWaitNoticeTold(notice: Locator, wait: FilmToolWaitView, wor
   await expect(notice.getByRole('button', { name: words.t('tools.loginLabel', { tool: wait.tool }), exact: true })).toBeEnabled(ONE_LOOK);
 }
 
-/** What the pull request page says of the film that waits: the notice, the queued film, the hold on the ready notice and the blocker of the merge. */
+/** What the pull request page says of the films that wait: the notice, each queued film, the holds on the ready notice and the blocker of the merge. */
 async function expectFilmWaitTold(page: Page, factory: RunningFactory, words: I18n): Promise<void> {
   const { pullRequest } = sceneOrFail();
   await untilPageAgreesWithFactory(async () => {
@@ -83,21 +87,27 @@ async function expectFilmWaitTold(page: Page, factory: RunningFactory, words: I1
     const films = page.getByRole('region', { name: words.t('pullRequests.films.title'), exact: true });
     await expectWaitNoticeTold(films.getByRole('region', { name: words.t('filmWait.label', { tool: wait.tool }), exact: true }), wait, words);
 
-    const waitingState = words.t('pullRequests.films.state.waiting-for-tool', { tool: wait.tool });
-    const queued = films.getByRole('region', { name: words.t('pullRequests.films.queueLabel', { scenario: CHECKOUT_FLOW_SCENARIO }), exact: true });
-    await expect(queued).toContainText(words.t('pullRequests.films.queueTitle', { state: waitingState, scenario: CHECKOUT_FLOW_SCENARIO }), ONE_LOOK);
-    await expect(queued, 'a film that waits for a tool has no arrival to expect').not.toContainText(/Expected around|Arrivée prévue|ahead of this one|devant celui-ci/, ONE_LOOK);
+    const { filmOrders, readyNotice, mergeBlockers } = pullRequestOf(state, STOREFRONT, pullRequest);
+    const waiting = filmOrders.filter((order) => PENDING_FILM_STATES.includes(order.state));
+    expect(waiting.length, 'the declared film waits').toBeGreaterThan(0);
+    for (const order of waiting) {
+      const queued = films.getByRole('region', { name: words.t('pullRequests.films.queueLabel', { scenario: order.scenario }), exact: true });
+      const title = words.t('pullRequests.films.state.waiting-for-tool', { tool: wait.tool });
+      await expect(queued).toContainText(words.t('pullRequests.films.queueTitle', { state: title, scenario: order.scenario }), ONE_LOOK);
+      await expect(queued, 'a film that waits for a tool has no arrival to expect').not.toContainText(/Expected around|Arrivée prévue|ahead of this one|devant celui-ci/, ONE_LOOK);
+    }
 
+    if (readyNotice.status !== 'held') throw new Error(`the ready notice is ${readyNotice.status}, not held`);
+    expect(readyNotice.holds).toContainEqual({ kind: 'films-pending', scenarios: waiting.map((order) => order.scenario) });
     const notice = page.getByRole('region', { name: words.t('pullRequests.ready.title'), exact: true });
     await expect(notice).toContainText(words.t('pullRequests.ready.description'), ONE_LOOK);
-    await expect(notice.getByRole('list', { name: words.t('pullRequests.ready.holds') })).toContainText(
-      words.t('pullRequests.ready.hold.films-waiting', { count: 1, scenarios: CHECKOUT_FLOW_SCENARIO, tool: wait.tool }),
+    await expect(notice.getByRole('list', { name: words.t('pullRequests.ready.holds') }).getByRole('listitem')).toHaveText(
+      readyNotice.holds.map((hold) => holdWords(hold, words, wait)),
       ONE_LOOK,
     );
 
-    const blockers = pullRequestOf(state, STOREFRONT, pullRequest).mergeBlockers;
-    expect(blockers, 'the factory names the tool in the blocker of the merge').toContain(`${FILMS_IN_PROGRESS_REASON}, waiting for the tool ${wait.tool}`);
-    await expect(page.getByRole('region', { name: words.t('pullRequests.blocked.title'), exact: true }).getByRole('listitem')).toHaveText(blockers, ONE_LOOK);
+    expect(mergeBlockers, 'the factory names the tool in the blocker of the merge').toContain(`${FILMS_IN_PROGRESS_REASON}, waiting for the tool ${wait.tool}`);
+    await expect(page.getByRole('region', { name: words.t('pullRequests.blocked.title'), exact: true }).getByRole('listitem')).toHaveText(mergeBlockers, ONE_LOOK);
   });
 }
 
@@ -122,6 +132,15 @@ test.describe('the films of a pull request whose tool is logged out, in a rehear
     await expect(page.getByRole('region', { name: english.t('pullRequests.films.title'), exact: true })).toBeVisible();
     await expectFilmWaitTold(page, factory, english);
     await expect(page.getByRole('button', { name: 'Merge', exact: true })).toBeDisabled();
+  });
+
+  test('queues a film ordered from the page behind the declared one, waiting for the same tool', async ({ page, factory }) => {
+    const { issue, pullRequest } = sceneOrFail();
+    await openCockpit(page, factory, paths.pullRequest(STOREFRONT, pullRequest));
+    const ordered = await clickCommand(page, 'pr.film', () => submitFilmOrder(page, { number: pullRequest }, ORDERED_SCENARIO));
+    expect(ordered.effect).toBe(`The film of scenario ${ORDERED_SCENARIO} is queued for issue #${issue} of ${STOREFRONT}; the daemon picks it up at its next tick`);
+    await expectFilmWaitTold(page, factory, english);
+    await expect(page.getByRole('region', { name: english.t('pullRequests.films.queueLabel', { scenario: ORDERED_SCENARIO }), exact: true })).toBeVisible();
   });
 
   test('lists the tools a film needs on the settings of the project, with the same notice', async ({ page, factory }) => {
@@ -169,14 +188,15 @@ test.describe('the films of a pull request whose tool is logged out, in a rehear
       { name: 'tools.login', body: { project: STOREFRONT, tool: CATALOG_ADMIN } },
     ]);
 
-    const recorded = await factory.api.until('the film that waited is recorded', (state) => pullRequestOf(state, STOREFRONT, pullRequest).films.some((film) => film.scenario === CHECKOUT_FLOW_SCENARIO), {
+    const waited = [CHECKOUT_FLOW_SCENARIO, ORDERED_SCENARIO];
+    const recorded = await factory.api.until('the films that waited are recorded', (state) => waited.every((scenario) => pullRequestOf(state, STOREFRONT, pullRequest).films.some((film) => film.scenario === scenario)), {
       timeoutMs: AGENT_WORK_TIMEOUT_MS,
     });
     expect(projectOf(recorded, STOREFRONT).filmToolWait).toBeNull();
     await untilPageAgreesWithFactory(async () => {
       await expect(notice).toHaveCount(0, ONE_LOOK);
       const films = page.getByRole('region', { name: english.t('pullRequests.films.title'), exact: true });
-      await expect(films.getByRole('article', { name: english.t('pullRequests.films.scenario', { scenario: CHECKOUT_FLOW_SCENARIO }), exact: true })).toBeVisible(ONE_LOOK);
+      for (const scenario of waited) await expect(films.getByRole('article', { name: english.t('pullRequests.films.scenario', { scenario }), exact: true })).toBeVisible(ONE_LOOK);
     });
   });
 });

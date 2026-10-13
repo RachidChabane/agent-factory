@@ -25,6 +25,7 @@ import { clickCommand, type ClickOptions, type CommandOutcome } from '../../supp
 import { AGENT_WORK_TEST_TIMEOUT_MS, AGENT_WORK_TIMEOUT_MS, untilNoAgentIsWorking } from '../../support/factory-activity.ts';
 import type { RunningFactory } from '../../support/factory.ts';
 import { factValue, literally } from '../../support/facts.ts';
+import { filmOrderForm, filmsRegion, submitFilmOrder } from '../../support/film-orders.ts';
 import { english } from '../../support/formats.ts';
 import { isLater } from '../../support/instants.ts';
 import { firstOf, issueNamed, pullRequestOfIssue } from '../../support/project-facts.ts';
@@ -351,14 +352,6 @@ function cartBadgePullRequest(state: CockpitSnapshot): PullRequestView {
   return pullRequestOfIssue(state, STOREFRONT, issueNamed(state, STOREFRONT, CART_BADGE_TOTAL.spec.title));
 }
 
-function filmsRegion(page: Page): Locator {
-  return page.getByRole('region', { name: 'Videos', exact: true });
-}
-
-function filmOrderForm(page: Page, pullRequest: PullRequestView): Locator {
-  return page.getByRole('dialog', { name: `Film pull request #${pullRequest.number}` });
-}
-
 function recordedFilm(pullRequest: PullRequestView, scenario: string): FilmView {
   const film = pullRequest.films.find((candidate) => candidate.scenario === scenario);
   if (film === undefined) throw new Error(`pull request #${pullRequest.number} holds no film of scenario ${scenario}`);
@@ -377,17 +370,7 @@ function isPending(state: PullRequestView['filmOrders'][number]['state']): boole
 
 /** Fills the form of the Film button with the scenario and sends it. */
 function orderFilm(page: Page, pullRequest: PullRequestView, scenario: string, options: ClickOptions = {}): Promise<CommandOutcome> {
-  return clickCommand(
-    page,
-    'pr.film',
-    async () => {
-      await filmsRegion(page).getByRole('button', { name: 'Film', exact: true }).click();
-      const form = filmOrderForm(page, pullRequest);
-      await form.getByRole('textbox', { name: 'Scenario name' }).fill(scenario);
-      await form.getByRole('button', { name: 'Order the film' }).click();
-    },
-    options,
-  );
+  return clickCommand(page, 'pr.film', () => submitFilmOrder(page, pullRequest, scenario), options);
 }
 
 /** What the page says of the films that wait in the queue and of the merge they hold, compared with the snapshot the page holds. */
