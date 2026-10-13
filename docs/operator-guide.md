@@ -135,6 +135,10 @@ reviews and opens the pull request with its evidence. You do nothing unless it a
   answer is not a failure: the agent gets the whole retry budget again.
 - **Rewrite a check**: when a frozen check is wrong, order its rewrite from the issue
   page with an instruction; the acceptance author rewrites it and the proof runs again.
+  A rewrite that does not hold leaves the check as it was frozen, so another rewrite can
+  follow. When the check needs a test double that depends on the internal shapes of a
+  framework, write and run that double apart first, then give its exact code in the
+  instruction instead of describing it.
 - **Pause** an issue, a project or the whole factory, and **Resume** it.
 
 ## Watching what blocks
