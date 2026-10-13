@@ -157,7 +157,8 @@ export function beforeProofCorrectionPrompt(reason: string): string {
   return [
     'The factory ran your checks on the current code and cannot accept the before proof:',
     reason,
-    `Fix the checks, and ${inlineCode(ACCEPTANCE_MANIFEST_PATH)} if it needs it, so that every new-behaviour check fails on an assertion, every kept-behaviour check passes, every file loads and nothing needs the network or writes outside the repository. Then run the command once and stop. Do not change anything else.`,
+    'Fix the checks so that every new-behaviour check fails on an assertion, every kept-behaviour check passes, every file loads and nothing needs the network or writes outside the repository. Then run the command once and stop. Do not change anything else.',
+    `The factory keeps ${inlineCode(ACCEPTANCE_MANIFEST_PATH)} from your previous run. Rewrite it only if the set of checks changes.`,
   ].join(PARAGRAPH);
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ACCEPTANCE_MANIFEST_PATH } from '../acceptance/acceptance-manifest.ts';
 import { renderSpecBody } from '../spec/render-spec-body.ts';
 import { ResumeRefusedError, SpecNotValidatedError } from './pipeline-errors.ts';
 import { DECISION_REQUEST_PATH } from './decision-request.ts';
@@ -73,6 +74,19 @@ describe('ResumeIssue', () => {
     expect(outcome.kind).toBe('pr-open');
     expect(scenario.harness.requestsOf('acceptance-author').at(-1)?.prompt).toContain(CLARIFIED_CRITERION);
     expect(await scenario.states.path(ISSUE_NUMBER)).toContain('needs-human');
+  });
+
+  it('does not reuse the manifest of the previous authoring after the checks are written again', async () => {
+    const scenario = new PipelineScenario();
+    scenario.acceptancePassesOnBase = true;
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('needs-human');
+    await scenario.resumer().resume(ISSUE_NUMBER);
+    expect((await scenario.journal()).authoredManifest).toBeNull();
+    scenario.harness.script('acceptance-author', { effect: (request) => scenario.workspace.write(request.workingDirectory, CHECK_PATH, 'half-written check') });
+
+    const outcome = await scenario.pipeline().runIssue(ISSUE_NUMBER);
+
+    expect(outcome.kind === 'needs-human' ? outcome.reason : '').toContain(`${ACCEPTANCE_MANIFEST_PATH} was not written`);
   });
 
   it('resumes without recording the spec again when the operator left it as it was', async () => {

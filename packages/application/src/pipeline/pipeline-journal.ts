@@ -117,6 +117,8 @@ export interface PipelineJournal {
   readonly baseSha: string | null;
   readonly workspacePrepared: boolean;
   readonly manifest: AcceptanceManifest | null;
+  /** The manifest of the current authoring, which a before-proof correction keeps when it leaves the manifest out. */
+  readonly authoredManifest: AcceptanceManifest | null;
   readonly beforeProof: BeforeProofRecord | null;
   readonly beforeProofCorrections: readonly BeforeProofCorrectionRecord[];
   readonly pendingBeforeProofCorrection: BeforeProofCorrectionRecord | null;
@@ -168,6 +170,7 @@ function emptyJournal(issueNumber: number): Draft {
     baseSha: null,
     workspacePrepared: false,
     manifest: null,
+    authoredManifest: null,
     beforeProof: null,
     beforeProofCorrections: [],
     pendingBeforeProofCorrection: null,
@@ -264,6 +267,7 @@ const REDUCERS: Readonly<Record<string, Reducer>> = {
     journal.worktree = null;
     journal.workspacePrepared = false;
     journal.manifest = null;
+    journal.authoredManifest = null;
     journal.beforeProof = null;
     journal.beforeProofCorrections = [];
     journal.pendingBeforeProofCorrection = null;
@@ -274,7 +278,9 @@ const REDUCERS: Readonly<Record<string, Reducer>> = {
     journal.agentRuns = [...journal.agentRuns, parse(AgentRunFinishedSchema, event)];
   },
   [PIPELINE_EVENTS.acceptanceAuthored]: (journal, event) => {
-    journal.manifest = parse(AcceptanceAuthoredSchema, event).manifest;
+    const { manifest } = parse(AcceptanceAuthoredSchema, event);
+    journal.manifest = manifest;
+    journal.authoredManifest = manifest;
     journal.pendingBeforeProofCorrection = null;
   },
   [PIPELINE_EVENTS.beforeProofCorrectionRequested]: (journal, event) => {

@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { ACCEPTANCE_MANIFEST_PATH } from '../acceptance/acceptance-manifest.ts';
 import { shellCommandLine } from '../acceptance/shell-quote.ts';
 import type { AgentRunRequest } from '../ports.ts';
 import { ResourcesUnavailableError } from '../resources/agent-run-admission.ts';
 import { DECISION_REQUEST_PATH } from './decision-request.ts';
+import { PIPELINE_EVENTS } from './journal-events.ts';
 import { SpecNotValidatedError } from './pipeline-errors.ts';
 import {
   ACCEPTANCE_COMMAND,
   acceptanceTestId,
+  ASSERTION_FAILURE_MESSAGE,
   CHECK_CONTENT,
   CHECK_PATH,
   EVIDENCE_PATH,
@@ -254,6 +257,36 @@ describe('runIssue', () => {
     expect(journal.beforeProof?.evaluation.valid).toBe(true);
     expect(journal.frozen?.checks.map((check) => check.path)).toEqual([CHECK_PATH]);
     expect(scenario.harness.requestsOf('implementer')).toHaveLength(1);
+  });
+
+  it('writes the authored manifest back when the correction run leaves it out, and freezes the checks once the before proof is valid', async () => {
+    const scenario = new PipelineScenario();
+    scenario.acceptanceFailureMessage = LOCATOR_TIMEOUT_MESSAGE;
+    scenario.harness.script(
+      'acceptance-author',
+      { effect: (request) => scenario.authorChecks(request) },
+      {
+        effect: (request) => {
+          scenario.workspace.write(request.workingDirectory, CHECK_PATH, CHECK_CONTENT);
+          scenario.acceptanceFailureMessage = ASSERTION_FAILURE_MESSAGE;
+        },
+      },
+    );
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+    const journal = await scenario.journal();
+    expect(journal.beforeProofCorrections).toHaveLength(1);
+    expect(journal.beforeProof?.evaluation.valid).toBe(true);
+    expect(journal.frozen?.checks.map((check) => check.path)).toEqual([CHECK_PATH]);
+    expect(scenario.events.records.filter((event) => event.type === PIPELINE_EVENTS.acceptanceAuthored)).toHaveLength(2);
+    expect(scenario.harness.requestsOf('acceptance-author')[1]?.prompt).toContain('Rewrite it only if the set of checks changes');
+  });
+
+  it('sends the issue to a human when the first authoring run leaves the manifest out', async () => {
+    const scenario = new PipelineScenario();
+    scenario.harness.script('acceptance-author', { effect: (request) => scenario.workspace.write(request.workingDirectory, CHECK_PATH, CHECK_CONTENT) });
+    const outcome = await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    expect(outcome.kind === 'needs-human' ? outcome.reason : '').toContain(`${ACCEPTANCE_MANIFEST_PATH} was not written`);
+    expect(scenario.harness.requestsOf('acceptance-author')).toHaveLength(1);
   });
 
   it('sends the issue to a human at once when the author session cannot be resumed', async () => {

@@ -24,6 +24,7 @@ export const BEFORE_PROOF_CORRECTIONS = 1;
 export const WORKSPACE_SETUP_LOG = 'workspace-setup.log';
 const LOG_SEPARATOR = '\n\n';
 const NEWLINE = '\n';
+const MANIFEST_INDENT = 2;
 
 type ManifestOutcome =
   | { readonly kind: 'valid'; readonly manifest: AcceptanceManifest }
@@ -137,7 +138,7 @@ export class AuthoringChecksStage implements PipelineStage {
       if (result.outcome !== 'success') {
         throw new EscalationRequiredError(agentFailureSummary('acceptance-author', result.outcome, result.finalText));
       }
-      const outcome = await this.readManifest(context, worktree, spec);
+      const outcome = await this.readOrRestoreManifest(context, worktree, spec);
       if (outcome.kind === 'valid') {
         await writer.record(PIPELINE_EVENTS.acceptanceAuthored, { manifest: outcome.manifest });
         return;
@@ -149,6 +150,18 @@ export class AuthoringChecksStage implements PipelineStage {
       prompt = manifestCorrectionPrompt(outcome.problems);
       resumeSessionId = result.sessionId;
     }
+  }
+
+  /**
+   * The manifest the run wrote, or the one of the current authoring written back when a correction run left it out:
+   * the factory removes its work directory before it runs the checks, so a correction that fixes only check files finds none.
+   */
+  private async readOrRestoreManifest(context: StageContext, worktree: Worktree, spec: IssueSpec): Promise<ManifestOutcome> {
+    const outcome = await this.readManifest(context, worktree, spec);
+    const kept = context.journal.authoredManifest;
+    if (outcome.kind !== 'missing' || kept === null) return outcome;
+    await context.toolkit.dependencies.files.writeText(worktree.path, ACCEPTANCE_MANIFEST_PATH, JSON.stringify(kept, null, MANIFEST_INDENT));
+    return this.readManifest(context, worktree, spec);
   }
 
   private async readManifest(context: StageContext, worktree: Worktree, spec: IssueSpec): Promise<ManifestOutcome> {
