@@ -72,6 +72,7 @@ export function DeploymentLane({ project, baseBranch, lane }: DeploymentLaneProp
         <span className="changes-lane__status">
           <StatusMark mark={environmentMark(lane.status)} label={vocabulary.environmentStatus(lane.status)} />
           {vocabulary.environmentStatus(lane.status)}
+          {lane.statusSampledAt === null ? null : <ReadStamp readAt={lane.statusSampledAt} kind="health" verb="sampled" />}
         </span>
         <span className="changes-lane__count num">{lane.deployments.length}</span>
       </header>

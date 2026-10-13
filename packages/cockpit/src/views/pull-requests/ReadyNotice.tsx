@@ -90,6 +90,16 @@ function HeldNotice({ notice, wait }: { readonly notice: Extract<ReadyNoticeView
   );
 }
 
+function DueNotice({ checksReadAt }: { readonly checksReadAt: string | null }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <EmptyState compact title={t('pullRequests.ready.due')} />
+      <ReadStamp readAt={checksReadAt} kind="forge" neverLabel={t('pullRequests.ready.checksNeverRead')} />
+    </>
+  );
+}
+
 /** The notice that tells the operator the pull request is ready: when it was sent and the links it carried, or what holds it. */
 export function ReadyNotice({ pullRequest }: { readonly pullRequest: PullRequestView }) {
   const { t } = useI18n();
@@ -99,7 +109,7 @@ export function ReadyNotice({ pullRequest }: { readonly pullRequest: PullRequest
     <Section title={t('pullRequests.ready.title')} id={SECTION_ID} description={t('pullRequests.ready.description')}>
       {notice.status === 'sent' ? <SentNotice notice={notice} /> : null}
       {notice.status === 'held' ? <HeldNotice notice={notice} wait={project.filmToolWait} /> : null}
-      {notice.status === 'due' ? <EmptyState compact title={t('pullRequests.ready.due')} /> : null}
+      {notice.status === 'due' ? <DueNotice checksReadAt={notice.checksReadAt} /> : null}
       {notice.status === 'none' ? <EmptyState compact title={t('pullRequests.ready.none')} /> : null}
     </Section>
   );

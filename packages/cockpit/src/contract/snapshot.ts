@@ -534,7 +534,11 @@ export const ReadyNoticeViewSchema = z.discriminatedUnion('status', [
     /** When the checks the hold depends on were last read from the forge; null when they never were. */
     checksReadAt: IsoDateTimeSchema.nullable(),
   }),
-  z.object({ status: z.literal(READY_NOTICE_STATUSES[2]) }),
+  z.object({
+    status: z.literal(READY_NOTICE_STATUSES[2]),
+    /** When the checks that make the notice due were last read from the forge; null when they never were. */
+    checksReadAt: IsoDateTimeSchema.nullable(),
+  }),
   z.object({ status: z.literal(READY_NOTICE_STATUSES[3]) }),
 ]);
 export type ReadyNoticeView = z.infer<typeof ReadyNoticeViewSchema>;
@@ -750,6 +754,8 @@ export const AuditViewSchema = z.object({
   publishedIssueNumber: IssueNumberSchema.nullable(),
   /** The page the forge gives the issue published from the audit; the factory does not list that issue, so this is where its number leads. */
   publishedIssueUrl: z.string().nullable(),
+  /** When the issue was published from the audit; null before it was. */
+  publishedIssueAt: IsoDateTimeSchema.nullable(),
   resolved: z.boolean(),
   resolutionNote: z.string().nullable(),
 });

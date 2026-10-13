@@ -84,10 +84,10 @@ describe('the ready notice of a pull request in the cockpit', () => {
     expect(pullRequest.mergeBlockers.join(' ')).not.toContain('lint');
   });
 
-  it('is due once every check of the head completed without failing and no film holds it', () => {
-    expect(pullRequestOf(projectHistory(), GREEN).readyNotice).toEqual({ status: 'due' });
+  it('is due once every check of the head completed without failing and no film holds it, with when the checks were read', () => {
+    expect(pullRequestOf(projectHistory(), GREEN).readyNotice).toEqual({ status: 'due', checksReadAt: READ_AT.toISOString() });
     const completed = [run('success', 'lint'), run('neutral', 'size'), run('skipped', 'docs')];
-    expect(pullRequestOf(projectHistory(), { pullRequestChecks: new Map([[100, observed(completed)]]) }).readyNotice).toEqual({ status: 'due' });
+    expect(pullRequestOf(projectHistory(), { pullRequestChecks: new Map([[100, observed(completed)]]) }).readyNotice).toEqual({ status: 'due', checksReadAt: READ_AT.toISOString() });
   });
 
   it('is held by a film queued or recording, and by one that failed, with the scenarios named', () => {
@@ -112,7 +112,7 @@ describe('the ready notice of a pull request in the cockpit', () => {
 
   it('leaves the films out when the project films nothing', () => {
     const history = withEvents(projectHistory(), { type: PIPELINE_EVENTS.filmQueued, payload: { scenario: 'checkout-flow', operator: 'Alex Morgan' } });
-    expect(pullRequestOf(history, GREEN, false).readyNotice).toEqual({ status: 'due' });
+    expect(pullRequestOf(history, GREEN, false).readyNotice).toEqual({ status: 'due', checksReadAt: READ_AT.toISOString() });
   });
 
   it('is sent once announced for the head it has now, with its links and the files that failed', () => {
@@ -140,7 +140,7 @@ describe('the ready notice of a pull request in the cockpit', () => {
   it('is due again for a new head: the notice of an earlier head does not count', () => {
     const history = projectHistory();
     const earlier = withEvents(history, { type: PIPELINE_EVENTS.pullRequestReadyAnnounced, payload: { pullRequestNumber: 100, headSha: 'a-head-the-pull-request-had-before', links: [], failures: [] } });
-    expect(pullRequestOf(earlier, GREEN).readyNotice).toEqual({ status: 'due' });
+    expect(pullRequestOf(earlier, GREEN).readyNotice).toEqual({ status: 'due', checksReadAt: READ_AT.toISOString() });
   });
 
   it('keeps the last notice of a pull request that was merged, and has none to show when it never got one', () => {

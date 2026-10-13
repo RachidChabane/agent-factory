@@ -22,7 +22,8 @@ export const DEMO_ENVIRONMENTS: readonly DemoEnvironmentHealth[] = [
   { path: '/ledger/sandbox/healthz', healthy: false, detail: 'the invoice store is not reachable' },
 ];
 
-const CATALOG_ADMIN = 'catalog-admin';
+/** A tool whose session is a file: logged out until the operator logs in from the cockpit. */
+export const CATALOG_ADMIN = 'catalog-admin';
 const SESSION_KEEP_ALIVE_MINUTES = 5;
 /** Long enough for the cockpit to show a film being recorded, short enough to wait for. */
 const FILM_SECONDS_PER_RUN = 4;
@@ -40,7 +41,7 @@ function demoFilms(): Readonly<Record<string, unknown>> {
   };
 }
 
-/** A tool of the catalogue service whose session is a file: logged out until the operator logs in from the cockpit. */
+/** The tool of the catalogue service, whose login creates its session file. */
 function catalogAdmin(sessionsDirectory: string): Readonly<Record<string, unknown>> {
   const session = join(sessionsDirectory, CATALOG_ADMIN);
   return {

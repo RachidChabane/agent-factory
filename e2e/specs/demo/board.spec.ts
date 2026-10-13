@@ -1,8 +1,12 @@
 import { paths } from '../../../packages/cockpit/src/model/routes.ts';
 import { projectOf } from '../../support/api.ts';
 import { card, column, openCockpit } from '../../support/cockpit.ts';
+import { expectDecisionListed } from '../../support/decisions.ts';
 import { CART_BADGE_TOTAL, CATEGORY_FILTER, DELIVERY_ESTIMATES, DISCOUNT_ROUNDING, ORDER_HISTORY_PAGINATION, PAYMENT_RETRIES, PDF_INVOICES, SAVED_CARTS, STOREFRONT, TAX_ROUNDING, GIFT_PICKS_TITLE } from '../../support/story.ts';
 import { expect, test } from '../../support/test.ts';
+import { wordsIn } from '../../support/words.ts';
+
+const words = wordsIn('en');
 
 test.describe('the board of the demonstration', () => {
   test.beforeEach(async ({ page, factory }) => {
@@ -26,6 +30,18 @@ test.describe('the board of the demonstration', () => {
     await expect(card(column(page, 'Pull requests'), PAYMENT_RETRIES.spec.title)).toBeVisible();
     await expect(card(column(page, 'Needs a human'), DISCOUNT_ROUNDING.spec.title)).toBeVisible();
     await expect(card(column(page, 'Delivered'), CATEGORY_FILTER.spec.title)).toBeVisible();
+  });
+
+  test('keeps the time of every card inside the card, whatever the room its column leaves', async ({ page }) => {
+    const cards = await page.getByRole('main').getByRole('article').all();
+    expect(cards.length).toBeGreaterThan(0);
+    for (const article of cards) {
+      const frame = await article.boundingBox();
+      const time = await article.getByRole('time').boundingBox();
+      if (frame === null || time === null) throw new Error('a card or its time is not laid out');
+      expect(time.x + time.width, 'the time ends before the right edge of its card').toBeLessThanOrEqual(frame.x + frame.width);
+      expect(time.y + time.height, 'the time ends above the bottom edge of its card').toBeLessThanOrEqual(frame.y + frame.height);
+    }
   });
 
   test('shows the agent that waits for the operator in the runs in progress', async ({ page }) => {
@@ -68,17 +84,23 @@ test.describe('the board of the demonstration', () => {
     expect((await factory.api.state()).sequence).toBe(before);
   });
 
-  test('lists on the overview of a project what its orchestrator decided in the operator\'s place, with the reason it gave', async ({ page, factory }) => {
+  test('lists on the overview of a project what it delegates and what its orchestrator decided in the operator\'s place: who, why, under which rule and when', async ({ page, factory }) => {
     const state = await factory.api.state();
-    const [decision] = projectOf(state, STOREFRONT).delegatedDecisions;
+    const { delegatedDecisions, settings } = projectOf(state, STOREFRONT);
+    const [decision] = delegatedDecisions;
     if (decision === undefined) throw new Error('the orchestrator of the storefront decided nothing');
     expect(decision.reason).toBe(DISCOUNT_ROUNDING.delegatedValidation);
     await openCockpit(page, factory, paths.project(STOREFRONT));
-    const decisions = page.getByRole('region', { name: 'Delegated decisions', exact: true });
-    await expect(decisions).toContainText('orchestrator may:');
-    const item = decisions.getByRole('list', { name: 'Delegated decisions' }).getByRole('listitem').first();
-    await expect(item).toContainText('Spec validated');
-    await expect(item).toContainText(`Reason: ${decision.reason}`);
-    await expect(item.getByRole('link', { name: `Issue #${decision.target.number}` })).toHaveAttribute('href', paths.issue(STOREFRONT, decision.target.number));
+    const section = page.getByRole('region', { name: 'Delegated decisions', exact: true });
+    const delegated = section.getByLabel(words.t('autonomy.policy.label'));
+    await expect(delegated).toContainText(words.t('autonomy.policy.intro', { actor: settings.autonomy.actor }));
+    await expect(delegated.getByRole('listitem')).toHaveText([
+      words.t('autonomy.policy.validateSpecs'),
+      words.t('autonomy.policy.resume'),
+      words.t('autonomy.policy.mergeWhen', { types: 'Fix', conditions: words.t('autonomy.condition.films-recorded') }),
+    ]);
+    const items = section.getByRole('list', { name: 'Delegated decisions' }).getByRole('listitem');
+    await expect(items).toHaveCount(delegatedDecisions.length);
+    await expectDecisionListed(items.first(), STOREFRONT, decision);
   });
 });

@@ -8,13 +8,12 @@ import { openCockpit } from '../../support/cockpit.ts';
 import { clickCommand } from '../../support/commands.ts';
 import { english } from '../../support/formats.ts';
 import { isLater } from '../../support/instants.ts';
-import { STOREFRONT } from '../../support/story.ts';
+import { CATALOG_ADMIN, STOREFRONT } from '../../support/story.ts';
 import { expect, test } from '../../support/test.ts';
 
 const INSTALLATION_SETTINGS = '/settings';
 const STOREFRONT_SETTINGS = `/projects/${STOREFRONT}/settings`;
 const DESIGN_EXPORT = 'design-export';
-const CATALOG_ADMIN = 'catalog-admin';
 const OPERATOR = 'Alex Morgan';
 
 function storefrontToolOf(state: CockpitSnapshot, name: string): ToolView {

@@ -1,6 +1,8 @@
 /** The story the demonstration plays, by the titles and keys the specs look for: one definition, shared with the server. */
-export { LEDGER_ID as LEDGER, STOREFRONT_ID as STOREFRONT } from '../../packages/server/src/demo/demo-projects.ts';
-export { CART_BADGE_TOTAL } from '../../packages/server/src/demo/story/storefront/cart-badge-total.ts';
+export { CATALOG_ADMIN, LEDGER_ID as LEDGER, STOREFRONT_ID as STOREFRONT } from '../../packages/server/src/demo/demo-projects.ts';
+export { CART_BADGE_TOTAL, CHECKOUT_FLOW_SCENARIO } from '../../packages/server/src/demo/story/storefront/cart-badge-total.ts';
+export { SKIPPED_REASON } from '../../packages/server/src/demo/films/demo-film.ts';
+export { UNAVAILABLE_SCENARIO } from '../../packages/server/src/demo/films/demo-film-request.ts';
 export { CATEGORY_FILTER } from '../../packages/server/src/demo/story/storefront/category-filter.ts';
 export { DISCOUNT_ROUNDING } from '../../packages/server/src/demo/story/storefront/discount-rounding.ts';
 export { GIFT_FINDING, GIFT_PICKS_TITLE, PRICE_CEILING_TITLE } from '../../packages/server/src/demo/story/storefront/gift-finding-request.ts';

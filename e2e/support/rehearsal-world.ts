@@ -6,7 +6,7 @@ import { buildGitEnvironment, localOnlyGitEnvironment, SpawnCommandRunner } from
 import { LocalGitHubFiles } from '../../packages/adapters/src/github-local/localGitHubFiles.ts';
 import { SystemClock } from '../../packages/server/src/composition/system.ts';
 import { startDemoHealthEndpoints } from '../../packages/server/src/demo/demo-health.ts';
-import { DEMO_ENVIRONMENTS, DEMO_INSTALLATION, DEMO_PROJECTS, STOREFRONT_ID } from '../../packages/server/src/demo/demo-projects.ts';
+import { CATALOG_ADMIN, DEMO_ENVIRONMENTS, DEMO_INSTALLATION, DEMO_PROJECTS, LEDGER_ID, STOREFRONT_ID } from '../../packages/server/src/demo/demo-projects.ts';
 import { FAKE_CLAUDE_MAIN } from '../../packages/server/src/demo/demo-paths.ts';
 import { prepareDemoWorld, type DemoCommit, type DemoProject } from '../../packages/server/src/demo/demo-world.ts';
 import { storyScenario } from '../../packages/server/src/demo/story/scenario.ts';
@@ -14,7 +14,7 @@ import { LEDGER_STORY } from '../../packages/server/src/demo/story/ledger-story.
 import { STOREFRONT_STORY } from '../../packages/server/src/demo/story/storefront-story.ts';
 import { DANA_REYES } from '../../packages/server/src/demo/story/story-people.ts';
 import { REPOSITORY_ROOT } from './paths.ts';
-import { HOLD_FILE_NAME, stagingDeployments } from './rehearsal-layout.ts';
+import { HOLD_FILE_NAME, LEDGER_POOL_SIZE, stagingDeployments, UNRELEASED_CHANGE_MESSAGE } from './rehearsal-layout.ts';
 import { rehearsalScenario } from './rehearsal-scenario.ts';
 
 /**
@@ -42,7 +42,7 @@ const REHEARSAL_WORKTREE_POOL_SIZE = 12;
 const UNRELEASED_CHANGE: DemoCommit = {
   author: { name: DANA_REYES.name, email: DANA_REYES.email },
   daysAgo: 3,
-  message: 'docs: describe the product categories of the shop',
+  message: UNRELEASED_CHANGE_MESSAGE,
   files: { 'docs/categories.md': '# Categories\n\nThe shop sells kitchen, apparel and bag products.\n' },
   tag: null,
 };
@@ -69,6 +69,28 @@ function withRehearsalDelivery(project: DemoProject): DemoProject {
           ),
         },
       };
+    },
+  };
+}
+
+/** The ledger takes one issue at a time and keeps one worktree, which the pull request of that issue holds until it is merged. */
+function withOneWorktree(project: DemoProject): DemoProject {
+  if (project.id !== LEDGER_ID) return project;
+  return {
+    ...project,
+    settings: (health) => ({ ...project.settings(health), worktrees: { size: LEDGER_POOL_SIZE }, concurrency: { issues: LEDGER_POOL_SIZE, ceiling: LEDGER_POOL_SIZE } }),
+  };
+}
+
+/** The storefront's films need the catalogue tool, whose session is a file that exists once the operator logs in. */
+function withFilmTool(project: DemoProject): DemoProject {
+  if (project.id !== STOREFRONT_ID) return project;
+  return {
+    ...project,
+    settings: (health) => {
+      const entry = project.settings(health);
+      const evidence = entry['evidence'] as { films: Record<string, unknown> };
+      return { ...entry, evidence: { ...evidence, films: { ...evidence.films, tools: [CATALOG_ADMIN] } } };
     },
   };
 }
@@ -110,7 +132,7 @@ const world = await prepareDemoWorld({
   clock: new SystemClock(),
   userHome: homedir(),
   health,
-  projects: DEMO_PROJECTS.map(withRehearsalDelivery),
+  projects: DEMO_PROJECTS.map(withRehearsalDelivery).map(withOneWorktree).map(withFilmTool),
   scenario: rehearsalScenario(storyScenario([STOREFRONT_STORY, LEDGER_STORY])),
   installation: { ...DEMO_INSTALLATION, claude },
 });

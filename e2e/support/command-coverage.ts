@@ -27,6 +27,7 @@ export const COMMAND_COVERAGE: Readonly<Record<CommandName, CommandCoverage>> = 
   'run.answer': { mode: 'rehearsal', spec: 'rehearsal/escalations.spec.ts' },
   'pr.merge': { mode: 'demo', spec: 'demo/pull-requests.spec.ts' },
   'pr.feedback': { mode: 'demo', spec: 'demo/pull-requests.spec.ts' },
+  'pr.film': { mode: 'demo', spec: 'demo/pull-requests.spec.ts' },
   'deployment.redeploy': { mode: 'rehearsal', spec: 'rehearsal/delivery.spec.ts' },
   'release.cut': { mode: 'rehearsal', spec: 'rehearsal/releases.spec.ts' },
   'release.evaluate': { mode: 'demo', spec: 'demo/releases.spec.ts' },

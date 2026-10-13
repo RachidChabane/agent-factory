@@ -139,8 +139,10 @@ test.describe('the audits of the demonstration', () => {
     const { draft } = audit;
     if (draft === null) throw new Error(`the audit of ${shortSha(audit.commitSha)} has no draft`);
     expect(audit.publishedIssueNumber).toBeNull();
+    expect(audit.publishedIssueAt).toBeNull();
     await openAudit(page, factory, audit);
 
+    const publishing = Date.now();
     const outcome = await clickCommand(page, 'audit.publish-issue', async () => {
       await page.getByRole('button', { name: 'Publish the audit issue' }).click();
     });
@@ -158,8 +160,21 @@ test.describe('the audits of the demonstration', () => {
     const state = await factory.api.state();
     const issuePage = forgeFilePath(STOREFRONT, `issues/${issueNumber}.md`);
     expect(auditOf(state, STOREFRONT, audit.id).publishedIssueUrl).toBe(issuePage);
-    const listed = projectOf(state, STOREFRONT).issues.some((issue) => issue.number === issueNumber);
-    await expect(issueSection.getByRole('link', { name: `Published as issue #${issueNumber}` })).toHaveAttribute('href', listed ? paths.issue(STOREFRONT, issueNumber) : issuePage);
+    expect(projectOf(state, STOREFRONT).issues.map((issue) => issue.number), 'the factory lists no issue that an audit published').not.toContain(issueNumber);
+    const link = issueSection.getByRole('link', { name: `Published as issue #${issueNumber}` });
+    await expect(link).toHaveAttribute('href', issuePage);
+    const publishedAt = auditOf(state, STOREFRONT, audit.id).publishedIssueAt;
+    if (publishedAt === null) throw new Error(`the factory dates no publication of issue #${issueNumber}`);
+    expect(Date.parse(publishedAt), 'the issue was published by the click').toBeGreaterThanOrEqual(publishing);
+    await expect(issueSection.getByRole('time')).toHaveAttribute('datetime', publishedAt);
+    await expect(issueSection.getByRole('time')).toHaveAttribute('title', english.absolute(publishedAt));
+
+    const opened = page.context().waitForEvent('page');
+    await link.click();
+    const forgePage = await opened;
+    await expect(forgePage).toHaveURL(new URL(issuePage, factory.origin).href);
+    await expect(forgePage.locator('body')).toContainText(draft.title);
+    await forgePage.close();
   });
 
   test('asks for a note before marking an audit as resolved and sends nothing without it', async ({ page, factory }) => {

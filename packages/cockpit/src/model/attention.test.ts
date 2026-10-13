@@ -20,6 +20,18 @@ describe('deriveAttention', () => {
     expect(deriveAttention(fixtureSnapshot(), 'ledger')).toHaveLength(5);
   });
 
+  it('refers to the question of an agent by what its run works on, not by the identifier of the run', () => {
+    const snapshot = fixtureSnapshot();
+    const questions = deriveAttention(snapshot).filter((item) => item.kind === 'question');
+    expect(questions.length).toBeGreaterThan(0);
+    for (const question of questions) {
+      const run = snapshot.runs.find((candidate) => `run:${candidate.id}` === question.key);
+      expect(run, `the run of ${question.key}`).toBeDefined();
+      expect(question.reference).toBe(run?.subject.kind === 'issue' ? `#${run.subject.id}` : run?.subject.id);
+      expect(question.reference).not.toBe(run?.id);
+    }
+  });
+
   it('keeps the same number of an issue apart in two projects', () => {
     const keys = deriveAttention(fixtureSnapshot()).map((item) => item.key);
     expect(keys.filter((key) => key.endsWith('request:R-13'))).toEqual(expect.arrayContaining(['storefront:request:R-13', 'ledger:request:R-13']));

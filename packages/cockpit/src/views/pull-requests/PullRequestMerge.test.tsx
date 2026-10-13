@@ -12,6 +12,16 @@ const MERGE_DIALOG = 'Merge #57?';
 
 const mergeButton = () => screen.getByRole('button', { name: 'Merge' });
 
+/** The elements the description of an element points at. */
+function describedBy(element: HTMLElement): HTMLElement[] {
+  const ids = (element.getAttribute('aria-describedby') ?? '').split(' ').filter((id) => id.length > 0);
+  return ids.map((id) => {
+    const target = document.getElementById(id);
+    if (target === null) throw new Error(`nothing has the id ${id}`);
+    return target;
+  });
+}
+
 /** The pull request whose given check runs fail, as they do on the base branch too. */
 const failingOnBase = (names: readonly string[]) =>
   withPullRequest(STOREFRONT, SEARCH, (pullRequest) => ({
@@ -143,6 +153,19 @@ describe('PullRequestsView merge blockers', () => {
     expect(mergeButton()).toHaveAccessibleDescription(expect.stringContaining('The check e2e-checkout failed.'));
     const blockers = within(screen.getByRole('region', { name: 'Not mergeable yet' })).getByRole('list', { name: 'Merge blockers' });
     expect(within(blockers).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['The check e2e-checkout failed.', 'The check deploy-preview is still running.']);
+  });
+
+  it('points the disabled merge at the reasons themselves, which a browser reads by their text and not by the label of the callout', async () => {
+    await openPullRequest(PULL_REQUEST.expiredPromoMessage);
+    const described = describedBy(mergeButton());
+    expect(described.map((element) => element.textContent)).toEqual(['The check e2e-checkout failed.', 'The check deploy-preview is still running.']);
+    for (const element of described) expect(element).not.toHaveAttribute('aria-label');
+  });
+
+  it('points the disabled merge at the sentence that says the factory names no blocker', async () => {
+    const snapshot = withPullRequest(STOREFRONT, SEARCH, (pullRequest) => ({ ...pullRequest, mergeable: false, mergeBlockers: [] }));
+    await openPullRequest(SEARCH, { snapshot });
+    expect(describedBy(mergeButton()).map((element) => element.textContent)).toEqual(['The factory does not say what blocks the merge.']);
   });
 
   it('still explains a pull request that is not mergeable although the factory names no blocker', async () => {

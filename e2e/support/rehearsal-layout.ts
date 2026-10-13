@@ -1,6 +1,12 @@
 /** Names shared by the process that prepares a rehearsal and the specs that run against it. */
 export const HOLD_FILE_NAME = 'agents.hold';
 
+/** The commit merged after the last release tag of the storefront: no deployment brought it. */
+export const UNRELEASED_CHANGE_MESSAGE = 'docs: describe the product categories of the shop';
+
+/** The ledger keeps one worktree in its pool, so a pull request that waits for review leaves no room for the next issue. */
+export const LEDGER_POOL_SIZE = 1;
+
 export interface DeployedTag {
   readonly tag: string;
   readonly sha: string;

@@ -1,5 +1,7 @@
 import { workEntries, type Scenario, type ScenarioEntry } from '../../packages/server/src/demo/story/scenario.ts';
 import type { StorySpec, StoryWork } from '../../packages/server/src/demo/story/story-types.ts';
+import { PAYMENT_RETRIES } from '../../packages/server/src/demo/story/ledger/payment-retries.ts';
+import { TAX_ROUNDING } from '../../packages/server/src/demo/story/ledger/tax-rounding.ts';
 import { DISCOUNT_ROUNDING } from '../../packages/server/src/demo/story/storefront/discount-rounding.ts';
 
 /**
@@ -12,6 +14,27 @@ export const DECISION_REQUESTS = [
   { title: 'Discount codes round differently on each line', body: 'When a code takes 5% off a cart of several lines, the summary and the invoice show different discount amounts. We need one rule.' },
   { title: 'Checkout discount differs from the card charge', body: 'Some customers see a discount on the summary that is not the amount taken off their card. Please look at how the discount is computed.' },
 ] as const;
+
+/**
+ * Requests of the ledger whose challenge proposes one spec each, for the ledger's single worktree: the first spec is
+ * carried to its pull request, which keeps the worktree, and the second waits for one.
+ */
+export const LEDGER_REQUESTS = {
+  holder: {
+    request: {
+      title: 'Declined card payments are never tried again',
+      body: 'When the card gateway declines a charge because of a bank timeout, the invoice stays unpaid and the customer has to start over. Could the charge be tried again a few times before we give up?',
+    },
+    spec: PAYMENT_RETRIES.spec,
+  },
+  waiting: {
+    request: {
+      title: 'Invoice totals are a cent off the sum of their lines',
+      body: 'The total of some invoices is not the sum of their lines once the VAT is added: it differs by one cent. Could the VAT be rounded once, on the total?',
+    },
+    spec: TAX_ROUNDING.spec,
+  },
+} as const;
 
 /** The title of the spec that the challenge of the review request proposes: the scripted agents are selected by it. */
 export const REVIEW_BLOCKED_TITLE = 'Round the discounts of the invoice export once';
@@ -70,6 +93,8 @@ export function rehearsalScenario(story: Scenario): Scenario {
       ...story.entries,
       ...DECISION_REQUESTS.map((request) => challengeOf(request)),
       challengeOf(REVIEW_REQUEST, REVIEW_BLOCKED_SPEC),
+      challengeOf(LEDGER_REQUESTS.holder.request, LEDGER_REQUESTS.holder.spec),
+      challengeOf(LEDGER_REQUESTS.waiting.request, LEDGER_REQUESTS.waiting.spec),
       ...workEntries(REVIEW_BLOCKED_TITLE, REVIEW_BLOCKED_WORK),
     ],
   };

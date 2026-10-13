@@ -105,6 +105,7 @@ export function storefrontAudits(clock: FixtureClock): AuditView[] {
       conclusion: HTTP_CLIENT_BUMP_CONCLUSION,
       draft: HTTP_CLIENT_BUMP_DRAFT,
       publishedIssueNumber: ISSUE.httpTimeoutRegression,
+      publishedIssueAt: ago(days(8)),
       resolved: true,
       resolutionNote: 'The timeout is now set explicitly in the checkout configuration. Issue #75 tracks the regression test.',
     }),

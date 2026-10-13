@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { FactoryApi } from './api.ts';
@@ -13,6 +14,7 @@ export type FactoryMode = (typeof FACTORY_MODES)[number];
 const LOOPBACK = '127.0.0.1';
 const START_TIMEOUT_MS = 90_000;
 const STORY_TIMEOUT_MS = 300_000;
+const COMMAND_LINE_TIMEOUT_MS = 60_000;
 const SETTLE_TIMEOUT_MS = 240_000;
 const WORLD_TIMEOUT_MS = 180_000;
 /** The operator of a rehearsal is whoever the factory's `USER` names. */
@@ -20,6 +22,13 @@ const REHEARSAL_OPERATOR = 'Alex Morgan';
 const WORLD_HELPER = join(REPOSITORY_ROOT, 'e2e', 'support', 'rehearsal-world.ts');
 const READY_LINE = /^READY (.+)$/m;
 const STOPPING_LINE = /^Factory stopped$/m;
+
+/** What the factory's command line printed and the code it exited with. */
+export interface CommandLineResult {
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
 
 export interface RunningFactory {
   readonly mode: FactoryMode;
@@ -32,6 +41,8 @@ export interface RunningFactory {
   output(): string;
   /** Makes agent runs wait before they start, until the returned function is called; a rehearsal only. */
   holdAgents(): Promise<() => Promise<void>>;
+  /** Runs the factory's command line against this factory's home, as the operator would at a terminal; a rehearsal only. */
+  commandLine(args: readonly string[]): Promise<CommandLineResult>;
   stop(): Promise<void>;
 }
 
@@ -46,6 +57,15 @@ function factoryEnvironment(extra: Readonly<Record<string, string>> = {}): Recor
 
 function factoryCommand(...args: readonly string[]): string[] {
   return [process.execPath, FACTORY_CLI, ...args];
+}
+
+function runCommandLine(args: readonly string[], environment: Record<string, string | undefined>): Promise<CommandLineResult> {
+  return new Promise((resolve, reject) => {
+    execFile(process.execPath, [FACTORY_CLI, ...args], { cwd: REPOSITORY_ROOT, env: environment, timeout: COMMAND_LINE_TIMEOUT_MS }, (error, stdout, stderr) => {
+      if (error !== null && typeof error.code !== 'number') reject(error);
+      else resolve({ exitCode: typeof error?.code === 'number' ? error.code : 0, stdout, stderr });
+    });
+  });
 }
 
 async function assertReleased(port: number): Promise<void> {
@@ -80,6 +100,7 @@ async function startDemonstration(): Promise<RunningFactory> {
     home: null,
     output: () => factory.output,
     holdAgents: () => Promise.reject(new Error('agent runs are held in a rehearsal only')),
+    commandLine: () => Promise.reject(new Error('the command line reaches a rehearsal only: the demonstration keeps its home out of reach')),
     stop: async () => {
       const exit = await factory.stop();
       if (exit.code !== 0) throw new Error(`the demonstration stopped with ${exit.signal ?? `exit code ${exit.code}`}:\n${factory.tail()}`);
@@ -122,6 +143,7 @@ async function startRehearsal(): Promise<RunningFactory> {
         await writeFile(holdFile, '');
         return () => rm(holdFile, { force: true });
       },
+      commandLine: (args) => runCommandLine(args, factoryEnvironment({ AGENT_FACTORY_HOME: home, USER: REHEARSAL_OPERATOR })),
       stop: async () => {
         const exit = await started.stop();
         await world.stop();

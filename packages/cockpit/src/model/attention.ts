@@ -4,6 +4,7 @@ import { toEpoch } from '../i18n/formatters.ts';
 import { shortSha } from './identifiers.ts';
 import { isLiveRun } from './projects.ts';
 import { paths } from './routes.ts';
+import { describeRunSubject } from './subjects.ts';
 
 export const ATTENTION_PRIORITIES = [
   'needs-human',
@@ -116,7 +117,7 @@ function questionItems(snapshot: Pick<CockpitSnapshot, 'runs' | 'projects'>): At
         key: `run:${run.id}`,
         kind: 'question',
         project: run.project,
-        reference: run.id,
+        reference: describeRunSubject(snapshot, run).reference,
         title: run.pendingQuestion.text,
         detail: null,
         href: paths.run(run.id),

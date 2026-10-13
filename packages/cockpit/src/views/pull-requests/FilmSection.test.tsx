@@ -80,6 +80,8 @@ describe('the videos of a pull request', () => {
     expect(within(queued).getByText('2 films ahead of this one.')).toBeInTheDocument();
     expect(within(queued).getByText(/^Expected around Oct 12, 2026, 12:40\sPM \(Europe\/Paris\)\.$/)).toBeInTheDocument();
     expect(within(queued).getByText('Ordered by Alex Morgan.')).toBeInTheDocument();
+    expect(within(queued).getByText(/^In this state since /)).toBeInTheDocument();
+    expect(within(queued).getByText(/ago$/)).toHaveAttribute('datetime', waiting.since);
     expect(within(filmsRegion()).getByText(/^Read /)).toHaveAttribute('datetime', fixtureSnapshot().generatedAt);
   });
 
@@ -101,6 +103,7 @@ describe('the videos of a pull request', () => {
     const running = within(filmsRegion()).getByRole('region', { name: 'Film of scenario checkout-flow' });
     expect(within(running).getByText(title)).toBeInTheDocument();
     expect(within(running).queryByText(/films? ahead/)).not.toBeInTheDocument();
+    expect(within(running).getByText(/ago$/)).toHaveAttribute('datetime', order().since);
   });
 
   it('show the reason a film failed, and drop the failure once the scenario is recorded', async () => {
@@ -109,6 +112,8 @@ describe('the videos of a pull request', () => {
     const alert = within(filmsRegion()).getByRole('region', { name: 'Failed film of scenario checkout-flow' });
     expect(within(alert).getByText('The film of scenario checkout-flow failed')).toBeInTheDocument();
     expect(within(alert).getByText('the scenario was skipped: the sandbox account is locked')).toBeInTheDocument();
+    expect(within(alert).getByText(/^Failed /)).toBeInTheDocument();
+    expect(within(alert).getByText(/ago$/)).toHaveAttribute('datetime', failed.since);
   });
 
   it('hide the failure of an earlier attempt when the scenario was recorded since', async () => {
@@ -132,6 +137,7 @@ describe('the videos of a pull request', () => {
     expect(within(region).getByRole('button', { name: 'Filmer' })).toBeInTheDocument();
     expect(within(region).getByText('En file d’attente · scénario checkout-flow')).toBeInTheDocument();
     expect(within(region).getByText('1 tournage devant celui-ci.')).toBeInTheDocument();
+    expect(within(region).getByText(/^Dans cet état depuis /)).toBeInTheDocument();
     expect(within(region).getByRole('article', { name: 'Scénario checkout-flow' })).toBeInTheDocument();
   });
 });

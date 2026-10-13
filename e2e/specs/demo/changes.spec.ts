@@ -1,4 +1,10 @@
+import { DAY_MS } from '../../../packages/cockpit/src/i18n/formatters.ts';
+import { deriveAttention } from '../../../packages/cockpit/src/model/attention.ts';
+import { paths } from '../../../packages/cockpit/src/model/routes.ts';
+import { untilPageAgreesWithFactory } from '../../support/agreement.ts';
+import { expectAwaitingShown, expectEnvironmentLanesShown, expectPullRequestLanesShown, expectSummaryShown, sinceOf } from '../../support/changes-page.ts';
 import { openCockpit, sidebar } from '../../support/cockpit.ts';
+import { waitingRunOf } from '../../support/run-facts.ts';
 import { expect, test } from '../../support/test.ts';
 
 const SEEN_STORAGE_KEY = 'agent-factory.changes.seen-at';
@@ -28,4 +34,28 @@ test.describe('the landing page of the demonstration', () => {
     await page.reload();
     await expect(page.getByText(/^Last seen:/)).toBeVisible();
   });
+
+  test('counts the period, dates the pull requests that moved and what waits for the operator, and dates the status of each environment', async ({ page, factory }) => {
+    await page.getByRole('radio', { name: '7 days' }).click();
+    await expect.poll(() => sinceOf(page)).toBeLessThan(Date.now() - 6 * DAY_MS);
+    const since = sinceOf(page);
+    await untilPageAgreesWithFactory(async () => {
+      const state = await factory.api.state();
+      await expectSummaryShown(page, state, since);
+      await expectPullRequestLanesShown(page, state, since);
+      await expectAwaitingShown(page, state);
+      await expectEnvironmentLanesShown(page, state, since);
+    });
+  });
+
+  test('refers to the question of an agent by the issue it works on, not by the identifier of its run', async ({ page, factory }) => {
+    const state = await factory.api.state();
+    const waiting = waitingRunOf(state);
+    const question = deriveAttention(state).find((item) => item.key === `run:${waiting.id}`);
+    expect(question?.reference).toBe(`#${waiting.subject.id}`);
+    const link = page.getByRole('region', { name: 'Waiting for you', exact: true }).locator(`a[href="${paths.run(waiting.id)}"]`);
+    await expect(link).toContainText(`#${waiting.subject.id}`);
+    await expect(link).not.toContainText(waiting.id);
+  });
 });
+

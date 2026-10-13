@@ -4,6 +4,7 @@ import { ONE_LOOK, untilPageAgreesWithFactory } from '../../support/agreement.ts
 import { issueOf, projectOf, pullRequestOf } from '../../support/api.ts';
 import { openCockpit, recordCommandsSent } from '../../support/cockpit.ts';
 import { clickCommand } from '../../support/commands.ts';
+import { expectDecisionListed } from '../../support/decisions.ts';
 import { AGENT_WORK_TEST_TIMEOUT_MS, AGENT_WORK_TIMEOUT_MS, untilNoAgentIsWorking } from '../../support/factory-activity.ts';
 import { english } from '../../support/formats.ts';
 import { firstOf, issueNamed } from '../../support/project-facts.ts';
@@ -218,6 +219,26 @@ test.describe('the issues of the demonstration', () => {
     await expect(detail.getByRole('button', { name: 'Abandon' })).toBeEnabled();
     await expect(detail.getByRole('button', { name: 'Validate spec' })).toHaveCount(0);
     expect(sent).toEqual([]);
+  });
+
+  test('marks on the issue what its orchestrator decided in the operator\'s place, and marks nothing on an issue the operator took', async ({ page, factory }) => {
+    const state = await factory.api.state();
+    const delegated = issueNamed(state, STOREFRONT, DISCOUNT_ROUNDING.spec.title);
+    const [decision] = delegated.delegated;
+    if (decision === undefined) throw new Error(`the orchestrator made no gesture on issue #${delegated.number}`);
+    expect(decision.reason).toBe(DISCOUNT_ROUNDING.delegatedValidation);
+    await openCockpit(page, factory, paths.issue(STOREFRONT, delegated.number));
+    const mark = page.getByRole('region', { name: 'Decided without you', exact: true });
+    await expect(mark).toContainText(`The gestures ${decision.actor} made on this item.`);
+    const items = mark.getByRole('list', { name: 'Delegated decisions' }).getByRole('listitem');
+    await expect(items).toHaveCount(delegated.delegated.length);
+    await expectDecisionListed(items.first(), STOREFRONT, decision);
+
+    const taken = issueNamed(state, STOREFRONT, CART_BADGE_TOTAL.spec.title);
+    expect(taken.delegated).toEqual([]);
+    await openCockpit(page, factory, paths.issue(STOREFRONT, taken.number));
+    await expect(page.getByRole('heading', { level: 1, name: taken.title })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Decided without you', exact: true })).toHaveCount(0);
   });
 
   test('validates the spec of a draft from its issue page and lets the factory take the issue', async ({ page, factory }) => {

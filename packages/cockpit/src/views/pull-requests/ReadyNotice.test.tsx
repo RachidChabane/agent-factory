@@ -72,9 +72,15 @@ describe('the ready notice of a pull request', () => {
     expect(within(noticeRegion()).getByText('The checks were not read')).toBeInTheDocument();
   });
 
-  it('says that everything holds and the notice goes out at the next tick', async () => {
-    await openPullRequest(SEARCH, { snapshot: withNotice({ status: 'due' }) });
+  it('says that everything holds and the notice goes out at the next tick, with when the checks it rests on were read', async () => {
+    await openPullRequest(SEARCH, { snapshot: withNotice({ status: 'due', checksReadAt: minutesAgo(2) }) });
     expect(within(noticeRegion()).getByText('Everything holds: the notice goes out at the next tick of the factory.')).toBeInTheDocument();
+    expect(noticeRegion()).toHaveTextContent(/Read 2 min\. ago/);
+  });
+
+  it('says that the checks it rests on were never read when the factory holds no reading of them', async () => {
+    await openPullRequest(SEARCH, { snapshot: withNotice({ status: 'due', checksReadAt: null }) });
+    expect(within(noticeRegion()).getByText('The checks were not read')).toBeInTheDocument();
   });
 
   it('says that none was sent for a pull request that waits for no merge', async () => {
