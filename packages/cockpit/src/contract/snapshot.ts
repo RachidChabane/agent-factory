@@ -531,7 +531,11 @@ export const ReadyNoticeViewSchema = z.discriminatedUnion('status', [
     /** When the checks the hold depends on were last read from the forge; null when they never were. */
     checksReadAt: IsoDateTimeSchema.nullable(),
   }),
-  z.object({ status: z.literal(READY_NOTICE_STATUSES[2]) }),
+  z.object({
+    status: z.literal(READY_NOTICE_STATUSES[2]),
+    /** When the checks that make the notice due were last read from the forge; null when they never were. */
+    checksReadAt: IsoDateTimeSchema.nullable(),
+  }),
   z.object({ status: z.literal(READY_NOTICE_STATUSES[3]) }),
 ]);
 export type ReadyNoticeView = z.infer<typeof ReadyNoticeViewSchema>;

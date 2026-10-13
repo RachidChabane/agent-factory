@@ -53,7 +53,8 @@ export function readyNoticeView(journal: PipelineJournal, open: boolean, reading
     pendingFilms: films ? pendingFilmScenarios(journal) : [],
     failedFilms: films ? failedFilmScenarios(journal) : [],
   });
-  if (readiness.ready) return { status: 'due' };
+  const checksReadAt = readings.checks.readAt === null ? null : iso(readings.checks.readAt);
+  if (readiness.ready) return { status: 'due', checksReadAt };
   const [first, ...others] = readiness.blockers.map(holdView);
-  return first === undefined ? { status: 'due' } : { status: 'held', holds: [first, ...others], checksReadAt: readings.checks.readAt === null ? null : iso(readings.checks.readAt) };
+  return first === undefined ? { status: 'due', checksReadAt } : { status: 'held', holds: [first, ...others], checksReadAt };
 }
