@@ -14,7 +14,7 @@ import { LEDGER_STORY } from '../../packages/server/src/demo/story/ledger-story.
 import { STOREFRONT_STORY } from '../../packages/server/src/demo/story/storefront-story.ts';
 import { DANA_REYES } from '../../packages/server/src/demo/story/story-people.ts';
 import { REPOSITORY_ROOT } from './paths.ts';
-import { HOLD_FILE_NAME, LEDGER_POOL_SIZE, stagingDeployments } from './rehearsal-layout.ts';
+import { HOLD_FILE_NAME, LEDGER_POOL_SIZE, stagingDeployments, UNRELEASED_CHANGE_MESSAGE } from './rehearsal-layout.ts';
 import { rehearsalScenario } from './rehearsal-scenario.ts';
 
 /**
@@ -42,7 +42,7 @@ const REHEARSAL_WORKTREE_POOL_SIZE = 12;
 const UNRELEASED_CHANGE: DemoCommit = {
   author: { name: DANA_REYES.name, email: DANA_REYES.email },
   daysAgo: 3,
-  message: 'docs: describe the product categories of the shop',
+  message: UNRELEASED_CHANGE_MESSAGE,
   files: { 'docs/categories.md': '# Categories\n\nThe shop sells kitchen, apparel and bag products.\n' },
   tag: null,
 };
