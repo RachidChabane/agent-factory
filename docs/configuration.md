@@ -127,6 +127,7 @@ runs.
 | `timeoutMinutes` | `20` | the bound of one recording; the command's process group is stopped when it expires, and with the factory |
 | `replayFile` | `replay.json` | the file the recording of the base writes in `{output}`; `{replay}` is its path in the recording of the head |
 | `timeZone` | the machine's | the zone of the expected arrival times in the pull request body and the cockpit |
+| `tools` | `[]` | the names of the [tools](#tools) whose checks must pass before a film starts, declared in the installation's `tools` or in the project's own; see [Films and their tools](#films-and-their-tools) |
 
 The tokens of `command` reach the program as they are, without a shell: `~` and
 variables such as `$HOME` are not expanded in them (`workingDirectory` is). The program
@@ -157,6 +158,28 @@ operator orders any other with `agent-factory film <issue> --scenario <name>` or
 pull request page. A scenario name is letters, digits, dots, dashes and underscores, at
 most 45 characters. Films wait in one queue for the whole installation, one at a time,
 while nothing else runs: see [ADR 0030](adr/0030-films.md).
+
+### Films and their tools
+
+The credentials a film command needs, such as a secrets vault token or a cloud login, can expire while the factory
+runs unattended. `evidence.films.tools` lists the tools the command needs, by their names in `tools` (the
+installation's, or the project's own; see [Tools](#tools)). A name that no `tools` declares is refused.
+
+Before a film of the project starts, the factory runs the check of each listed tool, all at once, each within its
+own `timeoutSeconds`.
+
+- While a check fails, the film does not start and does not fail: it stays queued, and so do the other films of the
+  project. They hold no slot, so issues go on and the films of the other projects go on.
+- The operator is told once when the films begin to wait. The notice names the tool, why its check fails, and the
+  command to run: the tool's `login`, or its `fix` when it declares no login. The cockpit shows the waiting films with
+  the tool, the command and since when; `agent-factory status` says the same, and `agent-factory validate` names the
+  listed tools on the project's `films` line.
+- The factory reads the failing tool again every 5 minutes, whether or not other work runs. Once every tool passes, the
+  films start and the operator is told once that they resume. A tool is also read right before its film starts, and
+  every 5 minutes while the film waits for running work to end.
+- A wait the factory recorded before a restart is read again at once.
+
+A tool that passes does not guarantee the film: a film that fails for any other reason fails, as before.
 
 ### Evidence limits
 

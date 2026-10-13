@@ -205,6 +205,10 @@ queues the order, a stopped one records it at once.
   and its place in the queue, and replaces the announcement with the videos and
   screenshots when they land. The cockpit's **Videos** section shows the same, with
   the state of each film.
+- A project whose film command needs logins lists their tools in `evidence.films.tools`. While one of
+  their checks fails, its films stay queued and none fails: you are told once which login to run, the
+  pull request page and `agent-factory status` show the tool, the command and since when, and the films
+  start by themselves, with a notice, once every tool passes.
 - **Merge** waits while a film of the pull request is queued or recording, and says
   when it is expected. A film that failed does not hold the merge; its reason stands in
   the body and in the cockpit, and you order it again.
