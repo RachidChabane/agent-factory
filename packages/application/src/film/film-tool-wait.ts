@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { TOOL_FAILURE_STATUSES, type ToolFailureStatus } from '@agent-factory/domain';
+import { TOOL_FAILURE_STATUSES, type ToolFailureStatus, type ToolName } from '@agent-factory/domain';
 import { NOTICES, type OperatorNotifications } from '../notifications/operator-notifications.ts';
 import type { EventStore, FactoryEventRecord } from '../ports.ts';
+import { latestToolChecks, type CheckedTool } from '../settings/tool-checks.ts';
 import { FILM_TOOL_RECHECK_INTERVAL_MS, FILM_TOOL_SCOPES, type FilmTool } from './film-tools.ts';
 
 /** Where a project records that its films wait for a tool. */
@@ -28,7 +29,7 @@ export type FilmToolsUnavailablePayload = z.infer<typeof FilmToolsUnavailablePay
 export interface FilmToolWait extends FilmToolsUnavailablePayload {
   /** When the films began to wait; a change of the tool that fails does not move it. */
   readonly since: Date;
-  /** When the tool was last read failing. */
+  /** When the record of the wait last changed: the tool, or what its check found. */
   readonly checkedAt: Date;
 }
 
@@ -48,6 +49,19 @@ export function filmToolWaitOf(records: readonly FactoryEventRecord[]): FilmTool
   return wait;
 }
 
+/**
+ * The wait in force, with the time its tool was last read: the log's latest check of the tool when it is newer than the
+ * record of the wait, whoever ran it. A tool of the installation is checked in the installation's log, a tool of the
+ * project in the project's.
+ */
+export function currentFilmToolWait(projectRecords: readonly FactoryEventRecord[], installationChecks: ReadonlyMap<ToolName, CheckedTool>): FilmToolWait | null {
+  const wait = filmToolWaitOf(projectRecords);
+  if (wait === null) return null;
+  const checks = wait.scope === 'project' ? latestToolChecks(projectRecords) : installationChecks;
+  const checkedAt = checks.get(wait.tool)?.checkedAt;
+  return checkedAt === undefined || checkedAt.getTime() <= wait.checkedAt.getTime() ? wait : { ...wait, checkedAt };
+}
+
 /** A tool read failing: what the record keeps of it, and what the notice tells. */
 export interface FilmToolFinding {
   readonly tool: FilmTool;
@@ -60,7 +74,7 @@ export interface FilmToolFinding {
 /** What the lane asks of the record of a project's films waiting for a tool. */
 export interface FilmToolWaitRecord {
   current(): Promise<FilmToolWait | null>;
-  /** Records a reading of a tool that fails; the operator is told once, when the films begin to wait. */
+  /** Records what a tool that fails found; the operator is told once, when the films begin to wait. */
   unavailable(finding: FilmToolFinding): Promise<void>;
   /** Records that the films stop waiting; the operator is told when films were queued and start again. */
   available(resumed: boolean): Promise<void>;

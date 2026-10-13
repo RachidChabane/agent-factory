@@ -50,10 +50,6 @@ export class FilmToolReadings {
     return this.readings.get(key);
   }
 
-  wasReadInThisRound(key: string): boolean {
-    return this.readInThisRound.has(key);
-  }
-
   /** Remembers what the record of a wait says of a tool nobody has read since the factory started; it is read again at once. */
   seed(key: string, tool: FilmTool, result: ToolProbeResult): void {
     if (!this.readings.has(key)) this.readings.set(key, { tool, result, readAt: SEEDED_AT });

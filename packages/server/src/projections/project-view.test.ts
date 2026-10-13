@@ -10,7 +10,7 @@ import { pendingQuestions, projectRuns, recordedRuns } from './run-views.ts';
 import { imageKey, type ProjectSnapshotContext } from './snapshot-context.ts';
 import { COST_SETTINGS, GENERATED_AT, PROJECT, projectContext, projectHistory, type ProjectHistory } from './testing/project-history.ts';
 
-const READINGS: ProjectReadingsView = { forgeUrl: 'https://github.com/acme/widgets', workflows: null, deployments: () => null, knowledge: [], references: [], tools: [] };
+const READINGS: ProjectReadingsView = { forgeUrl: 'https://github.com/acme/widgets', workflows: null, deployments: () => null, knowledge: [], references: [], tools: [], installationToolChecks: new Map() };
 
 function viewOf(history: ProjectHistory = projectHistory(), context = projectContext(history)) {
   return projectView(PROJECT, history.project, context, READINGS);

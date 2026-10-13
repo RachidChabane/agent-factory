@@ -1,5 +1,6 @@
 import type { FilmOrderView, FilmToolWaitView, FilmView } from '@agent-factory/cockpit';
-import { FACTORY_FILM_OPERATOR, filmMergeBlocker, filmToolWaitOf, isFilmPending, unorderedDeclaredFilms, PIPELINE_EVENTS, FilmFinishedSchema, type FactoryEventRecord, type FilmForecast, type FilmOrderState, type FilmPhaseRecord, type FilmPresentation, type PipelineJournal } from '@agent-factory/application';
+import { FACTORY_FILM_OPERATOR, filmMergeBlocker, currentFilmToolWait, isFilmPending, unorderedDeclaredFilms, PIPELINE_EVENTS, FilmFinishedSchema, type CheckedTool, type FactoryEventRecord, type FilmForecast, type FilmOrderState, type FilmPhaseRecord, type FilmPresentation, type PipelineJournal } from '@agent-factory/application';
+import type { ToolName } from '@agent-factory/domain';
 import { iso } from './event-index.ts';
 import type { ProjectSnapshotContext } from './snapshot-context.ts';
 
@@ -71,9 +72,12 @@ export function filmMergeReason(journal: PipelineJournal, context: ProjectSnapsh
   return films === null ? null : filmMergeBlocker(journal, films.forecast, context.project, films.presentation);
 }
 
-/** The tool the films of a project wait for, while its check fails; null when they wait for none, or the project no longer lists a tool. */
-export function filmToolWaitView(records: readonly FactoryEventRecord[], listsTools: boolean): FilmToolWaitView | null {
-  const wait = listsTools ? filmToolWaitOf(records) : null;
+/**
+ * The tool the films of a project wait for, while its check fails; null when they wait for none, or the project lists no
+ * tool. The tool was last read at the latest check the log records, the installation's checks being those of its own tools.
+ */
+export function filmToolWaitView(records: readonly FactoryEventRecord[], listsTools: boolean, installationChecks: ReadonlyMap<ToolName, CheckedTool>): FilmToolWaitView | null {
+  const wait = listsTools ? currentFilmToolWait(records, installationChecks) : null;
   if (wait === null) return null;
   const { tool, scope, status, detail, loginCommand, fixCommand } = wait;
   return { tool, scope, status, detail, loginCommand, fixCommand, since: iso(wait.since), checkedAt: iso(wait.checkedAt) };

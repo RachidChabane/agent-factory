@@ -165,7 +165,7 @@ describe('the films of a project that needs tools', () => {
     );
   });
 
-  it('reads the failing tool again only when the interval has passed, and records each reading', async () => {
+  it('reads the failing tool again only when the interval has passed, and records the wait once while the reading does not change', async () => {
     const context = world();
     const storefront = context.project('storefront', [VAULT]);
     queue(context.filmsOf('storefront'), 1, 'checkout-flow', 1);
@@ -180,8 +180,25 @@ describe('the films of a project that needs tools', () => {
     context.advance(1);
     await lane.tick(IDLE, SIGNAL);
     expect(context.checks.calls).toEqual(['vault', 'vault']);
+    expect(context.typesOf('storefront')).toEqual([FILM_TOOLS_UNAVAILABLE_EVENT]);
+    expect(await context.waitOf('storefront')).toMatchObject({ since: START, checkedAt: START });
+    expect(context.sent).toHaveLength(1);
+  });
+
+  it('records the wait again when what the check finds changes, keeping when the films began to wait', async () => {
+    const context = world();
+    const storefront = context.project('storefront', [VAULT]);
+    queue(context.filmsOf('storefront'), 1, 'checkout-flow', 1);
+    context.checks.say('vault', 'unauthenticated', 'token expired');
+    const lane = new FilmLane([storefront], { clock: context.clock });
+    await lane.tick(IDLE, SIGNAL);
+
+    context.checks.say('vault', 'error', 'the vault did not answer');
+    context.advance(FILM_TOOL_RECHECK_INTERVAL_MS);
+    await lane.tick(IDLE, SIGNAL);
+
     expect(context.typesOf('storefront')).toEqual([FILM_TOOLS_UNAVAILABLE_EVENT, FILM_TOOLS_UNAVAILABLE_EVENT]);
-    expect(await context.waitOf('storefront')).toMatchObject({ since: START, checkedAt: new Date(START.getTime() + FILM_TOOL_RECHECK_INTERVAL_MS) });
+    expect(await context.waitOf('storefront')).toMatchObject({ status: 'error', detail: 'the vault did not answer', since: START, checkedAt: new Date(START.getTime() + FILM_TOOL_RECHECK_INTERVAL_MS) });
     expect(context.sent).toHaveLength(1);
   });
 
@@ -498,7 +515,8 @@ describe('the films of a project that needs tools', () => {
     context.advance(60_000);
     expect(await new FilmLane([storefront], { clock: context.clock }).tick(RUNNING, SIGNAL)).toBe(SLOTS_FREE);
 
-    expect(await context.waitOf('storefront')).toMatchObject({ since: START, checkedAt: new Date(START.getTime() + 60_000) });
+    expect(await context.waitOf('storefront')).toMatchObject({ since: START, checkedAt: START });
+    expect(context.typesOf('storefront')).toEqual([FILM_TOOLS_UNAVAILABLE_EVENT]);
     expect(context.sent).toHaveLength(1);
   });
 

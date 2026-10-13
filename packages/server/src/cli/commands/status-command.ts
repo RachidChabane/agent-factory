@@ -1,5 +1,5 @@
-import { filmToolWaitOf, issueStatus, loadJournal, ProjectEventStore, restartHazards, type FactoryEventRecord } from '@agent-factory/application';
-import type { IssueState } from '@agent-factory/domain';
+import { currentFilmToolWait, issueStatus, latestToolChecks, loadJournal, ProjectEventStore, restartHazards, type CheckedTool, type FactoryEventRecord } from '@agent-factory/application';
+import type { IssueState, ToolName } from '@agent-factory/domain';
 import type { AgentFactoryConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
 import { costBasis } from '../../projections/cost-views.ts';
 import { indexEvents } from '../../projections/event-index.ts';
@@ -39,7 +39,7 @@ function issuesByState(index: ReturnType<typeof indexEvents>): ReadonlyMap<Issue
   return counts;
 }
 
-function projectOverview(project: ProjectConfig, records: readonly FactoryEventRecord[]): ProjectOverview {
+function projectOverview(project: ProjectConfig, records: readonly FactoryEventRecord[], installationChecks: ReadonlyMap<ToolName, CheckedTool>): ProjectOverview {
   const listsTools = (project.evidence.films?.tools.length ?? 0) > 0;
   return {
     id: project.id,
@@ -47,7 +47,7 @@ function projectOverview(project: ProjectConfig, records: readonly FactoryEventR
     forge: forgeName(project),
     issuesByState: issuesByState(indexEvents(records)),
     pauses: pauseViews(records, 'project'),
-    filmToolWait: listsTools ? filmToolWaitOf(records) : null,
+    filmToolWait: listsTools ? currentFilmToolWait(records, installationChecks) : null,
   };
 }
 
@@ -58,6 +58,7 @@ async function overviewCommand(context: CliContext): Promise<number> {
     const records = await installation.events.read(EVERY_SUBJECT, FIRST_SEQUENCE);
     const recordsByProject = new Map<string, readonly FactoryEventRecord[]>();
     for (const project of config.projects) recordsByProject.set(project.id, await new ProjectEventStore(installation.events, project.id).read(EVERY_SUBJECT, FIRST_SEQUENCE));
+    const installationChecks = latestToolChecks(records);
     const factoryProcess = await runningFactory(config);
     const overview = {
       home: config.home,
@@ -68,7 +69,7 @@ async function overviewCommand(context: CliContext): Promise<number> {
       maxConcurrentRuns: config.resources.maxConcurrentRuns,
       pauses: pauseViews(records, 'installation'),
       usage: usageView(config, await installation.budget.usage(), records),
-      projects: config.projects.map((project) => projectOverview(project, recordsByProject.get(project.id) ?? [])),
+      projects: config.projects.map((project) => projectOverview(project, recordsByProject.get(project.id) ?? [], installationChecks)),
     };
     for (const line of renderOverview(overview, context.clock.now())) context.output.line(line);
     return EXIT_CODES.ok;

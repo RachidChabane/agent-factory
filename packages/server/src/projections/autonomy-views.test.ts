@@ -7,7 +7,7 @@ import { projectView, type ProjectReadingsView } from './project-view.ts';
 import { PROJECT, projectContext, projectHistory, type ProjectHistory } from './testing/project-history.ts';
 
 const AT = Date.parse('2026-10-09T11:00:00.000Z');
-const READINGS: ProjectReadingsView = { forgeUrl: null, workflows: null, deployments: () => null, knowledge: [], references: [], tools: [] };
+const READINGS: ProjectReadingsView = { forgeUrl: null, workflows: null, deployments: () => null, knowledge: [], references: [], tools: [], installationToolChecks: new Map() };
 
 function gesture(sequence: number, overrides: Record<string, unknown> = {}, subject = 'issue/42'): FactoryEventRecord {
   return {

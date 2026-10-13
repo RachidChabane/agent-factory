@@ -13,6 +13,7 @@ import {
   parseProjectSubject,
   PENDING_ISSUE_EVENTS,
   referenceState,
+  type CheckedTool,
   type CheckRunSummary,
   type FactoryEventRecord,
   type FilmForecast,
@@ -20,7 +21,7 @@ import {
   type RunLogLine,
   type WorkflowRunRecord,
 } from '@agent-factory/application';
-import type { ResourceSnapshot } from '@agent-factory/domain';
+import type { ResourceSnapshot, ToolName } from '@agent-factory/domain';
 import type { InstallationRuntime } from '../composition/installation/installation-runtime.ts';
 import { projectTools } from '../composition/installation/tools.ts';
 import { forgeUrl } from '../composition/project/forge.ts';
@@ -208,6 +209,14 @@ export interface SnapshotSourceOptions {
   readonly coldReadWaitMs?: number;
 }
 
+/** What every project's view takes from the installation's own records. */
+interface InstallationSnapshotFacts {
+  readonly runs: readonly RecordedRun[];
+  readonly generatedAt: Date;
+  readonly forecast: FilmForecast | null;
+  readonly installationToolChecks: ReadonlyMap<ToolName, CheckedTool>;
+}
+
 /** Builds the cockpit's snapshot of an installation and the telemetry it streams between events. */
 export class SnapshotSource {
   private readonly runtime: InstallationRuntime;
@@ -232,7 +241,10 @@ export class SnapshotSource {
     const installation = indexEvents(split.installation);
     const runs = recordedRuns(installation);
     const forecast = runtime.filmLedger?.forecastFrom(split.projects) ?? null;
-    const projects = await Promise.all(runtime.projects.map((project) => this.projectSnapshot(project, split.projects.get(project.id) ?? [], runs, generatedAt, forecast)));
+    const installationToolChecks = latestToolChecks(split.installation);
+    const projects = await Promise.all(
+      runtime.projects.map((project) => this.projectSnapshot(project, split.projects.get(project.id) ?? [], { runs, generatedAt, forecast, installationToolChecks })),
+    );
     const questions = new Map(projects.flatMap((project) => [...project.questions]));
     const pauses = pauseViews(split.installation, 'installation');
     const config = runtime.config;
@@ -260,7 +272,7 @@ export class SnapshotSource {
         perRunCapUsd: config.budget.perRunCapUsd,
       }),
       resources: await this.resourcesView(pauses.some((pause) => pause.cause === RESOURCES_CAUSE)),
-      tools: toolViews(runtime.configuredTools, latestToolChecks(split.installation), latestToolSessions(split.installation), 'installation'),
+      tools: toolViews(runtime.configuredTools, installationToolChecks, latestToolSessions(split.installation), 'installation'),
       settings: installationSettingsView(config, runtime.environment, split.installation),
     };
   }
@@ -320,13 +332,8 @@ export class SnapshotSource {
     return created;
   }
 
-  private async projectSnapshot(
-    project: ProjectRuntime,
-    records: readonly FactoryEventRecord[],
-    runs: readonly RecordedRun[],
-    generatedAt: Date,
-    forecast: FilmForecast | null,
-  ): Promise<ProjectViewProjection> {
+  private async projectSnapshot(project: ProjectRuntime, records: readonly FactoryEventRecord[], installation: InstallationSnapshotFacts): Promise<ProjectViewProjection> {
+    const { runs, generatedAt, forecast, installationToolChecks } = installation;
     const readings = this.projectReadings(project);
     const index = indexEvents(records);
     const journals = issueJournals(index);
@@ -373,6 +380,7 @@ export class SnapshotSource {
       knowledge,
       references,
       tools: toolViews(projectTools(config), latestToolChecks(records), latestToolSessions(records), 'project'),
+      installationToolChecks,
     });
   }
 
