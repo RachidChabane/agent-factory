@@ -1,5 +1,7 @@
 import { SHORT_SHA_LENGTH } from '../audit/audit-issue-renderer.ts';
-import type { FilmFinishedRecord, FilmPhaseRecord } from '../pipeline/journal-events.ts';
+import { evidenceCaption } from '../pipeline/evidence.ts';
+import { describeOmission } from '../pipeline/evidence-omission.ts';
+import type { FilmFinishedRecord, FilmPhaseRecord, OmittedFilmFile } from '../pipeline/journal-events.ts';
 import { inlineCode } from '../pipeline/markdown.ts';
 import type { ForgeFileLinks } from '../pipeline/pipeline-settings.ts';
 
@@ -18,11 +20,16 @@ function screenshotAlt(title: string, position: number): string {
   return position === 0 ? title : `${title}, key frame ${position}`;
 }
 
+function leftOutNote(file: OmittedFilmFile): string {
+  return `Left out of the pull request: ${inlineCode(evidenceCaption(file.path))}, ${describeOmission(file)}.`;
+}
+
 function phaseBlock(links: ForgeFileLinks, commitSha: string, title: string, sha: string, phase: FilmPhaseRecord): string {
-  const video = `[Watch the recording](${links.file(commitSha, phase.video)})`;
-  const screenshots = phase.screenshots.map((path, position) => `![${screenshotAlt(title, position)}](${links.rawFile(commitSha, path)})`);
+  const leftOut = new Set(phase.omitted.map((file) => file.path));
+  const video = leftOut.has(phase.video) ? [] : [`[Watch the recording](${links.file(commitSha, phase.video)})`];
+  const screenshots = phase.screenshots.flatMap((path, position) => (leftOut.has(path) ? [] : [`![${screenshotAlt(title, position)}](${links.rawFile(commitSha, path)})`]));
   const facts = phase.facts.map((fact) => `- ${fact.label}: ${fact.value}`).join(NEWLINE);
-  const body = [video, ...screenshots, ...(facts === '' ? [] : [facts])];
+  const body = [...video, ...phase.omitted.map(leftOutNote), ...screenshots, ...(facts === '' ? [] : [facts])];
   return [`#### ${title} ${DASH} ${sha.slice(0, SHORT_SHA_LENGTH)}`, ...body].join(PARAGRAPH);
 }
 

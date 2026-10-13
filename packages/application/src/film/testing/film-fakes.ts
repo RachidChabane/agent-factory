@@ -57,6 +57,7 @@ export class FakeFilmRecorder implements FilmRecorder {
   facts: readonly FilmFact[] = FACTS;
   reportText = REPORT_TEXT;
   screenshotContent: (ref: string, path: string) => string = (ref, path) => `image:${ref}:${path}`;
+  videoContent: (ref: string) => string = (ref) => `video:${ref}`;
   private readonly workspace: InMemoryWorkspace;
   private readonly storeRoot: string;
 
@@ -72,7 +73,7 @@ export class FakeFilmRecorder implements FilmRecorder {
     const relative = request.outputDirectory.slice(this.storeRoot.length + 1);
     this.workspace.write(this.storeRoot, `${relative}/report.json`, this.reportText);
     if (this.wroteReplay) this.workspace.write(this.storeRoot, `${relative}/${REPLAY_FILE}`, REPLAY_TEXT);
-    this.workspace.write(this.storeRoot, `${relative}/${this.videoPath}`, `video:${request.ref}`);
+    this.workspace.write(this.storeRoot, `${relative}/${this.videoPath}`, this.videoContent(request.ref));
     for (const screenshot of this.screenshots) this.workspace.write(this.storeRoot, `${relative}/${screenshot}`, this.screenshotContent(request.ref, screenshot));
     return { facts: this.facts, videoPath: this.videoPath, screenshotPaths: this.screenshots, wroteReplay: this.wroteReplay };
   }

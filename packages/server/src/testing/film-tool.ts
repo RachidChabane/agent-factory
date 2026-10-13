@@ -40,10 +40,15 @@ export async function installFilmTool(directory: string): Promise<void> {
   await writeFile(join(directory, FILM_TOOL_FILE), FILM_TOOL);
 }
 
-/** The film declaration of a project whose command is the stand-in tool. */
-export function filmSettings(directory: string, environment: Readonly<Record<string, string>> = {}): Readonly<Record<string, unknown>> {
+/** The film declaration of a project whose command is the stand-in tool, with the limits of its evidence when given. */
+export function filmSettings(
+  directory: string,
+  environment: Readonly<Record<string, string>> = {},
+  limits: { readonly maxFileBytes?: number; readonly maxTotalBytes?: number } = {},
+): Readonly<Record<string, unknown>> {
   return {
     evidence: {
+      ...limits,
       films: {
         command: [process.execPath, FILM_TOOL_FILE, '--ref', '{ref}', '--out', '{output}', '--scenario', '{scenario}', '--replay', '{replay}'],
         workingDirectory: directory,

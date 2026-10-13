@@ -1,4 +1,4 @@
-import { filmLabel } from '@agent-factory/domain';
+import { filmLabel, type EvidenceLimits } from '@agent-factory/domain';
 import { ISSUE_NUMBER, issueRecord, PipelineScenario, SCENARIO_START } from '../../pipeline/testing/pipeline-scenario.ts';
 import type { SteppingClock } from '../../runs/test-support.ts';
 import { FilmBehaviour, type FilmBehaviourSettings } from '../film-behaviour.ts';
@@ -22,11 +22,13 @@ export function behaviourOf(
   scenario: PipelineScenario,
   collaborators: Pick<Film, 'recorder' | 'transcoder' | 'activity' | 'services'>,
   replayFile: string | null = REPLAY_FILE,
+  evidenceLimits: EvidenceLimits = scenario.settings.evidenceLimits,
 ): FilmBehaviour {
   const settings: FilmBehaviourSettings = {
     fileLinks: scenario.settings.fileLinks,
     evidenceCacheDirectory: scenario.settings.evidenceCacheDirectory,
     resources: scenario.settings.resources,
+    evidenceLimits,
     replayFile,
   };
   const { recorder, transcoder, activity, services } = collaborators;

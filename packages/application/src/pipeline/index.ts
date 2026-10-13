@@ -3,6 +3,7 @@ export * from './branch-name.ts';
 export * from './conventional-commit.ts';
 export * from './diff-stat.ts';
 export * from './evidence.ts';
+export * from './evidence-omission.ts';
 export * from './failure-summary.ts';
 export * from './gate-runner.ts';
 export * from './head-visibility.ts';

@@ -1,7 +1,7 @@
-import { admitAgentRun, FILM_SCENARIO_RULE, isFilmScenarioName, textDocument } from '@agent-factory/domain';
-import type { ResourceAdmissionPolicy, ScanDocument } from '@agent-factory/domain';
+import { admitAgentRun, FILM_SCENARIO_RULE, isFilmScenarioName, selectEvidenceWithinLimits, textDocument } from '@agent-factory/domain';
+import type { EvidenceLimits, ResourceAdmissionPolicy, ScanDocument } from '@agent-factory/domain';
 import { filmsCommitMessage } from '../pipeline/conventional-commit.ts';
-import { FILM_PHASES, PIPELINE_EVENTS, type FilmFinishedRecord, type FilmPhase, type FilmPhaseRecord } from '../pipeline/journal-events.ts';
+import { FILM_PHASES, PIPELINE_EVENTS, type FilmFinishedRecord, type FilmPhase, type FilmPhaseRecord, type OmittedFilmFile } from '../pipeline/journal-events.ts';
 import { IssueJournalWriter } from '../pipeline/journal-writer.ts';
 import { OutboundSecretScan } from '../pipeline/outbound-secret-scan.ts';
 import type { PipelineDependencies } from '../pipeline/pipeline-dependencies.ts';
@@ -29,6 +29,7 @@ import type { FilmQueue } from './film-queue.ts';
 import { renderFinishedFilm } from './film-section.ts';
 
 const PATH_SEPARATOR = '/';
+const NO_BYTES = 0;
 const NORMAL_PRESSURE_ONLY: Pick<ResourceAdmissionPolicy, 'pauseAbovePressure'> = { pauseAbovePressure: 'normal' };
 const STOPPED_REASON = 'the film was stopped before it finished';
 /** Screenshots in these formats are text, so the secret scan reads them like the reports. */
@@ -49,6 +50,8 @@ export interface FilmBehaviourSettings {
   readonly fileLinks: ForgeFileLinks;
   readonly evidenceCacheDirectory: string;
   readonly resources: ResourceAdmissionPolicy;
+  /** What the films committed to a pull request may weigh, with the evidence it already holds. */
+  readonly evidenceLimits: EvidenceLimits;
   /** The file the base recording must write for the head recording to replay it; null when the command replays nothing. */
   readonly replayFile: string | null;
 }
@@ -77,9 +80,18 @@ export type FilmOutcome =
   | { readonly kind: 'failed'; readonly issueNumber: number; readonly scenario: string; readonly reason: string };
 
 interface FilmFileCopy {
+  readonly phase: FilmPhase;
   readonly from: string;
   readonly to: string;
   readonly isText: boolean;
+  /** Whether the limits of the pull request apply: the videos and the screenshots, not the reports. */
+  readonly limited: boolean;
+}
+
+/** The files of a film that go on the branch, and the ones its limits keep off it, by the recording they belong to. */
+interface PlacedFiles {
+  readonly kept: readonly FilmFileCopy[];
+  readonly omitted: ReadonlyMap<FilmPhase, readonly OmittedFilmFile[]>;
 }
 
 interface CapturedPhase {
@@ -209,14 +221,15 @@ export class FilmBehaviour {
     await writer.record(PIPELINE_EVENTS.filmStageEntered, { scenario, stage: 'committing' });
     await this.inspect(issueNumber, target.headSha);
     const copies = this.filmFiles(order, [before, after]);
-    const documents = await this.textDocuments(order, copies);
-    const announced = renderFinishedFilm(this.settings.fileLinks, this.finishedRecord(order, target, target.headSha, before, after));
+    const placed = await this.withinLimits(order, target, copies);
+    const documents = await this.textDocuments(order, placed.kept);
+    const announced = renderFinishedFilm(this.settings.fileLinks, this.finishedRecord(order, target, target.headSha, before, after, placed.omitted));
     await new OutboundSecretScan(this.dependencies.knownSecrets).assertClean({ documents, body: announced }, `commit the films of #${issueNumber}`);
-    const commitSha = await this.commitCopies(order, target.worktree, copies);
+    const commitSha = await this.commitCopies(order, target.worktree, copies, placed);
     await writer.record(PIPELINE_EVENTS.filmCommitted, { scenario, sha: commitSha });
     await sourceControl.push(target.worktree);
     await writer.record(PIPELINE_EVENTS.filmPushed, { headSha: commitSha });
-    const finished = this.finishedRecord(order, target, commitSha, before, after);
+    const finished = this.finishedRecord(order, target, commitSha, before, after, placed.omitted);
     await writer.record(PIPELINE_EVENTS.filmFinished, finished);
     return {
       kind: 'finished',
@@ -254,14 +267,46 @@ export class FilmBehaviour {
   private filmFiles(order: FilmOrder, phases: readonly CapturedPhase[]): readonly FilmFileCopy[] {
     const { issueNumber, scenario } = order;
     return phases.flatMap(({ phase, recording, storeVideo }) => [
-      { from: storeVideo, to: filmBranchVideo(issueNumber, scenario, phase), isText: false },
-      { from: filmStoreFile(scenario, phase, FILM_REPORT_FILE), to: filmBranchReport(issueNumber, scenario, phase), isText: true },
+      { phase, from: storeVideo, to: filmBranchVideo(issueNumber, scenario, phase), isText: false, limited: true },
+      { phase, from: filmStoreFile(scenario, phase, FILM_REPORT_FILE), to: filmBranchReport(issueNumber, scenario, phase), isText: true, limited: false },
       ...recording.screenshotPaths.map((path, position) => ({
+        phase,
         from: filmStoreFile(scenario, phase, path),
         to: filmBranchScreenshot(issueNumber, scenario, phase, position, path),
         isText: isTextImage(path),
+        limited: true,
       })),
     ]);
+  }
+
+  /** The weight of the evidence the pull request already holds: its bundle and the other scenarios' films, as committed. */
+  private async committedEvidenceBytes({ journal, worktree }: FilmTarget, scenario: string): Promise<number> {
+    const otherFilms = journal.films
+      .filter((film) => film.scenario !== scenario)
+      .flatMap((film) => [film.before, film.after].flatMap((phase) => [phase.video, ...phase.screenshots]));
+    const paths = [...(journal.evidence?.bundle.files.map((file) => file.bundlePath) ?? []), ...otherFilms];
+    let total = 0;
+    for (const path of paths) total += (await this.dependencies.files.sizeOf(worktree.path, path)) ?? NO_BYTES;
+    return total;
+  }
+
+  /** Splits the files of the film into the ones that go on the branch and the ones the limits of the pull request keep off it. */
+  private async withinLimits(order: FilmOrder, target: FilmTarget, copies: readonly FilmFileCopy[]): Promise<PlacedFiles> {
+    const root = this.storeRoot(order.issueNumber);
+    const weighed = [];
+    for (const copy of copies.filter((candidate) => candidate.limited)) {
+      const bytes = await this.dependencies.files.sizeOf(root, copy.from);
+      if (bytes === null) throw new FilmRecordingError(`${copy.from} is missing from the film store`);
+      weighed.push({ path: copy.to, bytes });
+    }
+    const { omitted } = selectEvidenceWithinLimits(weighed, this.settings.evidenceLimits, await this.committedEvidenceBytes(target, order.scenario));
+    const leftOut = new Map(omitted.map((file) => [file.path, file]));
+    const byPhase = new Map<FilmPhase, OmittedFilmFile[]>();
+    for (const copy of copies) {
+      const file = leftOut.get(copy.to);
+      if (file !== undefined) byPhase.set(copy.phase, [...(byPhase.get(copy.phase) ?? []), file]);
+    }
+    return { kept: copies.filter((copy) => !leftOut.has(copy.to)), omitted: byPhase };
   }
 
   private async textDocuments(order: FilmOrder, copies: readonly FilmFileCopy[]): Promise<readonly ScanDocument[]> {
@@ -284,21 +329,41 @@ export class FilmBehaviour {
     }
   }
 
-  /** Commits the copies, or restores the worktree to what it was when any step fails. */
-  private async commitCopies(order: FilmOrder, worktree: Worktree, copies: readonly FilmFileCopy[]): Promise<string> {
+  /** Removes what an earlier film of the scenario left at the places its limits now keep files off; says which places held a file. */
+  private async removeLeftOut(worktree: Worktree, copies: readonly FilmFileCopy[], placed: PlacedFiles): Promise<readonly string[]> {
+    const { files } = this.dependencies;
+    const targets = copies.filter((copy) => !placed.kept.includes(copy)).map((copy) => copy.to);
+    const held: string[] = [];
+    for (const target of targets) {
+      if (!(await files.exists(worktree.path, target))) continue;
+      await files.remove(worktree.path, target);
+      held.push(target);
+    }
+    return held;
+  }
+
+  /** Commits the files of the film that go on the branch, or restores the worktree to what it was when any step fails. */
+  private async commitCopies(order: FilmOrder, worktree: Worktree, copies: readonly FilmFileCopy[], placed: PlacedFiles): Promise<string> {
     const { sourceControl } = this.dependencies;
-    const paths = copies.map((copy) => copy.to);
     try {
-      await this.copyIntoWorktree(order, worktree, copies);
+      await this.copyIntoWorktree(order, worktree, placed.kept);
+      const removed = await this.removeLeftOut(worktree, copies, placed);
       if (await sourceControl.isClean(worktree)) return await sourceControl.headSha(worktree);
-      return await sourceControl.commitPaths(worktree, paths, filmsCommitMessage(order.issueNumber, order.scenario));
+      return await sourceControl.commitPaths(worktree, [...placed.kept.map((copy) => copy.to), ...removed], filmsCommitMessage(order.issueNumber, order.scenario));
     } catch (error) {
-      await sourceControl.discardPaths(worktree, paths);
+      await sourceControl.discardPaths(worktree, copies.map((copy) => copy.to));
       throw error;
     }
   }
 
-  private finishedRecord(order: FilmOrder, target: FilmTarget, commitSha: string, before: CapturedPhase, after: CapturedPhase): FilmFinishedRecord {
+  private finishedRecord(
+    order: FilmOrder,
+    target: FilmTarget,
+    commitSha: string,
+    before: CapturedPhase,
+    after: CapturedPhase,
+    omitted: PlacedFiles['omitted'],
+  ): FilmFinishedRecord {
     const { issueNumber, scenario } = order;
     const phaseRecord = ({ phase, recording, storeVideo }: CapturedPhase): FilmPhaseRecord => ({
       video: filmBranchVideo(issueNumber, scenario, phase),
@@ -307,6 +372,7 @@ export class FilmBehaviour {
       facts: [...recording.facts],
       storeVideo,
       storeScreenshots: recording.screenshotPaths.map((path) => filmStoreFile(scenario, phase, path)),
+      omitted: [...(omitted.get(phase) ?? [])],
     });
     return { scenario, baseSha: target.worktree.baseSha, headSha: target.filmedHeadSha, commitSha, before: phaseRecord(before), after: phaseRecord(after) };
   }

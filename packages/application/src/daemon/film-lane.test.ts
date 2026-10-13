@@ -76,7 +76,7 @@ class ScriptedFilms implements FilmRunner {
 }
 
 function finished(issueNumber: number, scenario: string): FilmOutcome {
-  const phase = { video: 'v', report: 'r', screenshots: [], facts: [], storeVideo: 's', storeScreenshots: [] };
+  const phase = { video: 'v', report: 'r', screenshots: [], facts: [], storeVideo: 's', storeScreenshots: [], omitted: [] };
   return { kind: 'finished', issueNumber, pullRequestNumber: 100 + issueNumber, scenario, commitSha: 'films000', before: phase, after: phase };
 }
 

@@ -10,7 +10,9 @@ import {
   criterionChecksOf,
   isImagePath,
   stripAnsi,
+  evidenceIsComplete,
   failingOnBase,
+  incompleteEvidenceLines,
   MERGEABLE_STATES,
   PIPELINE_EVENTS,
   pullRequestTitle,
@@ -198,8 +200,8 @@ export function projectPullRequests(
     const merged = firstOf(records, PIPELINE_EVENTS.pullRequestMerged);
     const checks = context.pullRequestChecks.get(pullRequest.number) ?? NEVER_READ;
     const preExisting = failingOnBase(checks.value ?? [], context.baseChecks.value ?? []);
-    const missing = journal.evidence?.bundle.missing.map((entry) => `${entry.sourcePath} (${entry.phase})`) ?? [];
-    const evidenceComplete = journal.evidence !== null && missing.length === 0;
+    const missing = journal.evidence === null ? [] : [...incompleteEvidenceLines(journal.evidence.bundle)];
+    const evidenceComplete = journal.evidence !== null && evidenceIsComplete(journal.evidence.bundle);
     const onForge = context.pullRequestsOnForge.get(pullRequest.number);
     const state = stateOf(journal, onForge);
     const blockers = state === 'open' ? mergeBlockers(journal, checks, preExisting, evidenceComplete, filmMergeReason(journal, context)) : [];

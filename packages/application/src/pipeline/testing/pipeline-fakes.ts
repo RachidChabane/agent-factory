@@ -84,6 +84,11 @@ export class InMemoryWorkspace implements WorkspaceFiles {
     return Promise.resolve(directory || tree.has(relativePath) || [...tree.keys()].some((path) => path.startsWith(prefix)));
   }
 
+  sizeOf(root: string, relativePath: string): Promise<number | null> {
+    const content = this.tree(root).get(relativePath);
+    return Promise.resolve(content === undefined ? null : Buffer.byteLength(content));
+  }
+
   copyFile(fromRoot: string, fromRelativePath: string, toRoot: string, toRelativePath: string): Promise<boolean> {
     const content = this.tree(fromRoot).get(fromRelativePath);
     if (content === undefined) return Promise.resolve(false);

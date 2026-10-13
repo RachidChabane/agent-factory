@@ -1,4 +1,4 @@
-import type { FilmOutcome } from '@agent-factory/application';
+import { describeOmission, type FilmOutcome, type FilmPhaseRecord } from '@agent-factory/application';
 import { filmBehaviour, FilmsNotConfiguredError } from '../../composition/project/project-use-cases.ts';
 import type { ProjectConfig } from '../../config/agent-factory-config.ts';
 import type { CliContext } from '../cli-context.ts';
@@ -7,6 +7,11 @@ import { abortOnShutdown } from '../shutdown.ts';
 import { runningFactory, withFactoryLock } from './factory-running.ts';
 import { itemName, selectedProject, withProjectSession } from './project-session.ts';
 
+function recordingLine(label: string, phase: FilmPhaseRecord): string {
+  const leftOut = phase.omitted.find((file) => file.path === phase.video);
+  return leftOut === undefined ? `${label}: ${phase.video}` : `${label}: left out of the pull request, ${describeOmission(leftOut)}`;
+}
+
 export function reportFilm(project: ProjectConfig, outcome: FilmOutcome, output: CliOutput): number {
   const issue = itemName(project, outcome.issueNumber);
   if (outcome.kind === 'failed') {
@@ -14,8 +19,8 @@ export function reportFilm(project: ProjectConfig, outcome: FilmOutcome, output:
     return EXIT_CODES.failure;
   }
   output.line(`Films of scenario ${outcome.scenario} recorded on pull request #${outcome.pullRequestNumber} of ${issue} at ${outcome.commitSha}`);
-  output.line(`Before: ${outcome.before.video}`);
-  output.line(`After: ${outcome.after.video}`);
+  output.line(recordingLine('Before', outcome.before));
+  output.line(recordingLine('After', outcome.after));
   return EXIT_CODES.ok;
 }
 

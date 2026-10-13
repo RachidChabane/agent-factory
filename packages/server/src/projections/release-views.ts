@@ -3,6 +3,7 @@ import { assertReleaseTransition } from '@agent-factory/domain';
 import type { ReleaseState } from '@agent-factory/domain';
 import {
   AUDIT_SUBJECT_PREFIX,
+  evidenceIsComplete,
   RELEASE_CUT_EVENT,
   RELEASE_DETECTED_EVENT,
   RELEASE_EVALUATED_EVENT,
@@ -81,7 +82,7 @@ export function projectReleases(index: EventIndex, journals: ReadonlyMap<number,
       supersededBy: detection.supersededBy,
       commits: (evaluation?.commits ?? []).map((commit) => {
         const journal = commit.pullRequestNumber === null ? undefined : issueOfPullRequest.get(commit.pullRequestNumber);
-        const evidenceComplete = journal?.evidence === null || journal === undefined ? null : journal.evidence.bundle.missing.length === 0;
+        const evidenceComplete = journal?.evidence === null || journal === undefined ? null : evidenceIsComplete(journal.evidence.bundle);
         return {
           sha: commit.sha,
           message: commit.message,

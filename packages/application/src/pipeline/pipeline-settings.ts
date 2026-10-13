@@ -1,4 +1,4 @@
-import type { EffortLevel, EscalationProfile, ResourceAdmissionPolicy } from '@agent-factory/domain';
+import type { EffortLevel, EscalationProfile, EvidenceLimits, ResourceAdmissionPolicy } from '@agent-factory/domain';
 import type { ProjectConventions } from '../conventions/project-conventions.ts';
 
 export const PIPELINE_ROLES = ['acceptance-author', 'implementer', 'reviewer'] as const;
@@ -71,6 +71,8 @@ export interface PipelineSettings {
   readonly gate: GateSettings;
   readonly conventions: ProjectConventions;
   readonly evidenceCacheDirectory: string;
+  /** What the evidence committed to a pull request may weigh: the files over it are left out. */
+  readonly evidenceLimits: EvidenceLimits;
   readonly resources: ResourceAdmissionPolicy;
   readonly stack: StackSettings | null;
 }

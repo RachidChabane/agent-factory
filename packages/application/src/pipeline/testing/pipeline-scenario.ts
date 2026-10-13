@@ -1,4 +1,4 @@
-import { DEFAULT_ISSUE_TYPES, IssueTypology, type EscalationProfile, type IssueSpec } from '@agent-factory/domain';
+import { DEFAULT_EVIDENCE_LIMITS, DEFAULT_ISSUE_TYPES, IssueTypology, type EscalationProfile, type IssueSpec } from '@agent-factory/domain';
 import { DEFAULT_PROJECT_CONVENTIONS, type ProjectConventions } from '../../conventions/project-conventions.ts';
 import { ISSUE_OPENED_AT, StubPromptCatalog } from '../../audit/testing/fakes.ts';
 import { SteppingClock } from '../../runs/test-support.ts';
@@ -117,6 +117,7 @@ export const SETTINGS: PipelineSettings = {
   },
   conventions: SCENARIO_CONVENTIONS,
   evidenceCacheDirectory: '/factory/evidence',
+  evidenceLimits: DEFAULT_EVIDENCE_LIMITS,
   resources: { minimumFreeMemoryPercent: 40, pauseAbovePressure: 'normal' },
 };
 
