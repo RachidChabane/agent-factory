@@ -170,7 +170,8 @@ nothing is delegated, and a gesture without `--as` is always the operator's own.
 The only condition is `films-recorded`: every film the spec declares is recorded for the pull request as it is now, and
 none of its films failed or is queued or recording. A spec that declares no film has nothing to record, so the
 condition holds. A merge by the orchestrator keeps every guard of a merge: the head the reviewer saw, the checks, and the
-films in progress.
+films in progress. No policy delegates a new review of the same implementation (`resume <issue> --review-again`): the
+orchestrator is refused it, whatever `resume` allows.
 
 Each gesture the orchestrator makes is an event with its actor, the gesture, its target, its reason and the rule that
 allowed it; the operator is notified of it, the cockpit lists it under **Delegated decisions** of the project, and the

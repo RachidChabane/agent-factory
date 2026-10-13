@@ -274,7 +274,8 @@ issues, and merging the issue types you list under the conditions you name. With
 `autonomy`, nothing is delegated. The orchestrator makes each of these gestures with
 `--as orchestrator --reason "<why>"`; the factory refuses what the policy does not
 delegate, names the rule that is missing, and records what it accepts with the reason.
-The cockpit lists each project's delegated decisions. The orchestrator runs with your
+A new review of the same implementation (`resume --review-again`) stays yours to order:
+the orchestrator is refused it. The cockpit lists each project's delegated decisions. The orchestrator runs with your
 account, so the policy keeps its gestures within what you delegated and makes each
 visible; it does not confine a hostile process.
 
