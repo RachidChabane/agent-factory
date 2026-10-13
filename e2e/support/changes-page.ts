@@ -112,6 +112,7 @@ export async function expectAwaitingShown(page: Page, state: CockpitSnapshot): P
   for (const [position, item] of items.entries()) {
     const link = awaiting.getByRole('link').nth(position);
     await expect(link).toHaveAttribute('href', item.href, ONE_LOOK);
+    await expect(link).toContainText(item.reference, ONE_LOOK);
     await expect(link).toContainText(item.title, ONE_LOOK);
     await expect(link).toContainText(words.t(`attention.${item.kind}`), ONE_LOOK);
     await expect(link.getByRole('time')).toHaveAttribute('datetime', item.at, ONE_LOOK);
