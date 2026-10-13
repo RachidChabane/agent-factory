@@ -7,11 +7,12 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { Button } from '../../ui/components/Button.tsx';
 import { Section } from '../../ui/components/Card.tsx';
 import { EmptyState } from '../../ui/components/EmptyState.tsx';
+import { FilmToolWaitNotice } from '../../widgets/FilmToolWaitNotice.tsx';
 import { ReadStamp } from '../../widgets/ReadStamp.tsx';
 import { FilmCard } from './FilmCard.tsx';
 import { FilmOrderDialog } from './FilmOrderDialog.tsx';
 import { FailedFilm, QueuedFilm } from './FilmQueue.tsx';
-import { canOrderFilm, failedFilms, filmTimeZone, isRecorded, pendingFilms } from './film-model.ts';
+import { canOrderFilm, failedFilms, filmTimeZone, isRecorded, pendingFilms, waitOfQueuedFilms } from './film-model.ts';
 
 const ICON_SIZE = 14;
 const SECTION_ID = 'pull-request-films';
@@ -25,6 +26,7 @@ export function FilmSection({ pullRequest }: { readonly pullRequest: PullRequest
   const orderable = canOrderFilm(project, pullRequest);
   const pending = pendingFilms(pullRequest);
   const failed = failedFilms(pullRequest).filter((order) => !isRecorded(pullRequest, order.scenario));
+  const wait = waitOfQueuedFilms(project, pending);
   return (
     <Section
       title={t('pullRequests.films.title')}
@@ -39,8 +41,9 @@ export function FilmSection({ pullRequest }: { readonly pullRequest: PullRequest
       }
     >
       {pending.length === 0 ? null : <ReadStamp readAt={generatedAt} kind="resources" neverLabel={t('pullRequests.films.queueNeverRead')} />}
+      {wait === null ? null : <FilmToolWaitNotice wait={wait} project={project.id} />}
       {pending.map((order) => (
-        <QueuedFilm key={order.scenario} order={order} timeZone={filmTimeZone(project)} />
+        <QueuedFilm key={order.scenario} order={order} timeZone={filmTimeZone(project)} waitingForTool={wait?.tool ?? null} />
       ))}
       {failed.map((order) => (
         <FailedFilm key={order.scenario} order={order} />

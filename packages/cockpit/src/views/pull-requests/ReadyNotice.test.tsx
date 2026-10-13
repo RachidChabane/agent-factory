@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ReadyNoticeView } from '../../contract/index.ts';
 import { PULL_REQUEST } from '../../test/fixtures/storefront/ids.ts';
+import { mapProject } from '../../test/fixtures/mutate.ts';
 import { fixtureSnapshot } from '../../test/render.tsx';
 import { minutesAgo, openPullRequest, STOREFRONT, withPullRequest } from './pull-request-test-support.ts';
 
@@ -76,5 +77,35 @@ describe('the ready notice of a pull request', () => {
     const region = screen.getByRole('region', { name: 'Notification de prête à merger' });
     expect(region).toHaveTextContent(/Envoyée .* pour la tête bada550\./);
     expect(within(region).getByRole('list', { name: 'Liens de la notification' })).toBeInTheDocument();
+  });
+});
+
+describe('the ready notice of a pull request whose films wait for a tool', () => {
+  const wait = { tool: 'vault', scope: 'installation' as const, status: 'unauthenticated' as const, detail: '', loginCommand: null, fixCommand: null, since: minutesAgo(30), checkedAt: minutesAgo(2) };
+
+  function waitingNotice(scenarios: readonly string[], toolWait: typeof wait | null) {
+    const held = withNotice({ status: 'held', holds: [{ kind: 'films-pending', scenarios: [...scenarios] }], checksReadAt: minutesAgo(1) });
+    return mapProject(held, STOREFRONT, (project) => ({ ...project, filmToolWait: toolWait }));
+  }
+
+  it('names the tool the films wait for, in place of saying they are queued or recording', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingNotice(['checkout-flow'], wait) });
+    const holds = within(noticeRegion()).getByRole('list', { name: 'What holds the notice' });
+    expect(within(holds).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['The film of scenario checkout-flow waits for the tool vault.']);
+  });
+
+  it('counts the films that wait', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingNotice(['checkout-flow', 'order-history'], wait) });
+    expect(within(noticeRegion()).getByRole('list', { name: 'What holds the notice' })).toHaveTextContent('The films of scenarios checkout-flow, order-history wait for the tool vault.');
+  });
+
+  it('keeps saying that the films are queued or recording when they wait for no tool', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingNotice(['checkout-flow'], null) });
+    expect(within(noticeRegion()).getByRole('list', { name: 'What holds the notice' })).toHaveTextContent('The film of scenario checkout-flow is queued or recording.');
+  });
+
+  it('is told in French', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingNotice(['checkout-flow', 'order-history'], wait), locale: 'fr' });
+    expect(within(screen.getByRole('region', { name: 'Notification de prête à merger' })).getByRole('list')).toHaveTextContent('Les films des scénarios checkout-flow, order-history attendent l’outil vault.');
   });
 });

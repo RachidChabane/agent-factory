@@ -1,5 +1,6 @@
 import { Bell, BellOff, ExternalLink } from 'lucide-react';
-import type { PullRequestView, ReadyHoldView } from '../../contract/index.ts';
+import { useProject } from '../../app/ProjectRoute.tsx';
+import type { FilmToolWaitView, PullRequestView, ReadyHoldView } from '../../contract/index.ts';
 import { useI18n, type LocalizedI18n } from '../../i18n/I18nProvider.tsx';
 import { shortSha } from '../../model/identifiers.ts';
 import { Section } from '../../ui/components/Card.tsx';
@@ -13,15 +14,17 @@ const SECTION_ID = 'pull-request-ready-notice';
 
 type ReadyNoticeView = PullRequestView['readyNotice'];
 
-/** Why the notice is held, in the words of the cockpit: the checks, or the scenarios of the films that block it. */
-function holdText(t: LocalizedI18n['t'], hold: ReadyHoldView): string {
+/** Why the notice is held, in the words of the cockpit: the checks, or the scenarios of the films that block it, and the tool they wait for. */
+function holdText(t: LocalizedI18n['t'], hold: ReadyHoldView, wait: FilmToolWaitView | null): string {
   switch (hold.kind) {
     case 'checks-running':
       return t('pullRequests.ready.hold.checks-running');
     case 'checks-failed':
       return t('pullRequests.ready.hold.checks-failed');
-    case 'films-pending':
-      return t('pullRequests.ready.hold.films-pending', { count: hold.scenarios.length, scenarios: hold.scenarios.join(SCENARIO_SEPARATOR) });
+    case 'films-pending': {
+      const values = { count: hold.scenarios.length, scenarios: hold.scenarios.join(SCENARIO_SEPARATOR) };
+      return wait === null ? t('pullRequests.ready.hold.films-pending', values) : t('pullRequests.ready.hold.films-waiting', { ...values, tool: wait.tool });
+    }
     case 'films-failed':
       return t('pullRequests.ready.hold.films-failed', { count: hold.scenarios.length, scenarios: hold.scenarios.join(SCENARIO_SEPARATOR) });
   }
@@ -62,7 +65,7 @@ function SentNotice({ notice }: { readonly notice: Extract<ReadyNoticeView, { st
   );
 }
 
-function HeldNotice({ notice }: { readonly notice: Extract<ReadyNoticeView, { status: 'held' }> }) {
+function HeldNotice({ notice, wait }: { readonly notice: Extract<ReadyNoticeView, { status: 'held' }>; readonly wait: FilmToolWaitView | null }) {
   const { t } = useI18n();
   return (
     <>
@@ -72,7 +75,7 @@ function HeldNotice({ notice }: { readonly notice: Extract<ReadyNoticeView, { st
       </p>
       <ul className="bullets" aria-label={t('pullRequests.ready.holds')}>
         {notice.holds.map((hold) => (
-          <li key={`${hold.kind}/${'scenarios' in hold ? hold.scenarios.join('/') : ''}`}>{holdText(t, hold)}</li>
+          <li key={`${hold.kind}/${'scenarios' in hold ? hold.scenarios.join('/') : ''}`}>{holdText(t, hold, wait)}</li>
         ))}
       </ul>
       <ReadStamp readAt={notice.checksReadAt} kind="forge" neverLabel={t('pullRequests.ready.checksNeverRead')} />
@@ -83,11 +86,12 @@ function HeldNotice({ notice }: { readonly notice: Extract<ReadyNoticeView, { st
 /** The notice that tells the operator the pull request is ready: when it was sent and the links it carried, or what holds it. */
 export function ReadyNotice({ pullRequest }: { readonly pullRequest: PullRequestView }) {
   const { t } = useI18n();
+  const project = useProject();
   const notice = pullRequest.readyNotice;
   return (
     <Section title={t('pullRequests.ready.title')} id={SECTION_ID} description={t('pullRequests.ready.description')}>
       {notice.status === 'sent' ? <SentNotice notice={notice} /> : null}
-      {notice.status === 'held' ? <HeldNotice notice={notice} /> : null}
+      {notice.status === 'held' ? <HeldNotice notice={notice} wait={project.filmToolWait} /> : null}
       {notice.status === 'due' ? <EmptyState compact title={t('pullRequests.ready.due')} /> : null}
       {notice.status === 'none' ? <EmptyState compact title={t('pullRequests.ready.none')} /> : null}
     </Section>

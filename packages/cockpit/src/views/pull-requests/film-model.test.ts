@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { FilmOrderView, FilmView, ProjectView, PullRequestView } from '../../contract/index.ts';
+import type { FilmOrderView, FilmToolWaitView, FilmView, ProjectView, PullRequestView } from '../../contract/index.ts';
 import { createFormatters } from '../../i18n/formatters.ts';
-import { canOrderFilm, expectedArrival, failedFilms, filmTimeZone, hasFilmsToShow, isPendingFilm, isRecorded, pendingFilms } from './film-model.ts';
+import { canOrderFilm, expectedArrival, failedFilms, filmTimeZone, hasFilmsToShow, isPendingFilm, isRecorded, pendingFilms, waitOfQueuedFilms } from './film-model.ts';
 
 const MOMENT = '2026-10-12T10:00:00.000Z';
 
@@ -48,6 +48,25 @@ describe('the films of a pull request', () => {
     expect(hasFilmsToShow(NOT_FILMING, { films: [], filmOrders: [] })).toBe(false);
     expect(hasFilmsToShow(NOT_FILMING, { films: [film('a')], filmOrders: [] })).toBe(true);
     expect(hasFilmsToShow(NOT_FILMING, { films: [], filmOrders: [order('a', 'queued')] })).toBe(true);
+  });
+});
+
+describe('the tool the films of a pull request wait for', () => {
+  const wait: FilmToolWaitView = { tool: 'vault', scope: 'installation', status: 'unauthenticated', detail: '', loginCommand: null, fixCommand: null, since: MOMENT, checkedAt: MOMENT };
+  const waiting = { filmToolWait: wait };
+
+  it('is the tool the project says its films wait for, while a film of the pull request is queued', () => {
+    expect(waitOfQueuedFilms(waiting, pendingFilms({ filmOrders: [order('a', 'queued'), order('b', 'recording-head')] }))).toBe(wait);
+  });
+
+  it('is none when no film of the pull request is queued: one that records, or has ended, waits for no tool', () => {
+    expect(waitOfQueuedFilms(waiting, pendingFilms({ filmOrders: [order('a', 'recording-base')] }))).toBeNull();
+    expect(waitOfQueuedFilms(waiting, pendingFilms({ filmOrders: [order('a', 'finished'), order('b', 'failed')] }))).toBeNull();
+    expect(waitOfQueuedFilms(waiting, [])).toBeNull();
+  });
+
+  it('is none when the films of the project wait for no tool', () => {
+    expect(waitOfQueuedFilms({ filmToolWait: null }, pendingFilms({ filmOrders: [order('a', 'queued')] }))).toBeNull();
   });
 });
 

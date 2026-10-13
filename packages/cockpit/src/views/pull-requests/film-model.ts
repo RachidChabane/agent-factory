@@ -1,4 +1,4 @@
-import { PENDING_FILM_STATES, type FilmOrderView, type FilmOrderState, type ProjectView, type PullRequestView } from '../../contract/index.ts';
+import { PENDING_FILM_STATES, type FilmOrderView, type FilmOrderState, type FilmToolWaitView, type ProjectView, type PullRequestView } from '../../contract/index.ts';
 import type { Formatters } from '../../i18n/formatters.ts';
 
 const FAILED: FilmOrderState = 'failed';
@@ -14,6 +14,11 @@ export function isPendingFilm(order: FilmOrderView): order is PendingFilmOrder {
 /** The films the factory has yet to record, in the order they were ordered. */
 export function pendingFilms(pullRequest: Pick<PullRequestView, 'filmOrders'>): readonly PendingFilmOrder[] {
   return pullRequest.filmOrders.filter(isPendingFilm);
+}
+
+/** The tool the queued films of the pull request wait for; null when the project's films wait for none, or none of this pull request's is queued. */
+export function waitOfQueuedFilms(project: Pick<ProjectView, 'filmToolWait'>, pending: readonly PendingFilmOrder[]): FilmToolWaitView | null {
+  return pending.some((order) => order.state === 'queued') ? project.filmToolWait : null;
 }
 
 /** The films that failed and were not recorded since, with the reason the factory gave. */

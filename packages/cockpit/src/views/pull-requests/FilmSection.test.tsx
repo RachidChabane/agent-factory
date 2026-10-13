@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { CockpitSnapshot, FilmOrderView, FilmView, PullRequestView } from '../../contract/index.ts';
+import type { CockpitSnapshot, FilmOrderView, FilmToolWaitView, FilmView, PullRequestView } from '../../contract/index.ts';
 import { clickAndExpectCommand, expectCommand } from '../../test/commands.ts';
 import { ISSUE, PULL_REQUEST } from '../../test/fixtures/storefront/ids.ts';
 import { mapProject } from '../../test/fixtures/mutate.ts';
@@ -133,6 +133,137 @@ describe('the videos of a pull request', () => {
     expect(within(region).getByText('En file d’attente · scénario checkout-flow')).toBeInTheDocument();
     expect(within(region).getByText('1 tournage devant celui-ci.')).toBeInTheDocument();
     expect(within(region).getByRole('article', { name: 'Scénario checkout-flow' })).toBeInTheDocument();
+  });
+});
+
+const VAULT_LOGIN = 'vault login -method=oidc';
+
+function toolWait(overrides: Partial<FilmToolWaitView> = {}): FilmToolWaitView {
+  return {
+    tool: 'vault',
+    scope: 'installation',
+    status: 'unauthenticated',
+    detail: 'token expired',
+    loginCommand: VAULT_LOGIN,
+    fixCommand: null,
+    since: minutesAgo(125),
+    checkedAt: minutesAgo(4),
+    ...overrides,
+  };
+}
+
+/** The storefront films, waits for a tool, and its search pull request has the films the test says. */
+function waitingForTool(wait: FilmToolWaitView | null, orders: readonly FilmOrderView[] = [order({ filmsAhead: 2, expectedAt: '2026-10-12T10:40:00.000Z' })]): CockpitSnapshot {
+  const snapshot = filming((pullRequest) => ({ ...pullRequest, filmOrders: [...orders] }));
+  return mapProject(snapshot, STOREFRONT, (project) => ({ ...project, filmToolWait: wait }));
+}
+
+describe('the videos of a pull request that wait for a tool', () => {
+  const noticeRegion = () => within(filmsRegion()).getByRole('region', { name: 'Films waiting for vault' });
+
+  it('name the tool, why its check fails, the login that restores it, since when they wait and when the tool was checked', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait()) });
+    const notice = noticeRegion();
+    expect(within(notice).getByText('The films wait for vault')).toBeInTheDocument();
+    expect(within(notice).getByText(/^Its check reports: Not signed in\./)).toHaveTextContent('Its check reports: Not signed in. token expired');
+    expect(within(notice).getByText(VAULT_LOGIN)).toBeInTheDocument();
+    expect(within(notice).getByText(/^The queued films stay queued and none fails\./)).toBeInTheDocument();
+    expect(within(notice).getByText(/^The films have waited since/).querySelector('time')).toHaveAttribute('datetime', minutesAgo(125));
+    expect(within(notice).getByText(/^Checked /)).toHaveAttribute('datetime', minutesAgo(4));
+  });
+
+  it('put the tool in place of the place in the queue and of the expected arrival', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait()) });
+    const queued = within(filmsRegion()).getByRole('region', { name: 'Film of scenario checkout-flow' });
+    expect(within(queued).getByText('Waiting for vault · scenario checkout-flow')).toBeInTheDocument();
+    expect(within(queued).queryByText(/films? ahead/)).not.toBeInTheDocument();
+    expect(within(queued).queryByText(/^Expected around/)).not.toBeInTheDocument();
+    expect(within(queued).getByText('Ordered by Alex Morgan.')).toBeInTheDocument();
+  });
+
+  it('show one notice for all the films of the pull request that wait', async () => {
+    const orders = [order(), order({ scenario: 'order-history' })];
+    await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait(), orders) });
+    expect(within(filmsRegion()).getAllByRole('region', { name: 'Films waiting for vault' })).toHaveLength(1);
+    expect(within(filmsRegion()).getAllByText(/^Waiting for vault · scenario /)).toHaveLength(2);
+  });
+
+  it('give the fix of the check when the tool declares no login, and offer no login', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait({ loginCommand: null, fixCommand: 'brew install vault', status: 'missing' })) });
+    const notice = noticeRegion();
+    expect(within(notice).getByText(/^To fix it:/)).toBeInTheDocument();
+    expect(within(notice).getByText('brew install vault')).toBeInTheDocument();
+    expect(within(notice).getByText(/^Its check reports: Missing\./)).toBeInTheDocument();
+    expect(within(notice).queryByRole('button', { name: 'Log in to vault' })).not.toBeInTheDocument();
+    expect(within(notice).getByRole('button', { name: 'Check vault' })).toBeInTheDocument();
+  });
+
+  it('say when the tool declares neither, and leave out the detail the check did not give', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait({ loginCommand: null, fixCommand: null, detail: '' })) });
+    const notice = noticeRegion();
+    expect(within(notice).getByText('The tool declares no login or fix command: restore it by hand.')).toBeInTheDocument();
+    expect(within(notice).getByText(/^Its check reports: Not signed in\.$/)).toBeInTheDocument();
+  });
+
+  it('check the tool again on the order of the operator, and show what the factory found', async () => {
+    const view = await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait()) });
+    view.transport.effects.set('tools.check', 'vault: unauthenticated');
+    await clickAndExpectCommand(view.user, within(noticeRegion()).getByRole('button', { name: 'Check vault' }), view.transport, 'tools.check', { project: null, tool: 'vault' });
+    expect(await within(screen.getByRole('status')).findByText('vault: unauthenticated')).toBeInTheDocument();
+  });
+
+  it('start the login of the tool, which the installation declares, without naming a project', async () => {
+    const view = await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait()) });
+    view.transport.effects.set('tools.login', 'vault: login succeeded; the tool is now connected');
+    const login = within(noticeRegion()).getByRole('button', { name: 'Log in to vault' });
+    expect(login).toHaveAttribute('title', `Starts ${VAULT_LOGIN} on the factory’s machine.`);
+    await clickAndExpectCommand(view.user, login, view.transport, 'tools.login', { project: null, tool: 'vault' });
+    expect(await within(screen.getByRole('status')).findByText('vault: login succeeded; the tool is now connected')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['Log in to vault', 'tools.login'],
+    ['Check vault', 'tools.check'],
+  ] as const)('address a tool of the project through the project: %s', async (button, command) => {
+    const view = await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait({ scope: 'project' })) });
+    await clickAndExpectCommand(view.user, within(noticeRegion()).getByRole('button', { name: button }), view.transport, command, { project: STOREFRONT, tool: 'vault' });
+  });
+
+  it('show the refusal of the factory when the login fails', async () => {
+    const view = await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait()) });
+    view.transport.commandFailure = 'vault declares no login the factory can start';
+    await clickAndExpectCommand(view.user, within(noticeRegion()).getByRole('button', { name: 'Log in to vault' }), view.transport, 'tools.login', { project: null, tool: 'vault' });
+    expect(await within(screen.getByRole('alert')).findByText('vault declares no login the factory can start')).toBeInTheDocument();
+  });
+
+  it('keep the buttons from sending twice while the factory answers', async () => {
+    const view = await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait()) });
+    const release = view.transport.holdCommands();
+    await view.user.click(within(noticeRegion()).getByRole('button', { name: 'Check vault' }));
+    expect(within(noticeRegion()).getByRole('button', { name: 'Check vault' })).toBeDisabled();
+    release();
+  });
+
+  it('are not announced when the films wait for nothing', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingForTool(null) });
+    expect(screen.queryByRole('region', { name: 'Films waiting for vault' })).not.toBeInTheDocument();
+    expect(within(filmsRegion()).getByText('Queued · scenario checkout-flow')).toBeInTheDocument();
+    expect(within(filmsRegion()).getByText('2 films ahead of this one.')).toBeInTheDocument();
+  });
+
+  it('are not announced for a pull request none of whose films is queued', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait(), [order({ state: 'recording-head' })]) });
+    expect(screen.queryByRole('region', { name: 'Films waiting for vault' })).not.toBeInTheDocument();
+    expect(within(filmsRegion()).getByText('Recording the head · scenario checkout-flow')).toBeInTheDocument();
+  });
+
+  it('are shown in French when the cockpit is', async () => {
+    await openPullRequest(SEARCH, { snapshot: waitingForTool(toolWait()), locale: 'fr' });
+    const notice = within(screen.getByRole('region', { name: 'Vidéos' })).getByRole('region', { name: 'Tournages en attente de vault' });
+    expect(within(notice).getByText('Les tournages attendent vault')).toBeInTheDocument();
+    expect(within(notice).getByText(/^Son contrôle indique : Non connecté\./)).toBeInTheDocument();
+    expect(within(notice).getByRole('button', { name: 'Se connecter à vault' })).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Vidéos' })).getByText('En attente de vault · scénario checkout-flow')).toBeInTheDocument();
   });
 });
 
