@@ -83,8 +83,10 @@ rule that allowed it. The delegate's own events carry its name too, and a merge 
 The policy is not a security boundary: the delegate runs with the operator's account.
 
 Failures retry within bounds: two corrections in the same session, then one fresh
-restart, then `needs-human` with the reason. A decision only a person can take
-stops the run and comes back to the agent with the answer.
+restart, then `needs-human` with the reason. The bounds count the failures of one
+cycle: the operator's feedback on a pull request, the answer to a decision and a
+rewritten check each open a cycle with the whole budget. A decision only a person can
+take stops the run and comes back to the agent with the answer.
 
 ## Ports and adapters
 

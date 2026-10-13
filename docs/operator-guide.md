@@ -123,7 +123,8 @@ reviews and opens the pull request with its evidence. You do nothing unless it a
   that blocks again escalates the issue again.
 - **A decision**: an agent asked a question only a person can answer (a product
   choice, a constraint of the repository). Answer it from the issue page, or with
-  `agent-factory resume <issue> --answer "<text>"`; the agent continues with it.
+  `agent-factory resume <issue> --answer "<text>"`; the agent continues with it. An
+  answer is not a failure: the agent gets the whole retry budget again.
 - **Rewrite a check**: when a frozen check is wrong, order its rewrite from the issue
   page with an instruction; the acceptance author rewrites it and the proof runs again.
 - **Pause** an issue, a project or the whole factory, and **Resume** it.
@@ -170,7 +171,10 @@ A pull request is merged on your order only: **Merge** (or `agent-factory merge 
 --expected-head <sha>`) removes the evidence folder and squash-merges the head you
 reviewed. A check that also fails on the base branch is shown but does not block.
 Review feedback from people goes back to the factory with **Send feedback** (or
-`agent-factory pr feedback <pr> <file> --author <name>`), which starts a new cycle.
+`agent-factory pr feedback <pr> <file> --author <name>`), which starts a new cycle in the
+implementer's session. The retry budget counts the failures of one cycle (two corrections, then
+one fresh session, then a person), so feedback gets all of it, whatever failures came before, and
+is refused only when the issue does not await review.
 
 A check that fails on every pull request and on the base branch is the repository's
 problem, not the change's: the cockpit marks it as failing on the base and the merge

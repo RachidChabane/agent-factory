@@ -80,3 +80,8 @@ with sources, and proposes specifications and a draft reply for the operator onl
   recalibrated on measurements.
 - Changing the cycle (adding a step, removing the reviewer) is a decision recorded
   in a new ADR, not a configuration option.
+- The retry budget counts the failures of one cycle. A cycle begins with the first
+  attempt and again with each check the operator has rewritten, each feedback the
+  operator records on the pull request and each answer to a decision request. These
+  gestures spend none of the budget, and failures that spent it never refuse them: only
+  an issue in a state that does not take them does.
