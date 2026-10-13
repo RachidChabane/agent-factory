@@ -82,7 +82,7 @@ applies at the next tick, and the cockpit lists what waits for a restart.
 | `prompts` | the built-in prompts | a file per role whose text replaces the built-in prompt |
 | `knowledge` | `[]` | sources of the knowledge pack given to agents: `{ path }` (a file or directory) or `{ repository: <path in the repo> }` |
 | `references` | `[]` | other repositories the specifications cite, read as snapshots: `{ name, repository, ref, source }`; see [References](#references) |
-| `evidence.maxFileBytes` / `maxTotalBytes` | 5 MB / 40 MB | limits of the evidence committed to a pull request |
+| `evidence.maxFileBytes` / `maxTotalBytes` | 5 MB / 40 MB | limits of the evidence committed to a pull request; see [Evidence limits](#evidence-limits) |
 | `evidence.films` | none | the command that films a pull request; see [Films](#films) |
 | `autonomy` | nothing delegated | what the orchestrator may do for the operator; see [Autonomy](#autonomy) |
 | `delivery` | none | see [Delivery](#delivery) |
@@ -157,6 +157,26 @@ operator orders any other with `agent-factory film <issue> --scenario <name>` or
 pull request page. A scenario name is letters, digits, dots, dashes and underscores, at
 most 45 characters. Films wait in one queue for the whole installation, one at a time,
 while nothing else runs: see [ADR 0030](adr/0030-films.md).
+
+### Evidence limits
+
+`evidence.maxFileBytes` (default 5 000 000) and `evidence.maxTotalBytes` (default 40 000 000) bound the
+evidence the factory commits to a pull request: the files the acceptance checks declare as evidence, and the
+videos and screenshots of films. Sizes are decimal: 1 MB is 1 000 000 bytes. Reports, logs and the list of
+acceptance tests are not weighed.
+
+- A file over `maxFileBytes` is left out.
+- While the evidence of the pull request weighs more than `maxTotalBytes`, the largest file is left out. The
+  weight counts what the pull request already holds: its evidence and the films committed before.
+- Each file left out is named, with its size and the limit it passed, in the pull request body: in the
+  evidence table and the risks for the checks' evidence, in the block of the recording for a film. `agent-factory
+  film` says so too.
+- Evidence left out makes the evidence of the pull request incomplete: the cockpit lists the files and does not
+  offer the merge, and the release gate counts the pull request. A film's files left out do not: the film is
+  recorded, and its video and screenshots stay in the factory's own store, where the cockpit plays them.
+
+A recording of more than a few seconds passes 5 MB: raise `maxFileBytes` for a project that films. Both
+settings apply after a restart.
 
 ### Autonomy
 
