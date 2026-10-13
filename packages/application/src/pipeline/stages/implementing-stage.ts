@@ -1,11 +1,13 @@
 import type { IssueSpec } from '@agent-factory/domain';
 import type { AgentRunResult, Worktree } from '../../ports.ts';
 import {
-  answeredDecisionAddendum,
   answeredDecisionPrompt,
   answerFor,
   DECISION_REQUEST_PATH,
   decisionRequestReason,
+  decisionRequestText,
+  operatorDecisionsAddendum,
+  operatorDecisionsOf,
 } from '../decision-request.ts';
 import { agentFailureSummary, FINAL_TEXT_TAIL_LINES } from '../failure-summary.ts';
 import { composeGateCommand } from '../gate-runner.ts';
@@ -13,7 +15,7 @@ import { PIPELINE_EVENTS, type FrozenRecord, type ImplementerAttemptRecord } fro
 import { EscalationRequiredError } from '../pipeline-errors.ts';
 import { attemptRecord, currentAttempt } from '../pipeline-journal.ts';
 import { planAttempt, settleFailure, type AttemptPlan } from '../retry.ts';
-import { checkRewriteImplementerAddendum, earlierAttemptsAddendum, implementerCorrectionPrompt, implementerValues, withAddendum } from '../role-prompts.ts';
+import { checkRewriteImplementerAddendum, earlierAttemptsAddendum, implementerCorrectionPrompt, implementerValues, withAddenda } from '../role-prompts.ts';
 import { tailLines } from '../shell-commands.ts';
 import { leasedWorktree, requireFrozen, requireManifest, requireSpec } from './journal-facts.ts';
 import { ADVANCED, type PipelineStage, type StageContext, type StageResult } from './stage.ts';
@@ -22,10 +24,6 @@ import { issueTypeOfSpec, profileOf, readCheckContents } from './stage-support.t
 interface AnsweredDecision {
   readonly request: ImplementerAttemptRecord;
   readonly answer: string;
-}
-
-function decisionText(record: ImplementerAttemptRecord): string {
-  return record.decisionRequest ?? record.finalTextTail;
 }
 
 function answeredPlan(attempt: number, answered: AnsweredDecision): AttemptPlan {
@@ -58,7 +56,7 @@ export class ImplementingStage implements PipelineStage {
     }
     if (recorded.outcome === 'decision-requested') {
       const answer = answerFor(journal, recorded.runId);
-      if (answer === null) throw new EscalationRequiredError(decisionRequestReason(decisionText(recorded)));
+      if (answer === null) throw new EscalationRequiredError(decisionRequestReason(decisionRequestText(recorded)));
       await this.runAttempt(context, attempt, { request: recorded, answer: answer.answer });
       return ADVANCED;
     }
@@ -136,11 +134,12 @@ export class ImplementingStage implements PipelineStage {
     const { dependencies, settings } = context.toolkit;
     const checks = await readCheckContents(context, worktree, frozen);
     const rendered = dependencies.roles.render('implementer', implementerValues(settings.repository, spec, checks, settings.gate));
-    if (answered !== null) return withAddendum(rendered, answeredDecisionAddendum(decisionText(answered.request), answered.answer));
+    const decisions = operatorDecisionsAddendum(operatorDecisionsOf(context.journal));
+    if (answered !== null) return withAddenda(rendered, [decisions]);
     const rewrite = context.journal.checkRewrites.at(-1);
     if (plan.mode === 'initial' && rewrite !== undefined && rewrite.nextAttempt === plan.attempt) {
-      return withAddendum(rendered, checkRewriteImplementerAddendum(rewrite.path, rewrite.instruction));
+      return withAddenda(rendered, [checkRewriteImplementerAddendum(rewrite.path, rewrite.instruction), decisions]);
     }
-    return withAddendum(rendered, plan.earlierFailures === null ? null : earlierAttemptsAddendum(plan.earlierFailures));
+    return withAddenda(rendered, [plan.earlierFailures === null ? null : earlierAttemptsAddendum(plan.earlierFailures), decisions]);
   }
 }

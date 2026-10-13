@@ -216,6 +216,24 @@ describe('ResumeIssue', () => {
     expect(answered?.prompt).toContain(OPERATOR_ANSWER);
   });
 
+  it('tells the fresh session that follows failures after the answer the question and the answer', async () => {
+    const scenario = new PipelineScenario();
+    decisionAsker(scenario);
+    const implement = { effect: (request: AgentRunRequest) => scenario.implement(request) };
+    scenario.harness.script('implementer', implement, implement, implement, implement);
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    await scenario.resumer().resume(ISSUE_NUMBER, OPERATOR_ANSWER);
+    scenario.lintFailuresLeft = 3;
+
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+
+    const fresh = scenario.harness.requestsOf('implementer').at(-1);
+    expect(fresh?.resumeSessionId).toBeNull();
+    expect(fresh?.prompt).toContain('# Earlier attempts');
+    expect(fresh?.prompt).toContain(DECISION_QUESTION);
+    expect(fresh?.prompt).toContain(OPERATOR_ANSWER);
+  });
+
   it('refuses to resume a decision request without an answer, and an answer when no decision is pending', async () => {
     const asking = new PipelineScenario();
     decisionAsker(asking);
