@@ -200,7 +200,7 @@ export const frPullRequests = {
   'pullRequests.ready.failure': '{label} : {reason}',
   'pullRequests.ready.held': 'Pas encore envoyée',
   'pullRequests.ready.holds': 'Ce qui retient la notification',
-  'pullRequests.ready.hold.checks-unreported': 'La forge n’a relevé encore aucun check pour cette tête.',
+  'pullRequests.ready.hold.checks-unreported': 'Aucun check de cette tête n’est connu pour l’instant.',
   'pullRequests.ready.hold.checks-running': {
     one: 'Le check {checks} n’est pas terminé.',
     other: 'Les checks {checks} ne sont pas terminés.',

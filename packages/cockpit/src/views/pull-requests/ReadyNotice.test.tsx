@@ -49,9 +49,9 @@ describe('the ready notice of a pull request', () => {
     expect(within(noticeRegion()).getByRole('list', { name: 'What holds the notice' })).toHaveTextContent('The check quality-gate failed.');
   });
 
-  it('says that the forge reported no check yet without naming one', async () => {
+  it('says that no check is known yet without naming one', async () => {
     await openPullRequest(SEARCH, { snapshot: withNotice({ status: 'held', holds: [{ kind: 'checks-running', checks: [] }], checksReadAt: null }) });
-    expect(within(noticeRegion()).getByRole('list', { name: 'What holds the notice' })).toHaveTextContent('The forge has reported no check for this head yet.');
+    expect(within(noticeRegion()).getByRole('list', { name: 'What holds the notice' })).toHaveTextContent('No check of this head is known yet.');
   });
 
   it('says that the checks were never read, and names the scenarios of the films that hold it', async () => {
@@ -95,7 +95,7 @@ describe('the ready notice of a pull request', () => {
     expect(within(list).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'Le check quality-gate a échoué.',
       'Les checks e2e-checkout, unit ne sont pas terminés.',
-      'La forge n’a relevé encore aucun check pour cette tête.',
+      'Aucun check de cette tête n’est connu pour l’instant.',
     ]);
   });
 });

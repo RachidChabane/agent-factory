@@ -13,8 +13,8 @@ export interface PullRequestReadinessFacts {
 }
 
 /**
- * What keeps a pull request from being ready. A check blocker names each check; one without a name says that the forge has
- * reported no check for the head yet.
+ * What keeps a pull request from being ready. A check blocker names each check; one without a name says that no check of
+ * the head is known yet.
  */
 export type ReadinessBlocker =
   | { readonly kind: 'checks-running'; readonly checks: readonly string[] }

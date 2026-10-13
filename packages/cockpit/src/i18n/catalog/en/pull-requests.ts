@@ -199,7 +199,7 @@ export const enPullRequests = {
   'pullRequests.ready.failure': '{label}: {reason}',
   'pullRequests.ready.held': 'Not sent yet',
   'pullRequests.ready.holds': 'What holds the notice',
-  'pullRequests.ready.hold.checks-unreported': 'The forge has reported no check for this head yet.',
+  'pullRequests.ready.hold.checks-unreported': 'No check of this head is known yet.',
   'pullRequests.ready.hold.checks-running': {
     one: 'The check {checks} has not finished.',
     other: 'The checks {checks} have not finished.',
