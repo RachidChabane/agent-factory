@@ -19,9 +19,17 @@ export interface FilmTool {
   readonly loginCommand: string | null;
 }
 
-/** Checks a tool now and records the reading where the tools of its scope keep theirs. */
+/** A check of a tool that the log records: what it found, and when. */
+export interface LoggedToolReading {
+  readonly result: ToolProbeResult;
+  readonly checkedAt: Date;
+}
+
 export interface FilmToolChecks {
+  /** Checks the tool now and records the reading where the tools of its scope keep theirs. */
   check(tool: FilmTool): Promise<ToolProbeResult>;
+  /** The latest check of the tool that the log records, whoever ran it; null when none was recorded. */
+  latest(tool: FilmTool): Promise<LoggedToolReading | null>;
 }
 
 /** What the lane of the films knows about the tools the films of one project need. */

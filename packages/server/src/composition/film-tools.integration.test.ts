@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { NotifyFetchFunction } from '@agent-factory/adapters';
 import {
+  checkTool,
   FILM_TOOL_RECHECK_INTERVAL_MS,
   FILM_TOOLS_SUBJECT,
   filmToolWaitOf,
@@ -105,9 +106,9 @@ describe('films that wait for the tools they need, over the composition of an in
     expect(installationChecks.get('vault')).toMatchObject({ status: 'unauthenticated' });
   });
 
-  it('moves on to the next tool that fails once the first passes, and does not tell the operator again', async () => {
+  it('moves on to the next tool that fails as soon as the operator has logged in and checked the first, and does not tell the operator again', async () => {
     await writeFile(flag('vault-session'), '');
-    advanceClock(FILM_TOOL_RECHECK_INTERVAL_MS + SECOND_MS);
+    await checkTool(installation.events, installation.tools, 'vault', 'alex');
     await waitUntilWaitingFor('registry');
 
     const wait = await waitOfFilms();
@@ -119,7 +120,7 @@ describe('films that wait for the tools they need, over the composition of an in
     expect(latestToolChecks(await installation.events.read('settings', 0)).get('vault')).toMatchObject({ status: 'connected' });
   });
 
-  it('records the film once every tool passes, and says that the films resume', async () => {
+  it('records the film once every tool passes at the next reading, and says that the films resume', async () => {
     await writeFile(flag('registry-session'), '');
     advanceClock(FILM_TOOL_RECHECK_INTERVAL_MS + SECOND_MS);
     await waitFor(async () => ((await journal()).films.length > 0 ? true : null), TIMEOUT_MS, 'the film to be recorded');

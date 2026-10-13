@@ -207,8 +207,9 @@ export class FilmLane implements InstallationFilms {
       }
       const reading = this.readings.reading(block.tool);
       if (reading === undefined) continue;
-      const justRead = this.readings.wasReadInThisRound(block.tool);
-      if (justRead || (await tools.wait.current()) === null) {
+      const recorded = await tools.wait.current();
+      const sameAsRecorded = recorded !== null && recorded.tool === reading.tool.name && recorded.status === block.status && recorded.detail === reading.result.detail;
+      if (this.readings.wasReadInThisRound(block.tool) || !sameAsRecorded) {
         await tools.wait.unavailable({ tool: reading.tool, status: block.status, detail: reading.result.detail, fixCommand: reading.result.fixCommand });
       }
     }

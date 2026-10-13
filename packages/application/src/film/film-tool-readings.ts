@@ -1,4 +1,4 @@
-import type { ToolProbeResult, ToolStatus } from '@agent-factory/domain';
+import { isToolFailure, type ToolProbeResult, type ToolStatus } from '@agent-factory/domain';
 import type { Clock } from '../ports.ts';
 import { FILM_TOOL_RECHECK_INTERVAL_MS, type FilmTool, type FilmToolChecks } from './film-tools.ts';
 
@@ -23,7 +23,9 @@ const SEEDED_AT = Number.NEGATIVE_INFINITY;
 
 /**
  * The latest reading of each tool the films wait for. A tool is read at most once per recheck interval while nothing
- * asks for more, and again when a film is about to start; the tools asked for are read at once.
+ * asks for more, and again when a film is about to start; the tools asked for are read at once. A tool that fails is
+ * also compared with the checks the log records: the one the operator ran from the cockpit after a login is a newer
+ * reading than the factory's own.
  */
 export class FilmToolReadings {
   private readonly clock: Clock;
@@ -59,6 +61,7 @@ export class FilmToolReadings {
   /** Reads the wanted tools that the rule asks for, all at once: a slow tool delays the others by no more than its own bound. */
   async read(wanted: readonly WantedTool[], rule: ReadRule): Promise<void> {
     const distinct = [...new Map(wanted.map((entry) => [entry.key, entry])).values()];
+    await this.adoptLoggedChecks(distinct);
     const now = this.clock.now().getTime();
     const toRead = distinct.filter((entry) => this.isToRead(entry.key, rule, now));
     await Promise.all(
@@ -66,6 +69,23 @@ export class FilmToolReadings {
         const result = await checks.check(tool);
         this.readings.set(key, { tool, result, readAt: this.clock.now().getTime() });
         this.readInThisRound.add(key);
+      }),
+    );
+  }
+
+  /** A tool read failing takes the log's check of it when that check is newer. */
+  private async adoptLoggedChecks(wanted: readonly WantedTool[]): Promise<void> {
+    const failing = wanted.filter(({ key }) => {
+      const reading = this.readings.get(key);
+      return reading !== undefined && isToolFailure(reading.result.status);
+    });
+    await Promise.all(
+      failing.map(async ({ key, tool, checks }) => {
+        const logged = await checks.latest(tool);
+        const reading = this.readings.get(key);
+        if (logged !== null && reading !== undefined && logged.checkedAt.getTime() > reading.readAt) {
+          this.readings.set(key, { tool, result: logged.result, readAt: logged.checkedAt.getTime() });
+        }
       }),
     );
   }

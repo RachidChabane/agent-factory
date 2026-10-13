@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ToolProbeResult, ToolStatus } from '@agent-factory/domain';
 import { InMemoryEventStore } from '../audit/testing/fakes.ts';
 import { FILM_TOOLS_AVAILABLE_EVENT, FILM_TOOLS_SUBJECT, FILM_TOOLS_UNAVAILABLE_EVENT, filmToolWaitOf, FilmToolWaitReporter } from '../film/film-tool-wait.ts';
-import { FILM_TOOL_RECHECK_INTERVAL_MS, type FilmTool, type FilmToolChecks } from '../film/film-tools.ts';
+import { FILM_TOOL_RECHECK_INTERVAL_MS, type FilmTool, type FilmToolChecks, type LoggedToolReading } from '../film/film-tools.ts';
 import { OperatorNotifications } from '../notifications/operator-notifications.ts';
 import type { Notifier } from '../ports.ts';
 import { SteppingClock } from '../runs/test-support.ts';
@@ -30,8 +30,19 @@ class ScriptedChecks implements FilmToolChecks {
   private inFlight = 0;
   private readonly results = new Map<string, ToolProbeResult>();
 
+  private readonly logged = new Map<string, LoggedToolReading>();
+
   say(name: string, status: ToolStatus, detail = '', fixCommand: string | null = null): void {
     this.results.set(name, { tool: name, status, version: null, detail, fixCommand });
+  }
+
+  /** A check of the tool that someone else ran, which the log recorded at that time. */
+  record(name: string, status: ToolStatus, checkedAt: Date): void {
+    this.logged.set(name, { result: { tool: name, status, version: null, detail: '', fixCommand: null }, checkedAt });
+  }
+
+  latest(tool: FilmTool): Promise<LoggedToolReading | null> {
+    return Promise.resolve(this.logged.get(tool.name) ?? null);
   }
 
   async check(tool: FilmTool): Promise<ToolProbeResult> {
@@ -185,6 +196,103 @@ describe('the films of a project that needs tools', () => {
     expect(await lane.tick(RUNNING, SIGNAL)).toBe(SLOTS_FREE);
 
     expect(context.checks.calls).toEqual(['vault', 'vault']);
+  });
+
+  describe('a check of the tool that the operator ran', () => {
+    it('releases the films at the next tick when it found the tool connected, without waiting for the interval', async () => {
+      const context = world();
+      const storefront = context.project('storefront', [VAULT]);
+      queue(context.filmsOf('storefront'), 1, 'checkout-flow', 1);
+      context.checks.say('vault', 'unauthenticated', 'token expired');
+      const lane = new FilmLane([storefront], { clock: context.clock });
+      await lane.tick(IDLE, SIGNAL);
+
+      context.advance(60_000);
+      context.checks.say('vault', 'connected');
+      context.checks.record('vault', 'connected', context.clock.now());
+      expect(await lane.tick(IDLE, SIGNAL)).toBe(SLOTS_HELD);
+
+      expect(context.filmsOf('storefront').filmed).toEqual([order(1, 'checkout-flow')]);
+      expect(await context.waitOf('storefront')).toBeNull();
+      expect(context.notices.map((notice) => notice.title)).toEqual(['Films of storefront wait for vault', 'Films of storefront resume']);
+    });
+
+    it('moves the wait to the next tool that fails once the operator has made the first connected, and tells nothing more', async () => {
+      const context = world();
+      const storefront = context.project('storefront', [VAULT, CLOUD]);
+      queue(context.filmsOf('storefront'), 1, 'checkout-flow', 1);
+      context.checks.say('vault', 'unauthenticated', 'token expired');
+      context.checks.say('cloud', 'unauthenticated', 'session expired');
+      const lane = new FilmLane([storefront], { clock: context.clock });
+      await lane.tick(IDLE, SIGNAL);
+      expect(await context.waitOf('storefront')).toMatchObject({ tool: 'vault', scope: 'installation' });
+
+      context.advance(60_000);
+      context.checks.say('vault', 'connected');
+      context.checks.record('vault', 'connected', context.clock.now());
+      expect(await lane.tick(IDLE, SIGNAL)).toBe(SLOTS_FREE);
+
+      expect(await context.waitOf('storefront')).toMatchObject({ tool: 'cloud', scope: 'project', detail: 'session expired', since: START });
+      expect(context.notices.map((notice) => notice.title)).toEqual(['Films of storefront wait for vault']);
+    });
+
+    it('shows what the operator found when the tool still fails, but differently', async () => {
+      const context = world();
+      const storefront = context.project('storefront', [VAULT]);
+      queue(context.filmsOf('storefront'), 1, 'checkout-flow', 1);
+      context.checks.say('vault', 'unauthenticated', 'token expired');
+      const lane = new FilmLane([storefront], { clock: context.clock });
+      await lane.tick(IDLE, SIGNAL);
+
+      context.advance(60_000);
+      context.checks.record('vault', 'missing', context.clock.now());
+      await lane.tick(IDLE, SIGNAL);
+
+      expect(await context.waitOf('storefront')).toMatchObject({ tool: 'vault', status: 'missing', detail: '' });
+    });
+
+    it('is not taken for a newer reading when it is older than the factory\'s own', async () => {
+      const context = world();
+      const storefront = context.project('storefront', [VAULT]);
+      queue(context.filmsOf('storefront'), 1, 'checkout-flow', 1);
+      context.checks.say('vault', 'unauthenticated');
+      context.checks.record('vault', 'connected', new Date(START.getTime() - 60_000));
+      const lane = new FilmLane([storefront], { clock: context.clock });
+
+      expect(await lane.tick(IDLE, SIGNAL)).toBe(SLOTS_FREE);
+      context.advance(60_000);
+      expect(await lane.tick(IDLE, SIGNAL)).toBe(SLOTS_FREE);
+
+      expect(context.filmsOf('storefront').filmed).toEqual([]);
+    });
+
+    it('keeps the films waiting when the operator found the tool still failing', async () => {
+      const context = world();
+      const storefront = context.project('storefront', [VAULT]);
+      queue(context.filmsOf('storefront'), 1, 'checkout-flow', 1);
+      context.checks.say('vault', 'unauthenticated');
+      const lane = new FilmLane([storefront], { clock: context.clock });
+      await lane.tick(IDLE, SIGNAL);
+
+      context.advance(60_000);
+      context.checks.record('vault', 'unauthenticated', context.clock.now());
+      expect(await lane.tick(IDLE, SIGNAL)).toBe(SLOTS_FREE);
+      expect(context.checks.calls).toEqual(['vault']);
+    });
+
+    it('is read at once after a restart, when the operator logged in while the factory was down', async () => {
+      const context = world();
+      const storefront = context.project('storefront', [VAULT]);
+      queue(context.filmsOf('storefront'), 1, 'checkout-flow', 1);
+      context.checks.say('vault', 'unauthenticated');
+      await new FilmLane([storefront], { clock: context.clock }).tick(IDLE, SIGNAL);
+
+      context.advance(60_000);
+      context.checks.say('vault', 'connected');
+      context.checks.record('vault', 'connected', context.clock.now());
+      expect(await new FilmLane([storefront], { clock: context.clock }).tick(IDLE, SIGNAL)).toBe(SLOTS_HELD);
+      expect(context.filmsOf('storefront').filmed).toHaveLength(1);
+    });
   });
 
   it('starts the films again once every tool passes, and says so once', async () => {

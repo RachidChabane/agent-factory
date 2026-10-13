@@ -177,6 +177,8 @@ own `timeoutSeconds`.
 - The factory reads the failing tool again every 5 minutes, whether or not other work runs. Once every tool passes, the
   films start and the operator is told once that they resume. A tool is also read right before its film starts, and
   every 5 minutes while the film waits for running work to end.
+- A check you run yourself counts as a reading: when **Check** or **Log in** on the tool in the cockpit, or `agent-factory
+  tool`, finds it connected, the films start at the next tick of the factory instead of at the next reading.
 - A wait the factory recorded before a restart is read again at once.
 
 A tool that passes does not guarantee the film: a film that fails for any other reason fails, as before.
