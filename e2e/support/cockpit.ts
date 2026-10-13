@@ -18,6 +18,11 @@ export function card(scope: Page | Locator, title: string | RegExp): Locator {
   return scope.getByRole('article', { name: title });
 }
 
+/** The detail of a pull request: the article that carries its title, apart from the articles nested in it, such as a film. */
+export function pullRequestDetail(page: Page, title: string): Locator {
+  return page.getByRole('article').filter({ has: page.getByRole('heading', { level: 1, name: title, exact: true }) });
+}
+
 export function sidebar(page: Page): Locator {
   return page.getByRole('navigation', { name: 'Main navigation' });
 }

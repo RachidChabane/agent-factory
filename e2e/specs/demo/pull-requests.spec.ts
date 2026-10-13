@@ -12,7 +12,7 @@ import { shortSha } from '../../../packages/cockpit/src/model/identifiers.ts';
 import { paths } from '../../../packages/cockpit/src/model/routes.ts';
 import { ONE_LOOK, untilPageAgreesWithFactory } from '../../support/agreement.ts';
 import { issueOf, projectOf, pullRequestOf } from '../../support/api.ts';
-import { openCockpit } from '../../support/cockpit.ts';
+import { openCockpit, pullRequestDetail } from '../../support/cockpit.ts';
 import { clickCommand } from '../../support/commands.ts';
 import { AGENT_WORK_TEST_TIMEOUT_MS, AGENT_WORK_TIMEOUT_MS, untilNoAgentIsWorking } from '../../support/factory-activity.ts';
 import type { RunningFactory } from '../../support/factory.ts';
@@ -52,7 +52,7 @@ function mergedAtOf(pullRequest: PullRequestView): string {
 
 async function openPullRequest(page: Page, factory: RunningFactory, project: string, pullRequest: PullRequestView): Promise<void> {
   await openCockpit(page, factory, paths.pullRequest(project, pullRequest.number));
-  await expect(page.getByRole('article').getByRole('heading', { level: 1, name: pullRequest.title })).toBeVisible();
+  await expect(pullRequestDetail(page, pullRequest.title)).toBeVisible();
 }
 
 async function expectImageCompare(figure: Locator, evidence: EvidenceOfKind<'image-compare'>): Promise<void> {
@@ -116,8 +116,8 @@ test.describe('the pull requests of the demonstration', () => {
 
     await mergedGroup.getByRole('link', { name: merged.title }).click();
     await expect(page).toHaveURL(new URL(paths.pullRequest(STOREFRONT, merged.number), factory.origin).href);
-    await expect(page.getByRole('article').getByRole('heading', { level: 1, name: merged.title })).toBeVisible();
-    await expect(page.getByRole('article')).toContainText(`Merged ${english.dateTime(mergedAtOf(merged))}`);
+    await expect(pullRequestDetail(page, merged.title)).toBeVisible();
+    await expect(pullRequestDetail(page, merged.title)).toContainText(`Merged ${english.dateTime(mergedAtOf(merged))}`);
     await expect(mergeButton(page)).toHaveCount(0);
   });
 
@@ -129,7 +129,7 @@ test.describe('the pull requests of the demonstration', () => {
     const issue = issueNamed(state, STOREFRONT, CART_BADGE_TOTAL.spec.title);
     const pullRequest = pullRequestOfIssue(state, STOREFRONT, issue);
     await openPullRequest(page, factory, STOREFRONT, pullRequest);
-    const detail = page.getByRole('article');
+    const detail = pullRequestDetail(page, pullRequest.title);
     await expect(detail).toContainText(`#${pullRequest.number}`);
     await expect(detail).toContainText(pullRequest.branch);
     await expect(detail).toContainText(`Head ${shortSha(pullRequest.headSha)}`);
@@ -308,6 +308,6 @@ test.describe('the pull requests of the demonstration', () => {
 
     await expect(dialog).toBeHidden();
     await expect(mergeButton(page)).toHaveCount(0);
-    await expect(page.getByRole('article')).toContainText(`Merged ${english.dateTime(mergedAtOf(pullRequestOf(merged, LEDGER, pullRequest.number)))}`);
+    await expect(pullRequestDetail(page, pullRequest.title)).toContainText(`Merged ${english.dateTime(mergedAtOf(pullRequestOf(merged, LEDGER, pullRequest.number)))}`);
   });
 });
