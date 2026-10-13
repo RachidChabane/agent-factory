@@ -5,8 +5,10 @@ import {
   DEFAULT_DELEGATE_ACTOR,
   MERGE_CONDITIONS,
   NO_AUTONOMY,
+  OPERATOR_ONLY_GESTURES,
   decideGesture,
   describeAutonomy,
+  gesturePhrase,
   isDelegateActor,
   unknownMergeTypes,
   unrecordedFilms,
@@ -98,8 +100,35 @@ describe('the gestures a policy delegates', () => {
   });
 
   it('says which rule allowed a gesture', () => {
-    expect(decideGesture(everything, ACTOR, { gesture: 'resume' })).toEqual({ allowed: true, rule: 'autonomy.resume' });
-    expect(decideGesture(everything, ACTOR, merge({ issueType: 'docs', films: NO_FILMS }))).toEqual({ allowed: true, rule: 'autonomy.merge for docs' });
+    expect(decideGesture(everything, ACTOR, { gesture: 'resume' })).toEqual({ allowed: true, gesture: 'resume', rule: 'autonomy.resume' });
+    expect(decideGesture(everything, ACTOR, merge({ issueType: 'docs', films: NO_FILMS }))).toEqual({ allowed: true, gesture: 'merge', rule: 'autonomy.merge for docs' });
+  });
+});
+
+describe('the gestures no policy delegates', () => {
+  const REASON = 'the autonomy policy cannot delegate a new review of the same implementation; only the operator orders it';
+
+  it('are not among the gestures a policy can delegate', () => {
+    const delegable: readonly string[] = DELEGABLE_GESTURES;
+    expect(OPERATOR_ONLY_GESTURES.filter((gesture) => delegable.includes(gesture))).toEqual([]);
+  });
+
+  it('are refused to every actor, whatever the policy delegates', () => {
+    fc.assert(
+      fc.property(policyArbitrary, fc.constantFrom(ACTOR, 'operator', 'someone-else'), fc.constantFrom(...OPERATOR_ONLY_GESTURES), (policy, actor, gesture) => {
+        const decision = decideGesture(policy, actor, { gesture });
+        return !decision.allowed && decision.missing === REASON;
+      }),
+    );
+  });
+
+  it('are refused to the policy\'s own delegate even when it delegates everything it can', () => {
+    const everything: AutonomyPolicy = { actor: ACTOR, validateSpecs: true, answerDecisions: true, resume: true, merge: [{ types: [...TYPES], requires: [] }] };
+    expect(decideGesture(everything, ACTOR, { gesture: 'review-again' })).toEqual({ allowed: false, missing: REASON });
+  });
+
+  it('read as the gesture they are in the words of a refusal', () => {
+    expect(gesturePhrase('review-again')).toBe('order a new review of the same implementation');
   });
 });
 
@@ -139,7 +168,11 @@ describe('the merge rules', () => {
   });
 
   it('allows a type whose rule requires films once every declared film is recorded', () => {
-    expect(decideGesture(policy, ACTOR, merge({ issueType: 'fix', films: RECORDED }))).toEqual({ allowed: true, rule: 'autonomy.merge for fix, docs, requiring films-recorded' });
+    expect(decideGesture(policy, ACTOR, merge({ issueType: 'fix', films: RECORDED }))).toEqual({
+      allowed: true,
+      gesture: 'merge',
+      rule: 'autonomy.merge for fix, docs, requiring films-recorded',
+    });
   });
 
   it('allows a type whose rule requires films when the spec declares none', () => {
@@ -167,7 +200,11 @@ describe('the merge rules', () => {
 
   it('lets a second rule for the same type allow what the first refuses', () => {
     const both: AutonomyPolicy = { ...NO_AUTONOMY, merge: [{ types: ['fix'], requires: ['films-recorded'] }, { types: ['fix'], requires: [] }] };
-    expect(decideGesture(both, ACTOR, merge({ issueType: 'fix', films: { ...NO_FILMS, pending: ['checkout-flow'] } }))).toEqual({ allowed: true, rule: 'autonomy.merge for fix' });
+    expect(decideGesture(both, ACTOR, merge({ issueType: 'fix', films: { ...NO_FILMS, pending: ['checkout-flow'] } }))).toEqual({
+      allowed: true,
+      gesture: 'merge',
+      rule: 'autonomy.merge for fix',
+    });
   });
 });
 

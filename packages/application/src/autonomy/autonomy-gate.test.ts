@@ -6,7 +6,7 @@ import { FINAL_SCREENSHOT, SCENARIO } from '../film/testing/film-fakes.ts';
 import { openPullRequest, type Film } from '../film/testing/film-world.ts';
 import type { FilmOrder } from '../film/film-order.ts';
 import { GESTURE_MADE_EVENT } from './autonomy-events.ts';
-import { AutonomyGate, GestureRefusedError } from './autonomy-gate.ts';
+import { AutonomyGate, authoriseGesture, GestureRefusedError } from './autonomy-gate.ts';
 import { delegatedDecisionsOf } from './delegated-decisions.ts';
 import type { Delegation } from './delegation.ts';
 import { describeGestureMade } from './gesture-sentence.ts';
@@ -42,6 +42,15 @@ describe('AutonomyGate', () => {
   it('refuses an actor that is not the delegate of the project', async () => {
     const world = await openPullRequest();
     expect(() => gateOf(world).authorise({ actor: 'intern', reason: 'because' }, 'validate-spec')).toThrow('the delegate of the project is "orchestrator", not "intern"');
+  });
+
+  it('refuses a new review of the same implementation whatever the policy delegates, naming the gesture and the project', () => {
+    const everything: AutonomyPolicy = { ...POLICY, answerDecisions: true, resume: true, merge: [{ types: ['ui'], requires: [] }] };
+    const attempt = (): unknown => authoriseGesture({ project: 'storefront', policy: everything }, DELEGATION, { gesture: 'review-again' });
+    expect(attempt).toThrow(GestureRefusedError);
+    expect(attempt).toThrow(
+      'Refused: orchestrator may not order a new review of the same implementation in project storefront: the autonomy policy cannot delegate a new review of the same implementation; only the operator orders it',
+    );
   });
 
   it('allows a merge for a listed issue type whose films are recorded', async () => {

@@ -2,6 +2,13 @@
 export const DELEGABLE_GESTURES = ['validate-spec', 'answer-decision', 'resume', 'merge'] as const;
 export type DelegableGesture = (typeof DELEGABLE_GESTURES)[number];
 
+/** The gestures of the operator that no policy delegates: they stay the operator's whatever a project declares. */
+export const OPERATOR_ONLY_GESTURES = ['review-again'] as const;
+export type OperatorOnlyGesture = (typeof OPERATOR_ONLY_GESTURES)[number];
+
+/** Every gesture a delegate can ask for, whether a policy can allow it or not. */
+export type RequestedGesture = DelegableGesture | OperatorOnlyGesture;
+
 /** What a merge rule can require besides the issue type. */
 export const MERGE_CONDITIONS = ['films-recorded'] as const;
 export type MergeCondition = (typeof MERGE_CONDITIONS)[number];
@@ -12,11 +19,16 @@ export const DEFAULT_DELEGATE_ACTOR = 'orchestrator';
 export const DELEGATE_ACTOR_PATTERN = /^[a-z][a-z0-9-]*$/;
 export const DELEGATE_ACTOR_RULE = `lowercase letters, digits and dashes, starting with a letter, and not "${OPERATOR_ACTOR}"`;
 
-const GESTURE_PHRASES: Readonly<Record<DelegableGesture, string>> = {
+const GESTURE_PHRASES: Readonly<Record<RequestedGesture, string>> = {
   'validate-spec': 'validate a spec',
   'answer-decision': 'answer a decision',
   resume: 'resume an issue',
   merge: 'merge a pull request',
+  'review-again': 'order a new review of the same implementation',
+};
+
+const OPERATOR_ONLY_REASONS: Readonly<Record<OperatorOnlyGesture, string>> = {
+  'review-again': 'the autonomy policy cannot delegate a new review of the same implementation; only the operator orders it',
 };
 
 const LIST_SEPARATOR = ', ';
@@ -44,7 +56,7 @@ export function isDelegateActor(actor: string): boolean {
   return actor !== OPERATOR_ACTOR && DELEGATE_ACTOR_PATTERN.test(actor);
 }
 
-export function gesturePhrase(gesture: DelegableGesture): string {
+export function gesturePhrase(gesture: RequestedGesture): string {
   return GESTURE_PHRASES[gesture];
 }
 
@@ -64,15 +76,27 @@ export interface MergeFacts {
   readonly films: FilmFacts;
 }
 
+/** A gesture no policy delegates, asked for by a delegate. */
+interface OperatorOnlyRequest {
+  readonly gesture: OperatorOnlyGesture;
+}
+
 /** A gesture the delegate wants to make, with the facts a decision about it needs. */
 export type GestureRequest =
   | { readonly gesture: 'validate-spec' }
   | { readonly gesture: 'answer-decision' }
   | { readonly gesture: 'resume' }
-  | { readonly gesture: 'merge'; readonly facts: MergeFacts };
+  | { readonly gesture: 'merge'; readonly facts: MergeFacts }
+  | OperatorOnlyRequest;
 
-/** Allowed, with the rule of the policy that allows it; or refused, with what the policy lacks. */
-export type GestureDecision = { readonly allowed: true; readonly rule: string } | { readonly allowed: false; readonly missing: string };
+/** Allowed, with the gesture and the rule of the policy that allows it; or refused, with what the policy lacks. */
+export type GestureDecision =
+  | { readonly allowed: true; readonly gesture: DelegableGesture; readonly rule: string }
+  | { readonly allowed: false; readonly missing: string };
+
+function isOperatorOnly(request: GestureRequest): request is OperatorOnlyRequest {
+  return OPERATOR_ONLY_GESTURES.some((gesture) => gesture === request.gesture);
+}
 
 function words(items: readonly string[]): string {
   const last = items.at(-1);
@@ -118,7 +142,7 @@ function decideMerge(policy: AutonomyPolicy, facts: MergeFacts): GestureDecision
   }
   const outcomes = covering.map((rule) => ({ rule, problems: ruleProblems(rule, facts) }));
   const allowing = outcomes.find((outcome) => outcome.problems.length === 0);
-  if (allowing !== undefined) return { allowed: true, rule: describeMergeRule(allowing.rule) };
+  if (allowing !== undefined) return { allowed: true, gesture: 'merge', rule: describeMergeRule(allowing.rule) };
   const unmet = outcomes.flatMap((outcome) => outcome.problems);
   return { allowed: false, missing: `the autonomy.merge rule for "${facts.issueType}" is not met: ${[...new Set(unmet)].join('; ')}` };
 }
@@ -131,13 +155,15 @@ const FLAG_RULES = {
 
 /**
  * Whether the policy lets `actor` make the gesture. Only the policy's own delegate is ever allowed, and
- * only for a gesture the policy names: an empty policy allows nothing.
+ * only for a gesture the policy names: an empty policy allows nothing, and a gesture no policy delegates
+ * is refused to everyone.
  */
 export function decideGesture(policy: AutonomyPolicy, actor: string, request: GestureRequest): GestureDecision {
+  if (isOperatorOnly(request)) return { allowed: false, missing: OPERATOR_ONLY_REASONS[request.gesture] };
   if (actor !== policy.actor) return { allowed: false, missing: `the delegate of the project is "${policy.actor}", not "${actor}"` };
   if (request.gesture === 'merge') return decideMerge(policy, request.facts);
   const { flag, allowedBy } = FLAG_RULES[request.gesture];
-  return policy[flag] === true ? { allowed: true, rule: allowedBy } : { allowed: false, missing: `${allowedBy} is not set` };
+  return policy[flag] === true ? { allowed: true, gesture: request.gesture, rule: allowedBy } : { allowed: false, missing: `${allowedBy} is not set` };
 }
 
 /** The merge rules that cover a type the project does not have, for a configuration to refuse. */

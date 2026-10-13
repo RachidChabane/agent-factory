@@ -1,4 +1,4 @@
-import { decideGesture, gesturePhrase, issueSubject, type AutonomyPolicy, type DelegableGesture, type FilmFacts, type GestureRequest } from '@agent-factory/domain';
+import { decideGesture, gesturePhrase, issueSubject, type AutonomyPolicy, type DelegableGesture, type FilmFacts, type GestureRequest, type RequestedGesture } from '@agent-factory/domain';
 import { failedFilmScenarios, pendingFilmScenarios } from '../film/film-pending.ts';
 import { issueOfPullRequest } from '../pipeline/merge-on-order.ts';
 import { loadJournal, type PipelineJournal } from '../pipeline/pipeline-journal.ts';
@@ -9,11 +9,11 @@ import type { Delegation } from './delegation.ts';
 /** The gesture a policy refused, with the actor, the project and what the policy lacks. */
 export class GestureRefusedError extends Error {
   readonly actor: string;
-  readonly gesture: DelegableGesture;
+  readonly gesture: RequestedGesture;
   readonly project: string;
   readonly missing: string;
 
-  constructor(actor: string, gesture: DelegableGesture, project: string, missing: string) {
+  constructor(actor: string, gesture: RequestedGesture, project: string, missing: string) {
     super(`Refused: ${actor} may not ${gesturePhrase(gesture)} in project ${project}: ${missing}`);
     this.name = 'GestureRefusedError';
     this.actor = actor;
@@ -53,11 +53,14 @@ export function filmFactsOf(journal: PipelineJournal): FilmFacts {
 
 const NO_SPEC = 'the issue of the pull request has no recorded spec, so its type is unknown';
 
-/** Whether the policy lets the delegate make the gesture: the allowing rule, or a refusal naming what the policy lacks. */
+/**
+ * Whether the policy lets the delegate make the gesture: the allowing rule, or a refusal naming what the policy lacks.
+ * A gesture no policy delegates is always refused.
+ */
 export function authoriseGesture(settings: AutonomyGateSettings, delegation: Delegation, request: GestureRequest): Authorisation {
   const decision = decideGesture(settings.policy, delegation.actor, request);
   if (!decision.allowed) throw new GestureRefusedError(delegation.actor, request.gesture, settings.project, decision.missing);
-  return { gesture: request.gesture, rule: decision.rule };
+  return { gesture: decision.gesture, rule: decision.rule };
 }
 
 /**
