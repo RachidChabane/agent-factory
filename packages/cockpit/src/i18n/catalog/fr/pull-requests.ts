@@ -191,7 +191,7 @@ export const frPullRequests = {
   'pullRequests.films.order.error': 'Ce n’est pas un nom de scénario. {rule}',
 
   'pullRequests.ready.title': 'Notification de prête à merger',
-  'pullRequests.ready.description': 'Le message envoyé à vos canaux quand les checks requis sont passés et qu’aucun film n’est en attente, en cours ou en échec. Il part une fois par tête de la pull request.',
+  'pullRequests.ready.description': 'Le message envoyé à vos canaux quand tous les checks de la tête sont terminés sans échec et qu’aucun film n’est en attente, en cours ou en échec. Il part une fois par tête de la pull request.',
   'pullRequests.ready.sent': 'Envoyée {when} pour la tête {sha}.',
   'pullRequests.ready.links': 'Liens de la notification',
   'pullRequests.ready.linksNone': 'La notification ne portait aucun lien : l’installation ne déclare pas de commande de dépôt, ou aucun fichier n’a pu être déposé.',
@@ -200,8 +200,15 @@ export const frPullRequests = {
   'pullRequests.ready.failure': '{label} : {reason}',
   'pullRequests.ready.held': 'Pas encore envoyée',
   'pullRequests.ready.holds': 'Ce qui retient la notification',
-  'pullRequests.ready.hold.checks-running': 'Les checks requis ne sont pas terminés.',
-  'pullRequests.ready.hold.checks-failed': 'Un check requis a échoué.',
+  'pullRequests.ready.hold.checks-unreported': 'La forge n’a relevé encore aucun check pour cette tête.',
+  'pullRequests.ready.hold.checks-running': {
+    one: 'Le check {checks} n’est pas terminé.',
+    other: 'Les checks {checks} ne sont pas terminés.',
+  },
+  'pullRequests.ready.hold.checks-failed': {
+    one: 'Le check {checks} a échoué.',
+    other: 'Les checks {checks} ont échoué.',
+  },
   'pullRequests.ready.hold.films-pending': {
     one: 'Le film du scénario {scenarios} est en attente ou en cours.',
     other: 'Les films des scénarios {scenarios} sont en attente ou en cours.',

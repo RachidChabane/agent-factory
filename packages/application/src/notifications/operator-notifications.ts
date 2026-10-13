@@ -106,7 +106,7 @@ export const NOTICES = {
     title: `Pull request #${ready.pullRequest.number} is ready to merge`,
     body: [
       `${ready.title} (issue #${ready.issueNumber}).`,
-      'Its required checks passed.',
+      'Every check of its head passed.',
       ready.films.length === 0 ? 'No film was recorded.' : `Films recorded: ${ready.films.join(LIST_SEPARATOR)}.`,
       ready.pullRequest.url,
     ].join(WORD_SEPARATOR),

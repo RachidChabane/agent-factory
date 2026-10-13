@@ -8,22 +8,29 @@ import { ReadStamp } from '../../widgets/ReadStamp.tsx';
 import { Time } from '../../widgets/Time.tsx';
 
 const ICON_SIZE = 14;
-const SCENARIO_SEPARATOR = ', ';
+const LIST_SEPARATOR = ', ';
 const SECTION_ID = 'pull-request-ready-notice';
 
 type ReadyNoticeView = PullRequestView['readyNotice'];
 
-/** Why the notice is held, in the words of the cockpit: the checks, or the scenarios of the films that block it. */
+/** The checks or the scenarios a hold names. */
+function namesOf(hold: ReadyHoldView): readonly string[] {
+  return 'scenarios' in hold ? hold.scenarios : hold.checks;
+}
+
+/** Why the notice is held, in the words of the cockpit: each check, or the scenarios of the films that block it. */
 function holdText(t: LocalizedI18n['t'], hold: ReadyHoldView): string {
+  const count = namesOf(hold).length;
+  const names = namesOf(hold).join(LIST_SEPARATOR);
   switch (hold.kind) {
     case 'checks-running':
-      return t('pullRequests.ready.hold.checks-running');
+      return count === 0 ? t('pullRequests.ready.hold.checks-unreported') : t('pullRequests.ready.hold.checks-running', { count, checks: names });
     case 'checks-failed':
-      return t('pullRequests.ready.hold.checks-failed');
+      return t('pullRequests.ready.hold.checks-failed', { count, checks: names });
     case 'films-pending':
-      return t('pullRequests.ready.hold.films-pending', { count: hold.scenarios.length, scenarios: hold.scenarios.join(SCENARIO_SEPARATOR) });
+      return t('pullRequests.ready.hold.films-pending', { count, scenarios: names });
     case 'films-failed':
-      return t('pullRequests.ready.hold.films-failed', { count: hold.scenarios.length, scenarios: hold.scenarios.join(SCENARIO_SEPARATOR) });
+      return t('pullRequests.ready.hold.films-failed', { count, scenarios: names });
   }
 }
 
@@ -72,7 +79,7 @@ function HeldNotice({ notice }: { readonly notice: Extract<ReadyNoticeView, { st
       </p>
       <ul className="bullets" aria-label={t('pullRequests.ready.holds')}>
         {notice.holds.map((hold) => (
-          <li key={`${hold.kind}/${'scenarios' in hold ? hold.scenarios.join('/') : ''}`}>{holdText(t, hold)}</li>
+          <li key={`${hold.kind}/${namesOf(hold).join('/')}`}>{holdText(t, hold)}</li>
         ))}
       </ul>
       <ReadStamp readAt={notice.checksReadAt} kind="forge" neverLabel={t('pullRequests.ready.checksNeverRead')} />

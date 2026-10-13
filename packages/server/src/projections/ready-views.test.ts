@@ -55,25 +55,39 @@ describe('the ready notice of a pull request in the cockpit', () => {
   it('is held by the checks while they were never read, and says so', () => {
     const pullRequest = pullRequestOf(projectHistory(), { pullRequestChecks: new Map() });
     expect(PullRequestViewSchema.safeParse(pullRequest).error?.issues ?? []).toEqual([]);
-    expect(pullRequest.readyNotice).toEqual({ status: 'held', holds: [{ kind: 'checks-running' }], checksReadAt: null });
+    expect(pullRequest.readyNotice).toEqual({ status: 'held', holds: [{ kind: 'checks-running', checks: [] }], checksReadAt: null });
   });
 
-  it('is held while a check runs, with when the checks were read, and by a failing check', () => {
-    expect(pullRequestOf(projectHistory(), { pullRequestChecks: new Map([[100, observed([run('pending')])]]) }).readyNotice).toEqual({
+  it('is held while a check runs, naming it, with when the checks were read, and by a failing check', () => {
+    expect(pullRequestOf(projectHistory(), { pullRequestChecks: new Map([[100, observed([run('pending', 'e2e'), run('success', 'lint')])]]) }).readyNotice).toEqual({
       status: 'held',
-      holds: [{ kind: 'checks-running' }],
+      holds: [{ kind: 'checks-running', checks: ['e2e'] }],
       checksReadAt: READ_AT.toISOString(),
     });
-    expect(pullRequestOf(projectHistory(), { pullRequestChecks: new Map([[100, observed([run('failure')])]]) }).readyNotice).toMatchObject({ status: 'held', holds: [{ kind: 'checks-failed' }] });
+    expect(pullRequestOf(projectHistory(), { pullRequestChecks: new Map([[100, observed([run('failure', 'quality-gate')])]]) }).readyNotice).toMatchObject({
+      status: 'held',
+      holds: [{ kind: 'checks-failed', checks: ['quality-gate'] }],
+    });
   });
 
-  it('does not count a failure the base branch has too', () => {
+  it('names every failing and every running check, the failures first', () => {
+    const checks = [run('failure', 'quality-gate'), run('cancelled', 'e2e'), run('pending', 'deploy-preview'), run('success', 'lint'), run('skipped', 'docs'), run('neutral', 'size')];
+    const notice = pullRequestOf(projectHistory(), { pullRequestChecks: new Map([[100, observed(checks)]]) }).readyNotice;
+    expect(ReadyNoticeViewSchema.safeParse(notice).error?.issues ?? []).toEqual([]);
+    expect(notice).toMatchObject({ status: 'held', holds: [{ kind: 'checks-failed', checks: ['quality-gate', 'e2e'] }, { kind: 'checks-running', checks: ['deploy-preview'] }] });
+  });
+
+  it('is held by a failing check that the base branch fails too, which does not hold the merge', () => {
     const context = { pullRequestChecks: new Map([[100, observed([run('failure', 'lint'), run('success', 'unit')])]]), baseChecks: observed([run('failure', 'lint')]) };
-    expect(pullRequestOf(projectHistory(), context).readyNotice).toEqual({ status: 'due' });
+    const pullRequest = pullRequestOf(projectHistory(), context);
+    expect(pullRequest.readyNotice).toMatchObject({ status: 'held', holds: [{ kind: 'checks-failed', checks: ['lint'] }] });
+    expect(pullRequest.mergeBlockers.join(' ')).not.toContain('lint');
   });
 
-  it('is due once the required checks passed and no film holds it', () => {
+  it('is due once every check of the head completed without failing and no film holds it', () => {
     expect(pullRequestOf(projectHistory(), GREEN).readyNotice).toEqual({ status: 'due' });
+    const completed = [run('success', 'lint'), run('neutral', 'size'), run('skipped', 'docs')];
+    expect(pullRequestOf(projectHistory(), { pullRequestChecks: new Map([[100, observed(completed)]]) }).readyNotice).toEqual({ status: 'due' });
   });
 
   it('is held by a film queued or recording, and by one that failed, with the scenarios named', () => {
@@ -91,7 +105,7 @@ describe('the ready notice of a pull request in the cockpit', () => {
   it('lists every hold at once, the checks first', () => {
     const history = withEvents(projectHistory(), { type: PIPELINE_EVENTS.filmQueued, payload: { scenario: 'checkout-flow', operator: 'Alex Morgan' } });
     expect((pullRequestOf(history, { pullRequestChecks: new Map([[100, observed([run('pending')])]]) }).readyNotice as { holds: unknown[] }).holds).toEqual([
-      { kind: 'checks-running' },
+      { kind: 'checks-running', checks: ['ci'] },
       { kind: 'films-pending', scenarios: ['checkout-flow'] },
     ]);
   });

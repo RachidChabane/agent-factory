@@ -190,7 +190,7 @@ export const enPullRequests = {
   'pullRequests.films.order.error': 'This is not a scenario name. {rule}',
 
   'pullRequests.ready.title': 'Ready notice',
-  'pullRequests.ready.description': 'The message sent to your channels once the required checks passed and no film is queued, recording or failed. It goes out once per head of the pull request.',
+  'pullRequests.ready.description': 'The message sent to your channels once every check of the head completed without failing and no film is queued, recording or failed. It goes out once per head of the pull request.',
   'pullRequests.ready.sent': 'Sent {when} for head {sha}.',
   'pullRequests.ready.links': 'Links in the notice',
   'pullRequests.ready.linksNone': 'The notice carried no link: the installation declares no upload command, or no file could be uploaded.',
@@ -199,8 +199,15 @@ export const enPullRequests = {
   'pullRequests.ready.failure': '{label}: {reason}',
   'pullRequests.ready.held': 'Not sent yet',
   'pullRequests.ready.holds': 'What holds the notice',
-  'pullRequests.ready.hold.checks-running': 'The required checks have not finished.',
-  'pullRequests.ready.hold.checks-failed': 'A required check failed.',
+  'pullRequests.ready.hold.checks-unreported': 'The forge has reported no check for this head yet.',
+  'pullRequests.ready.hold.checks-running': {
+    one: 'The check {checks} has not finished.',
+    other: 'The checks {checks} have not finished.',
+  },
+  'pullRequests.ready.hold.checks-failed': {
+    one: 'The check {checks} failed.',
+    other: 'The checks {checks} failed.',
+  },
   'pullRequests.ready.hold.films-pending': {
     one: 'The film of scenario {scenarios} is queued or recording.',
     other: 'The films of scenarios {scenarios} are queued or recording.',

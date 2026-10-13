@@ -202,13 +202,30 @@ describe('PullRequestReadyWatch', () => {
     expect(notifier.sent).toHaveLength(1);
   });
 
-  it('tells nothing while a required check fails, and counts a check that also fails on the base branch as passed', async () => {
+  it('tells nothing while any check of the head fails or runs, even one that also fails on the base branch, until all of them completed', async () => {
     const { world, watch, notifier } = await setup();
-    world.scenario.github.checkRuns = [check('failure', 'lint'), check('success', 'unit')];
+    world.scenario.github.checkRuns = [check('failure', 'quality-gate'), check('success', 'unit')];
+    world.scenario.github.baseCheckRuns = [check('failure', 'quality-gate')];
     expect(await watch.scan(SIGNAL)).toEqual([]);
-    world.scenario.github.baseCheckRuns = [check('failure', 'lint')];
+    world.scenario.github.checkRuns = [check('success', 'quality-gate'), check('pending', 'unit')];
+    expect(await watch.scan(SIGNAL)).toEqual([]);
+    expect(notifier.sent).toEqual([]);
+
+    world.scenario.github.checkRuns = [check('success', 'quality-gate'), check('neutral', 'unit'), check('skipped', 'e2e')];
     expect(await watch.scan(SIGNAL)).toHaveLength(1);
     expect(notifier.sent).toHaveLength(1);
+  });
+
+  it('reads no check of the base branch: only the head decides', async () => {
+    const { world, watch } = await setup();
+    world.scenario.github.checkRuns = GREEN;
+    let baseReads = 0;
+    world.scenario.github.baseBranchChecks = () => {
+      baseReads += 1;
+      return Promise.resolve([]);
+    };
+    expect(await watch.scan(SIGNAL)).toHaveLength(1);
+    expect(baseReads).toBe(0);
   });
 
   it('skips a pull request whose head moved on the forge, and one already merged', async () => {

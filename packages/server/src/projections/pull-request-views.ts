@@ -220,7 +220,7 @@ export function projectPullRequests(
       evidence: evidenceOf(journal, context, records),
       films: filmViews(journal, records, context),
       filmOrders: filmOrderViews(journal, context),
-      readyNotice: readyNoticeView(journal, state === 'open', { checks, baseChecks: context.baseChecks, filming: context.films !== null }),
+      readyNotice: readyNoticeView(journal, state === 'open', { checks, filming: context.films !== null }),
       delegated: pullRequestDecisions(delegatedDecisionViews(records), pullRequest.number),
       reviewRounds: reviewRounds(journal, index),
       externalFeedback: feedbackOf(journal),

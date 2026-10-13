@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { ReadyNoticeView } from '../../contract/index.ts';
+import type { ReadyHoldView, ReadyNoticeView } from '../../contract/index.ts';
 import { PULL_REQUEST } from '../../test/fixtures/storefront/ids.ts';
 import { fixtureSnapshot } from '../../test/render.tsx';
 import { minutesAgo, openPullRequest, STOREFRONT, withPullRequest } from './pull-request-test-support.ts';
@@ -36,19 +36,29 @@ describe('the ready notice of a pull request', () => {
     expect(within(noticeRegion()).queryByRole('list', { name: 'Links in the notice' })).not.toBeInTheDocument();
   });
 
-  it('says what holds it while the checks run, with when they were read', async () => {
-    await openPullRequest(SEARCH, { snapshot: withNotice({ status: 'held', holds: [{ kind: 'checks-running' }], checksReadAt: minutesAgo(3) }) });
+  it('names the checks that run, with when they were read', async () => {
+    await openPullRequest(SEARCH, { snapshot: withNotice({ status: 'held', holds: [{ kind: 'checks-running', checks: ['e2e-checkout', 'quality-gate'] }], checksReadAt: minutesAgo(3) }) });
     const region = noticeRegion();
     expect(within(region).getByText('Not sent yet')).toBeInTheDocument();
-    expect(within(region).getByRole('list', { name: 'What holds the notice' })).toHaveTextContent('The required checks have not finished.');
+    expect(within(region).getByRole('list', { name: 'What holds the notice' })).toHaveTextContent('The checks e2e-checkout, quality-gate have not finished.');
     expect(region).toHaveTextContent(/Read 3 min\. ago/);
+  });
+
+  it('names a check that failed, whether the merge requires it or not', async () => {
+    await openPullRequest(SEARCH, { snapshot: withNotice({ status: 'held', holds: [{ kind: 'checks-failed', checks: ['quality-gate'] }], checksReadAt: minutesAgo(3) }) });
+    expect(within(noticeRegion()).getByRole('list', { name: 'What holds the notice' })).toHaveTextContent('The check quality-gate failed.');
+  });
+
+  it('says that the forge reported no check yet without naming one', async () => {
+    await openPullRequest(SEARCH, { snapshot: withNotice({ status: 'held', holds: [{ kind: 'checks-running', checks: [] }], checksReadAt: null }) });
+    expect(within(noticeRegion()).getByRole('list', { name: 'What holds the notice' })).toHaveTextContent('The forge has reported no check for this head yet.');
   });
 
   it('says that the checks were never read, and names the scenarios of the films that hold it', async () => {
     await openPullRequest(SEARCH, {
       snapshot: withNotice({
         status: 'held',
-        holds: [{ kind: 'films-pending', scenarios: ['checkout-flow'] }, { kind: 'films-failed', scenarios: ['order-history', 'refund'] }, { kind: 'checks-failed' }],
+        holds: [{ kind: 'films-pending', scenarios: ['checkout-flow'] }, { kind: 'films-failed', scenarios: ['order-history', 'refund'] }, { kind: 'checks-failed', checks: ['lint', 'unit'] }],
         checksReadAt: null,
       }),
     });
@@ -56,7 +66,7 @@ describe('the ready notice of a pull request', () => {
     expect(within(holds).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'The film of scenario checkout-flow is queued or recording.',
       'The films of scenarios order-history, refund failed: order them again, or merge without them.',
-      'A required check failed.',
+      'The checks lint, unit failed.',
     ]);
     expect(within(noticeRegion()).getByText('The checks were not read')).toBeInTheDocument();
   });
@@ -76,5 +86,16 @@ describe('the ready notice of a pull request', () => {
     const region = screen.getByRole('region', { name: 'Notification de prête à merger' });
     expect(region).toHaveTextContent(/Envoyée .* pour la tête bada550\./);
     expect(within(region).getByRole('list', { name: 'Liens de la notification' })).toBeInTheDocument();
+  });
+
+  it('names the checks that hold it in French, one or several', async () => {
+    const holds: ReadyHoldView[] = [{ kind: 'checks-failed', checks: ['quality-gate'] }, { kind: 'checks-running', checks: ['e2e-checkout', 'unit'] }, { kind: 'checks-running', checks: [] }];
+    await openPullRequest(SEARCH, { locale: 'fr', snapshot: withNotice({ status: 'held', holds, checksReadAt: minutesAgo(3) }) });
+    const list = within(screen.getByRole('region', { name: 'Notification de prête à merger' })).getByRole('list', { name: 'Ce qui retient la notification' });
+    expect(within(list).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Le check quality-gate a échoué.',
+      'Les checks e2e-checkout, unit ne sont pas terminés.',
+      'La forge n’a relevé encore aucun check pour cette tête.',
+    ]);
   });
 });

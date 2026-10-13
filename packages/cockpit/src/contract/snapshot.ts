@@ -508,8 +508,10 @@ export type MediaLinkView = z.infer<typeof MediaLinkViewSchema>;
 
 /** What keeps the ready notice of a pull request from going out. */
 export const ReadyHoldViewSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('checks-running') }),
-  z.object({ kind: z.literal('checks-failed') }),
+  /** The checks of the head that have not completed; none named means the forge has reported no check yet. */
+  z.object({ kind: z.literal('checks-running'), checks: z.array(z.string().min(1)) }),
+  /** The checks of the head that failed or were cancelled, whether the merge requires them or not. */
+  z.object({ kind: z.literal('checks-failed'), checks: z.array(z.string().min(1)) }),
   z.object({ kind: z.literal('films-pending'), scenarios: z.array(z.string().min(1)) }),
   z.object({ kind: z.literal('films-failed'), scenarios: z.array(z.string().min(1)) }),
 ]);

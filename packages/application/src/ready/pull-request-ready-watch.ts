@@ -6,9 +6,9 @@ import { NOTICES, type OperatorNotifications } from '../notifications/operator-n
 import { PIPELINE_EVENTS, type PullRequestReadyAnnouncedRecord } from '../pipeline/journal-events.ts';
 import { IssueJournalWriter } from '../pipeline/journal-writer.ts';
 import { currentHeadOf, isAnnouncedReady, type PipelineJournal } from '../pipeline/pipeline-journal.ts';
-import type { CheckRunSummary, Clock, EventStore, GitHubGateway, IssueStateStore, OperationLog } from '../ports.ts';
+import type { Clock, EventStore, GitHubGateway, IssueStateStore, OperationLog } from '../ports.ts';
 import { isAwaitingMerge } from './awaiting-merge.ts';
-import { requiredChecksVerdict } from './ready-checks.ts';
+import { readinessChecksOf } from './ready-checks.ts';
 import { readyMediaOf } from './ready-media.ts';
 import { NO_PUBLISHED_MEDIA, type MediaPublisher, type PublishedMedia } from './media-publisher.ts';
 
@@ -58,7 +58,8 @@ function errorText(error: unknown): string {
 
 /**
  * Tells the operator once per head that a pull request is ready to merge, with links to its films and images.
- * A pull request is ready when its required checks passed and none of its films is queued, recording or failed.
+ * A pull request is ready when every check reported on its head completed without failing and none of its films is queued,
+ * recording or failed.
  */
 export class PullRequestReadyWatch implements PullRequestReadyScanner {
   private readonly dependencies: PullRequestReadyDependencies;
@@ -76,13 +77,11 @@ export class PullRequestReadyWatch implements PullRequestReadyScanner {
     const announced: PullRequestReadyAnnouncedRecord[] = [];
     const journals = [...issueJournalsOf(await readIssueRecords(this.dependencies.events)).values()].toSorted((left, right) => left.issueNumber - right.issueNumber);
     this.forgetAllBut(journals);
-    let baseChecks: readonly CheckRunSummary[] | null = null;
     for (const journal of journals) {
       const candidate = this.candidateOf(journal);
       if (candidate === null || signal.aborted) continue;
       try {
-        baseChecks ??= await this.dependencies.github.baseBranchChecks();
-        const record = await this.announceIfReady(candidate, baseChecks, signal);
+        const record = await this.announceIfReady(candidate, signal);
         if (record !== null) announced.push(record);
       } catch (error) {
         this.holdOff(candidate);
@@ -99,10 +98,10 @@ export class PullRequestReadyWatch implements PullRequestReadyScanner {
     return { journal, headSha, pendingFilms: films ? pendingFilmScenarios(journal) : [], failedFilms: films ? failedFilmScenarios(journal) : [] };
   }
 
-  private async announceIfReady(candidate: Candidate, baseChecks: readonly CheckRunSummary[], signal: AbortSignal): Promise<PullRequestReadyAnnouncedRecord | null> {
+  private async announceIfReady(candidate: Candidate, signal: AbortSignal): Promise<PullRequestReadyAnnouncedRecord | null> {
     const { journal, headSha } = candidate;
-    const checks = requiredChecksVerdict(await this.dependencies.github.checks(headSha), baseChecks, this.settledWithoutChecks(journal.issueNumber, headSha));
-    const readiness = evaluatePullRequestReadiness({ checks, pendingFilms: candidate.pendingFilms, failedFilms: candidate.failedFilms });
+    const checks = readinessChecksOf(await this.dependencies.github.checks(headSha), this.settledWithoutChecks(journal.issueNumber, headSha));
+    const readiness = evaluatePullRequestReadiness({ ...checks, pendingFilms: candidate.pendingFilms, failedFilms: candidate.failedFilms });
     if (!readiness.ready || !(await this.headIsLive(journal, headSha))) return null;
     return this.announce(candidate, signal);
   }
