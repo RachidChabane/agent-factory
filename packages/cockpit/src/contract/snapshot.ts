@@ -748,8 +748,12 @@ export const AuditViewSchema = z.object({
   suggestedType: IssueTypeIdSchema.nullable(),
   releaseId: z.string().nullable(),
   conclusion: AuditConclusionViewSchema.nullable(),
+  /** When the auditor concluded; null before it did. */
+  concludedAt: IsoDateTimeSchema.nullable(),
   failureCount: CountSchema,
   lastFailure: z.string().nullable(),
+  /** When the last audit run failed; null when none did. */
+  lastFailureAt: IsoDateTimeSchema.nullable(),
   draft: AuditIssueDraftViewSchema.nullable(),
   publishedIssueNumber: IssueNumberSchema.nullable(),
   /** The page the forge gives the issue published from the audit; the factory does not list that issue, so this is where its number leads. */
@@ -758,6 +762,8 @@ export const AuditViewSchema = z.object({
   publishedIssueAt: IsoDateTimeSchema.nullable(),
   resolved: z.boolean(),
   resolutionNote: z.string().nullable(),
+  /** When the audit was resolved; null while it is not. */
+  resolvedAt: IsoDateTimeSchema.nullable(),
 });
 export type AuditView = z.infer<typeof AuditViewSchema>;
 

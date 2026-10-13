@@ -5,6 +5,7 @@ import { useVocabulary } from '../../i18n/vocabulary.ts';
 import { paths } from '../../model/routes.ts';
 import { Section } from '../../ui/components/Card.tsx';
 import { EmptyState } from '../../ui/components/EmptyState.tsx';
+import { Time } from '../../widgets/Time.tsx';
 import { findingsByLevel } from './audit-model.ts';
 
 function PendingConclusion({ state }: { readonly state: AuditView['state'] }) {
@@ -45,7 +46,22 @@ function Findings({ conclusion }: { readonly conclusion: AuditConclusionView }) 
   );
 }
 
-/** What the auditor concluded, level by level, and the fix it proposes. */
+/** The auditor run that concluded, and when it did. */
+function ConclusionStamp({ runId, concludedAt }: { readonly runId: string; readonly concludedAt: string | null }) {
+  const { t, rich } = useI18n();
+  return (
+    <span className="audit-section__actions">
+      {runId.length === 0 ? null : (
+        <Link to={paths.run(runId)} className="link mono" aria-label={t('audits.conclusion.openRun', { run: runId })}>
+          {runId}
+        </Link>
+      )}
+      {concludedAt === null ? null : <span className="subtle">{rich('audits.conclusion.at', { when: <Time iso={concludedAt} /> })}</span>}
+    </span>
+  );
+}
+
+/** What the auditor concluded and when, level by level, and the fix it proposes. */
 export function AuditConclusion({ audit }: { readonly audit: AuditView }) {
   const { t } = useI18n();
   const { conclusion } = audit;
@@ -55,13 +71,7 @@ export function AuditConclusion({ audit }: { readonly audit: AuditView }) {
         title={t('audits.conclusion.title')}
         id="audit-conclusion"
         description={conclusion?.summary}
-        actions={
-          conclusion === null || conclusion.runId.length === 0 ? undefined : (
-            <Link to={paths.run(conclusion.runId)} className="link mono" aria-label={t('audits.conclusion.openRun', { run: conclusion.runId })}>
-              {conclusion.runId}
-            </Link>
-          )
-        }
+        actions={conclusion === null ? undefined : <ConclusionStamp runId={conclusion.runId} concludedAt={audit.concludedAt} />}
       >
         {conclusion === null ? <PendingConclusion state={audit.state} /> : <Findings conclusion={conclusion} />}
       </Section>

@@ -90,6 +90,8 @@ test.describe('the audits of the demonstration', () => {
     const conclusionRegion = page.getByRole('region', { name: CONCLUSION_TITLE });
     await expect(conclusionRegion).toContainText(conclusion.summary);
     await expect(conclusionRegion.getByRole('link', { name: `Open the auditor run ${conclusion.runId}` })).toHaveAttribute('href', paths.run(conclusion.runId));
+    if (audit.concludedAt === null) throw new Error(`the audit of ${shortSha(audit.commitSha)} has a conclusion but no time it was concluded`);
+    await expect(conclusionRegion.getByRole('time')).toHaveAttribute('datetime', audit.concludedAt);
     for (const level of new Set(conclusion.findings.map((finding) => finding.level))) await expect(conclusionRegion).toContainText(LEVEL_WORDS[level]);
     for (const finding of conclusion.findings) {
       await expect(conclusionRegion).toContainText(finding.statement);
@@ -204,10 +206,13 @@ test.describe('the audits of the demonstration', () => {
     expect(outcome.effect).toBe(`The audit of ${shortSha(audit.commitSha)} is resolved`);
 
     const state = await factory.api.until('the audit is resolved', (snapshot) => auditOf(snapshot, STOREFRONT, audit.id).resolved);
-    expect(auditOf(state, STOREFRONT, audit.id).resolutionNote).toBe(RESOLUTION_NOTE);
+    const { resolutionNote, resolvedAt } = auditOf(state, STOREFRONT, audit.id);
+    expect(resolutionNote).toBe(RESOLUTION_NOTE);
+    if (resolvedAt === null) throw new Error(`the audit of ${shortSha(audit.commitSha)} is resolved but has no time it was resolved`);
 
     await expect(dialog).toBeHidden();
     await expect(page.getByRole('region', { name: 'Resolved', exact: true })).toContainText(RESOLUTION_NOTE);
+    await expect(page.getByRole('region', { name: 'Resolved', exact: true }).getByRole('time')).toHaveAttribute('datetime', resolvedAt);
     await expect(page.getByRole('button', { name: 'Mark as resolved', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Publish the audit issue' })).toHaveCount(0);
     await expect(auditList(page).getByRole('region', { name: 'Settled', exact: true }).getByRole('link', { name: audit.commitMessage })).toContainText('Resolved');

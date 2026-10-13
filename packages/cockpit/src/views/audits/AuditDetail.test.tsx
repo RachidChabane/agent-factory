@@ -1,5 +1,11 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import {
+  AUDITOR_TIMEOUT_MINUTES,
+  DOUBLE_SUBMIT_AUDIT_MINUTES_AGO,
+  HTTP_CLIENT_RESOLVED_MINUTES_AGO,
+  PROMO_BANNER_CONCLUDED_MINUTES_AGO,
+} from '../../test/fixtures/storefront/audits.ts';
 import { AUDIT, LEDGER, minutesAgo, openAudit, short, STOREFRONT, withAudit, withProject } from './audit-test-support.ts';
 
 const article = () => screen.getByRole('article');
@@ -129,6 +135,12 @@ describe('AuditsView notices', () => {
     expect(within(failure).getByText('No reason was recorded.')).toBeInTheDocument();
   });
 
+  it('tells when the audit run last failed', async () => {
+    await openAudit(AUDIT.doubleSubmit);
+    const failure = screen.getByRole('region', { name: '1 audit attempt failed' });
+    expect(within(failure).getByText(/ago$/)).toHaveAttribute('datetime', minutesAgo(DOUBLE_SUBMIT_AUDIT_MINUTES_AGO - AUDITOR_TIMEOUT_MINUTES));
+  });
+
   it('shows no failure callout for an audit that never failed', async () => {
     await openAudit(AUDIT.promoBanner);
     expect(screen.queryByRole('region', { name: /audit attempts? failed/ })).not.toBeInTheDocument();
@@ -160,6 +172,11 @@ describe('AuditsView notices', () => {
     expect(within(article()).getAllByText('Resolved').length).toBeGreaterThan(1);
   });
 
+  it('tells when a resolved audit was resolved', async () => {
+    await openAudit(AUDIT.httpClient);
+    expect(within(screen.getByRole('region', { name: 'Resolved' })).getByText(/ago$/)).toHaveAttribute('datetime', minutesAgo(HTTP_CLIENT_RESOLVED_MINUTES_AGO));
+  });
+
   it('says that no note was recorded for a resolution without one', async () => {
     const snapshot = withAudit(STOREFRONT, AUDIT.httpClient, (audit) => ({ ...audit, resolutionNote: null }));
     await openAudit(AUDIT.httpClient, { snapshot });
@@ -176,6 +193,17 @@ describe('AuditsView conclusion', () => {
   it('sums up what the auditor concluded', async () => {
     await openAudit(AUDIT.promoBanner);
     expect(within(conclusion()).getByText(/^The banner now promises "20% off everything"/)).toBeInTheDocument();
+  });
+
+  it('tells when the auditor concluded', async () => {
+    await openAudit(AUDIT.promoBanner);
+    expect(within(conclusion()).getByText(/ago$/)).toHaveAttribute('datetime', minutesAgo(PROMO_BANNER_CONCLUDED_MINUTES_AGO));
+  });
+
+  it('tells no conclusion time before the auditor concluded', async () => {
+    const snapshot = withAudit(STOREFRONT, AUDIT.promoBanner, (audit) => ({ ...audit, conclusion: null, concludedAt: null }));
+    await openAudit(AUDIT.promoBanner, { snapshot });
+    expect(within(conclusion()).queryByText(/ago$/)).not.toBeInTheDocument();
   });
 
   it('groups the findings as intent, idea and method, each with its statement and its evidence', async () => {

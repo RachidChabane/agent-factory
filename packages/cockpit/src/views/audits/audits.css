@@ -151,7 +151,7 @@
   font-weight: var(--weight-semibold);
   overflow-wrap: anywhere;
 }
-.audit-draft__published {
+.audit-section__actions {
   display: inline-flex;
   align-items: baseline;
   flex-wrap: wrap;

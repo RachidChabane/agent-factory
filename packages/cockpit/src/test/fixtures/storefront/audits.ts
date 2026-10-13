@@ -24,6 +24,10 @@ export const HTTP_CLIENT_BUMP_MESSAGE = `build(deps): update the HTTP client to 
 export const API_REFERENCE_RESYNC_MESSAGE = `docs: sync the API reference from the OpenAPI schema (#${OUTSIDE_PULL_REQUEST.apiReferenceResync})`;
 
 export const DOUBLE_SUBMIT_AUDIT_MINUTES_AGO = 1_828;
+/** The auditor run of the double submit timed out this long after the change was detected. */
+export const AUDITOR_TIMEOUT_MINUTES = 25;
+export const PROMO_BANNER_CONCLUDED_MINUTES_AGO = 1_160;
+export const HTTP_CLIENT_RESOLVED_MINUTES_AGO = days(7);
 
 const audit = (seed: AuditSeed): AuditView => auditView(seed, storefrontLinks);
 
@@ -43,6 +47,7 @@ export function storefrontAudits(clock: FixtureClock): AuditView[] {
       releaseId: RELEASE.oneEightTwo,
       failureCount: 1,
       lastFailure: 'The auditor run ended with outcome timeout after 25 minutes.',
+      lastFailureAt: ago(DOUBLE_SUBMIT_AUDIT_MINUTES_AGO - AUDITOR_TIMEOUT_MINUTES),
     }),
     audit({
       id: mergeSha(OUTSIDE_PULL_REQUEST.lockfileRefresh),
@@ -72,6 +77,7 @@ export function storefrontAudits(clock: FixtureClock): AuditView[] {
       suggestedType: 'docs',
       releaseId: RELEASE.oneEightTwo,
       conclusion: FOOTER_LINKS_CONCLUSION,
+      concludedAt: ago(days(3) + hours(3)),
     }),
     audit({
       id: mergeSha(OUTSIDE_PULL_REQUEST.promoBannerCopy),
@@ -87,6 +93,7 @@ export function storefrontAudits(clock: FixtureClock): AuditView[] {
       suggestedType: null,
       releaseId: RELEASE.oneEightThree,
       conclusion: PROMO_BANNER_COPY_CONCLUSION,
+      concludedAt: ago(PROMO_BANNER_CONCLUDED_MINUTES_AGO),
       draft: PROMO_BANNER_COPY_DRAFT,
     }),
     audit({
@@ -103,11 +110,13 @@ export function storefrontAudits(clock: FixtureClock): AuditView[] {
       suggestedType: 'dependencies',
       releaseId: RELEASE.oneEight,
       conclusion: HTTP_CLIENT_BUMP_CONCLUSION,
+      concludedAt: ago(days(9) - hours(1)),
       draft: HTTP_CLIENT_BUMP_DRAFT,
       publishedIssueNumber: ISSUE.httpTimeoutRegression,
       publishedIssueAt: ago(days(8)),
       resolved: true,
       resolutionNote: 'The timeout is now set explicitly in the checkout configuration. Issue #75 tracks the regression test.',
+      resolvedAt: ago(HTTP_CLIENT_RESOLVED_MINUTES_AGO),
     }),
     audit({
       id: mergeSha(OUTSIDE_PULL_REQUEST.apiReferenceResync),

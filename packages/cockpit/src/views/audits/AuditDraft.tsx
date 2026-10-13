@@ -19,7 +19,7 @@ export function AuditDraft({ audit }: { readonly audit: AuditView }) {
       description={draft !== null && publishedIssueNumber === null ? t('audits.draft.unpublished') : undefined}
       actions={
         publishedIssueNumber === null ? undefined : (
-          <span className="audit-draft__published">
+          <span className="audit-section__actions">
             <PublishedIssueLink number={publishedIssueNumber} url={publishedIssueUrl} />
             {publishedIssueAt === null ? null : <Time iso={publishedIssueAt} className="subtle" />}
           </span>

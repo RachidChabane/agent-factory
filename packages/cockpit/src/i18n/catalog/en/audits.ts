@@ -48,9 +48,11 @@ export const enAudits = {
   'audits.resolve.errorNote': 'Write how the audit was resolved.',
   'audits.resolved.title': 'Resolved',
   'audits.resolved.noNote': 'No note was recorded.',
+  'audits.resolved.at': 'Resolved {when}.',
 
   'audits.failure.title': { one: '{count} audit attempt failed', other: '{count} audit attempts failed' },
   'audits.failure.noReason': 'No reason was recorded.',
+  'audits.failure.at': 'Last failure {when}.',
 
   'audits.conclusion.title': 'Auditor’s conclusion',
   'audits.conclusion.noneDetected': 'The audit has not started',
@@ -58,6 +60,7 @@ export const enAudits = {
   'audits.conclusion.noneAuditing': 'The audit is under way',
   'audits.conclusion.noneOther': 'No conclusion recorded',
   'audits.conclusion.openRun': 'Open the auditor run {run}',
+  'audits.conclusion.at': 'Concluded {when}',
   'audits.conclusion.clean': 'No finding: the change is kept as it is.',
   'audits.finding.evidence': 'Evidence',
   'audits.fix.title': 'Proposed fix',

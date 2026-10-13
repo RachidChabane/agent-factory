@@ -133,13 +133,16 @@ export type AuditSeed = WithDefaults<
   | 'branch'
   | 'releaseId'
   | 'conclusion'
+  | 'concludedAt'
   | 'failureCount'
   | 'lastFailure'
+  | 'lastFailureAt'
   | 'draft'
   | 'publishedIssueNumber'
   | 'publishedIssueAt'
   | 'resolved'
   | 'resolutionNote'
+  | 'resolvedAt'
 >;
 
 /** An audit; the addresses of its pull request and of its published issue are the ones the forge of the project gives those numbers. */
@@ -150,13 +153,16 @@ export function auditView(seed: AuditSeed, links: Pick<ForgeLinks, 'pullRequest'
     branch: null,
     releaseId: null,
     conclusion: null,
+    concludedAt: null,
     failureCount: 0,
     lastFailure: null,
+    lastFailureAt: null,
     draft: null,
     publishedIssueNumber: null,
     publishedIssueAt: null,
     resolved: false,
     resolutionNote: null,
+    resolvedAt: null,
     ...seed,
     pullRequestUrl: seed.pullRequestNumber === undefined || seed.pullRequestNumber === null ? null : links.pullRequest(seed.pullRequestNumber),
     publishedIssueUrl: seed.publishedIssueNumber === undefined || seed.publishedIssueNumber === null ? null : links.issue(seed.publishedIssueNumber),

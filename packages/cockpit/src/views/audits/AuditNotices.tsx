@@ -7,6 +7,7 @@ import type { Translate } from '../../i18n/create-i18n.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { useVocabulary } from '../../i18n/vocabulary.ts';
 import { paths } from '../../model/routes.ts';
+import { Time } from '../../widgets/Time.tsx';
 import { holdsRelease } from './audit-model.ts';
 
 const ICON_SIZE = 16;
@@ -26,9 +27,9 @@ function reasonExplanation(reason: AuditReason, t: Translate, settings: Pick<Pro
   }
 }
 
-/** Why the change is audited, what is wrong with the audit run, which release it holds back, and how it was resolved. */
+/** Why the change is audited, what is wrong with the audit run and since when, which release it holds back, and how and when it was resolved. */
 export function AuditNotices({ audit }: { readonly audit: AuditView }) {
-  const { t } = useI18n();
+  const { t, rich } = useI18n();
   const vocabulary = useVocabulary();
   const project = useProject();
   const release = audit.releaseId === null ? undefined : project.releases.find((entry) => entry.id === audit.releaseId);
@@ -48,6 +49,7 @@ export function AuditNotices({ audit }: { readonly audit: AuditView }) {
           <div className="callout__body">
             <p className="callout__title">{t('audits.failure.title', { count: audit.failureCount })}</p>
             <p className="audit-notice__text">{audit.lastFailure ?? t('audits.failure.noReason')}</p>
+            {audit.lastFailureAt === null ? null : <p className="subtle">{rich('audits.failure.at', { when: <Time iso={audit.lastFailureAt} /> })}</p>}
           </div>
         </section>
       )}
@@ -66,6 +68,7 @@ export function AuditNotices({ audit }: { readonly audit: AuditView }) {
           <div className="callout__body">
             <p className="callout__title">{t('audits.resolved.title')}</p>
             <p className="audit-notice__text">{audit.resolutionNote ?? t('audits.resolved.noNote')}</p>
+            {audit.resolvedAt === null ? null : <p className="subtle">{rich('audits.resolved.at', { when: <Time iso={audit.resolvedAt} /> })}</p>}
           </div>
         </section>
       ) : null}

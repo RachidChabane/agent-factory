@@ -49,9 +49,11 @@ export const frAudits = {
   'audits.resolve.errorNote': 'Notez comment l’audit a été résolu.',
   'audits.resolved.title': 'Résolu',
   'audits.resolved.noNote': 'Aucune note n’a été enregistrée.',
+  'audits.resolved.at': 'Résolu {when}.',
 
   'audits.failure.title': { one: '{count} tentative d’audit en échec', other: '{count} tentatives d’audit en échec' },
   'audits.failure.noReason': 'Aucune raison n’a été enregistrée.',
+  'audits.failure.at': 'Dernier échec {when}.',
 
   'audits.conclusion.title': 'Conclusion de l’auditeur',
   'audits.conclusion.noneDetected': 'L’audit n’a pas commencé',
@@ -59,6 +61,7 @@ export const frAudits = {
   'audits.conclusion.noneAuditing': 'L’audit est en cours',
   'audits.conclusion.noneOther': 'Aucune conclusion enregistrée',
   'audits.conclusion.openRun': 'Ouvrir le run de l’auditeur {run}',
+  'audits.conclusion.at': 'Conclu {when}',
   'audits.conclusion.clean': 'Aucun constat : le changement est conservé tel quel.',
   'audits.finding.evidence': 'Preuves',
   'audits.fix.title': 'Correction proposée',

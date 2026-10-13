@@ -247,6 +247,20 @@ describe('the view of one project', () => {
     });
   });
 
+  it('tells when the auditor concluded, when the last audit run failed and when the audit was resolved', () => {
+    const [audit] = view.audits;
+    if (audit === undefined) throw new Error('the project has an audit');
+    const subject = auditSubject(audit.id);
+    const concluded = projectHistory().project.find((record) => record.subject === subject && record.type === 'audit.concluded');
+    expect(audit).toMatchObject({ concludedAt: concluded?.occurredAt.toISOString(), lastFailureAt: null, resolvedAt: null });
+    const failed = { occurredAt: new Date(GENERATED_AT.getTime() + 1), type: 'audit.failed', subject, payload: { runId: 'run-auditor-2', reason: 'the auditor run timed out' } };
+    const resolved = { occurredAt: new Date(GENERATED_AT.getTime() + 2), type: 'audit.resolved', subject, payload: { note: 'a test now covers the patch' } };
+    expect(viewOf(withProjectEvents(projectHistory(), failed, resolved)).view.audits[0]).toMatchObject({
+      lastFailureAt: failed.occurredAt.toISOString(),
+      resolvedAt: resolved.occurredAt.toISOString(),
+    });
+  });
+
   describe('the scheduler of a project', () => {
     const at = (minutes: number): Date => new Date(GENERATED_AT.getTime() - minutes * 60_000);
     const full = (minutes: number, waiting: readonly number[]) => ({
