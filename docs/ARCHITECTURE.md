@@ -141,6 +141,10 @@ How the cockpit loads, caches and shares its stream:
   waited for at most three seconds; past that the snapshot carries it empty (`null`,
   never a stand-in) and the read ends in the background. The factory builds the first
   snapshot as it starts.
+- **A range of commits is read once.** The commits a deployment delivered, and those waiting behind the
+  current one, come from the project's clone. A range between two shas never changes, so the server keeps it
+  by those two shas, up to a bound on the entries, and runs git only for a range it has not read. The commits
+  waiting behind a deployment end at the head of the base branch, so each head gives a range of its own.
 - **Errors never blank the page.** Every view and the application sit in an error
   boundary that shows the message with a retry. A lazy chunk that fails to load offers
   a document reload, because the browser caches a rejected dynamic import.

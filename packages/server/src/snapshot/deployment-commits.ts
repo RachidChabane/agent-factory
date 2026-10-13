@@ -1,5 +1,14 @@
 import type { RepositoryCommit } from '@agent-factory/adapters';
 import { currentDeployment, deploymentRanges, type DeploymentRecord } from '@agent-factory/application';
+import { RecentlyUsedCache } from './recently-used-cache.ts';
+
+/**
+ * How many commit ranges a project keeps. The deployments an environment shows and the commits waiting behind its current
+ * one are a few dozen ranges for the whole project; the ranges that a base branch leaves behind as its head moves are the
+ * ones this bound lets go of.
+ */
+export const MAX_CACHED_RANGES = 200;
+const RANGE_SEPARATOR = '..';
 
 /** The commits of a range; null when the clone cannot say, which is not the same as no commit at all. */
 export type Commits = readonly RepositoryCommit[] | null;
@@ -12,14 +21,17 @@ export interface ClonedHistory {
 
 /**
  * The commits each deployment of an environment brought, and those that wait behind the current one, read from the
- * clone. A range between two shas never changes, so one that the clone answered is kept for good.
+ * clone. A range between two shas never changes, so one that the clone answered is kept, by its two shas, and read again
+ * only after enough other ranges pushed it out. The commits waiting behind a deployment end at the head of the base
+ * branch, which moves: each head gives a range of its own.
  */
 export class DeploymentCommits {
   private readonly history: ClonedHistory;
-  private readonly known = new Map<string, readonly RepositoryCommit[]>();
+  private readonly known: RecentlyUsedCache<string, readonly RepositoryCommit[]>;
 
-  constructor(history: ClonedHistory) {
+  constructor(history: ClonedHistory, capacity: number = MAX_CACHED_RANGES) {
     this.history = history;
+    this.known = new RecentlyUsedCache(capacity);
   }
 
   /** The commits of each deployment, by deployment id, from the deployments of an environment newest first. */
@@ -40,7 +52,7 @@ export class DeploymentCommits {
   private async between(baseSha: string | null, headSha: string | null): Promise<Commits> {
     if (baseSha === null || headSha === null) return null;
     if (baseSha === headSha) return [];
-    const key = `${baseSha}..${headSha}`;
+    const key = `${baseSha}${RANGE_SEPARATOR}${headSha}`;
     const known = this.known.get(key);
     if (known !== undefined) return known;
     const commits = await this.history.commitsBetween(baseSha, headSha).catch((): Commits => null);
