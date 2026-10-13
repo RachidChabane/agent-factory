@@ -32,6 +32,18 @@ test.describe('the board of the demonstration', () => {
     await expect(card(column(page, 'Delivered'), CATEGORY_FILTER.spec.title)).toBeVisible();
   });
 
+  test('keeps the time of every card inside the card, whatever the room its column leaves', async ({ page }) => {
+    const cards = await page.getByRole('main').getByRole('article').all();
+    expect(cards.length).toBeGreaterThan(0);
+    for (const article of cards) {
+      const frame = await article.boundingBox();
+      const time = await article.getByRole('time').boundingBox();
+      if (frame === null || time === null) throw new Error('a card or its time is not laid out');
+      expect(time.x + time.width, 'the time ends before the right edge of its card').toBeLessThanOrEqual(frame.x + frame.width);
+      expect(time.y + time.height, 'the time ends above the bottom edge of its card').toBeLessThanOrEqual(frame.y + frame.height);
+    }
+  });
+
   test('shows the agent that waits for the operator in the runs in progress', async ({ page }) => {
     const running = page.getByRole('region', { name: 'Runs in progress' });
     await expect(running.getByRole('link', { name: new RegExp(`Implementer · #3 ${DISCOUNT_ROUNDING.spec.title}`) })).toBeVisible();
