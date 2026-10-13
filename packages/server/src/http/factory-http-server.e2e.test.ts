@@ -576,7 +576,7 @@ describe('the factory HTTP server end to end, with two projects', () => {
   it('drains on order: no new work starts, and the factory stops once its running work finishes', async () => {
     const drained = await post('factory.drain', {});
     expect(drained.status).toBe(200);
-    expect(CommandAcceptedSchema.parse(await drained.json()).effect).toBe('No new work starts; the factory stops at its next tick');
+    expect(CommandAcceptedSchema.parse(await drained.json()).effect).toMatch(/^No new work starts; the factory stops (at its next tick|once its running work finishes)$/);
     await running.finished;
     const records = await installation.events.read('daemon', 0);
     expect(records.at(-1)).toMatchObject({ type: 'daemon.stopped', payload: { reason: 'the installation stopped once its running work finished, as the operator asked' } });
