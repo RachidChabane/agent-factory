@@ -201,4 +201,23 @@ describe('gestures made as the delegate of a project', () => {
     expect(allowed.code).toBe(1);
     expect(allowed.captured.errors[0]).toMatch(/^Issue #99 cannot be resumed/);
   });
+
+  it('refuses the delegate a new review of the same implementation however much the policy delegates, and leaves it to the operator', async () => {
+    const eventsBefore = (await eventsOf(FIRST_PROJECT).read('', 0)).length;
+    const noticesBefore = notices.length;
+
+    const refused = await run('--project', FIRST_PROJECT, 'resume', String(issues.guarded), '--review-again', '--as', 'orchestrator', '--reason', REASON);
+
+    expect(refused.code).toBe(1);
+    expect(refused.captured.lines).toEqual([]);
+    expect(refused.captured.errors).toEqual([
+      `Refused: orchestrator may not order a new review of the same implementation in project ${FIRST_PROJECT}: the autonomy policy cannot delegate a new review of the same implementation; only the operator orders it`,
+    ]);
+    expect((await eventsOf(FIRST_PROJECT).read('', 0)).length).toBe(eventsBefore);
+    expect(notices.slice(noticesBefore)).toEqual([]);
+
+    const operator = await run('--project', FIRST_PROJECT, 'resume', '99', '--review-again');
+    expect(operator.code).toBe(1);
+    expect(operator.captured.errors[0]).toMatch(/^Issue #99 cannot be resumed/);
+  });
 });

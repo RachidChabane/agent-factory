@@ -8,7 +8,7 @@ import {
   type Delegation,
   type GestureTarget,
 } from '@agent-factory/application';
-import type { DelegableGesture } from '@agent-factory/domain';
+import type { DelegableGesture, OperatorOnlyGesture } from '@agent-factory/domain';
 import type { ProjectConfig } from '../../config/agent-factory-config.ts';
 import type { CliContext } from '../cli-context.ts';
 import type { ProjectSession } from './project-session.ts';
@@ -23,6 +23,14 @@ function settingsOf(project: ProjectConfig): AutonomyGateSettings {
  */
 export function authorisedDelegate(project: ProjectConfig, delegation: Delegation | null, gesture: Exclude<DelegableGesture, 'merge'>): Authorisation | null {
   return delegation === null ? null : authoriseGesture(settingsOf(project), delegation, { gesture });
+}
+
+/**
+ * Refuses the delegate who asks for a gesture no policy delegates, before anything else is read or written.
+ * Nothing happens when the operator makes the gesture themselves.
+ */
+export function refuseDelegation(project: ProjectConfig, delegation: Delegation | null, gesture: OperatorOnlyGesture): void {
+  if (delegation !== null) authoriseGesture(settingsOf(project), delegation, { gesture });
 }
 
 /** The gate of an open project, for the gestures that need the journal and for recording the ones that were made. */

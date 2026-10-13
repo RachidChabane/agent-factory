@@ -3,7 +3,7 @@ import { issueResumer } from '../../composition/project/project-use-cases.ts';
 import type { CliContext } from '../cli-context.ts';
 import { COMMAND_NAMES } from '../command-line.ts';
 import { EXIT_CODES } from '../output.ts';
-import { authorisedDelegate, recordDelegation } from './delegated-gestures.ts';
+import { authorisedDelegate, recordDelegation, refuseDelegation } from './delegated-gestures.ts';
 import { runningFactory } from './factory-running.ts';
 import { itemName, nextCommand, selectedProject, withProjectSession, type SelectedProject } from './project-session.ts';
 
@@ -24,9 +24,10 @@ async function continuation(selected: SelectedProject, issueNumber: number): Pro
     : `The factory running as process ${running} continues it at its next tick.`;
 }
 
-/** Orders a new review of the implementation the issue has. */
-async function reviewAgainCommand(issueNumber: number, requested: string | null, context: CliContext): Promise<number> {
+/** Orders a new review of the implementation the issue has: the operator's alone, since no policy delegates it. */
+async function reviewAgainCommand(issueNumber: number, delegation: Delegation | null, requested: string | null, context: CliContext): Promise<number> {
   const selected = await selectedProject(context, requested);
+  refuseDelegation(selected.project, delegation, 'review-again');
   return withProjectSession(context, selected, async ({ installation, project }) => {
     const ordered = await issueResumer(project).reviewAgain(issueNumber, installation.operator);
     context.output.line(
@@ -55,6 +56,6 @@ async function returnCommand(issueNumber: number, answer: string | null, delegat
 
 export function resumeCommand(issueNumber: number, options: ResumeOptions, requested: string | null, context: CliContext): Promise<number> {
   return options.reviewAgain
-    ? reviewAgainCommand(issueNumber, requested, context)
+    ? reviewAgainCommand(issueNumber, options.delegation, requested, context)
     : returnCommand(issueNumber, options.answer, options.delegation, requested, context);
 }

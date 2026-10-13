@@ -111,6 +111,7 @@ export const USAGE = [
   '    --as <actor> --reason "<why>"',
   '  both together: the factory checks the project\'s autonomy policy first, refuses what it does not delegate and names what is',
   '  missing (exit 1), and records each accepted gesture with its reason. Without --as the gesture is the operator\'s own.',
+  '  resume --review-again is the operator\'s alone: --as is refused for it, whatever the policy delegates.',
   '',
   'Work items',
   '  request add <file> [--images <dir>] [--requester <name>]   store a product request with its images',

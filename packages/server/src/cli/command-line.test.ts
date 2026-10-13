@@ -140,6 +140,9 @@ describe('parseCommandLine', () => {
     expect(parseCommandLine(['resume', '7', '--answer', 'Yes', '--as', 'orchestrator', '--reason', 'the spec answers it'])).toEqual(
       ok({ kind: 'resume', issueNumber: 7, answer: 'Yes', reviewAgain: false, delegation: { actor: 'orchestrator', reason: 'the spec answers it' } }),
     );
+    expect(parseCommandLine(['resume', '7', '--review-again', '--as', 'orchestrator', '--reason', 'the review blocked on a nit'])).toEqual(
+      ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: true, delegation: { actor: 'orchestrator', reason: 'the review blocked on a nit' } }),
+    );
     expect(parseCommandLine(['merge', '100', '--expected-head', SHA, '--as', 'orchestrator', '--reason', 'a documentation change with a clean review'])).toEqual(
       ok({ kind: 'merge', pullRequestNumber: 100, expectedHeadSha: SHA, delegation }),
     );
