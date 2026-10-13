@@ -72,7 +72,10 @@ request never waits for a film, and no issue state is added.
   the reason.
 - **Publication.** A video that is not an MP4 is transcoded to H.264 with `ffmpeg`
   under `nice`. The films, screenshots and both reports go to
-  `.evidence/<issue>/films/<scenario>/` on the branch, in one evidence commit. The
+  `.evidence/<issue>/films/<scenario>/` on the branch, in one evidence commit. A video
+  or a screenshot over the evidence limits (`evidence.maxFileBytes` and `maxTotalBytes`)
+  is left out of that commit; the block of the recording names it with its size and the
+  limit, and the cockpit plays it from the factory's own store. The
   reports and the new pull request body pass the outbound secret scan first. A
   finding, or a failure to copy or commit, fails the film and leaves nothing behind.
   The new head is recorded, and the merge's head check holds on it.
