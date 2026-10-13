@@ -1,5 +1,5 @@
 {
-  "inputHash": "1dcd03df7af10ab1b75bcf0686a04c55be6065d2579c3ba1222ec6ba66604958",
+  "inputHash": "5763da28b2cbf4a64071413d7d4f6ac55709c034c81592977050ebc5f212e46f",
   "inputs": {
     "e2e/capture/inputs.ts": "abc73ef6064eddb91d7f2258dd8fb99fd4d5f5f8b576a23baeb9495d768d9caa",
     "e2e/capture/main.ts": "5bb270ac169ca25fa487045d3d86a973849387ac6a80ee61ce6ffb19d043d410",
@@ -61,7 +61,7 @@
     "packages/cockpit/src/contract/index.ts": "0e733742f004a348ce80f188f986d63a358040f66b749b1a6406384d626d7b57",
     "packages/cockpit/src/contract/primitives.ts": "2e66c98638b8f167e32844cb6c2c6b2ccea91dba344eb9d156aca6582b662751",
     "packages/cockpit/src/contract/run-log.ts": "48405b01c9f72f2dba8a58db51a8777e7cd3573d05b5451bc70377e380718bae",
-    "packages/cockpit/src/contract/snapshot.ts": "da5d2b40086a4b5a6c5816a738a993a8e188bcd0f26115653fcd288b64fe6bdd",
+    "packages/cockpit/src/contract/snapshot.ts": "00ecec35c0796dc28f83a66ac4e8234e07062789ba7949fa593ca36e435af317",
     "packages/cockpit/src/contract/telemetry.ts": "f2b4f31960734bfeb103c08330769bd8c2199419ca04551b303f70277c05824a",
     "packages/cockpit/src/contract/vocabulary.ts": "f58deee75e8303be9f36c76933ee992e1927cc95e49b9539fe3ecf24d5bd02ce",
     "packages/cockpit/src/data/__fixtures__/run-log-system-lines.json": "97924fee20afb998c0868838f1f2cbd99f3333696a21144a34330bcd28c1eed3",
@@ -82,7 +82,7 @@
     "packages/cockpit/src/data/system-notices.ts": "585aadb4b893236a465bb5e51944b368adb6fae79c30248ef9d03619f2df52ea",
     "packages/cockpit/src/data/transport.ts": "3674de48ca5121ed114edccb086665a4276bfed3f8fcd61bdc95e50ac34474cc",
     "packages/cockpit/src/i18n/I18nProvider.tsx": "d2a90311cb50709e1429178331fd17961b2e250f7e357b3e03627c128e43b0b9",
-    "packages/cockpit/src/i18n/catalog/en/audits.ts": "2d840b08899da4ef6ad0e86cfc6ed63f95b0788447895ed71699ee184a19bd43",
+    "packages/cockpit/src/i18n/catalog/en/audits.ts": "188dfa24778b920401ee83e934ab044ccc528bb688dbc7eda3fcc4867229fc15",
     "packages/cockpit/src/i18n/catalog/en/autonomy.ts": "eb99c093298c0782a8d6c03ec338594006156d8387cf0c0bce6750b775eddd64",
     "packages/cockpit/src/i18n/catalog/en/board.ts": "98019762f2ef47a2ead16e96f0977d58bdbdc7f2ea13d6e0ab56101dce0477c5",
     "packages/cockpit/src/i18n/catalog/en/changes.ts": "f0d5fa672175ecd71e3770c8e3bada3d9d95c7a542d81856b44b6a3add494a5b",
@@ -103,7 +103,7 @@
     "packages/cockpit/src/i18n/catalog/en/usage.ts": "5cbb6ba998a1b70a132532596108764addc8799f6e2bd77de936fbe0b40da01b",
     "packages/cockpit/src/i18n/catalog/en/vocabulary.ts": "3d9c4eea0906ade4937b939d15ccd660782cb8b7e589a1054cc29fb181b87879",
     "packages/cockpit/src/i18n/catalog/en/widgets.ts": "05059657dc1f130aa80aeccd4f660ae26e045936097b1e5b9899a74de8338522",
-    "packages/cockpit/src/i18n/catalog/fr/audits.ts": "ef935b0d26c9b6da0ce13253346c8554ead66a47c5eda26d88135e73100866a0",
+    "packages/cockpit/src/i18n/catalog/fr/audits.ts": "8787696bf88b5ed3c40c2f5e6ead936905a2eac10d2c9dee79f6a8b91144cc7f",
     "packages/cockpit/src/i18n/catalog/fr/autonomy.ts": "8870aff1f843e4bf71b236437b745b4fb722db026d63775bf185eb7785bd46cb",
     "packages/cockpit/src/i18n/catalog/fr/board.ts": "0f46d3a9169fdb1e09270eda38e57d22f64900fafb91513cb3097e582c742dea",
     "packages/cockpit/src/i18n/catalog/fr/changes.ts": "74f73a52fdadb6fd5836c8f76e851c640edb867220de18329020ef5735194222",
@@ -181,13 +181,13 @@
     "packages/cockpit/src/ui/styles/tokens.css": "26a6a6e05962cefb404ea86e8d8bf140d01aeefec558fe64b83cdc13b4aa14c8",
     "packages/cockpit/src/views/NotFoundView.tsx": "a0a25e8d3952b2c832934a4e9741f191a1a257ae1ea9f3465608a8a6088281d6",
     "packages/cockpit/src/views/audits/AuditActions.tsx": "ca49e8e96acb216079a399ecd23972a85d223e6bd74bb5c088a532e0b6d7f544",
-    "packages/cockpit/src/views/audits/AuditConclusion.tsx": "ac252e608ce53fdae1439cc5a8d2bf62d0ea1a60017f83aba156b6880e381c0e",
+    "packages/cockpit/src/views/audits/AuditConclusion.tsx": "efa2513615f1d4a2d6afa9b047134359dadc67dcd7fb221bec727f4cb5d722e4",
     "packages/cockpit/src/views/audits/AuditDetail.tsx": "848e84fc929c0ae15601633e31fe3072adede6d70b8a93530d191f1e73c523f7",
-    "packages/cockpit/src/views/audits/AuditDraft.tsx": "1e59a3fe6aab6e3f5f2a326e1185365ed82a84ca5826de88e50062e48a71ed7a",
+    "packages/cockpit/src/views/audits/AuditDraft.tsx": "5e7f8f65218b20353e07696d1d23cec4443551a7f78df0bf5701f9f181ccdd56",
     "packages/cockpit/src/views/audits/AuditFiles.tsx": "7b498fc0b89d543512e5bd984ff9e6a078669afb29c3d70e4cdadb696c00e60d",
     "packages/cockpit/src/views/audits/AuditHeader.tsx": "db8062be224422fe9fc581488cb9cbda04cbc949e54f745f59f2d3105d78b9aa",
     "packages/cockpit/src/views/audits/AuditListItem.tsx": "c4e3e10bc75f83d8bc82a4f67646e6a7e4b411aceafb137680ee4527a495bc2c",
-    "packages/cockpit/src/views/audits/AuditNotices.tsx": "84032b132160206e4dd5fe743c460cfe637e67d691a1c2862232659e20ae117d",
+    "packages/cockpit/src/views/audits/AuditNotices.tsx": "b9fb82a0f34dd45da3214de16e37c41a724f34439e6c74fa9ce411a8cef651c4",
     "packages/cockpit/src/views/audits/AuditsView.tsx": "50a7f7ae0575461113ea3e648450c47be1a6d10c9f947d21ac326d8b736d2efa",
     "packages/cockpit/src/views/audits/PublishedIssueLink.tsx": "ad92489b655a70e64c452d43d6bbabcadd363e6c67d4c9083850c32c4a86693a",
     "packages/cockpit/src/views/audits/PullRequestLink.tsx": "b17ac3a9fce1c52f9af4382481679b0bacb277a0ffeb5a65f86fc9177c7c5c0b",
@@ -196,7 +196,7 @@
     "packages/cockpit/src/views/audits/audit-links.ts": "23be64d2cd72c847078300b9d53a3c8631f1a949d8940110f741cb2d7092d44b",
     "packages/cockpit/src/views/audits/audit-model.ts": "1c70d26f416b33d5afb9b6855a70b1524c02c53a76b452ea643b5bc2396c9a8a",
     "packages/cockpit/src/views/audits/audit-test-support.ts": "2bdff6f81adc378f5d2e18efabee715bbbedac61173bdae1197ab6de48daa1fc",
-    "packages/cockpit/src/views/audits/audits.css": "7b0076ab65bbc6d70ab462754a3b9b03355ad516d7fe251b87b32574c70fb730",
+    "packages/cockpit/src/views/audits/audits.css": "e557a76622abf4f6d16962cec4a9642643da5899c5e2385e75c9c932f790b941",
     "packages/cockpit/src/views/board/BoardCard.tsx": "d978513a1c1612011a6a84fd620cdac30aa04a5cbce39873b7ab423e134e2b6f",
     "packages/cockpit/src/views/board/BoardColumns.tsx": "857407ff6b6d7a8c0941a58e1499e43fee406c0e557cbfaf111308a627858b54",
     "packages/cockpit/src/views/board/BoardFilterMenu.tsx": "d0f8b7d566557d8e4dc9d73d076441203de674a61d1d4632c113eca96a19510f",
@@ -481,38 +481,38 @@
   "images": [
     {
       "file": "changes.png",
-      "bytes": 155960,
-      "sha256": "735b672b3f924b454f1e66816a09d81e8d28a2daa35f9a7a1a347020a7725ab8"
+      "bytes": 156424,
+      "sha256": "c3c8ed87ef9d383b14bab98728c091b9848aa65320d71076cf25a0d47b73f2a8"
     },
     {
       "file": "board.png",
-      "bytes": 193306,
-      "sha256": "b313cb3216d10bd3ce78fffe7a683aa2de9c3e59a93a2d03c6ee30de7335b38e"
+      "bytes": 193176,
+      "sha256": "242afbd0de63d2680dc7e53cf9e2fcc108e76c020adfc869b8af57886757f4cb"
     },
     {
       "file": "issue.png",
-      "bytes": 142504,
-      "sha256": "85a094aa3a94ec18de13da767829ecf9982c8fc87836304986d1f37f1e510489"
+      "bytes": 142598,
+      "sha256": "b37a6334490556133f1835fea75e8682a363ac4de6bd30609f147254fd6ec103"
     },
     {
       "file": "pull-request.png",
-      "bytes": 168373,
-      "sha256": "7220f2340dc700f59f804619ada73cfb80ede8cd3466528ac9c1f994023085df"
+      "bytes": 168280,
+      "sha256": "23fc1e4d90bd3a81f7c10ac1bdb36b35617b508f6f06474e72de40710e731525"
     },
     {
       "file": "delivery.png",
-      "bytes": 142704,
-      "sha256": "ce1bbf69518d99f66aca860b4ea248f5dc5c9c8b01a5e71d43469f4984b39f12"
+      "bytes": 142258,
+      "sha256": "d70f0e75477ddfc6fa582086d29918eefbfe6e0cfd79bb64e51abbdf5c2fbe9c"
     },
     {
       "file": "runs.png",
-      "bytes": 276297,
-      "sha256": "9306f0197bba247965f979e77099db8ab80a0148a2b07a1e21d72fff79387eda"
+      "bytes": 277471,
+      "sha256": "535c7577944ffd4914dba5bf11bb3731b47d9ae67f6759e2c024dbfed1d5f2aa"
     },
     {
       "file": "usage.png",
-      "bytes": 136406,
-      "sha256": "7953c54325ab71611e4945dd70a4a3032c52233fcbc58e9504116644b6928ab4"
+      "bytes": 136571,
+      "sha256": "affbdb4e8badee8dbcdf337df2ad8a1263d26e2fc22b1d25fad698119ae4aef4"
     }
   ]
 }
