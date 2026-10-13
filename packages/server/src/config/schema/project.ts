@@ -48,7 +48,7 @@ import {
   RoleOverrideSchema,
   uniqueBy,
 } from './common.ts';
-import { CheckEnvironmentSchema, SandboxSettingsSchema, ToolChecksSchema } from './installation.ts';
+import { CheckEnvironmentSchema, SandboxSettingsSchema, ToolChecksSchema, ToolNameSchema } from './installation.ts';
 
 export const DEFAULT_BASE_BRANCH = 'main';
 export const DEFAULT_CLONE_DIRECTORY = 'clone';
@@ -255,9 +255,15 @@ const FilmsSchema = z
     replayFile: z.string().regex(REPLAY_FILE_NAME, 'must be a file name').default(DEFAULT_FILM_REPLAY_FILE),
     /** The zone of the expected arrival times; the machine's zone when absent. */
     timeZone: NonEmptyString.refine(isTimeZone, { message: 'is not a time zone name such as Europe/Paris' }).optional(),
+    /**
+     * The tools whose checks must pass before a film starts, by their names in `tools` (of the installation or of the
+     * project): while one fails, the films of the project stay queued.
+     */
+    tools: z.array(ToolNameSchema).default([]),
   })
   .superRefine((films, context) => {
     for (const problem of filmCommandProblems(films.command)) context.addIssue({ code: 'custom', path: ['command'], message: problem });
+    for (const name of uniqueBy(films.tools, (tool) => tool)) context.addIssue({ code: 'custom', path: ['tools'], message: `tool ${name} is listed twice` });
   });
 
 /** Lets the delegate merge the pull requests of some issue types, once the conditions hold. */

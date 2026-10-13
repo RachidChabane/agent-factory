@@ -14,8 +14,12 @@ function film(scenario: string): FilmView {
   return { scenario, recordedAt: MOMENT, before: phase, after: phase };
 }
 
-const FILMING: Pick<ProjectView, 'settings'> = { settings: { films: { timeZone: 'UTC', timeoutMinutes: 20 } } as ProjectView['settings'] };
-const NOT_FILMING: Pick<ProjectView, 'settings'> = { settings: { films: null } as ProjectView['settings'] };
+function projectFilming(films: ProjectView['settings']['films']): Pick<ProjectView, 'settings'> {
+  return { settings: { films } as ProjectView['settings'] };
+}
+
+const FILMING = projectFilming({ timeZone: 'UTC', timeoutMinutes: 20, tools: [] });
+const NOT_FILMING = projectFilming(null);
 
 describe('the films of a pull request', () => {
   const orders = [order('a', 'queued'), order('b', 'recording-base'), order('c', 'recording-head'), order('d', 'committing'), order('e', 'finished'), order('f', 'failed', 'the session expired')];
@@ -53,7 +57,7 @@ describe('the time a film is expected', () => {
   const clock = (text: string) => text.replace(/\s/g, ' ');
 
   it('is told in the zone of the project, whatever zone the reader is in', () => {
-    expect(filmTimeZone({ settings: { films: { timeZone: 'Europe/Paris', timeoutMinutes: 20 } } as ProjectView['settings'] })).toBe('Europe/Paris');
+    expect(filmTimeZone(projectFilming({ timeZone: 'Europe/Paris', timeoutMinutes: 20, tools: [] }))).toBe('Europe/Paris');
     expect(clock(expectedArrival(reader, INSTANT, 'Europe/Paris'))).toBe('Oct 12, 2026, 11:11 PM (Europe/Paris)');
   });
 

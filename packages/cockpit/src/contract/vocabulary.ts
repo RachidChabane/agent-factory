@@ -54,8 +54,8 @@ export type AuditFindingLevel = (typeof AUDIT_FINDING_LEVELS)[number];
 export const MEMORY_PRESSURES = ['normal', 'warn', 'critical'] as const;
 export type MemoryPressure = (typeof MEMORY_PRESSURES)[number];
 
-export { TOOL_STATUSES } from '@agent-factory/domain';
-export type { ToolName, ToolStatus } from '@agent-factory/domain';
+export { TOOL_FAILURE_STATUSES, TOOL_STATUSES } from '@agent-factory/domain';
+export type { ToolFailureStatus, ToolName, ToolStatus } from '@agent-factory/domain';
 
 export { REFERENCE_SNAPSHOT_STATUSES } from '@agent-factory/domain';
 export type { ReferenceSnapshotStatus } from '@agent-factory/domain';

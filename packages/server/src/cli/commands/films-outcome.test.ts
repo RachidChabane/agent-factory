@@ -12,11 +12,11 @@ const EXECUTABLE_MODE = 0o755;
 const PLAIN_MODE = 0o644;
 const PROGRAM = 'record-film';
 
-function projectWith(films: Record<string, unknown> | null, workingDirectory: string): ProjectConfig {
+function projectWith(films: Record<string, unknown> | null, workingDirectory: string, tools: readonly Record<string, unknown>[] = []): ProjectConfig {
   const evidence = films === null ? {} : { films: { workingDirectory, ...films } };
   const text = stringify({
     version: 1,
-    projects: [{ id: 'storefront', name: 'Storefront', forge: { kind: 'local', repository: 'example-org/storefront' }, commitIdentity: { name: 'Bot', email: 'bot@example.invalid' }, evidence }],
+    projects: [{ id: 'storefront', name: 'Storefront', forge: { kind: 'local', repository: 'example-org/storefront' }, commitIdentity: { name: 'Bot', email: 'bot@example.invalid' }, tools, evidence }],
   });
   return projectOf(parseAgentFactoryConfig(text, HOME, `${HOME}/config.yaml`, USER_HOME), 'storefront');
 }
@@ -59,6 +59,21 @@ describe('the films line of validate', () => {
 
   it('has nothing to say about a project that declares no film command', async () => {
     expect(await filmsOutcome(projectWith(null, directory), environment)).toEqual({ ok: true, detail: 'no film command declared' });
+  });
+
+  describe('the tools the films wait for', () => {
+    const VAULT = { name: 'vault', check: ['vault', 'token', 'lookup'] };
+    const CLOUD = { name: 'cloud', check: ['cloud', 'auth', 'status'] };
+
+    it('are named, with what the factory does with them', async () => {
+      const outcome = await filmsOutcome(projectWith({ ...filmCommand(PROGRAM), tools: ['vault', 'cloud'] }, directory, [VAULT, CLOUD]), environment);
+      expect(outcome.ok).toBe(true);
+      expect(outcome.detail).toContain('before a film starts it checks vault, cloud and keeps the films queued while one fails, reading it again every 5 minutes');
+    });
+
+    it('are not mentioned when the films need none', async () => {
+      expect((await filmsOutcome(projectWith(filmCommand(PROGRAM), directory), environment)).detail).not.toContain('before a film starts');
+    });
   });
 
   describe('the program of the command', () => {

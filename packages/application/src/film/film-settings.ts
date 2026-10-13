@@ -23,6 +23,8 @@ export interface FilmSettings {
   readonly replayFile: string;
   /** The zone the expected arrival of a film is told in. */
   readonly timeZone: string;
+  /** The tools whose checks must pass before a film starts, by their names in the configuration. */
+  readonly tools: readonly string[];
 }
 
 /** What the pull request body and the merge guard need to tell about the queue. */

@@ -38,7 +38,7 @@ function order(overrides: Partial<FilmOrderView> = {}): FilmOrderView {
 
 /** The storefront project films, and its search pull request carries what the test says about films. */
 function filming(update: (pullRequest: PullRequestView) => PullRequestView = (pullRequest) => pullRequest, snapshot: CockpitSnapshot = fixtureSnapshot(), number: number = SEARCH): CockpitSnapshot {
-  const enabled = mapProject(snapshot, STOREFRONT, (project) => ({ ...project, settings: { ...project.settings, films: { timeZone: 'Europe/Paris', timeoutMinutes: 20 } } }));
+  const enabled = mapProject(snapshot, STOREFRONT, (project) => ({ ...project, settings: { ...project.settings, films: { timeZone: 'Europe/Paris', timeoutMinutes: 20, tools: [] } } }));
   return withPullRequest(STOREFRONT, number, update, enabled);
 }
 

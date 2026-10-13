@@ -142,7 +142,7 @@ function world() {
     updateConcurrency: (concurrency) => daemon.updateConcurrency(concurrency),
     isIdle: () => daemon.isIdle(),
   };
-  const lane = new FilmLane([{ projectId: 'shop', films, notifications, log: QUIET_LOG, pauses: () => activePauses(events) }]);
+  const lane = new FilmLane([{ projectId: 'shop', films, notifications, log: QUIET_LOG, tools: null, pauses: () => activePauses(events) }], { clock });
   installation = new InstallationDaemon(
     { events, clock, sleeper, log: QUIET_LOG, pauses: { refresh: () => Promise.resolve(new Map()) }, configuration: null, tasks: [], projects: [scheduler], films: lane },
     { pollIntervalMs: POLL_MS },

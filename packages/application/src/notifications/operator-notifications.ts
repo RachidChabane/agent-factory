@@ -46,6 +46,29 @@ export interface ReadyNoticeFacts {
   readonly media: readonly NoticeLink[];
 }
 
+/** What the notice that the films of a project wait for a tool tells. */
+export interface FilmToolsUnavailableFacts {
+  readonly projectId: string;
+  readonly tool: string;
+  readonly status: 'unauthenticated' | 'missing' | 'error';
+  readonly detail: string;
+  readonly loginCommand: string | null;
+  readonly fixCommand: string | null;
+  readonly recheckEveryMinutes: number;
+}
+
+const TOOL_STATUS_PHRASES: Readonly<Record<FilmToolsUnavailableFacts['status'], string>> = {
+  unauthenticated: 'is not logged in',
+  missing: 'is not installed',
+  error: 'did not answer its check',
+};
+
+function toolRecovery(facts: Pick<FilmToolsUnavailableFacts, 'loginCommand' | 'fixCommand'>): string {
+  if (facts.loginCommand !== null) return `Log in with: ${facts.loginCommand}.`;
+  if (facts.fixCommand !== null) return `The tool declares no login the factory can start. Restore it with: ${facts.fixCommand}.`;
+  return 'The tool declares no login or fix command: restore it by hand.';
+}
+
 export const NOTICES = {
   needsHuman: (issueNumber: number, reason: string): OperatorNotice => ({
     title: `Issue #${issueNumber} needs you`,
@@ -122,6 +145,21 @@ export const NOTICES = {
     title: `Films of scenario ${scenario} failed for issue #${issueNumber}`,
     body: reason,
     path: COCKPIT_PATHS.issue(issueNumber),
+  }),
+  filmToolsUnavailable: (facts: FilmToolsUnavailableFacts): OperatorNotice => ({
+    title: `Films of ${facts.projectId} wait for ${facts.tool}`,
+    body: [
+      `The tool ${facts.tool} ${TOOL_STATUS_PHRASES[facts.status]}${facts.detail === '' ? '' : `: ${facts.detail}`}.`,
+      'The queued films stay queued and none fails.',
+      toolRecovery(facts),
+      `The factory checks again every ${facts.recheckEveryMinutes} minutes and starts the films once every tool passes.`,
+    ].join(WORD_SEPARATOR),
+    path: COCKPIT_PATHS.settings,
+  }),
+  filmToolsAvailable: (facts: { readonly projectId: string; readonly tool: string }): OperatorNotice => ({
+    title: `Films of ${facts.projectId} resume`,
+    body: `The tool ${facts.tool} passes its check again: the queued films start.`,
+    path: COCKPIT_PATHS.settings,
   }),
   failed: (what: string, reason: string): OperatorNotice => ({
     title: `Factory error: ${what}`,

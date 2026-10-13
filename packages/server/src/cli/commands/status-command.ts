@@ -1,4 +1,4 @@
-import { issueStatus, loadJournal, ProjectEventStore, restartHazards, type FactoryEventRecord } from '@agent-factory/application';
+import { filmToolWaitOf, issueStatus, loadJournal, ProjectEventStore, restartHazards, type FactoryEventRecord } from '@agent-factory/application';
 import type { IssueState } from '@agent-factory/domain';
 import type { AgentFactoryConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
 import { costBasis } from '../../projections/cost-views.ts';
@@ -40,7 +40,15 @@ function issuesByState(index: ReturnType<typeof indexEvents>): ReadonlyMap<Issue
 }
 
 function projectOverview(project: ProjectConfig, records: readonly FactoryEventRecord[]): ProjectOverview {
-  return { id: project.id, name: project.name, forge: forgeName(project), issuesByState: issuesByState(indexEvents(records)), pauses: pauseViews(records, 'project') };
+  const listsTools = (project.evidence.films?.tools.length ?? 0) > 0;
+  return {
+    id: project.id,
+    name: project.name,
+    forge: forgeName(project),
+    issuesByState: issuesByState(indexEvents(records)),
+    pauses: pauseViews(records, 'project'),
+    filmToolWait: listsTools ? filmToolWaitOf(records) : null,
+  };
 }
 
 async function overviewCommand(context: CliContext): Promise<number> {

@@ -15,3 +15,6 @@ export * from './film-merge-guard.ts';
 export * from './film-behaviour.ts';
 export * from './film-runner.ts';
 export * from './orphan-films.ts';
+export * from './film-tools.ts';
+export * from './film-tool-wait.ts';
+export * from './film-tool-readings.ts';

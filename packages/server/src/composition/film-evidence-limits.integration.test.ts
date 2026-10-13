@@ -30,7 +30,7 @@ describe('the limits of the evidence of a pull request, over a real repository a
   beforeAll(async () => {
     tools = await realpath(await mkdtemp(join(tmpdir(), 'factory-film-limits-')));
     await installFilmTool(tools);
-    rehearsal = await createRehearsal({ projectSettings: { [FIRST_PROJECT]: filmSettings(tools, {}, { maxFileBytes: FILE_LIMIT_BYTES }) } });
+    rehearsal = await createRehearsal({ projectSettings: { [FIRST_PROJECT]: filmSettings(tools, {}, { limits: { maxFileBytes: FILE_LIMIT_BYTES } }) } });
     installation = await openInstallation(rehearsal.config, rehearsal.environment, {
       harnessFor: () => new RehearsalAgents(),
       resources: NORMAL_RESOURCES,

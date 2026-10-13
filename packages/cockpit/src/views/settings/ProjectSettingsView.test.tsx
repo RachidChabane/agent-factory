@@ -42,7 +42,7 @@ describe('ProjectSettingsView films', () => {
   });
 
   it('says where the film command runs, in which zone the arrivals are told and how long a recording may take', async () => {
-    const snapshot = withProjectSettings(STOREFRONT, (settings) => ({ ...settings, films: { timeZone: 'Europe/Paris', timeoutMinutes: 20 } }));
+    const snapshot = withProjectSettings(STOREFRONT, (settings) => ({ ...settings, films: { timeZone: 'Europe/Paris', timeoutMinutes: 20, tools: [] } }));
     await openProjectSettings(STOREFRONT, { snapshot });
     const films = section('Films');
     expect(within(films).getByText('That command runs outside the sandbox', { exact: false })).toBeInTheDocument();

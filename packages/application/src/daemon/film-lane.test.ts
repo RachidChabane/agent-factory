@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { FilmOutcome } from '../film/film-behaviour.ts';
-import type { FilmBodyRefresh } from '../film/film-bodies.ts';
 import { FilmDeferredError, FilmRefusedError } from '../film/film-errors.ts';
-import type { FilmOrder, QueuedFilm } from '../film/film-order.ts';
-import type { FilmRunner } from '../film/film-runner.ts';
 import { OperatorNotifications } from '../notifications/operator-notifications.ts';
 import type { Notifier } from '../ports.ts';
+import { SteppingClock } from '../runs/test-support.ts';
 import { FilmLane, type FilmLaneProject, type FilmTick } from './film-lane.ts';
+import { finished, order, ScriptedFilms } from './testing/scripted-films.ts';
 import { SLOTS_FREE, SLOTS_HELD } from './scheduling-hold.ts';
 import type { PauseSet } from './scheduling-pauses.ts';
 
@@ -16,69 +14,6 @@ const PAUSED_BY_OPERATOR: PauseSet = new Map([['operator', {}]]);
 const BUDGET_SPENT: PauseSet = new Map([['budget', {}]]);
 const RUNNING: FilmTick = { pauses: NO_PAUSES, workRunning: true };
 const IDLE: FilmTick = { pauses: NO_PAUSES, workRunning: false };
-
-function order(issueNumber: number, scenario: string): FilmOrder {
-  return { issueNumber, scenario, operator: 'Alex Morgan' };
-}
-
-class ScriptedFilms implements FilmRunner {
-  queued: QueuedFilm[] = [];
-  declared: FilmOrder[] = [];
-  prepareError: Error | null = null;
-  readonly prepared: FilmOrder[] = [];
-  readonly filmed: FilmOrder[] = [];
-  readonly failures: { order: FilmOrder; reason: string }[] = [];
-  refreshes = 0;
-  private finishing: ((outcome: FilmOutcome) => void) | null = null;
-
-  prepare(next: FilmOrder): Promise<unknown> {
-    this.prepared.push(next);
-    return this.prepareError === null ? Promise.resolve() : Promise.reject(this.prepareError);
-  }
-
-  film(next: FilmOrder, signal: AbortSignal): Promise<FilmOutcome> {
-    this.filmed.push(next);
-    return new Promise<FilmOutcome>((resolve, reject) => {
-      this.finishing = resolve;
-      signal.addEventListener('abort', () => reject(new Error('stopped')), { once: true });
-    });
-  }
-
-  finish(outcome: FilmOutcome): void {
-    this.queued = [];
-    this.finishing?.(outcome);
-  }
-
-  order(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  orderDeclared(): Promise<readonly FilmOrder[]> {
-    const orders = this.declared;
-    this.declared = [];
-    return Promise.resolve(orders);
-  }
-
-  next(): Promise<QueuedFilm | null> {
-    return Promise.resolve(this.queued[0] ?? null);
-  }
-
-  fail(failed: FilmOrder, reason: string): Promise<void> {
-    this.failures.push({ order: failed, reason });
-    this.queued = this.queued.filter((queued) => queued.order.scenario !== failed.scenario);
-    return Promise.resolve();
-  }
-
-  refreshBodies(): Promise<FilmBodyRefresh> {
-    this.refreshes += 1;
-    return Promise.resolve({ updated: [], failed: [] });
-  }
-}
-
-function finished(issueNumber: number, scenario: string): FilmOutcome {
-  const phase = { video: 'v', report: 'r', screenshots: [], facts: [], storeVideo: 's', storeScreenshots: [], omitted: [] };
-  return { kind: 'finished', issueNumber, pullRequestNumber: 100 + issueNumber, scenario, commitSha: 'films000', before: phase, after: phase };
-}
 
 interface Lane {
   readonly lane: FilmLane;
@@ -90,7 +25,7 @@ interface Lane {
 function projectOf(id: string, films: ScriptedFilms, titles: string[], pauses: { current: PauseSet }): FilmLaneProject {
   const notifier: Notifier = { notify: (title) => Promise.resolve(void titles.push(`${id}: ${title}`)) };
   const log = { info: () => undefined, warn: () => undefined };
-  return { projectId: id, films, notifications: new OperatorNotifications(notifier, 'https://factory.example.test', log), log, pauses: () => Promise.resolve(pauses.current) };
+  return { projectId: id, films, notifications: new OperatorNotifications(notifier, 'https://factory.example.test', log), log, tools: null, pauses: () => Promise.resolve(pauses.current) };
 }
 
 function setup(): { readonly storefront: Lane; readonly ledger: ScriptedFilms; readonly ledgerPauses: { current: PauseSet } } {
@@ -99,7 +34,7 @@ function setup(): { readonly storefront: Lane; readonly ledger: ScriptedFilms; r
   const ledger = new ScriptedFilms();
   const storefrontPauses = { current: NO_PAUSES };
   const ledgerPauses = { current: NO_PAUSES };
-  const lane = new FilmLane([projectOf('storefront', storefront, titles, storefrontPauses), projectOf('ledger', ledger, titles, ledgerPauses)]);
+  const lane = new FilmLane([projectOf('storefront', storefront, titles, storefrontPauses), projectOf('ledger', ledger, titles, ledgerPauses)], { clock: new SteppingClock(new Date('2026-10-12T08:00:00.000Z')) });
   return { storefront: { lane, films: storefront, titles, projectPauses: storefrontPauses }, ledger, ledgerPauses };
 }
 

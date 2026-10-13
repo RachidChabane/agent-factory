@@ -23,6 +23,7 @@ import {
   REVIEW_CATEGORIES,
   REVIEW_SEVERITIES,
   TEST_RUNNERS,
+  TOOL_FAILURE_STATUSES,
   TOOL_SESSION_OUTCOMES,
   TOOL_STATUSES,
   USAGE_FRESHNESS,
@@ -872,7 +873,7 @@ export const ProjectSettingsViewSchema = z.object({
   automations: z.array(z.object({ name: z.string(), branches: z.array(z.string()), authors: z.array(z.string()) })),
   releaseModel: z.enum(RELEASE_MODEL_KINDS),
   /** The films of the project's pull requests; null when the project declares no film command. */
-  films: z.object({ timeZone: z.string().min(1), timeoutMinutes: CountSchema }).nullable(),
+  films: z.object({ timeZone: z.string().min(1), timeoutMinutes: CountSchema, tools: z.array(z.string().min(1)) }).nullable(),
   /** What the project delegates to its orchestrator. */
   autonomy: AutonomyViewSchema,
 });
@@ -1000,6 +1001,28 @@ export const ProjectSchedulerViewSchema = z.object({
 });
 export type ProjectSchedulerView = z.infer<typeof ProjectSchedulerViewSchema>;
 
+/**
+ * The tool the films of a project wait for while its check fails: they stay queued, and none fails, until every tool
+ * the project lists passes.
+ */
+export const FilmToolWaitViewSchema = z.object({
+  tool: z.string().min(1),
+  /** Whether the installation declares the tool or the project does: it tells which tools list the tool is checked from. */
+  scope: z.enum(TOOL_SCOPES),
+  status: z.enum(TOOL_FAILURE_STATUSES),
+  /** What the check printed, as the tool's check gave it. */
+  detail: z.string(),
+  /** The login the tool declares, which the cockpit starts; null when it declares none. */
+  loginCommand: z.string().nullable(),
+  /** What the check says to run when it fails; null when it says nothing. */
+  fixCommand: z.string().nullable(),
+  /** When the films began to wait. */
+  since: IsoDateTimeSchema,
+  /** When the tool was last read failing. */
+  checkedAt: IsoDateTimeSchema,
+});
+export type FilmToolWaitView = z.infer<typeof FilmToolWaitViewSchema>;
+
 export const ProjectViewSchema = z.object({
   id: ProjectIdSchema,
   name: z.string().min(1),
@@ -1009,6 +1032,8 @@ export const ProjectViewSchema = z.object({
   /** The project's own pauses, on top of the installation's. */
   pauses: z.array(PauseViewSchema),
   scheduler: ProjectSchedulerViewSchema,
+  /** Null while the films of the project wait for no tool. */
+  filmToolWait: FilmToolWaitViewSchema.nullable(),
   issueTypes: z.array(IssueTypeInfoSchema),
   requests: z.array(RequestViewSchema),
   issues: z.array(IssueViewSchema),

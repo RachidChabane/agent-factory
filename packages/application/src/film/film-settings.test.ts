@@ -67,6 +67,7 @@ describe('film presentation', () => {
       timeoutMs: 20 * 60_000,
       replayFile: 'replay.json',
       timeZone: 'UTC',
+      tools: [],
     };
     expect(filmPresentationOf(settings, 'https://factory.example.test/projects/storefront')).toEqual({
       fallbackDurationMs: 20 * 60_000,

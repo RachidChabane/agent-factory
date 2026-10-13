@@ -6,6 +6,7 @@ import { projectAudits, projectSkippedChanges } from './audit-views.ts';
 import { delegatedDecisionViews } from './autonomy-views.ts';
 import { environmentView, type EnvironmentDeployments, type MergedPullRequests } from './environment-views.ts';
 import { indexEvents } from './event-index.ts';
+import { filmToolWaitView } from './film-views.ts';
 import { pauseViews, projectSettingsView, schedulerView } from './installation-views.ts';
 import { issueJournals, projectIssues } from './issue-views.ts';
 import { projectPullRequests } from './pull-request-views.ts';
@@ -57,6 +58,7 @@ export function projectView(project: ProjectConfig, records: readonly FactoryEve
     baseBranch: project.baseBranch,
     pauses: pauseViews(records, 'project'),
     scheduler: schedulerView(records),
+    filmToolWait: filmToolWaitView(records, (project.evidence.films?.tools.length ?? 0) > 0),
     issueTypes: project.issueTypes.map((type) => ({
       id: type.id,
       label: type.label,
