@@ -9,9 +9,9 @@ description: Run agent-factory watch and react to each line it prints. Use at th
 
 ## Run it
 
-Start it with the Monitor tool: command `agent-factory watch`, `timeout_ms` 1800000, description `factory blockers`. Each line then reaches you as it is printed. A monitor lives 30 minutes at most: start it again when it expires. Where there is no Monitor tool, run the command with Bash in the background and read its output file.
+Start it with the Monitor tool: command `agent-factory watch --all` at the start of a session, `timeout_ms` 1800000, description `factory blockers`. Each line then reaches you as it is printed. A monitor lives 30 minutes at most: start it again when it expires, as `agent-factory watch`. Where there is no Monitor tool, run the command with Bash in the background and read its output file.
 
-A watch keeps what it reported in the factory's state directory, so a restarted watch prints only what appeared or cleared since the last one reported. With nothing kept, its first reading prints every blocker present. `agent-factory watch --once --all` lists every blocker present now, whatever was reported before, and records nothing: use it to learn where things stand at the start of a session and before a report. Match each line to what you know by its kind and its place before acting.
+A watch keeps what it reported in the factory's state directory, so a restarted watch prints only what appeared or cleared since the last one reported. `--all` makes its first reading list every blocker present, whatever was reported before; so does a state directory that holds nothing yet. `agent-factory watch --once --all` lists every blocker present now and records nothing: use it before a report. Match each line to what you know by its kind and its place before acting.
 
 `agent-factory watch --once` prints what a watch would, records nothing, and exits 1 while anything blocks work, 0 when nothing does. `--json` prints one JSON object per line (`at`, `transition`, `kind`, `project`, `issue`, `key`, `detail`). `--port <port>` names a factory started on another port, and `--interval <seconds>` sets the pace.
 
