@@ -1,6 +1,6 @@
 {
   "name": "agent-factory",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "An agentic software factory: drives Claude Code from a validated issue spec to a proof-carrying pull request, with a live cockpit.",
   "license": "AGPL-3.0-only",
