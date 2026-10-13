@@ -312,6 +312,17 @@ describe('AuditsView issue draft', () => {
     expect(link).toHaveAttribute('rel', 'noreferrer');
   });
 
+  it('tells when the issue was published from the audit', async () => {
+    await openAudit(AUDIT.httpClient);
+    expect(within(draft()).getByText(/ago$/)).toHaveAttribute('datetime', minutesAgo(8 * 24 * 60));
+  });
+
+  it('tells no publication time of a draft that is not published', async () => {
+    await openAudit(AUDIT.promoBanner);
+    expect(within(draft()).getByText('Draft ready to publish on the repository.')).toBeInTheDocument();
+    expect(within(draft()).queryByText(/ago$/)).not.toBeInTheDocument();
+  });
+
   it('links an issue published from an audit of a local forge to the page the factory serves for it', async () => {
     const snapshot = withAudit(LEDGER, AUDIT.ledgerRewrite, (audit) => ({ ...audit, publishedIssueNumber: 93, publishedIssueUrl: '/api/projects/ledger/forge/issues/93.md' }));
     await openAudit(AUDIT.ledgerRewrite, { snapshot }, LEDGER);

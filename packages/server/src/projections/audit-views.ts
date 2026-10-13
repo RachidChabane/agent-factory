@@ -1,6 +1,7 @@
 import type { AuditView, SkippedChangeView } from '@agent-factory/cockpit';
 import {
   AUDIT_DETECTED_EVENT,
+  AUDIT_ISSUE_PUBLISHED_EVENT,
   AUDIT_RESOLVED_EVENT,
   AUDIT_SUBJECT_PREFIX,
   AuditResolvedPayloadSchema,
@@ -21,6 +22,7 @@ export function projectAudits(index: EventIndex, releaseOfCommit: ReadonlyMap<st
     .map((audit): AuditView => {
       const subjectRecords = index.subject(auditSubject(audit.id));
       const detected = firstOf(subjectRecords, AUDIT_DETECTED_EVENT);
+      const published = lastOf(subjectRecords, AUDIT_ISSUE_PUBLISHED_EVENT);
       const resolved = lastOf(subjectRecords, AUDIT_RESOLVED_EVENT);
       const changedFiles = context.changedFiles.get(audit.commitSha) ?? null;
       return {
@@ -51,6 +53,7 @@ export function projectAudits(index: EventIndex, releaseOfCommit: ReadonlyMap<st
         draft: audit.draft,
         publishedIssueNumber: audit.publishedIssueNumber,
         publishedIssueUrl: audit.publishedIssueNumber === null ? null : context.links.issue(audit.publishedIssueNumber),
+        publishedIssueAt: published === null ? null : iso(published.occurredAt),
         resolved: audit.resolved,
         resolutionNote: resolved === null ? null : AuditResolvedPayloadSchema.parse(resolved.payload).note,
       };

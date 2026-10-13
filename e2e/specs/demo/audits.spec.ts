@@ -139,8 +139,10 @@ test.describe('the audits of the demonstration', () => {
     const { draft } = audit;
     if (draft === null) throw new Error(`the audit of ${shortSha(audit.commitSha)} has no draft`);
     expect(audit.publishedIssueNumber).toBeNull();
+    expect(audit.publishedIssueAt).toBeNull();
     await openAudit(page, factory, audit);
 
+    const publishing = Date.now();
     const outcome = await clickCommand(page, 'audit.publish-issue', async () => {
       await page.getByRole('button', { name: 'Publish the audit issue' }).click();
     });
@@ -161,6 +163,11 @@ test.describe('the audits of the demonstration', () => {
     expect(projectOf(state, STOREFRONT).issues.map((issue) => issue.number), 'the factory lists no issue that an audit published').not.toContain(issueNumber);
     const link = issueSection.getByRole('link', { name: `Published as issue #${issueNumber}` });
     await expect(link).toHaveAttribute('href', issuePage);
+    const publishedAt = auditOf(state, STOREFRONT, audit.id).publishedIssueAt;
+    if (publishedAt === null) throw new Error(`the factory dates no publication of issue #${issueNumber}`);
+    expect(Date.parse(publishedAt), 'the issue was published by the click').toBeGreaterThanOrEqual(publishing);
+    await expect(issueSection.getByRole('time')).toHaveAttribute('datetime', publishedAt);
+    await expect(issueSection.getByRole('time')).toHaveAttribute('title', english.absolute(publishedAt));
 
     const opened = page.context().waitForEvent('page');
     await link.click();

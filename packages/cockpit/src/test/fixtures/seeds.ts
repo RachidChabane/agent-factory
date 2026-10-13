@@ -137,6 +137,7 @@ export type AuditSeed = WithDefaults<
   | 'lastFailure'
   | 'draft'
   | 'publishedIssueNumber'
+  | 'publishedIssueAt'
   | 'resolved'
   | 'resolutionNote'
 >;
@@ -153,6 +154,7 @@ export function auditView(seed: AuditSeed, links: Pick<ForgeLinks, 'pullRequest'
     lastFailure: null,
     draft: null,
     publishedIssueNumber: null,
+    publishedIssueAt: null,
     resolved: false,
     resolutionNote: null,
     ...seed,

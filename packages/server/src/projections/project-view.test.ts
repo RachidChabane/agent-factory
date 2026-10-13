@@ -174,14 +174,15 @@ describe('the view of one project', () => {
     expect(after).toMatchObject({ state: 'promotable', cutAt: at(3).toISOString() });
   });
 
-  it('gives the page the forge has for the issue published from an audit, and none before it is published', () => {
+  it('gives the page the forge has for the issue published from an audit, and the time it was, and none before it is published', () => {
     const [audit] = view.audits;
     if (audit === undefined) throw new Error('the project has an audit');
     const published = { occurredAt: new Date(GENERATED_AT.getTime() + 1), type: 'audit.issue.published', subject: auditSubject(audit.id), payload: { issueNumber: 77 } };
-    expect(audit).toMatchObject({ publishedIssueNumber: null, publishedIssueUrl: null });
+    expect(audit).toMatchObject({ publishedIssueNumber: null, publishedIssueUrl: null, publishedIssueAt: null });
     expect(viewOf(withProjectEvents(projectHistory(), published)).view.audits[0]).toMatchObject({
       publishedIssueNumber: 77,
       publishedIssueUrl: 'https://github.com/acme/widgets/issues/77',
+      publishedIssueAt: published.occurredAt.toISOString(),
     });
   });
 

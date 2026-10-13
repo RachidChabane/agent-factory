@@ -747,6 +747,8 @@ export const AuditViewSchema = z.object({
   publishedIssueNumber: IssueNumberSchema.nullable(),
   /** The page the forge gives the issue published from the audit; the factory does not list that issue, so this is where its number leads. */
   publishedIssueUrl: z.string().nullable(),
+  /** When the issue was published from the audit; null before it was. */
+  publishedIssueAt: IsoDateTimeSchema.nullable(),
   resolved: z.boolean(),
   resolutionNote: z.string().nullable(),
 });
