@@ -68,8 +68,8 @@ one evidence commit and announced in the pull request body. The merge waits for 
 films of its pull request.
 
 Once per head of an open pull request, the project daemon tells the operator that it is ready
-([ADR 0034](adr/0034-notification-media.md)): its required checks passed, by the rule that gates its
-merge, and none of its films is queued or recording; a failed film holds the notice. The scan runs
+([ADR 0034](adr/0034-notification-media.md)): every check reported on its head has completed and none
+failed, required or not, and none of its films is queued or recording; a failed check or film holds the notice. The scan runs
 beside the daemon's tick and never holds it. It uploads the films, their final screenshots and the
 evidence images with the operator's command, at most once per content, and records the notice with the
 links it carried. A failed upload leaves its link out; the notice still goes out.

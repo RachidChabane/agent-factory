@@ -44,7 +44,7 @@ applies at the next tick, and the cockpit lists what waits for a restart.
 | `daemon.pollIntervalSeconds` | `30` | how often the daemon looks for work |
 | `daemon.mergeWatchIntervalMinutes` | `10` | how often merged and outside changes are read from the forges |
 | `daemon.issueRefreshSeconds` | `120` | how often the forges' issues are read |
-| `daemon.checksSettleSeconds` | `120` | how long a forge may take to register the checks of a head before an empty list counts as passed; a pull request is announced as ready only once its required checks passed |
+| `daemon.checksSettleSeconds` | `120` | how long a forge may take to register the checks of a head before an empty list counts as passed; a pull request is announced as ready only once every check of its head has completed without failing |
 | `notifications.channels` | `[]` | `system`, `slack` (`webhookUrl`), `google-chat` (`webhookUrl`), `webhook` (`url`, `headers`); secrets as `{ fromEnvironment: NAME }` |
 | `notifications.dedupeWindowMinutes` | `30` | identical notices within this window are sent once |
 | `notifications.media` | none | the command that makes a pull request's films and images reachable from its notices; see [Media in notices](#media-in-notices) |
@@ -182,8 +182,9 @@ in one sentence, per project, what is delegated to whom.
 ### Media in notices
 
 When a pull request is ready to merge, the factory tells you once per head ([ADR 0034](adr/0034-notification-media.md)):
-its required checks passed (the rule that gates its merge), and none of its films is queued or recording. A failed film
-holds the notice until a later film of that scenario succeeds. The notice links the pull request in the cockpit and on
+every check reported on its head has completed and none failed, required or not (skipped and neutral checks pass), and
+none of its films is queued or recording. A check that fails on the base branch too holds the notice, though not the
+merge. A failed film holds the notice until a later film of that scenario succeeds. The notice links the pull request in the cockpit and on
 the forge. With `notifications.media`, it also lists a link for the film of each scenario before and after, its final
 screenshot, and each image of the pull request's evidence, labelled by scenario, phase and file name.
 

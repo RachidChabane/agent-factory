@@ -52,7 +52,7 @@ daemon:
   mergeWatchIntervalMinutes: 10
   issueRefreshSeconds: 120
   # How long a forge may take to register the checks of a head before an empty list counts as passed: a pull request
-  # is announced as ready only once its required checks passed.
+  # is announced as ready only once every check of its head has completed without failing.
   checksSettleSeconds: 120
 
 notifications:

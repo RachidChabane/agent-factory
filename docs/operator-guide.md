@@ -169,7 +169,8 @@ the concurrency ceiling.
 
 A pull request is merged on your order only: **Merge** (or `agent-factory merge <pr>
 --expected-head <sha>`) removes the evidence folder and squash-merges the head you
-reviewed. A check that also fails on the base branch is shown but does not block.
+reviewed. A check that also fails on the base branch is shown but does not block the merge; it
+still holds the ready notice, which waits for every check of the head.
 Review feedback from people goes back to the factory with **Send feedback** (or
 `agent-factory pr feedback <pr> <file> --author <name>`), which starts a new cycle in the
 implementer's session. The retry budget counts the failures of one cycle (two corrections, then
@@ -238,9 +239,10 @@ issue.
   what applied, what waits for a restart, and what was refused.
 - **Notifications** reach the declared channels when something needs you: a decision,
   an issue that needs a person, a pull request ready to merge, a release gate, a
-  pause. A pull request is announced once per head, when its required checks passed and
-  none of its films is queued or recording; a film that failed holds the notice, and the
-  pull request page says why. With `notifications.media`, the notice lists links to the
+  pause. A pull request is announced once per head, when every check reported on its head
+  has completed and none failed, required or not, and none of its films is queued or
+  recording; a failed check or film holds the notice, and the pull request page names each
+  failing or running check and each film that holds it. With `notifications.media`, the notice lists links to the
   films (before and after), their final screenshots and the evidence images, made
   reachable by the upload command you declare ([ADR 0034](adr/0034-notification-media.md)).
 
