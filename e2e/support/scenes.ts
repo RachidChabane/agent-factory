@@ -54,39 +54,39 @@ export async function untilAuditConcluded(factory: RunningFactory, commitSha: st
   return audit;
 }
 
-/** Records a request the way the cockpit does, for the storefront; answers its id. */
-export async function receiveRequest(factory: RunningFactory, text: RequestText): Promise<string> {
+/** Records a request the way the cockpit does, for the storefront unless a project is named; answers its id. */
+export async function receiveRequest(factory: RunningFactory, text: RequestText, project: string = STOREFRONT): Promise<string> {
   const { installation } = await factory.api.state();
-  const effect = await send(factory, 'request.create', { project: STOREFRONT, title: text.title, requester: installation.operator, body: text.body, attachments: [] });
+  const effect = await send(factory, 'request.create', { project, title: text.title, requester: installation.operator, body: text.body, attachments: [] });
   const id = RECEIVED_REQUEST.exec(effect)?.[1];
   if (id === undefined) throw new Error(`the factory named no request in "${effect}"`);
   return id;
 }
 
 /** Asks for the challenge of a request and waits for its report. */
-export async function challengeRequest(factory: RunningFactory, requestId: string): Promise<RequestView> {
-  await send(factory, 'request.challenge', { project: STOREFRONT, requestId });
-  const state = await factory.api.until(`request ${requestId} to be challenged`, (snapshot) => requestOf(snapshot, STOREFRONT, requestId).state === 'challenged', { timeoutMs: CHALLENGE_TIMEOUT_MS });
-  return requestOf(state, STOREFRONT, requestId);
+export async function challengeRequest(factory: RunningFactory, requestId: string, project: string = STOREFRONT): Promise<RequestView> {
+  await send(factory, 'request.challenge', { project, requestId });
+  const state = await factory.api.until(`request ${requestId} to be challenged`, (snapshot) => requestOf(snapshot, project, requestId).state === 'challenged', { timeoutMs: CHALLENGE_TIMEOUT_MS });
+  return requestOf(state, project, requestId);
 }
 
-export async function receiveChallengedRequest(factory: RunningFactory, text: RequestText): Promise<RequestView> {
-  return challengeRequest(factory, await receiveRequest(factory, text));
+export async function receiveChallengedRequest(factory: RunningFactory, text: RequestText, project: string = STOREFRONT): Promise<RequestView> {
+  return challengeRequest(factory, await receiveRequest(factory, text, project), project);
 }
 
 /** Turns one proposed spec into an issue, as the cockpit's accept buttons do; answers the issue number. */
-export async function acceptSpec(factory: RunningFactory, request: RequestView, specTitle: string, start: boolean): Promise<number> {
+export async function acceptSpec(factory: RunningFactory, request: RequestView, specTitle: string, start: boolean, project: string = STOREFRONT): Promise<number> {
   const spec = request.challenge?.specs.find((candidate) => candidate.title === specTitle);
   if (spec === undefined) throw new Error(`request ${request.id} proposes no spec titled "${specTitle}"`);
-  await send(factory, 'request.accept', { project: STOREFRONT, requestId: request.id, specIds: [spec.id], start });
-  const issueNumber = requestOf(await factory.api.state(), STOREFRONT, request.id).challenge?.specs.find((candidate) => candidate.id === spec.id)?.issueNumber ?? null;
+  await send(factory, 'request.accept', { project, requestId: request.id, specIds: [spec.id], start });
+  const issueNumber = requestOf(await factory.api.state(), project, request.id).challenge?.specs.find((candidate) => candidate.id === spec.id)?.issueNumber ?? null;
   if (issueNumber === null) throw new Error(`the spec "${specTitle}" of request ${request.id} has no issue after it was accepted`);
   return issueNumber;
 }
 
 /** Waits for the agents to carry the issue to its pull request, where the factory leaves it for the operator. */
-export function untilPullRequestIsOpen(factory: RunningFactory, issueNumber: number): Promise<CockpitSnapshot> {
-  return factory.api.until(`issue #${issueNumber} to reach its pull request`, (state) => issueOf(state, STOREFRONT, issueNumber).state === 'pr-open', { timeoutMs: AGENT_WORK_TIMEOUT_MS });
+export function untilPullRequestIsOpen(factory: RunningFactory, issueNumber: number, project: string = STOREFRONT): Promise<CockpitSnapshot> {
+  return factory.api.until(`issue #${issueNumber} to reach its pull request`, (state) => issueOf(state, project, issueNumber).state === 'pr-open', { timeoutMs: AGENT_WORK_TIMEOUT_MS });
 }
 
 export function pauseScheduler(factory: RunningFactory): Promise<string> {

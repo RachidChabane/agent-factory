@@ -1,6 +1,9 @@
 /** Names shared by the process that prepares a rehearsal and the specs that run against it. */
 export const HOLD_FILE_NAME = 'agents.hold';
 
+/** The ledger keeps one worktree in its pool, so a pull request that waits for review leaves no room for the next issue. */
+export const LEDGER_POOL_SIZE = 1;
+
 export interface DeployedTag {
   readonly tag: string;
   readonly sha: string;

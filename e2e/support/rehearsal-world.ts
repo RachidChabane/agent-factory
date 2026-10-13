@@ -6,7 +6,7 @@ import { buildGitEnvironment, localOnlyGitEnvironment, SpawnCommandRunner } from
 import { LocalGitHubFiles } from '../../packages/adapters/src/github-local/localGitHubFiles.ts';
 import { SystemClock } from '../../packages/server/src/composition/system.ts';
 import { startDemoHealthEndpoints } from '../../packages/server/src/demo/demo-health.ts';
-import { DEMO_ENVIRONMENTS, DEMO_INSTALLATION, DEMO_PROJECTS, STOREFRONT_ID } from '../../packages/server/src/demo/demo-projects.ts';
+import { DEMO_ENVIRONMENTS, DEMO_INSTALLATION, DEMO_PROJECTS, LEDGER_ID, STOREFRONT_ID } from '../../packages/server/src/demo/demo-projects.ts';
 import { FAKE_CLAUDE_MAIN } from '../../packages/server/src/demo/demo-paths.ts';
 import { prepareDemoWorld, type DemoCommit, type DemoProject } from '../../packages/server/src/demo/demo-world.ts';
 import { storyScenario } from '../../packages/server/src/demo/story/scenario.ts';
@@ -14,7 +14,7 @@ import { LEDGER_STORY } from '../../packages/server/src/demo/story/ledger-story.
 import { STOREFRONT_STORY } from '../../packages/server/src/demo/story/storefront-story.ts';
 import { DANA_REYES } from '../../packages/server/src/demo/story/story-people.ts';
 import { REPOSITORY_ROOT } from './paths.ts';
-import { HOLD_FILE_NAME, stagingDeployments } from './rehearsal-layout.ts';
+import { HOLD_FILE_NAME, LEDGER_POOL_SIZE, stagingDeployments } from './rehearsal-layout.ts';
 import { rehearsalScenario } from './rehearsal-scenario.ts';
 
 /**
@@ -73,6 +73,15 @@ function withRehearsalDelivery(project: DemoProject): DemoProject {
   };
 }
 
+/** The ledger takes one issue at a time and keeps one worktree, which the pull request of that issue holds until it is merged. */
+function withOneWorktree(project: DemoProject): DemoProject {
+  if (project.id !== LEDGER_ID) return project;
+  return {
+    ...project,
+    settings: (health) => ({ ...project.settings(health), worktrees: { size: LEDGER_POOL_SIZE }, concurrency: { issues: LEDGER_POOL_SIZE, ceiling: LEDGER_POOL_SIZE } }),
+  };
+}
+
 const home = await mkdtemp(join(tmpdir(), HOME_PREFIX));
 const health = await startDemoHealthEndpoints(DEMO_ENVIRONMENTS, port + HEALTH_PORT_OFFSET);
 const demoDirectory = join(home, 'demo');
@@ -110,7 +119,7 @@ const world = await prepareDemoWorld({
   clock: new SystemClock(),
   userHome: homedir(),
   health,
-  projects: DEMO_PROJECTS.map(withRehearsalDelivery),
+  projects: DEMO_PROJECTS.map(withRehearsalDelivery).map(withOneWorktree),
   scenario: rehearsalScenario(storyScenario([STOREFRONT_STORY, LEDGER_STORY])),
   installation: { ...DEMO_INSTALLATION, claude },
 });

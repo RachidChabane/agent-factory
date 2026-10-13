@@ -1,11 +1,13 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { API_COMMANDS_PATH, API_STATE_PATH, CockpitSnapshotSchema, type CockpitSnapshot } from '../../packages/cockpit/src/contract/index.ts';
+import type { Locale } from '../../packages/cockpit/src/i18n/locale.ts';
 import type { RunningFactory } from './factory.ts';
+import { wordsIn } from './words.ts';
 
-/** The cockpit's own navigation and pages, by the names the operator reads. */
-export async function openCockpit(page: Page, factory: RunningFactory, path = '/'): Promise<void> {
+/** Opens a page of the cockpit and waits for its navigation, which the cockpit names in the language it is shown in. */
+export async function openCockpit(page: Page, factory: RunningFactory, path = '/', language: Locale = 'en'): Promise<void> {
   await page.goto(`${factory.origin}${path}`);
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: wordsIn(language).t('nav.main') })).toBeVisible();
 }
 
 /** A column of the board. */
