@@ -489,8 +489,9 @@ export function reviewRecord(journal: PipelineJournal, attempt: number): ReviewR
   return journal.reviews.findLast((record) => record.attempt === attempt) ?? null;
 }
 
+/** The latest decision that followed the attempt: a review ordered again, or feedback on its pull request, can add one to an earlier decision. */
 export function decisionAfter(journal: PipelineJournal, attempt: number): RetryRecord | null {
-  return journal.decisions.find((record) => record.afterAttempt === attempt) ?? null;
+  return journal.decisions.findLast((record) => record.afterAttempt === attempt) ?? null;
 }
 
 export function totalCostUsd(journal: PipelineJournal): number {

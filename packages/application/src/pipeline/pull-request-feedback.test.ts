@@ -4,7 +4,7 @@ import { PIPELINE_EVENTS } from './journal-events.ts';
 import { currentAttempt } from './pipeline-journal.ts';
 import { FeedbackRefusedError, PullRequestFeedback } from './pull-request-feedback.ts';
 import { attemptHistory } from './retry.ts';
-import { ISSUE_NUMBER, PipelineScenario } from './testing/pipeline-scenario.ts';
+import { ISSUE_NUMBER, NO_FINDINGS, PipelineScenario, reviewAnswer } from './testing/pipeline-scenario.ts';
 
 const FEEDBACK = 'The link must open in a new tab.\nIt should also carry an icon.';
 const RECEIVED_AT = new Date('2026-10-10T09:00:00.000Z');
@@ -120,6 +120,24 @@ describe('external feedback on a factory pull request', () => {
     expect((await scenario.journal()).attemptEpoch).toBe(5);
     expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
     expect(scenario.harness.requestsOf('implementer').at(-1)?.prompt).toContain('Dana: Second point.');
+  });
+
+  it('goes on in the session of a pull request that a new review opened after the budget was spent on blocking reviews', async () => {
+    const scenario = new PipelineScenario();
+    const blocking = reviewAnswer([{ severity: 'blocking', category: 'criteria-coverage', file: null, line: null, summary: 'The link does not open the message.' }]);
+    scenario.harness.script('reviewer', ...Array.from({ length: 4 }, () => ({ finalText: blocking })), { finalText: NO_FINDINGS });
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('needs-human');
+    await scenario.resumer().reviewAgain(ISSUE_NUMBER, 'Alex Morgan');
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+    const implementerRuns = scenario.harness.requestsOf('implementer').length;
+
+    await recordFeedback(scenario);
+
+    expect((await scenario.pipeline().runIssue(ISSUE_NUMBER)).kind).toBe('pr-open');
+    const correction = scenario.harness.requestsOf('implementer').at(-1);
+    expect(scenario.harness.requestsOf('implementer')).toHaveLength(implementerRuns + 1);
+    expect(correction?.resumeSessionId).not.toBeNull();
+    expect(correction?.prompt).toContain('Dana: The link must open in a new tab.');
   });
 
   it('refuses feedback on an issue that is not waiting at its pull request', async () => {
