@@ -400,6 +400,8 @@ async function expectQueueShown(page: Page, received: SnapshotTrail, scenarios: 
       const queued = films.getByRole('region', { name: `Film of scenario ${order.scenario}`, exact: true });
       await expect(queued).toContainText(`Queued · scenario ${order.scenario}`, ONE_LOOK);
       await expect(queued).toContainText('Ordered by Alex Morgan.', ONE_LOOK);
+      await expect(queued.getByRole('time')).toHaveAttribute('datetime', order.since, ONE_LOOK);
+      await expect(queued.getByRole('time')).toHaveAttribute('title', english.absolute(order.since), ONE_LOOK);
       if (order.filmsAhead === 0) await expect(queued).not.toContainText('ahead of this one', ONE_LOOK);
       else await expect(queued).toContainText(`${order.filmsAhead} ${order.filmsAhead === 1 ? 'film' : 'films'} ahead of this one.`, ONE_LOOK);
       if (order.expectedAt === null) throw new Error(`the factory gives no arrival for the queued film of ${order.scenario}`);
@@ -525,14 +527,17 @@ test.describe('the films of a pull request that declares them', () => {
     });
     const pullRequest = cartBadgePullRequest(state);
     const failed = pullRequest.filmOrders.find((order) => order.scenario === UNAVAILABLE_SCENARIO);
-    expect(failed?.reason).toContain(SKIPPED_REASON);
+    if (failed === undefined) throw new Error(`no film of ${UNAVAILABLE_SCENARIO} was ordered`);
+    expect(failed.reason).toContain(SKIPPED_REASON);
     expect(pullRequest.mergeBlockers.filter((blocker) => blocker.startsWith(FILMS_IN_PROGRESS)), 'a failed film does not hold the merge').toEqual([]);
     expect(pullRequest.readyNotice.status).toBe('held');
 
     await openPullRequest(page, factory, STOREFRONT, pullRequest);
     const alert = filmsRegion(page).getByRole('region', { name: `Failed film of scenario ${UNAVAILABLE_SCENARIO}`, exact: true });
     await expect(alert).toContainText(`The film of scenario ${UNAVAILABLE_SCENARIO} failed`);
-    await expect(alert).toContainText(failed?.reason ?? '');
+    await expect(alert).toContainText(failed.reason ?? '');
+    await expect(alert.getByRole('time')).toHaveAttribute('datetime', failed.since);
+    await expect(alert.getByRole('time')).toHaveAttribute('title', english.absolute(failed.since));
     await expect(filmsRegion(page).getByRole('article', { name: `Scenario ${UNAVAILABLE_SCENARIO}` })).toHaveCount(0);
 
     const notice = page.getByRole('region', { name: 'Ready notice', exact: true });
