@@ -9,6 +9,7 @@ import { issueMark } from '../../model/status.ts';
 import { Badge } from '../../ui/components/Badge.tsx';
 import { Section } from '../../ui/components/Card.tsx';
 import { StatusMark } from '../../ui/components/StatusMark.tsx';
+import { DelegatedMarks } from '../../widgets/DelegatedMarks.tsx';
 import { DetailHeader } from '../../ui/layout/Page.tsx';
 import { IssueActions } from './IssueActions.tsx';
 import { IssueAttempts } from './IssueAttempts.tsx';
@@ -42,6 +43,7 @@ export function IssueDetail({ issue }: { readonly issue: IssueView }) {
         meta={<IssueMeta issue={issue} />}
       />
       <IssueNotices issue={issue} />
+      <DelegatedMarks decisions={issue.delegated} />
       {issue.state === ISSUE_ABANDONED_STATE ? null : <IssuePipeline issue={issue} />}
       <div className="issue-detail__grid">
         <Section title={t('issues.spec.title')} id="issue-spec">

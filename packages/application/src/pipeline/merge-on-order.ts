@@ -1,5 +1,6 @@
 import { ISSUE_SUBJECT_PREFIX } from '@agent-factory/domain';
 import { EVIDENCE_DIRECTORY } from '../acceptance/acceptance-manifest.ts';
+import { authorOf, delegationFields, type Delegation } from '../autonomy/delegation.ts';
 import type { CheckConclusion, CheckRunSummary, EventStore, Worktree } from '../ports.ts';
 import type { FilmMergeGuard } from '../film/film-merge-guard.ts';
 import { evidenceRemovalCommitMessage } from './conventional-commit.ts';
@@ -34,15 +35,28 @@ export function failingOnBase(checks: readonly CheckRunSummary[], baseChecks: re
   return new Set(checks.filter((check) => isRefused(check) && failedOnBase.has(check.name)).map((check) => check.name));
 }
 
+/** The checks of a head that keep it from merging: the ones that fail and the ones still running. */
+export interface MergeCheckProblems {
+  readonly failing: readonly CheckRunSummary[];
+  readonly pending: readonly CheckRunSummary[];
+}
+
 /**
- * Why the checks of a head block its merge, or null. A check that fails the same way on the base
- * branch was failing before the change, so it does not block; a pending one does, until it ends.
+ * The checks of a head that block its merge. A check that fails the same way on the base branch was
+ * failing before the change, so it does not block; a pending one does, until it ends.
  */
-export function checksBlockingMerge(checks: readonly CheckRunSummary[], baseChecks: readonly CheckRunSummary[] = []): string | null {
+export function mergeCheckProblems(checks: readonly CheckRunSummary[], baseChecks: readonly CheckRunSummary[] = []): MergeCheckProblems {
   const preExisting = failingOnBase(checks, baseChecks);
-  const failing = checks.filter((check) => isRefused(check) && !preExisting.has(check.name));
+  return {
+    failing: checks.filter((check) => isRefused(check) && !preExisting.has(check.name)),
+    pending: checks.filter((check) => check.conclusion === PENDING_CONCLUSION),
+  };
+}
+
+/** Why the checks of a head block its merge, or null. */
+export function checksBlockingMerge(checks: readonly CheckRunSummary[], baseChecks: readonly CheckRunSummary[] = []): string | null {
+  const { failing, pending } = mergeCheckProblems(checks, baseChecks);
   if (failing.length > 0) return `checks failed: ${describeChecks(failing)}`;
-  const pending = checks.filter((check) => check.conclusion === PENDING_CONCLUSION);
   return pending.length > 0 ? `checks still running: ${describeChecks(pending)}` : null;
 }
 
@@ -54,6 +68,8 @@ export type MergeOnOrderDependencies = Pick<
 export interface MergeOrder {
   readonly pullRequestNumber: number;
   readonly expectedHeadSha: string;
+  /** The delegate making the gesture; absent when the operator orders the merge themselves. */
+  readonly delegation?: Delegation;
 }
 
 export interface MergeOutcome {
@@ -117,7 +133,7 @@ export class MergeOnOrder {
     await this.advanceTo(journal, writer, order);
     await this.awaitPushedHead(order, worktree.branch, removal.headSha);
     const mergeSha = await this.squashMergeOnceVisible(order, removal);
-    await writer.record(PIPELINE_EVENTS.pullRequestMerged, { mergeSha });
+    await writer.record(PIPELINE_EVENTS.pullRequestMerged, { mergeSha, ...delegationFields(order.delegation ?? null) });
     await writer.transition('merged', `pull request #${order.pullRequestNumber} squash-merged as ${mergeSha}`);
     await this.dependencies.pool.release(worktree);
     await writer.record(PIPELINE_EVENTS.worktreeReleased, { path: worktree.path });
@@ -195,7 +211,7 @@ export class MergeOnOrder {
       await writer.transition('ci', `checks on ${order.expectedHeadSha} are green`);
     }
     if (journal.state === 'pr-open' || journal.state === 'ci') {
-      await writer.transition('ready-to-merge', `the operator ordered the merge of ${order.expectedHeadSha}`);
+      await writer.transition('ready-to-merge', `${authorOf(order.delegation ?? null)} ordered the merge of ${order.expectedHeadSha}`);
     }
   }
 }

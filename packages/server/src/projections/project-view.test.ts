@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CostsViewSchema, ProjectViewSchema, RunViewSchema } from '@agent-factory/cockpit';
-import { WorktreeAcquiredSchema, type FactoryEventRecord } from '@agent-factory/application';
+import { WorktreeAcquiredSchema, auditSubject, type FactoryEventRecord } from '@agent-factory/application';
 import { projectCosts } from './cost-views.ts';
 import { indexEvents } from './event-index.ts';
 import { issueJournals } from './issue-views.ts';
@@ -172,6 +172,17 @@ describe('the view of one project', () => {
     expect(before).toMatchObject({ state: 'open', cutAt: null });
     const after = viewOf(withProjectEvents(projectHistory(), detected, evaluated, cut)).view.releases.find((release) => release.id === 'pr-31');
     expect(after).toMatchObject({ state: 'promotable', cutAt: at(3).toISOString() });
+  });
+
+  it('gives the page the forge has for the issue published from an audit, and none before it is published', () => {
+    const [audit] = view.audits;
+    if (audit === undefined) throw new Error('the project has an audit');
+    const published = { occurredAt: new Date(GENERATED_AT.getTime() + 1), type: 'audit.issue.published', subject: auditSubject(audit.id), payload: { issueNumber: 77 } };
+    expect(audit).toMatchObject({ publishedIssueNumber: null, publishedIssueUrl: null });
+    expect(viewOf(withProjectEvents(projectHistory(), published)).view.audits[0]).toMatchObject({
+      publishedIssueNumber: 77,
+      publishedIssueUrl: 'https://github.com/acme/widgets/issues/77',
+    });
   });
 
   describe('the scheduler of a project', () => {

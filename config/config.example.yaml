@@ -51,6 +51,9 @@ daemon:
   pollIntervalSeconds: 30
   mergeWatchIntervalMinutes: 10
   issueRefreshSeconds: 120
+  # How long a forge may take to register the checks of a head before an empty list counts as passed: a pull request
+  # is announced as ready only once its required checks passed.
+  checksSettleSeconds: 120
 
 notifications:
   dedupeWindowMinutes: 30
@@ -58,6 +61,14 @@ notifications:
     - kind: system
     - kind: slack
       webhookUrl: { fromEnvironment: AGENT_FACTORY_SLACK_WEBHOOK_URL }
+  # Media: when a pull request is ready to merge, the factory runs this command once for each film, final screenshot
+  # and evidence image of the pull request, and the notice lists the links it prints. {file} is the path of the file;
+  # the last non-empty line the command prints must be an http(s) or file address. It runs outside the sandbox,
+  # with your environment, under nice: declare only a command you trust. A file already uploaded (same content) is not
+  # uploaded again; one that fails leaves its link out and the reason in the log.
+  media:
+    upload: [share-file, --public, "{file}"]
+    timeoutSeconds: 120
 
 # Read-only checks of the command-line tools the projects rely on, shown in the cockpit and run by `validate`.
 tools:
@@ -207,6 +218,19 @@ projects:
       ignore:
         - name: Dependency updates
           authors: ["dependabot[bot]"]
+    # What the orchestrator may do for the operator on this project. Without this section nothing is delegated:
+    # `agent-factory ... --as orchestrator --reason "<why>"` is refused, naming what is missing. Each delegated
+    # gesture is recorded with its reason and listed in the cockpit; none of it confines a hostile process.
+    autonomy:
+      actor: orchestrator
+      validateSpecs: true
+      answerDecisions: false
+      resume: true
+      # Merge the pull requests of these issue types, once every condition holds. films-recorded: every film the
+      # spec declares is recorded on the reviewed head, and none failed or is pending.
+      merge:
+        - { types: [docs], requires: [] }
+        - { types: [fix], requires: [films-recorded] }
 
   - id: ledger
     name: Ledger

@@ -19,6 +19,7 @@ import { frSettings } from './settings.ts';
 import { frConfiguration } from './configuration.ts';
 import { frRuns } from './runs.ts';
 import { frUsage } from './usage.ts';
+import { frAutonomy } from './autonomy.ts';
 
 export const frFragments = {
   common: frCommon,
@@ -40,6 +41,7 @@ export const frFragments = {
   configuration: frConfiguration,
   runs: frRuns,
   usage: frUsage,
+  autonomy: frAutonomy,
 } as const;
 
 export const fr = {
@@ -62,4 +64,5 @@ export const fr = {
   ...frConfiguration,
   ...frRuns,
   ...frUsage,
+  ...frAutonomy,
 } as const satisfies TwinOf<typeof en>;

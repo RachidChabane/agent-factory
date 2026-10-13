@@ -1,5 +1,5 @@
 import { DEFAULT_ISSUE_TYPES, type AgentRole } from '@agent-factory/domain';
-import type { IssueTypeInfo, NamedCommandView, ProjectSettingsView, ToolView } from '../../contract/index.ts';
+import type { AutonomyView, IssueTypeInfo, NamedCommandView, ProjectSettingsView, ToolView } from '../../contract/index.ts';
 import { ROLE_SETTINGS } from './roles.ts';
 
 /** The issue types a project keeps from the default typology, in the order of that typology. */
@@ -29,7 +29,12 @@ export interface ProjectSettingsSeed {
   readonly releaseModel: ProjectSettingsView['releaseModel'];
   /** The films of the project; none unless the seed says so. */
   readonly films?: ProjectSettingsView['films'];
+  /** What the project delegates; nothing unless the seed says so. */
+  readonly autonomy?: AutonomyView;
 }
+
+/** The policy of a project that delegates nothing. */
+export const NO_AUTONOMY_VIEW: AutonomyView = { actor: 'orchestrator', validateSpecs: false, answerDecisions: false, resume: false, merge: [] };
 
 const GATE_TIMEOUT_MINUTES = 30;
 
@@ -46,6 +51,7 @@ export function projectSettings(seed: ProjectSettingsSeed): ProjectSettingsView 
     automations: seed.automations.map((automation) => ({ ...automation })),
     releaseModel: seed.releaseModel,
     films: seed.films ?? null,
+    autonomy: seed.autonomy ?? NO_AUTONOMY_VIEW,
   };
 }
 

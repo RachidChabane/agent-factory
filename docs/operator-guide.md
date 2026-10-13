@@ -61,7 +61,8 @@ shown as unknown, never as empty.
 
 An issue written by a person on the forge, or created with `agent-factory issue create
 <spec.md>`, is a draft too: it carries the `factory` label and waits. **Validate spec**
-(the `spec:validated` label) is the operator's gesture that hands it to the factory.
+(the `spec:validated` label) is the operator's gesture that hands it to the factory;
+`agent-factory issue validate <issue>` makes it from the command line, and
 `issue create --start` creates and validates in one go.
 
 A spec has a title and four sections: **Need**, **Acceptance criteria** (numbered),
@@ -233,7 +234,11 @@ issue.
   what applied, what waits for a restart, and what was refused.
 - **Notifications** reach the declared channels when something needs you: a decision,
   an issue that needs a person, a pull request ready to merge, a release gate, a
-  pause.
+  pause. A pull request is announced once per head, when its required checks passed and
+  none of its films is queued or recording; a film that failed holds the notice, and the
+  pull request page says why. With `notifications.media`, the notice lists links to the
+  films (before and after), their final screenshots and the evidence images, made
+  reachable by the upload command you declare ([ADR 0034](adr/0034-notification-media.md)).
 
 ## Working with the orchestrator
 
@@ -269,7 +274,8 @@ issues, and merging the issue types you list under the conditions you name. With
 `autonomy`, nothing is delegated. The orchestrator makes each of these gestures with
 `--as orchestrator --reason "<why>"`; the factory refuses what the policy does not
 delegate, names the rule that is missing, and records what it accepts with the reason.
-The cockpit lists each project's delegated decisions. The orchestrator runs with your
+A new review of the same implementation (`resume --review-again`) stays yours to order:
+the orchestrator is refused it. The cockpit lists each project's delegated decisions. The orchestrator runs with your
 account, so the policy keeps its gestures within what you delegated and makes each
 visible; it does not confine a hostile process.
 

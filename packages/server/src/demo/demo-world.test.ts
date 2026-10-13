@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SpawnCommandRunner } from '@agent-factory/adapters';
+import { fileURLToPath } from 'node:url';
+import { CommandMediaUploader, SpawnCommandRunner } from '@agent-factory/adapters';
 import { referenceState } from '@agent-factory/application';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { projectOf } from '../config/agent-factory-config.ts';
@@ -63,5 +64,18 @@ describe('the world of the demonstration', { timeout: REAL_GIT_TEST_TIMEOUT_MS }
     expect(await readFile(join(built.path, 'tokens', 'colors.json'), 'utf8')).toContain('"brand"');
     expect(await referenceState(snapshots, reference)).toEqual({ status: 'ready', commit: built.commit });
     expect(built.path).toBe(join(home, 'projects', STOREFRONT_ID, 'references', 'design-tokens@v1.0.0'));
+  });
+
+  it('declares the upload command of the media of its notices, which puts a file in the uploads directory of its home and answers its address', async () => {
+    const media = world.config.notifications.media;
+    if (media === null) throw new Error('the demonstration declares no upload command');
+    const sample = join(home, 'cart.png');
+    await writeFile(sample, 'pixels of the cart');
+
+    const link = await new CommandMediaUploader(new SpawnCommandRunner(), { command: media.command, timeoutMs: media.timeoutMs, workingDirectory: home, operatorEnvironment: process.env }).upload(sample);
+
+    expect(link.startsWith('file://')).toBe(true);
+    expect(fileURLToPath(link).startsWith(join(home, 'uploads'))).toBe(true);
+    expect(await readFile(fileURLToPath(link), 'utf8')).toBe('pixels of the cart');
   });
 });

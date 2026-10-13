@@ -4,11 +4,12 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import { BARE_REPOSITORY_SUFFIX, type LocalCheckMode } from '@agent-factory/adapters';
-import { machineTimeZone, type FilmSettings, type NamedCommand, type ReferenceSource, type StackSettings } from '@agent-factory/application';
+import { machineTimeZone, type FilmSettings, type MediaUploadSettings, type NamedCommand, type ReferenceSource, type StackSettings } from '@agent-factory/application';
 import {
   DEFAULT_ISSUE_TYPES,
   NO_DAILY_CAP,
   type AgentRole,
+  type AutonomyPolicy,
   type BillingMode,
   type DailyCap,
   type EffortLevel,
@@ -169,6 +170,8 @@ export interface ProjectConfig {
   readonly evidence: { readonly maxFileBytes: number; readonly maxTotalBytes: number; readonly films: FilmSettings | null };
   readonly delivery: { readonly release: ReleaseModelConfig; readonly environments: readonly EnvironmentConfig[]; readonly healthIntervalMs: number };
   readonly audits: { readonly ignore: readonly { readonly name: string; readonly branches: readonly string[]; readonly authors: readonly string[] }[] };
+  /** What the project delegates to its orchestrator; nothing unless the configuration says so. */
+  readonly autonomy: AutonomyPolicy;
   readonly tools: readonly ToolCheckConfig[];
   readonly directories: {
     readonly checkouts: string;
@@ -194,8 +197,13 @@ export interface AgentFactoryConfig {
   };
   readonly budget: { readonly thresholds: UsageThresholds; readonly dailyCap: DailyCap; readonly perRunCapUsd: number | null };
   readonly resources: { readonly minimumFreeMemoryPercent: number; readonly pauseAbovePressure: PauseAbovePressureLevel; readonly maxConcurrentRuns: number };
-  readonly daemon: { readonly pollIntervalMs: number; readonly mergeWatchIntervalMs: number; readonly issueRefreshMs: number };
-  readonly notifications: { readonly dedupeWindowMs: number; readonly channels: readonly NotificationChannelConfig[] };
+  readonly daemon: { readonly pollIntervalMs: number; readonly mergeWatchIntervalMs: number; readonly issueRefreshMs: number; readonly checksSettleMs: number };
+  readonly notifications: {
+    readonly dedupeWindowMs: number;
+    readonly channels: readonly NotificationChannelConfig[];
+    /** The command that makes the media of a pull request reachable from its notices; null when the project declares none. */
+    readonly media: MediaUploadSettings | null;
+  };
   readonly tools: readonly ToolCheckConfig[];
   /** The roles of a project that overrides none: the built-in defaults under the installation's own. */
   readonly defaultRoles: RoleSettingsMap;
@@ -438,6 +446,7 @@ function resolveProject(raw: RawProject, config: RawAgentFactoryConfig, home: st
     evidence: { maxFileBytes: raw.evidence.maxFileBytes, maxTotalBytes: raw.evidence.maxTotalBytes, films: raw.evidence.films === undefined ? null : filmSettings(raw.evidence.films, at) },
     delivery: { release: raw.delivery.release, environments: raw.delivery.environments.map(environmentConfig), healthIntervalMs: minutes(raw.delivery.healthIntervalMinutes) },
     audits: raw.audits,
+    autonomy: raw.autonomy,
     tools: raw.tools.map(toolCheck),
     directories: {
       checkouts: join(directory, PROJECT_DIRECTORIES.checkouts),
@@ -480,8 +489,13 @@ export function resolveAgentFactoryConfig(raw: RawAgentFactoryConfig, home: stri
       pollIntervalMs: seconds(raw.daemon.pollIntervalSeconds),
       mergeWatchIntervalMs: minutes(raw.daemon.mergeWatchIntervalMinutes),
       issueRefreshMs: seconds(raw.daemon.issueRefreshSeconds),
+      checksSettleMs: seconds(raw.daemon.checksSettleSeconds),
     },
-    notifications: { dedupeWindowMs: minutes(raw.notifications.dedupeWindowMinutes), channels: raw.notifications.channels.map(notificationChannel) },
+    notifications: {
+      dedupeWindowMs: minutes(raw.notifications.dedupeWindowMinutes),
+      channels: raw.notifications.channels.map(notificationChannel),
+      media: raw.notifications.media === undefined ? null : { command: raw.notifications.media.upload, timeoutMs: seconds(raw.notifications.media.timeoutSeconds) },
+    },
     tools: raw.tools.map(toolCheck),
     defaultRoles: resolveRoles(raw.defaults.roles, {}),
     directories: {

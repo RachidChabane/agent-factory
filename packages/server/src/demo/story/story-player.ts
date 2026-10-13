@@ -4,11 +4,14 @@ import { buildGitEnvironment, localOnlyGitEnvironment } from '@agent-factory/ada
 import {
   acceptProposedSpecs,
   AddRequest,
+  AutonomyGate,
+  authoriseGesture,
   createIssueFromPlan,
   headVisibilityPolicy,
   loadJournal,
   loadRequest,
   MergeOnOrder,
+  NOTICES,
   planIssueCreation,
   renderSpecFile,
   requestChallenge,
@@ -122,8 +125,24 @@ export class StoryPlayer {
       for (const blocker of issue.dependsOn) await dependencies.github.addBlockedBy(this.numberOf(issue.key), this.numberOf(blocker));
     }
     for (const issue of this.story.issues.filter((candidate: StoryIssue) => candidate.validate)) {
-      await validateSpec(dependencies, this.numberOf(issue.key), this.installation.operator, conventions);
+      await this.validate(issue);
     }
+  }
+
+  /** The operator validates the spec, or the project's orchestrator does under the autonomy the project declares, and the cockpit lists the decision. */
+  private async validate(issue: StoryIssue): Promise<void> {
+    const { dependencies, conventions, config, notifications } = this.project;
+    const number = this.numberOf(issue.key);
+    if (issue.delegatedValidation === undefined) {
+      await validateSpec(dependencies, number, this.installation.operator, conventions);
+      return;
+    }
+    const delegation = { actor: config.autonomy.actor, reason: issue.delegatedValidation };
+    const settings = { project: config.id, policy: config.autonomy };
+    const authorisation = authoriseGesture(settings, delegation, { gesture: 'validate-spec' });
+    await validateSpec(dependencies, number, this.installation.operator, conventions, delegation);
+    const decision = await new AutonomyGate(dependencies.events, settings).record(delegation, authorisation, { kind: 'issue', number, issueNumber: number });
+    await notifications.send(NOTICES.gestureDelegated(decision));
   }
 
   private numberOf(key: string): number {

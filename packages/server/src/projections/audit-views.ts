@@ -50,6 +50,7 @@ export function projectAudits(index: EventIndex, releaseOfCommit: ReadonlyMap<st
         lastFailure: audit.lastFailure,
         draft: audit.draft,
         publishedIssueNumber: audit.publishedIssueNumber,
+        publishedIssueUrl: audit.publishedIssueNumber === null ? null : context.links.issue(audit.publishedIssueNumber),
         resolved: audit.resolved,
         resolutionNote: resolved === null ? null : AuditResolvedPayloadSchema.parse(resolved.payload).note,
       };

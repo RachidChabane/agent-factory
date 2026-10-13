@@ -77,7 +77,7 @@ export interface ProjectRuntime {
   readonly films: ProjectFilms | null;
   readonly notifications: OperatorNotifications;
   readonly log: OperationLog;
-  /** Takes the settings that apply without a restart (roles, concurrency) from a reloaded configuration. */
+  /** Takes the settings that apply without a restart (roles, concurrency, autonomy) from a reloaded configuration. */
   reconfigure(config: AgentFactoryConfig): void;
 }
 
@@ -209,7 +209,7 @@ export async function openProject(installation: InstallationContext, initial: Pr
     reconfigure: (reloaded) => {
       const next = reloaded.projects.find((candidate) => candidate.id === config.id);
       if (next === undefined) return;
-      config = { ...config, roles: next.roles, concurrency: next.concurrency };
+      config = { ...config, roles: next.roles, concurrency: next.concurrency, autonomy: next.autonomy };
       settings = pipelineSettings(reloaded, config, environment);
     },
   };

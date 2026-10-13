@@ -10,7 +10,7 @@ import {
   RemoteLocalityGuard,
 } from '@agent-factory/adapters';
 import { PIPELINE_ROLES, requiredLabels, worktreesBesideRuns, type CommandRunner, type ReferenceSource, type ToolProber } from '@agent-factory/application';
-import { admitAgentRun, REQUIRED_TOOLS, type ToolProbeResult } from '@agent-factory/domain';
+import { admitAgentRun, describeAutonomy, REQUIRED_TOOLS, type ToolProbeResult } from '@agent-factory/domain';
 import { z } from 'zod';
 import type { AgentFactoryConfig, NotificationChannelConfig, ProjectConfig } from '../../config/agent-factory-config.ts';
 import { ROLE_PROMPTS_DIRECTORY } from '../../composition/install-paths.ts';
@@ -36,7 +36,9 @@ const ENGINE_MISSING_DETAIL = 'the container engine is granted but no engine soc
 const FFMPEG_VERSION_COMMAND: readonly string[] = ['ffmpeg', '-version'];
 const FILM_CONSEQUENCE = "runs outside the sandbox, with your environment and your sessions, like one of your own scripts: declare only a command you trust";
 const FFMPEG_NEED = 'ffmpeg is needed only when the film command writes a video that is not an MP4';
+const UPLOAD_CONSEQUENCE = 'runs outside the sandbox, with your environment and your sessions, like one of your own scripts: declare only a command you trust';
 const MILLISECONDS_PER_MINUTE = 60_000;
+const MILLISECONDS_PER_SECOND = 1_000;
 const LabelListSchema = z.array(z.object({ name: z.string() }));
 
 export interface CheckOutcome {
@@ -132,14 +134,22 @@ function channelProblem(channel: NotificationChannelConfig, environment: SourceE
   return value === undefined || value === '' ? `${channel.kind}: ${variable} is not set` : null;
 }
 
-function notificationsOutcome(config: AgentFactoryConfig, environment: SourceEnvironment): CheckOutcome {
-  const { channels } = config.notifications;
-  if (channels.length === 0) return { ok: true, detail: NO_CHANNEL_DETAIL };
+/** What the upload command of the notices is allowed: everything the operator is, outside the sandbox. */
+export function mediaDetail(media: NonNullable<AgentFactoryConfig['notifications']['media']>): string {
+  const seconds = Math.round(media.timeoutMs / MILLISECONDS_PER_SECOND);
+  return `the upload command ${media.command.join(' ')} ${UPLOAD_CONSEQUENCE}; it stops after ${seconds} seconds`;
+}
+
+export function notificationsOutcome(config: AgentFactoryConfig, environment: SourceEnvironment): CheckOutcome {
+  const { channels, media } = config.notifications;
+  const upload = media === null ? [] : [mediaDetail(media)];
+  if (channels.length === 0) return { ok: true, detail: [NO_CHANNEL_DETAIL, ...upload].join('; ') };
   const problems = channels.flatMap((channel) => {
     const problem = channelProblem(channel, environment);
     return problem === null ? [] : [problem];
   });
-  return problems.length === 0 ? { ok: true, detail: channels.map((channel) => channel.kind).join(', ') } : { ok: false, detail: `${problems.join('; ')}; notices would not be sent` };
+  if (problems.length > 0) return { ok: false, detail: `${[...problems, ...upload].join('; ')}; notices would not be sent` };
+  return { ok: true, detail: [channels.map((channel) => channel.kind).join(', '), ...upload].join('; ') };
 }
 
 async function rolePromptsOutcome(): Promise<CheckOutcome> {
@@ -321,6 +331,7 @@ export function projectChecks(config: AgentFactoryConfig, project: ProjectConfig
     ),
     { name: 'worktrees', severity: 'optional', runsCommands: false, run: () => Promise.resolve(worktreesOutcome(project)) },
     { name: 'sandbox', severity: 'optional', runsCommands: false, run: () => guarded(() => Promise.resolve(sandboxOutcome(project, projectEngineSockets(project, settings)()))) },
+    { name: 'autonomy', severity: 'optional', runsCommands: false, run: () => Promise.resolve({ ok: true, detail: describeAutonomy(project.autonomy) }) },
     ...(project.evidence.films === null
       ? []
       : [

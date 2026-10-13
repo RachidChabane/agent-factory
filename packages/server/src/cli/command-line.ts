@@ -1,4 +1,4 @@
-import { parseLabelList } from '@agent-factory/application';
+import { parseLabelList, type Delegation } from '@agent-factory/application';
 import { FILM_SCENARIO_RULE, isFilmScenarioName } from '@agent-factory/domain';
 import { FORGE_KINDS, type ForgeKind } from '../config/schema/project.ts';
 import { DEFAULT_WATCH_INTERVAL_SECONDS } from '../watch/watch-settings.ts';
@@ -28,7 +28,7 @@ export const COMMAND_NAMES = {
 } as const;
 
 export const REQUEST_SUBCOMMANDS = { add: 'add', challenge: 'challenge' } as const;
-export const ISSUE_SUBCOMMANDS = { create: 'create', abandon: 'abandon' } as const;
+export const ISSUE_SUBCOMMANDS = { create: 'create', validate: 'validate', abandon: 'abandon' } as const;
 export const PR_SUBCOMMANDS = { feedback: 'feedback' } as const;
 export const REHEARSAL_SUBCOMMANDS = { init: 'init', reset: 'reset', addIssue: 'add-issue' } as const;
 export const TOOL_SUBCOMMANDS = { check: 'check', login: 'login' } as const;
@@ -57,6 +57,7 @@ export const LABELS_OPTION = '--labels';
 export const ANSWER_OPTION = '--answer';
 export const REVIEW_AGAIN_FLAG = '--review-again';
 export const REASON_OPTION = '--reason';
+export const AS_OPTION = '--as';
 export const SCENARIO_OPTION = '--scenario';
 export const SKIP_GATE_PREFLIGHT_FLAG = '--skip-gate-preflight';
 export const OFFLINE_FLAG = '--offline';
@@ -105,12 +106,20 @@ export const USAGE = [
   '  resume <issue> --review-again                after a review escalation whose gate passed, review the same implementation again, without an implementer attempt',
   '  merge <pull-request> --expected-head <sha>   remove the evidence and squash-merge the reviewed head (full sha)',
   '',
+  'Acting for the operator',
+  '  The gestures a project can delegate (issue create --start, issue validate, resume, merge) take',
+  '    --as <actor> --reason "<why>"',
+  '  both together: the factory checks the project\'s autonomy policy first, refuses what it does not delegate and names what is',
+  '  missing (exit 1), and records each accepted gesture with its reason. Without --as the gesture is the operator\'s own.',
+  '  resume --review-again is the operator\'s alone: --as is refused for it, whatever the policy delegates.',
+  '',
   'Work items',
   '  request add <file> [--images <dir>] [--requester <name>]   store a product request with its images',
   '  request challenge <id>                       challenge a stored request and draft its specs, report and reply',
   '  issue create <spec.md> [--blocked-by <n>[,<n>]] [--confirm] [--start]',
   '                                               create an issue from a spec file (on GitHub it needs --confirm; a Films: header names the scenarios to film);',
   '                                               --blocked-by lists the issues it waits on; --start validates it at once',
+  '  issue validate <issue>                       validate the spec of a drafted issue, so the factory takes it',
   '  issue abandon <issue> --reason <text>        stop the factory work on an escalated issue and free its worktree',
   '  pr feedback <pull-request> <file> --author <name>   record review feedback and start a new cycle',
   '  audit <commit> [<commit>...]                 audit commits of the base branch, one at a time',
@@ -133,14 +142,22 @@ export type CliCommand =
   | { readonly kind: 'watch'; readonly intervalSeconds: number; readonly once: boolean; readonly json: boolean; readonly port: number | null }
   | { readonly kind: 'stop'; readonly now: boolean }
   | { readonly kind: 'run-issue'; readonly issueNumber: number }
-  | { readonly kind: 'resume'; readonly issueNumber: number; readonly answer: string | null; readonly reviewAgain: boolean }
-  | { readonly kind: 'merge'; readonly pullRequestNumber: number; readonly expectedHeadSha: string }
+  | { readonly kind: 'resume'; readonly issueNumber: number; readonly answer: string | null; readonly reviewAgain: boolean; readonly delegation: Delegation | null }
+  | { readonly kind: 'merge'; readonly pullRequestNumber: number; readonly expectedHeadSha: string; readonly delegation: Delegation | null }
   | { readonly kind: 'rehearsal-init'; readonly sourceClonePath: string }
   | { readonly kind: 'rehearsal-reset'; readonly sourceClonePath: string }
   | { readonly kind: 'rehearsal-add-issue'; readonly specPath: string; readonly labels: readonly string[] }
   | { readonly kind: 'request-add'; readonly path: string; readonly imagesDirectory: string | null; readonly requester: string }
   | { readonly kind: 'request-challenge'; readonly requestId: string }
-  | { readonly kind: 'issue-create'; readonly specPath: string; readonly blockedBy: readonly number[]; readonly confirmed: boolean; readonly start: boolean }
+  | {
+      readonly kind: 'issue-create';
+      readonly specPath: string;
+      readonly blockedBy: readonly number[];
+      readonly confirmed: boolean;
+      readonly start: boolean;
+      readonly delegation: Delegation | null;
+    }
+  | { readonly kind: 'issue-validate'; readonly issueNumber: number; readonly delegation: Delegation | null }
   | { readonly kind: 'issue-abandon'; readonly issueNumber: number; readonly reason: string }
   | { readonly kind: 'pr-feedback'; readonly pullRequestNumber: number; readonly path: string; readonly author: string }
   | { readonly kind: 'audit'; readonly commits: readonly string[] }
@@ -208,6 +225,19 @@ function exactly(positional: readonly string[], names: readonly string[]): strin
   if (positional.length < names.length) return `missing ${names[positional.length] ?? 'argument'}`;
   if (positional.length > names.length) return `unexpected arguments: ${positional.slice(names.length).join(' ')}`;
   return null;
+}
+
+/** The options a gesture that a project can delegate takes besides its own. */
+const DELEGATION_OPTIONS: readonly string[] = [AS_OPTION, REASON_OPTION];
+
+/** `--as <actor> --reason <text>`, given both or neither: null when the operator makes the gesture themselves, or what is wrong with the pair. */
+function delegationOf(values: ReadonlyMap<string, string>): Delegation | null | string {
+  const actor = values.get(AS_OPTION);
+  const reason = values.get(REASON_OPTION)?.trim();
+  if (actor === undefined && reason === undefined) return null;
+  if (actor === undefined) return `${REASON_OPTION} goes with ${AS_OPTION} <actor>`;
+  if (reason === undefined || reason === '') return `${AS_OPTION} needs ${REASON_OPTION} "<why>"`;
+  return { actor, reason };
 }
 
 function withOptions(rest: readonly string[], valueOptions: readonly string[], flagOptions: readonly string[], build: (options: ParsedOptions) => ParsedCommand): ParsedCommand {
@@ -303,12 +333,24 @@ function parseIssue(rest: readonly string[]): ParsedCommand {
   const [subcommand, ...arguments_] = rest;
   switch (subcommand) {
     case ISSUE_SUBCOMMANDS.create:
-      return withOptions(arguments_, [BLOCKED_BY_OPTION], [CONFIRM_FLAG, START_FLAG], ({ positional, values, flags }) => {
+      return withOptions(arguments_, [BLOCKED_BY_OPTION, ...DELEGATION_OPTIONS], [CONFIRM_FLAG, START_FLAG], ({ positional, values, flags }) => {
         const problem = exactly(positional, ['spec file']);
         if (problem !== null) return failure(problem);
         const blockedBy = issueNumbersOf(values.get(BLOCKED_BY_OPTION));
         if (typeof blockedBy === 'string') return failure(blockedBy);
-        return done({ kind: 'issue-create', specPath: positional[0] ?? '', blockedBy, confirmed: flags.has(CONFIRM_FLAG), start: flags.has(START_FLAG) });
+        const delegation = delegationOf(values);
+        if (typeof delegation === 'string') return failure(delegation);
+        if (delegation !== null && !flags.has(START_FLAG)) return failure(`${AS_OPTION} goes with ${START_FLAG}: creating an issue is no gesture of the operator, validating its spec is`);
+        return done({ kind: 'issue-create', specPath: positional[0] ?? '', blockedBy, confirmed: flags.has(CONFIRM_FLAG), start: flags.has(START_FLAG), delegation });
+      });
+    case ISSUE_SUBCOMMANDS.validate:
+      return withOptions(arguments_, DELEGATION_OPTIONS, [], ({ positional, values }) => {
+        const problem = exactly(positional, ['issue number']);
+        if (problem !== null) return failure(problem);
+        const issueNumber = positiveInteger(positional[0], 'issue number');
+        if (typeof issueNumber === 'string') return failure(issueNumber);
+        const delegation = delegationOf(values);
+        return typeof delegation === 'string' ? failure(delegation) : done({ kind: 'issue-validate', issueNumber, delegation });
       });
     case ISSUE_SUBCOMMANDS.abandon:
       return withOptions(arguments_, [REASON_OPTION], [], ({ positional, values }) => {
@@ -359,7 +401,7 @@ function parseRehearsal(rest: readonly string[]): ParsedCommand {
 }
 
 function parseResume(rest: readonly string[]): ParsedCommand {
-  return withOptions(rest, [ANSWER_OPTION], [REVIEW_AGAIN_FLAG], ({ positional, values, flags }) => {
+  return withOptions(rest, [ANSWER_OPTION, ...DELEGATION_OPTIONS], [REVIEW_AGAIN_FLAG], ({ positional, values, flags }) => {
     const problem = exactly(positional, ['issue number']);
     if (problem !== null) return failure(problem);
     const issueNumber = positiveInteger(positional[0], 'issue number');
@@ -368,12 +410,13 @@ function parseResume(rest: readonly string[]): ParsedCommand {
     if (answer !== undefined && answer.trim() === '') return failure(`${ANSWER_OPTION} needs the text of the answer`);
     const reviewAgain = flags.has(REVIEW_AGAIN_FLAG);
     if (reviewAgain && answer !== undefined) return failure(`${REVIEW_AGAIN_FLAG} cannot be combined with ${ANSWER_OPTION}`);
-    return done({ kind: 'resume', issueNumber, answer: answer ?? null, reviewAgain });
+    const delegation = delegationOf(values);
+    return typeof delegation === 'string' ? failure(delegation) : done({ kind: 'resume', issueNumber, answer: answer ?? null, reviewAgain, delegation });
   });
 }
 
 function parseMerge(rest: readonly string[]): ParsedCommand {
-  return withOptions(rest, [EXPECTED_HEAD_OPTION], [], ({ positional, values }) => {
+  return withOptions(rest, [EXPECTED_HEAD_OPTION, ...DELEGATION_OPTIONS], [], ({ positional, values }) => {
     const problem = exactly(positional, ['pull request number']);
     if (problem !== null) return failure(problem);
     const pullRequestNumber = positiveInteger(positional[0], 'pull request number');
@@ -381,7 +424,8 @@ function parseMerge(rest: readonly string[]): ParsedCommand {
     const expectedHeadSha = values.get(EXPECTED_HEAD_OPTION);
     if (expectedHeadSha === undefined) return failure(`missing ${EXPECTED_HEAD_OPTION} <sha>`);
     if (!FULL_COMMIT_SHA.test(expectedHeadSha)) return failure(`${EXPECTED_HEAD_OPTION} must be the full 40-character commit sha, got "${expectedHeadSha}"`);
-    return done({ kind: 'merge', pullRequestNumber, expectedHeadSha });
+    const delegation = delegationOf(values);
+    return typeof delegation === 'string' ? failure(delegation) : done({ kind: 'merge', pullRequestNumber, expectedHeadSha, delegation });
   });
 }
 
@@ -464,6 +508,21 @@ function parseCommand(name: string, rest: readonly string[]): ParsedCommand {
   }
 }
 
+/** The commands whose gesture a project can delegate; `--as` on any other is refused with the list. */
+const DELEGABLE_COMMANDS: readonly string[] = [COMMAND_NAMES.resume, COMMAND_NAMES.merge, `${COMMAND_NAMES.issue} ${ISSUE_SUBCOMMANDS.create}`, `${COMMAND_NAMES.issue} ${ISSUE_SUBCOMMANDS.validate}`];
+
+function mentions(arguments_: readonly string[], option: string): boolean {
+  return arguments_.some((argument) => argument === option || argument.startsWith(`${option}${OPTION_VALUE_SEPARATOR}`));
+}
+
+/** Why `--as` is refused on this command, or null when the command can take it. */
+function delegationRefusal(name: string, arguments_: readonly string[]): string | null {
+  if (!mentions(arguments_, AS_OPTION)) return null;
+  const subcommand = name === COMMAND_NAMES.issue ? arguments_[0] : undefined;
+  const command = subcommand === undefined ? name : `${name} ${subcommand}`;
+  return DELEGABLE_COMMANDS.includes(command) ? null : `${command} is not a gesture a project can delegate; ${AS_OPTION} goes with ${DELEGABLE_COMMANDS.join(', ')}`;
+}
+
 /** Takes `--project <id>` from anywhere on the line, then parses the command. */
 export function parseCommandLine(argv: readonly string[]): ParsedCommandLine {
   const rest: string[] = [];
@@ -481,6 +540,8 @@ export function parseCommandLine(argv: readonly string[]): ParsedCommandLine {
   }
   const [name, ...arguments_] = rest;
   if (name === undefined || name === COMMAND_NAMES.help || HELP_FLAGS.includes(name)) return { ok: true, line: { project, command: { kind: 'help' } } };
+  const refusal = delegationRefusal(name, arguments_);
+  if (refusal !== null) return failure(refusal);
   const parsed = parseCommand(name, arguments_);
   return parsed.ok ? { ok: true, line: { project, command: parsed.command } } : parsed;
 }

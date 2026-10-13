@@ -96,12 +96,14 @@ describe('the agent-factory command line', () => {
       'ok   widgets',
       'ok   widgets',
       'ok   widgets',
+      'ok   widgets',
     ]);
-    expect(captured.lines.slice(-6).map((line) => line.split(':')[1]?.trim())).toEqual(['clone', 'labels', 'prompts', 'knowledge', 'worktrees', 'sandbox']);
-    expect(captured.lines.at(-2)).toBe(
+    expect(captured.lines.slice(-7).map((line) => line.split(':')[1]?.trim())).toEqual(['clone', 'labels', 'prompts', 'knowledge', 'worktrees', 'sandbox', 'autonomy']);
+    expect(captured.lines.at(-3)).toBe(
       'ok   widgets: worktrees: a pool of 5 holds 1 issue at once beside up to 4 pull requests awaiting review (2 beside 3 at the ceiling); no new issue starts once pull requests and escalated issues hold all 5',
     );
-    expect(captured.lines.at(-1)).toBe('ok   widgets: sandbox: agents and commands stay confined: no container engine, no network domain for agents');
+    expect(captured.lines.at(-2)).toBe('ok   widgets: sandbox: agents and commands stay confined: no container engine, no network domain for agents');
+    expect(captured.lines.at(-1)).toBe(`ok   widgets: autonomy: nothing is delegated: every gesture stays the operator's (the delegate would be "orchestrator")`);
   });
 
   it('says that a project merges with the administrator bypass, and what GitHub requires for it', async () => {

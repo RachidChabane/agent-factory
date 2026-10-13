@@ -25,6 +25,7 @@ import { ReadStamp } from '../../widgets/ReadStamp.tsx';
 import { Time } from '../../widgets/Time.tsx';
 import { BoardColumns } from '../board/BoardColumns.tsx';
 import { LiveRuns } from '../board/LiveRuns.tsx';
+import { DelegatedDecisions } from './DelegatedDecisions.tsx';
 
 function DeploymentSummary({ environment }: { readonly environment: EnvironmentView }) {
   const { t } = useI18n();
@@ -188,6 +189,7 @@ export function ProjectOverview() {
           </Card>
         </Section>
       </div>
+      <DelegatedDecisions project={project} />
       <NewRequestDialog open={creating} onClose={() => setCreating(false)} projectId={project.id} pickProject={false} />
     </Page>
   );

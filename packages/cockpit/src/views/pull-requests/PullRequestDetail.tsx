@@ -16,8 +16,10 @@ import { PullRequestHeader } from './PullRequestHeader.tsx';
 import { PullRequestChecks } from './PullRequestChecks.tsx';
 import { hasFilmsToShow } from './film-model.ts';
 import { mergeAvailability } from './pull-request-model.ts';
+import { ReadyNotice } from './ReadyNotice.tsx';
 import { ReviewRounds } from './ReviewRounds.tsx';
 import { useMergeDialog } from './use-merge-dialog.ts';
+import { DelegatedMarks } from '../../widgets/DelegatedMarks.tsx';
 
 const ICON_SIZE = 16;
 const BADGE_ICON_SIZE = 12;
@@ -68,8 +70,10 @@ export function PullRequestDetail({ pullRequest, requested }: PullRequestDetailP
     <article className="detail pr-detail">
       <PullRequestHeader pullRequest={pullRequest} availability={availability} blockersId={blockersId} onMerge={() => merge.setOpen(true)} />
       {availability.kind === 'blocked' ? <MergeBlockers id={blockersId} blockers={availability.blockers} /> : null}
+      <DelegatedMarks decisions={pullRequest.delegated} />
       <EvidenceSection pullRequest={pullRequest} />
       {hasFilmsToShow(project, pullRequest) ? <FilmSection pullRequest={pullRequest} /> : null}
+      <ReadyNotice pullRequest={pullRequest} />
       <div className="pr-detail__columns">
         <ReviewRounds rounds={pullRequest.reviewRounds} />
         <PullRequestChecks pullRequest={pullRequest} />

@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { ISSUE_CHECK_REWRITE_STATE, ISSUE_ESCALATION_STATE } from '@agent-factory/domain';
 import type { EscalationProfile, IssueState } from '@agent-factory/domain';
+import { authorOf, delegationFields, type Delegation } from '../autonomy/delegation.ts';
 import type { ProjectConventions } from '../conventions/project-conventions.ts';
 import { reviewFailureSummary } from './failure-summary.ts';
 import { isSpecValidated } from '../spec/markdown-spec-reader.ts';
@@ -14,9 +15,7 @@ import { currentAttempt, decisionAfter, decisionsOfEpoch, gateRecord, loadJourna
 
 export const STATES_BEFORE_FROZEN_CHECKS: readonly IssueState[] = ['spec-draft', 'spec-validated', 'blocked', 'authoring-checks'];
 export const AUTHORING_STATE: IssueState = 'authoring-checks';
-const RESUME_REASON = 'the operator resumed the issue';
 const REVIEW_AGAIN_REASON = 'the operator ordered a new review of the same implementation';
-const RESTART_REASON = 'the operator resumed the issue before its checks were frozen';
 
 const SPENT_RETRY_BUDGET = 'the implementer retry budget is spent, so the issue would escalate again; the change needs a human';
 const FROZEN_CHECKS_VIOLATED = 'a frozen acceptance check was modified or deleted; only the operator can have the checks rewritten';
@@ -96,7 +95,8 @@ export class ResumeIssue {
     return { issueNumber, attempt };
   }
 
-  async resume(issueNumber: number, answer: string | null = null): Promise<ResumeOutcome> {
+  /** Resumes an escalated issue: the operator's gesture, or the delegate's when `delegation` names it. */
+  async resume(issueNumber: number, answer: string | null = null, delegation: Delegation | null = null): Promise<ResumeOutcome> {
     const { events, states, github, specReader, pool } = this.dependencies;
     const journal = await loadJournal(events, issueNumber);
     if (journal.state !== ISSUE_ESCALATION_STATE) {
@@ -113,7 +113,7 @@ export class ResumeIssue {
     const feedback = pendingFeedback(journal);
     if (feedback !== null && this.escalation === null) throw new ResumeRefusedError(issueNumber, NO_ESCALATION_PROFILE);
     const writer = new IssueJournalWriter(events, states, issueNumber);
-    if (decision !== null) await writer.record(PIPELINE_EVENTS.decisionAnswered, { runId: decision.runId, answer: operatorAnswer });
+    if (decision !== null) await writer.record(PIPELINE_EVENTS.decisionAnswered, { runId: decision.runId, answer: operatorAnswer, ...delegationFields(delegation) });
     let specChanged = false;
     if (STATES_BEFORE_FROZEN_CHECKS.includes(target)) {
       const issue = await github.getIssue(issueNumber);
@@ -131,7 +131,7 @@ export class ResumeIssue {
     const branch = journal.branch;
     const checksReauthored = target === AUTHORING_STATE && branch !== null;
     if (checksReauthored) {
-      await writer.record(PIPELINE_EVENTS.authoringRestarted, { reason: RESTART_REASON });
+      await writer.record(PIPELINE_EVENTS.authoringRestarted, { reason: `${authorOf(delegation)} resumed the issue before its checks were frozen` });
       await writer.record(PIPELINE_EVENTS.worktreeAcquired, await pool.acquire(issueNumber, branch));
     }
     if (feedback !== null && this.escalation !== null) {
@@ -141,7 +141,7 @@ export class ResumeIssue {
         decision: { action: 'fresh-session-escalated', profile: this.escalation },
       });
     }
-    await writer.transition(target, RESUME_REASON);
+    await writer.transition(target, `${authorOf(delegation)} resumed the issue`);
     return {
       issueNumber,
       resumedAt: target,

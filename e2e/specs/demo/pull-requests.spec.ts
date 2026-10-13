@@ -175,6 +175,27 @@ test.describe('the pull requests of the demonstration', () => {
     });
   });
 
+  test('tells when the ready notice was sent and links the media the upload command made reachable', async ({ page, factory }) => {
+    const state = await factory.api.until(
+      'the ready notice of the pull request was sent',
+      (snapshot) => pullRequestOfIssue(snapshot, STOREFRONT, issueNamed(snapshot, STOREFRONT, CART_BADGE_TOTAL.spec.title)).readyNotice.status === 'sent',
+      { timeoutMs: AGENT_WORK_TIMEOUT_MS },
+    );
+    const pullRequest = pullRequestOfIssue(state, STOREFRONT, issueNamed(state, STOREFRONT, CART_BADGE_TOTAL.spec.title));
+    const { readyNotice } = pullRequest;
+    if (readyNotice.status !== 'sent') throw new Error(`the ready notice of pull request #${pullRequest.number} is ${readyNotice.status}`);
+    await openPullRequest(page, factory, STOREFRONT, pullRequest);
+    const notice = page.getByRole('region', { name: 'Ready notice', exact: true });
+    await expect(notice).toContainText(`for head ${shortSha(readyNotice.headSha)}`);
+    expect(readyNotice.links.map((link) => link.label)).toEqual(expect.arrayContaining([expect.stringMatching(/ · before · film\.mp4$/), expect.stringMatching(/ · after · film\.mp4$/)]));
+    expect(readyNotice.failures, 'every file of the pull request was uploaded').toEqual([]);
+    const links = notice.getByRole('list', { name: 'Links in the notice' });
+    for (const link of readyNotice.links) {
+      expect(link.url.startsWith('file://'), 'the demonstration uploads into a directory of its home').toBe(true);
+      await expect(links.getByRole('link', { name: `Open ${link.label}` })).toHaveAttribute('href', link.url);
+    }
+  });
+
   test('reads the changes of a pull request only when the operator opens a file', async ({ page, factory }) => {
     const state = await factory.api.state();
     const pullRequest = pullRequestOfIssue(state, STOREFRONT, issueNamed(state, STOREFRONT, CART_BADGE_TOTAL.spec.title));

@@ -89,6 +89,7 @@ describe.skipIf(!chromiumInstalled())('the cockpit in a real browser', { timeout
   let rehearsal: RehearsalEnvironment;
   let installation: InstallationRuntime;
   let server: FactoryHttpServer;
+const lifetime = new AbortController();
   let browser: Browser;
   let context: BrowserContext | undefined;
   let base = '';
@@ -110,12 +111,13 @@ describe.skipIf(!chromiumInstalled())('the cockpit in a real browser', { timeout
     buildCockpit(cockpitDirectory);
     await appendBusyRuns(installation.events, FIRST_PROJECT);
     await rehearsal.project(FIRST_PROJECT).addDocIssue('Document the cockpit');
-    server = createHttpServer(installation, null, { cockpitDirectory, stream: FAST_STREAM });
+    server = createHttpServer(installation, null, lifetime.signal, { cockpitDirectory, stream: FAST_STREAM });
     base = `http://127.0.0.1:${(await server.start()).port}`;
     browser = await launchChromium();
   }, TEST_TIMEOUT_MS);
 
   afterAll(async () => {
+  lifetime.abort();
     await browser?.close();
     await server?.stop();
     installation?.close();

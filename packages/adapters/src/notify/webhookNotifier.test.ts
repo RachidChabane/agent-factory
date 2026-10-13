@@ -20,8 +20,15 @@ describe('WebhookNotifier', () => {
     expect(call?.url).toBe(SECRET_WEBHOOK_URL);
     expect(call?.method).toBe('POST');
     expect(call?.headers).toEqual({ 'Content-Type': 'application/json; charset=UTF-8' });
-    expect(JSON.parse(call?.body ?? '')).toEqual({ title: NOTICE_TITLE, body: NOTICE_BODY, link: NOTICE_LINK });
-    expect(buildWebhookPayload(NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK)).toEqual({ title: NOTICE_TITLE, body: NOTICE_BODY, link: NOTICE_LINK });
+    expect(JSON.parse(call?.body ?? '')).toEqual({ title: NOTICE_TITLE, body: NOTICE_BODY, link: NOTICE_LINK, links: [] });
+    expect(buildWebhookPayload(NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK)).toEqual({ title: NOTICE_TITLE, body: NOTICE_BODY, link: NOTICE_LINK, links: [] });
+  });
+
+  it('posts the links of the notice, each with its label, all of them', async () => {
+    const calls: RecordedCall[] = [];
+    const media = Array.from({ length: 25 }, (_, index) => ({ label: `file ${index}`, url: `https://files.example.test/${index}` }));
+    await notifier({ fetch: recordingFetch(OK_STATUS, calls) }).notify(NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK, media);
+    expect((JSON.parse(calls[0]?.body ?? '') as { links: unknown[] }).links).toEqual(media);
   });
 
   it('sends the configured headers along with the content type', async () => {

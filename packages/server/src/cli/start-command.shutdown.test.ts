@@ -1,4 +1,4 @@
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -17,9 +17,12 @@ import { FACTORY_INSTALL_DIRECTORY } from '../composition/install-paths.ts';
 import { SILENT_LOG } from '../composition/operation-log.ts';
 import { factoryLockPath } from '../composition/runtime.ts';
 import { RehearsalAgents } from '../testing/rehearsal-agents.ts';
+import { descendantsOf, isAlive, killProcessTree } from '../testing/process-table.ts';
 import { createRehearsal, FIRST_PROJECT, TEST_WEBHOOK_VARIABLE, waitFor, type RehearsalEnvironment } from '../testing/rehearsal-environment.ts';
 
 const FAKE_CLAUDE = join(FACTORY_INSTALL_DIRECTORY, 'packages', 'adapters', 'src', 'claude', 'test-fixtures', 'fake-claude.ts');
+/** The fake agent does not end by itself when the factory is gone, so an agent the factory leaks behind is seen. */
+const UNWATCHED_FAKE_FLAG = '--fake-unwatched';
 const CLI = join(FACTORY_INSTALL_DIRECTORY, 'packages', 'server', 'src', 'cli', 'main.ts');
 /** How long each step may take: starting processes is slow on a loaded machine. */
 const TIMEOUT_MS = 120_000;
@@ -28,34 +31,6 @@ function withoutWebhook(environment: Readonly<Record<string, string | undefined>
   return Object.fromEntries(Object.entries(environment).filter(([name]) => name !== TEST_WEBHOOK_VARIABLE));
 }
 const NORMAL_RESOURCES = { snapshot: () => Promise.resolve({ freeMemoryPercent: 70, pressure: 'normal' as const }) };
-
-function descendantsOf(root: number): readonly number[] {
-  const table = execFileSync('ps', ['-A', '-o', 'pid=,ppid='], { encoding: 'utf8' })
-    .trim()
-    .split('\n')
-    .map((line) => line.trim().split(/\s+/).map(Number));
-  const found: number[] = [];
-  const queue = [root];
-  while (queue.length > 0) {
-    const parent = queue.shift();
-    for (const [pid, ppid] of table) {
-      if (ppid === parent && pid !== undefined && !found.includes(pid)) {
-        found.push(pid);
-        queue.push(pid);
-      }
-    }
-  }
-  return found;
-}
-
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function exited(child: ChildProcess): Promise<number | null> {
   return new Promise((resolve) => child.once('exit', (code) => resolve(code)));
@@ -67,11 +42,11 @@ describe('factory start shutdown', () => {
   let cli: ChildProcess | null = null;
 
   beforeEach(async () => {
-    rehearsal = await createRehearsal({ claudeCommand: [process.execPath, FAKE_CLAUDE, '--fake-mode', 'hang'], minimumFreeMemoryPercent: 0 });
+    rehearsal = await createRehearsal({ claudeCommand: [process.execPath, FAKE_CLAUDE, '--fake-mode', 'hang', UNWATCHED_FAKE_FLAG], minimumFreeMemoryPercent: 0 });
   });
 
   afterEach(async () => {
-    if (cli !== null && cli.exitCode === null) cli.kill('SIGKILL');
+    if (cli?.pid !== undefined && cli.exitCode === null) killProcessTree(cli.pid);
     eventLog.close();
     await rehearsal.cleanup();
   });

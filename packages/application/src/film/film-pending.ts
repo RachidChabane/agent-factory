@@ -1,6 +1,6 @@
 import type { IssueState } from '@agent-factory/domain';
 import { MERGEABLE_STATES } from '../pipeline/mergeable-states.ts';
-import { isFilmPending, type PipelineJournal } from '../pipeline/pipeline-journal.ts';
+import { isFilmFailed, isFilmPending, type PipelineJournal } from '../pipeline/pipeline-journal.ts';
 import type { PullRequestRef, Worktree } from '../ports.ts';
 import { FilmRefusedError } from './film-errors.ts';
 
@@ -54,4 +54,9 @@ export function unorderedDeclaredFilms(journal: PipelineJournal): readonly strin
 /** The scenarios whose film is queued or recording, and the declared ones about to be ordered. */
 export function pendingFilmScenarios(journal: PipelineJournal): readonly string[] {
   return [...journal.filmOrders.filter(isFilmPending).map((order) => order.scenario), ...unorderedDeclaredFilms(journal)];
+}
+
+/** The scenarios whose latest film failed. A scenario ordered again counts as pending until its film ends. */
+export function failedFilmScenarios(journal: PipelineJournal): readonly string[] {
+  return journal.filmOrders.filter(isFilmFailed).map((order) => order.scenario);
 }

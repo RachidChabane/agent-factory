@@ -7,7 +7,7 @@ export type ConfigurationListener = (config: AgentFactoryConfig) => void;
 
 /** Settings that take effect at once; everything else waits for a restart. */
 const LIVE_INSTALLATION_SECTIONS = ['budget', 'resources'] as const satisfies readonly (keyof AgentFactoryConfig)[];
-const LIVE_PROJECT_SECTIONS = ['roles', 'concurrency'] as const satisfies readonly (keyof ProjectConfig)[];
+const LIVE_PROJECT_SECTIONS = ['roles', 'concurrency', 'autonomy'] as const satisfies readonly (keyof ProjectConfig)[];
 const PROJECTS_SECTION = 'projects';
 
 function changedInstallationSections(current: AgentFactoryConfig, loaded: AgentFactoryConfig): readonly string[] {
@@ -31,7 +31,7 @@ function projectSetChanged(current: AgentFactoryConfig, loaded: AgentFactoryConf
 
 /**
  * The installation's configuration as the running factory applies it: a reload takes the budget,
- * the resources and each project's roles and concurrency at once, and names everything else that
+ * the resources and each project's roles, concurrency and autonomy at once, and names everything else that
  * changed in the file as waiting for a restart.
  */
 export class LiveInstallation implements InstallationConfigurationSource {
@@ -68,7 +68,7 @@ export class LiveInstallation implements InstallationConfigurationSource {
       resources: loaded.resources,
       projects: this.current.projects.map((project) => {
         const next = loaded.projects.find((candidate) => candidate.id === project.id);
-        return next === undefined ? project : { ...project, roles: next.roles, concurrency: next.concurrency };
+        return next === undefined ? project : { ...project, roles: next.roles, concurrency: next.concurrency, autonomy: next.autonomy };
       }),
     };
     for (const listener of this.listeners) listener(this.current);

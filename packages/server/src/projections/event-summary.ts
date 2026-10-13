@@ -1,4 +1,4 @@
-import type { FactoryEventRecord } from '@agent-factory/application';
+import { describeGestureMade, GestureMadePayloadSchema, type FactoryEventRecord } from '@agent-factory/application';
 
 type Fields = Readonly<Record<string, unknown>>;
 type Summarizer = (subjectId: string, fields: Fields) => string;
@@ -29,19 +29,31 @@ function issue(id: string): string {
   return `issue #${id}`;
 }
 
+/** Who made a gesture: the delegate when the event names one, otherwise the operator. */
+function madeBy(fields: Fields): string {
+  return text(fields, 'actor') ?? text(fields, 'operator') ?? 'the operator';
+}
+
+function gestureMade(fields: Fields): string {
+  const decision = GestureMadePayloadSchema.safeParse(fields);
+  return decision.success ? describeGestureMade(decision.data) : 'the delegate made a gesture of the operator';
+}
+
 /** One line per kind of event, for the cockpit's activity feed. */
 const SUMMARIES: Readonly<Record<string, Summarizer>> = {
   'issue.transitioned': (id, fields) => `${issue(id)} moved to ${text(fields, 'to') ?? 'a new state'}`,
-  'issue.spec-validated': (id, fields) => `the spec of ${issue(id)} was validated by ${text(fields, 'operator') ?? 'the operator'}`,
+  'issue.spec-validated': (id, fields) => `the spec of ${issue(id)} was validated by ${madeBy(fields)}`,
+  'autonomy.gesture-made': (_id, fields) => gestureMade(fields),
   'issue.paused': (id) => `${issue(id)} was paused`,
   'issue.unpaused': (id) => `${issue(id)} was resumed`,
   'pipeline.checks-frozen': (id) => `the acceptance checks of ${issue(id)} were frozen`,
   'pipeline.gate-completed': (id, fields) => `the gate of ${issue(id)} ${fields['passed'] === true ? 'passed' : 'ran'}`,
   'pipeline.review-completed': (id) => `the review of ${issue(id)} completed`,
   'pipeline.pull-request-opened': (id, fields) => `pull request #${number(fields, 'number') ?? '?'} opened for ${issue(id)}`,
-  'pipeline.pull-request-merged': (id) => `the pull request of ${issue(id)} was merged`,
+  'pipeline.pull-request-merged': (id, fields) => `the pull request of ${issue(id)} was merged${text(fields, 'actor') === null ? '' : ` by ${madeBy(fields)}`}`,
+  'pipeline.pull-request-ready-announced': (id, fields) => `the pull request of ${issue(id)} was announced as ready for head ${short(text(fields, 'headSha') ?? '')}`,
   'pipeline.external-feedback-received': (id) => `feedback arrived on the pull request of ${issue(id)}`,
-  'pipeline.decision-answered': (id) => `the operator answered the question of ${issue(id)}`,
+  'pipeline.decision-answered': (id, fields) => `${madeBy(fields)} answered the question of ${issue(id)}`,
   'pipeline.check-rewrite-ordered': (id, fields) => `a rewrite of ${text(fields, 'path') ?? 'a check'} was ordered on ${issue(id)}`,
   'run.started': (_id, fields) => `${text(fields, 'role') ?? 'an agent'} run started on ${text(fields, 'model') ?? 'its model'}`,
   'run.finished': (_id, fields) => `an agent run ended: ${text(fields, 'outcome') ?? text(fields, 'status') ?? 'finished'}`,

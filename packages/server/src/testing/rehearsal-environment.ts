@@ -36,6 +36,10 @@ export interface RehearsalOptions {
   readonly projects?: readonly string[];
   /** Settings a project declares besides its identity and forge, such as its delivery environments. */
   readonly projectSettings?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  /** The upload command of the media of the notices (`notifications.media`); none when absent. */
+  readonly media?: Readonly<Record<string, unknown>>;
+  /** How long an empty list of checks is waited on, in seconds; a local forge that runs no check has nothing to wait for. */
+  readonly checksSettleSeconds?: number;
 }
 
 function projectEntry(id: string, extra: Readonly<Record<string, unknown>>): Record<string, unknown> {
@@ -58,8 +62,12 @@ export function rehearsalConfigText(options: RehearsalOptions = {}): string {
     server: { port: 0 },
     claude: { niceness: null, ...(options.claudeCommand === undefined ? {} : { command: options.claudeCommand }) },
     ...(options.minimumFreeMemoryPercent === undefined ? {} : { resources: { minimumFreeMemoryPercent: options.minimumFreeMemoryPercent } }),
-    daemon: { pollIntervalSeconds: 0.05, mergeWatchIntervalMinutes: 0.002, issueRefreshSeconds: 0.05 },
-    notifications: { dedupeWindowMinutes: 1, channels: [{ kind: 'google-chat', webhookUrl: { fromEnvironment: TEST_WEBHOOK_VARIABLE } }] },
+    daemon: { pollIntervalSeconds: 0.05, mergeWatchIntervalMinutes: 0.002, issueRefreshSeconds: 0.05, checksSettleSeconds: options.checksSettleSeconds ?? 0 },
+    notifications: {
+      dedupeWindowMinutes: 1,
+      channels: [{ kind: 'google-chat', webhookUrl: { fromEnvironment: TEST_WEBHOOK_VARIABLE } }],
+      ...(options.media === undefined ? {} : { media: options.media }),
+    },
     defaults: {
       roles: {
         'acceptance-author': QUICK_ROLE,
@@ -80,6 +88,8 @@ export interface RehearsalProject {
   readonly forge: LocalGitHubGateway;
   /** A validated documentation issue; `films` are the scenarios its spec declares. */
   addDocIssue(title: string, films?: readonly string[]): Promise<number>;
+  /** A documentation issue whose spec the operator has not validated yet. */
+  addDraftDocIssue(title: string): Promise<number>;
   /** Pushes a commit straight to the base branch of the project's local forge, as someone outside the factory would. */
   pushDirectCommit(path: string, content: string, message: string): string;
 }
@@ -155,6 +165,11 @@ async function rehearsalProject(config: AgentFactoryConfig, id: string, source: 
       const spec = docIssue(title);
       const labels = [conventions.typology.get(spec.type).label, conventions.labels.validated, ...films.map(filmLabel)];
       const issue = await forge.createIssue(title, renderSpecBody({ ...spec, films }, conventions), labels);
+      return issue.number;
+    },
+    addDraftDocIssue: async (title) => {
+      const spec = docIssue(title);
+      const issue = await forge.createIssue(title, renderSpecBody(spec, conventions), [conventions.typology.get(spec.type).label]);
       return issue.number;
     },
     pushDirectCommit: (path, content, message) => {

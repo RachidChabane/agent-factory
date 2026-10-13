@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { argv, env, exit, stdin, stdout, stderr } from 'node:process';
+import { keepAlive, keepAliveWhileParentLives } from './keep-alive.ts';
 import {
   FAKE_FAILURE_EXIT_CODE,
   FAKE_FAILURE_MESSAGE,
@@ -8,22 +9,30 @@ import {
   FAKE_FLOOD_LINE_COUNT,
   FAKE_GRANDCHILD_TYPE,
   FAKE_INVOCATION_TYPE,
+  FAKE_LOGGED_IN_STATUS,
   FAKE_MODE_FLAG,
   FAKE_MODES,
   FAKE_OVERSIZED_LINE_CHARACTERS,
   FAKE_SESSION_ID,
   FAKE_SUCCESS_RESULT,
+  FAKE_UNWATCHED_FLAG,
   type FakeMode,
 } from './fake-claude-protocol.ts';
 
 const SETTINGS_FLAG = '--settings';
 const PRINT_FLAG = '-p';
 const USAGE_PROMPT = '/usage';
+const AUTH_STATUS_ARGUMENTS: readonly string[] = ['auth', 'status'];
 const USAGE_RESET_IN_MS = 3_600_000;
 const INTERRUPTED_EXIT_CODE = 130;
-const KEEP_ALIVE_MS = 1_000;
 const GRANDCHILD_SLEEP_SECONDS = '120';
 const INIT_LINE = { type: 'system', subtype: 'init', session_id: FAKE_SESSION_ID, model: 'fake-model' };
+
+/** A fake that waits for ever ends with its parent, unless the test that started it says otherwise. */
+function keepRunning(): void {
+  if (argv.includes(FAKE_UNWATCHED_FLAG)) keepAlive();
+  else keepAliveWhileParentLives();
+}
 
 function valueAfter(flag: string): string | undefined {
   const index = argv.indexOf(flag);
@@ -40,10 +49,6 @@ async function readPrompt(): Promise<string> {
     prompt += String(chunk);
   }
   return prompt;
-}
-
-function keepAlive(): void {
-  setInterval(() => undefined, KEEP_ALIVE_MS);
 }
 
 const behaviours: Readonly<Record<FakeMode, () => Promise<void>>> = {
@@ -64,16 +69,16 @@ const behaviours: Readonly<Record<FakeMode, () => Promise<void>>> = {
     exit(FAKE_FAILURE_EXIT_CODE);
   },
   hang: async () => {
-    emit(INIT_LINE);
+    keepRunning();
     process.once('SIGINT', () => exit(INTERRUPTED_EXIT_CODE));
-    keepAlive();
+    emit(INIT_LINE);
   },
   stubborn: async () => {
+    keepRunning();
     process.on('SIGINT', () => undefined);
     process.on('SIGTERM', () => undefined);
     const grandchild = spawn('sleep', [GRANDCHILD_SLEEP_SECONDS], { stdio: 'ignore' });
     emit({ type: FAKE_GRANDCHILD_TYPE, pid: grandchild.pid });
-    keepAlive();
   },
   flood: async () => {
     emit(INIT_LINE);
@@ -97,6 +102,15 @@ function isFakeMode(value: string | undefined): value is FakeMode {
   return FAKE_MODES.some((mode) => mode === value);
 }
 
+/** What the real CLI prints locally for `auth status`, whatever its agents would do. */
+function authStatus(): void {
+  emit(FAKE_LOGGED_IN_STATUS);
+}
+
+function asksForAuthStatus(): boolean {
+  return AUTH_STATUS_ARGUMENTS.every((word, index) => argv.at(index - AUTH_STATUS_ARGUMENTS.length) === word);
+}
+
 /** The usage report the real CLI answers locally, whatever its agents would do. */
 function usageReport(): void {
   const resetsAt = new Date(Date.now() + USAGE_RESET_IN_MS).toISOString();
@@ -114,4 +128,5 @@ if (!isFakeMode(mode)) {
   throw new Error(`unknown fake mode ${String(mode)}`);
 }
 if (valueAfter(PRINT_FLAG) === USAGE_PROMPT) usageReport();
+else if (asksForAuthStatus()) authStatus();
 else await behaviours[mode]();

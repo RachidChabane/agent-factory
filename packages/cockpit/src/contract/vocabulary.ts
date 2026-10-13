@@ -85,3 +85,14 @@ export type NotificationChannelKind = (typeof NOTIFICATION_CHANNEL_KINDS)[number
 
 export const TOOL_SCOPES = ['installation', 'project'] as const;
 export type ToolScope = (typeof TOOL_SCOPES)[number];
+
+export { DELEGABLE_GESTURES, MERGE_CONDITIONS } from '@agent-factory/domain';
+export type { DelegableGesture, MergeCondition } from '@agent-factory/domain';
+
+/** What a gesture of the delegate acted on. */
+export const DELEGATED_TARGET_KINDS = ['issue', 'pull-request'] as const;
+export type DelegatedTargetKind = (typeof DELEGATED_TARGET_KINDS)[number];
+
+/** What the ready notice of a pull request is: sent for its head, held by something, due at the next tick, or not applicable. */
+export const READY_NOTICE_STATUSES = ['sent', 'held', 'due', 'none'] as const;
+export type ReadyNoticeStatus = (typeof READY_NOTICE_STATUSES)[number];

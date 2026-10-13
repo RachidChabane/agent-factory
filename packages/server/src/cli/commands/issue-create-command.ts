@@ -1,9 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createIssueFromPlan, planIssueCreation, specOriginOf, validateSpec } from '@agent-factory/application';
+import { createIssueFromPlan, planIssueCreation, specOriginOf, validateSpec, type Delegation } from '@agent-factory/application';
 import { projectConventions } from '../../composition/project/project-settings.ts';
 import type { CliContext } from '../cli-context.ts';
 import { EXIT_CODES } from '../output.ts';
+import { authorisedDelegate, recordDelegation } from './delegated-gestures.ts';
 import { forgeName } from './forge-names.ts';
 import { itemName, selectedProject, withProjectEvents, withProjectSession } from './project-session.ts';
 
@@ -21,11 +22,14 @@ export interface IssueCreateOptions {
   readonly confirmed: boolean;
   /** The operator's explicit order to validate the spec at once, so the factory takes the issue. */
   readonly start: boolean;
+  /** The delegate validating the spec instead of the operator; its policy is checked before the issue is created. */
+  readonly delegation: Delegation | null;
 }
 
 export async function issueCreateCommand(specPath: string, options: IssueCreateOptions, requested: string | null, context: CliContext): Promise<number> {
   const selected = await selectedProject(context, requested);
   const { project } = selected;
+  const authorisation = authorisedDelegate(project, options.delegation, 'validate-spec');
   const path = resolve(context.workingDirectory, specPath);
   const text = await readFile(path, UTF8);
   const origin = await withProjectEvents(context, selected, (events) => specOriginOf(events, project.directories.requests, path));
@@ -52,8 +56,9 @@ export async function issueCreateCommand(specPath: string, options: IssueCreateO
       context.output.line(`${created}; validate it (${conventions.labels.validated}) once you have reviewed it`);
       return EXIT_CODES.ok;
     }
-    await validateSpec(dependencies, issue.number, session.installation.operator, conventions);
+    await validateSpec(dependencies, issue.number, session.installation.operator, conventions, options.delegation);
     context.output.line(`${created} and validated: the factory takes it at its next tick`);
+    await recordDelegation(session, context, options.delegation, authorisation, { kind: 'issue', number: issue.number, issueNumber: issue.number });
     return EXIT_CODES.ok;
   });
 }

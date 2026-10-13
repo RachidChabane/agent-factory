@@ -36,8 +36,11 @@ function projectNamed(runtime: InstallationRuntime, id: string): ProjectRuntime 
   return runtime.projects.find((candidate) => candidate.id === id);
 }
 
-/** The cockpit's HTTP server over an installation; without daemons, commands that need a running factory are refused. */
-export function createHttpServer(runtime: InstallationRuntime, daemons: RunningDaemons | null, options: RuntimeOptions = {}): FactoryHttpServer {
+/**
+ * The cockpit's HTTP server over an installation; without daemons, commands that need a running factory are refused.
+ * The commands it takes stop their processes when the lifetime signal aborts.
+ */
+export function createHttpServer(runtime: InstallationRuntime, daemons: RunningDaemons | null, lifetime: AbortSignal, options: RuntimeOptions = {}): FactoryHttpServer {
   const source = new SnapshotSource(runtime);
   const cursor = new SequenceCursor(runtime.events);
   const { config } = runtime;
@@ -51,7 +54,7 @@ export function createHttpServer(runtime: InstallationRuntime, daemons: RunningD
       log: runtime.log,
       snapshot: () => source.snapshot(),
       telemetry: () => source.telemetry(),
-      command: (name, body, operator) => dispatchCommand(name, body, { runtime, daemons, operator }, cursor),
+      command: (name, body, operator) => dispatchCommand(name, body, { runtime, daemons, operator, lifetime }, cursor),
       repositoryFile: async (id, sha, path) => (await projectNamed(runtime, id)?.repository.file(sha, path)) ?? null,
       pullRequestDiff: async (id, pullRequestNumber) => (await projectNamed(runtime, id)?.repository.pullRequestDiff(pullRequestNumber)) ?? null,
     },
@@ -75,7 +78,7 @@ export function createHttpServer(runtime: InstallationRuntime, daemons: RunningD
 /** Starts the daemons of every project and the cockpit; aborting the signal stops both. */
 export async function startFactory(runtime: InstallationRuntime, signal: AbortSignal, options: RuntimeOptions = {}): Promise<RunningFactory> {
   const daemons = createDaemons(runtime);
-  const server = createHttpServer(runtime, daemons, options);
+  const server = createHttpServer(runtime, daemons, signal, options);
   const address = await server.start();
   runtime.listeningPorts.register(address.port);
   const finished = daemons.installation.run(signal).finally(() => server.stop());

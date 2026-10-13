@@ -1,19 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import type { Notifier } from '../ports.ts';
+import type { NoticeLink, Notifier } from '../ports.ts';
 import { SteppingClock } from '../runs/test-support.ts';
 import { DedupingNotifier } from './deduping-notifier.ts';
 import { NOTICES, OperatorNotifications } from './operator-notifications.ts';
 
 class RecordingNotifier implements Notifier {
   readonly sent: { title: string; body: string; link: string }[] = [];
+  readonly media: (readonly NoticeLink[])[] = [];
   failures = 0;
 
-  notify(title: string, body: string, link: string): Promise<void> {
+  notify(title: string, body: string, link: string, media: readonly NoticeLink[] = []): Promise<void> {
     if (this.failures > 0) {
       this.failures -= 1;
       return Promise.reject(new Error('HTTP 500'));
     }
     this.sent.push({ title, body, link });
+    this.media.push(media);
     return Promise.resolve();
   }
 }
@@ -58,5 +60,50 @@ describe('operator notifications', () => {
     inner.failures = 1;
     await notifications.send(NOTICES.paused('budget', 'seven_day window at 90%', new Date('2026-10-12T00:00:00Z')));
     expect(warnings[0]).toContain('was not delivered: HTTP 500');
+  });
+
+  it('tells the operator whether every channel took a notice', async () => {
+    const inner = new RecordingNotifier();
+    const notifications = new OperatorNotifications(inner, 'http://127.0.0.1:7430', { info: () => undefined, warn: () => undefined });
+    expect(await notifications.send(NOTICES.needsHuman(1, 'stop'))).toBe(true);
+    inner.failures = 1;
+    expect(await notifications.send(NOTICES.needsHuman(2, 'stop'))).toBe(false);
+  });
+
+  it('hands the links of a notice to the channels, and tells two notices that differ only by a link apart', async () => {
+    const inner = new RecordingNotifier();
+    const notifier = new DedupingNotifier(inner, new SteppingClock(START), WINDOW_MS);
+    const first = [{ label: 'tour · before · film.mp4', url: 'https://files.example.test/a' }];
+    await notifier.notify('t', 'b', 'l', first);
+    await notifier.notify('t', 'b', 'l', first);
+    await notifier.notify('t', 'b', 'l', [{ label: 'tour · before · film.mp4', url: 'https://files.example.test/b' }]);
+    expect(inner.media).toEqual([first, [{ label: 'tour · before · film.mp4', url: 'https://files.example.test/b' }]]);
+  });
+
+  it('words the notice that a pull request is ready, with its films and its links', () => {
+    const media = [{ label: 'checkout-flow · after · film.mp4', url: 'https://files.example.test/after' }];
+    expect(NOTICES.pullRequestReady({ issueNumber: 12, pullRequest: { number: 31, url: 'https://forge.example.test/pull/31', headSha: 'abc' }, title: 'feat(cart): show the badge', films: ['checkout-flow'], media })).toEqual({
+      title: 'Pull request #31 is ready to merge',
+      body: 'feat(cart): show the badge (issue #12). Its required checks passed. Films recorded: checkout-flow. https://forge.example.test/pull/31',
+      path: '/pull-requests/31',
+      media,
+    });
+  });
+
+  it('words the notice of a gesture the delegate made, with its reason and its rule', () => {
+    expect(
+      NOTICES.gestureDelegated({
+        actor: 'orchestrator',
+        gesture: 'merge',
+        target: { kind: 'pull-request', number: 31 },
+        issueNumber: 12,
+        reason: 'a documentation change with a clean review',
+        rule: 'autonomy.merge for docs',
+      }),
+    ).toEqual({
+      title: 'orchestrator merged pull request #31',
+      body: 'Reason: a documentation change with a clean review. Allowed by autonomy.merge for docs.',
+      path: '/pull-requests/31',
+    });
   });
 });

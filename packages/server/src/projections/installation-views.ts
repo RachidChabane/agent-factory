@@ -38,6 +38,7 @@ import {
 import { AGENT_ROLES, type PauseCause } from '@agent-factory/domain';
 import type { AgentFactoryConfig, ProjectConfig, RoleSettings, RoleSettingsMap } from '../config/agent-factory-config.ts';
 import type { ConfiguredTool } from '../composition/installation/tools.ts';
+import { autonomyView } from './autonomy-views.ts';
 import { isChannelConfigured } from '../composition/installation/notifications.ts';
 import { iso } from './event-index.ts';
 
@@ -243,5 +244,6 @@ export function projectSettingsView(project: ProjectConfig): ProjectSettingsView
     automations: project.audits.ignore.map((automation) => ({ name: automation.name, branches: [...automation.branches], authors: [...automation.authors] })),
     releaseModel: project.delivery.release.kind,
     films: project.evidence.films === null ? null : { timeZone: project.evidence.films.timeZone, timeoutMinutes: Math.round(project.evidence.films.timeoutMs / MILLISECONDS_PER_MINUTE) },
+    autonomy: autonomyView(project.autonomy),
   };
 }

@@ -3,10 +3,14 @@ import { fileURLToPath } from 'node:url';
 export const FAKE_CLAUDE_SCRIPT = fileURLToPath(new URL('./fake-claude.ts', import.meta.url));
 export const FAKE_MODE_FLAG = '--fake-mode';
 export const FAKE_FIXTURE_FLAG = '--fake-fixture';
+/** Keeps a fake that waits for ever running after its parent is gone, for a test that checks the parent's own cleanup. */
+export const FAKE_UNWATCHED_FLAG = '--fake-unwatched';
 export const FAKE_MODES = ['replay', 'echo', 'fail', 'hang', 'stubborn', 'flood', 'tamper'] as const;
 export type FakeMode = (typeof FAKE_MODES)[number];
 
 export const FAKE_SESSION_ID = 'fake-session';
+/** What `claude auth status` prints for the fake's login. */
+export const FAKE_LOGGED_IN_STATUS = { loggedIn: true, authMethod: 'claude.ai', email: 'operator@example.com', orgName: 'Example Org', subscriptionType: 'max' } as const;
 export const FAKE_FAILURE_MESSAGE = 'fatal: fake claude could not start';
 export const FAKE_FAILURE_EXIT_CODE = 3;
 export const FAKE_FLOOD_LINE_COUNT = 5_000;

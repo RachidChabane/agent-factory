@@ -25,6 +25,7 @@ export type IssueSeed = WithDefaults<
   | 'attempts'
   | 'escalation'
   | 'costUsd'
+  | 'delegated'
 >;
 
 export function issueView(seed: IssueSeed): IssueView {
@@ -41,6 +42,7 @@ export function issueView(seed: IssueSeed): IssueView {
     attempts: [],
     escalation: null,
     costUsd: 0,
+    delegated: [],
     ...seed,
   };
 }
@@ -63,6 +65,8 @@ export type PullRequestSeed = WithDefaults<
   | 'evidence'
   | 'films'
   | 'filmOrders'
+  | 'readyNotice'
+  | 'delegated'
   | 'reviewRounds'
   | 'externalFeedback'
   | 'files'
@@ -79,6 +83,8 @@ export function pullRequestView(seed: PullRequestSeed): PullRequestView {
     evidence: [],
     films: [],
     filmOrders: [],
+    readyNotice: { status: 'none' },
+    delegated: [],
     reviewRounds: [],
     externalFeedback: [],
     files: [],
@@ -121,7 +127,7 @@ export function releaseView(seed: ReleaseSeed): ReleaseView {
 }
 
 export type AuditSeed = WithDefaults<
-  Omit<AuditView, 'pullRequestUrl'>,
+  Omit<AuditView, 'pullRequestUrl' | 'publishedIssueUrl'>,
   | 'authorLogin'
   | 'pullRequestNumber'
   | 'branch'
@@ -135,8 +141,8 @@ export type AuditSeed = WithDefaults<
   | 'resolutionNote'
 >;
 
-/** An audit; the address of its pull request is the one the forge of the project gives that number. */
-export function auditView(seed: AuditSeed, links: Pick<ForgeLinks, 'pullRequest'>): AuditView {
+/** An audit; the addresses of its pull request and of its published issue are the ones the forge of the project gives those numbers. */
+export function auditView(seed: AuditSeed, links: Pick<ForgeLinks, 'pullRequest' | 'issue'>): AuditView {
   return {
     authorLogin: null,
     pullRequestNumber: null,
@@ -151,6 +157,7 @@ export function auditView(seed: AuditSeed, links: Pick<ForgeLinks, 'pullRequest'
     resolutionNote: null,
     ...seed,
     pullRequestUrl: seed.pullRequestNumber === undefined || seed.pullRequestNumber === null ? null : links.pullRequest(seed.pullRequestNumber),
+    publishedIssueUrl: seed.publishedIssueNumber === undefined || seed.publishedIssueNumber === null ? null : links.issue(seed.publishedIssueNumber),
   };
 }
 

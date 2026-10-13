@@ -11,19 +11,19 @@ describe('parseCommandLine', () => {
   it('parses every command', () => {
     expect(parseCommandLine(['run-issue', '42'])).toEqual(ok({ kind: 'run-issue', issueNumber: 42 }));
     expect(parseCommandLine(['status', '7'])).toEqual(ok({ kind: 'status', issueNumber: 7 }));
-    expect(parseCommandLine(['resume', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: false }));
+    expect(parseCommandLine(['resume', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: false, delegation: null }));
     expect(parseCommandLine(['resume', '7', '--answer', 'Use the module option.'])).toEqual(
-      ok({ kind: 'resume', issueNumber: 7, answer: 'Use the module option.', reviewAgain: false }),
+      ok({ kind: 'resume', issueNumber: 7, answer: 'Use the module option.', reviewAgain: false, delegation: null }),
     );
-    expect(parseCommandLine(['resume', '--answer=Yes', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: 'Yes', reviewAgain: false }));
-    expect(parseCommandLine(['resume', '7', '--review-again'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: true }));
-    expect(parseCommandLine(['resume', '--review-again', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: true }));
+    expect(parseCommandLine(['resume', '--answer=Yes', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: 'Yes', reviewAgain: false, delegation: null }));
+    expect(parseCommandLine(['resume', '7', '--review-again'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: true, delegation: null }));
+    expect(parseCommandLine(['resume', '--review-again', '7'])).toEqual(ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: true, delegation: null }));
     expect(parseCommandLine(['validate'])).toEqual(ok({ kind: 'validate', offline: false, gatePreflight: true }));
     expect(parseCommandLine(['validate', '--skip-gate-preflight'])).toEqual(ok({ kind: 'validate', offline: false, gatePreflight: false }));
     expect(parseCommandLine(['validate', '--quick'])).toEqual({ ok: false, error: 'unknown option --quick' });
     expect(parseCommandLine(['validate', '--offline'])).toEqual(ok({ kind: 'validate', offline: true, gatePreflight: true }));
-    expect(parseCommandLine(['merge', '100', '--expected-head', SHA])).toEqual(ok({ kind: 'merge', pullRequestNumber: 100, expectedHeadSha: SHA }));
-    expect(parseCommandLine(['merge', `--expected-head=${SHA}`, '100'])).toEqual(ok({ kind: 'merge', pullRequestNumber: 100, expectedHeadSha: SHA }));
+    expect(parseCommandLine(['merge', '100', '--expected-head', SHA])).toEqual(ok({ kind: 'merge', pullRequestNumber: 100, expectedHeadSha: SHA, delegation: null }));
+    expect(parseCommandLine(['merge', `--expected-head=${SHA}`, '100'])).toEqual(ok({ kind: 'merge', pullRequestNumber: 100, expectedHeadSha: SHA, delegation: null }));
   });
 
   it('parses the rehearsal commands', () => {
@@ -44,10 +44,10 @@ describe('parseCommandLine', () => {
     expect(parseCommandLine(['request', 'add', 'ask.md', '--images', 'shots', '--requester=Dana'])).toEqual(ok({ kind: 'request-add', path: 'ask.md', imagesDirectory: 'shots', requester: 'Dana' }));
     expect(parseCommandLine(['request', 'add', 'ask.md'])).toEqual(ok({ kind: 'request-add', path: 'ask.md', imagesDirectory: null, requester: 'unknown' }));
     expect(parseCommandLine(['request', 'challenge', 'req-3'])).toEqual(ok({ kind: 'request-challenge', requestId: 'req-3' }));
-    expect(parseCommandLine(['issue', 'create', 'spec.md', '--confirm'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [], confirmed: true, start: false }));
-    expect(parseCommandLine(['issue', 'create', 'spec.md', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [], confirmed: false, start: true }));
-    expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by', '12, 14,12', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [12, 14], confirmed: false, start: true }));
-    expect(parseCommandLine(['issue', 'create', '--blocked-by=7', 'spec.md'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [7], confirmed: false, start: false }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--confirm'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [], confirmed: true, start: false, delegation: null }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [], confirmed: false, start: true, delegation: null }));
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by', '12, 14,12', '--start'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [12, 14], confirmed: false, start: true, delegation: null }));
+    expect(parseCommandLine(['issue', 'create', '--blocked-by=7', 'spec.md'])).toEqual(ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [7], confirmed: false, start: false, delegation: null }));
     expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by', '12,x'])).toEqual({ ok: false, error: '--blocked-by must list issue numbers separated by commas, got "12,x"' });
     expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by', '0'])).toEqual({ ok: false, error: '--blocked-by must list issue numbers separated by commas, got "0"' });
     expect(parseCommandLine(['issue', 'create', 'spec.md', '--blocked-by'])).toEqual({ ok: false, error: 'missing value for --blocked-by' });
@@ -122,10 +122,60 @@ describe('parseCommandLine', () => {
 
   it('lists every verb and subcommand it defines, and prints each verb in its usage', () => {
     expect(COMMAND_VERBS).toEqual(expect.arrayContaining(['init', 'validate', 'start', 'status', 'watch', 'stop', 'merge', 'resume', 'issue', 'pr', 'request', 'tool']));
-    expect(COMMAND_SUBCOMMANDS['issue']).toEqual(['create', 'abandon']);
+    expect(COMMAND_SUBCOMMANDS['issue']).toEqual(['create', 'validate', 'abandon']);
     expect(COMMAND_SUBCOMMANDS['pr']).toEqual(['feedback']);
     expect(COMMAND_SUBCOMMANDS['run-issue']).toBeUndefined();
     for (const verb of COMMAND_VERBS.filter((candidate) => candidate !== 'help')) expect(USAGE, verb).toContain(`  ${verb}`);
+  });
+
+  it('parses the gestures a project can delegate, with or without the delegate', () => {
+    const delegation = { actor: 'orchestrator', reason: 'a documentation change with a clean review' };
+    expect(parseCommandLine(['issue', 'validate', '12'])).toEqual(ok({ kind: 'issue-validate', issueNumber: 12, delegation: null }));
+    expect(parseCommandLine(['issue', 'validate', '12', '--as', 'orchestrator', '--reason', ' a documentation change with a clean review '])).toEqual(
+      ok({ kind: 'issue-validate', issueNumber: 12, delegation }),
+    );
+    expect(parseCommandLine(['resume', '7', '--as=orchestrator', '--reason=a documentation change with a clean review'])).toEqual(
+      ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: false, delegation }),
+    );
+    expect(parseCommandLine(['resume', '7', '--answer', 'Yes', '--as', 'orchestrator', '--reason', 'the spec answers it'])).toEqual(
+      ok({ kind: 'resume', issueNumber: 7, answer: 'Yes', reviewAgain: false, delegation: { actor: 'orchestrator', reason: 'the spec answers it' } }),
+    );
+    expect(parseCommandLine(['resume', '7', '--review-again', '--as', 'orchestrator', '--reason', 'the review blocked on a nit'])).toEqual(
+      ok({ kind: 'resume', issueNumber: 7, answer: null, reviewAgain: true, delegation: { actor: 'orchestrator', reason: 'the review blocked on a nit' } }),
+    );
+    expect(parseCommandLine(['merge', '100', '--expected-head', SHA, '--as', 'orchestrator', '--reason', 'a documentation change with a clean review'])).toEqual(
+      ok({ kind: 'merge', pullRequestNumber: 100, expectedHeadSha: SHA, delegation }),
+    );
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--start', '--as', 'orchestrator', '--reason', 'a documentation change with a clean review', '--project', 'ledger'])).toEqual(
+      ok({ kind: 'issue-create', specPath: 'spec.md', blockedBy: [], confirmed: false, start: true, delegation }, 'ledger'),
+    );
+  });
+
+  it('wants --as and --reason together, and --as only on a gesture a project can delegate', () => {
+    expect(parseCommandLine(['merge', '100', '--expected-head', SHA, '--as', 'orchestrator'])).toEqual({ ok: false, error: '--as needs --reason "<why>"' });
+    expect(parseCommandLine(['merge', '100', '--expected-head', SHA, '--as', 'orchestrator', '--reason', '  '])).toEqual({ ok: false, error: '--as needs --reason "<why>"' });
+    expect(parseCommandLine(['merge', '100', '--expected-head', SHA, '--reason', 'because'])).toEqual({ ok: false, error: '--reason goes with --as <actor>' });
+    expect(parseCommandLine(['resume', '7', '--as'])).toEqual({ ok: false, error: 'missing value for --as' });
+    expect(parseCommandLine(['issue', 'create', 'spec.md', '--as', 'orchestrator', '--reason', 'because'])).toEqual({
+      ok: false,
+      error: '--as goes with --start: creating an issue is no gesture of the operator, validating its spec is',
+    });
+    for (const line of [['issue', 'abandon', '5', '--as', 'orchestrator', '--reason', 'x'], ['run-issue', '4', '--as', 'orchestrator'], ['film', '12', '--scenario', 'tour', '--as', 'orchestrator'], ['stop', '--as=orchestrator']]) {
+      expect(parseCommandLine(line), line.join(' ')).toEqual({
+        ok: false,
+        error: expect.stringContaining('is not a gesture a project can delegate; --as goes with resume, merge, issue create, issue validate') as string,
+      });
+    }
+  });
+
+  it('keeps --reason as the reason of an abandoned issue when no delegate is named', () => {
+    expect(parseCommandLine(['issue', 'abandon', '5', '--reason', 'superseded'])).toEqual(ok({ kind: 'issue-abandon', issueNumber: 5, reason: 'superseded' }));
+    expect(parseCommandLine(['run-issue', '4', '--reason', 'because'])).toEqual({ ok: false, error: 'unknown option --reason' });
+  });
+
+  it('explains the delegate options in its usage', () => {
+    expect(USAGE).toContain('--as <actor> --reason "<why>"');
+    expect(USAGE).toContain('issue validate <issue>');
   });
 
   it('shows help without arguments or when asked', () => {

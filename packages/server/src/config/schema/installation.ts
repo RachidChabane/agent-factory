@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_MEDIA_UPLOAD_TIMEOUT_SECONDS, uploadCommandProblems } from '@agent-factory/application';
 import {
   BILLING_MODES,
   DEFAULT_BILLING_MODE,
@@ -37,6 +38,8 @@ export const DEFAULT_PAUSE_ABOVE_PRESSURE = 'normal';
 export const DEFAULT_POLL_INTERVAL_SECONDS = 30;
 export const DEFAULT_MERGE_WATCH_INTERVAL_MINUTES = 10;
 export const DEFAULT_ISSUE_REFRESH_SECONDS = 120;
+/** A forge may take this long after a push to register its checks; a list that stays empty past it means the project has none. */
+export const DEFAULT_CHECKS_SETTLE_SECONDS = 120;
 export const DEFAULT_NOTIFICATION_DEDUPE_MINUTES = 30;
 export const DEFAULT_TOOL_TIMEOUT_SECONDS = 20;
 /** A browser login waits for the operator's single sign-on. */
@@ -119,6 +122,7 @@ const DaemonSchema = z
     pollIntervalSeconds: PositiveSeconds.default(DEFAULT_POLL_INTERVAL_SECONDS),
     mergeWatchIntervalMinutes: PositiveMinutes.default(DEFAULT_MERGE_WATCH_INTERVAL_MINUTES),
     issueRefreshSeconds: PositiveSeconds.default(DEFAULT_ISSUE_REFRESH_SECONDS),
+    checksSettleSeconds: z.number().min(0).default(DEFAULT_CHECKS_SETTLE_SECONDS),
   })
   .prefault({});
 
@@ -132,10 +136,27 @@ export const NotificationChannelSchema = z.discriminatedUnion('kind', [
 ]);
 export type RawNotificationChannel = z.infer<typeof NotificationChannelSchema>;
 
+/**
+ * How the media of a pull request reach the operator's notices: a command that takes a file and prints a link. It runs
+ * outside the sandbox with the operator's environment, like the film command.
+ */
+const MediaSchema = z.strictObject({
+  /** The argument template of the upload command; it holds `{file}`. The last non-empty line it prints is the link. */
+  upload: z
+    .array(NonEmptyString)
+    .min(1)
+    .superRefine((command, context) => {
+      if (command.length === 0) return;
+      for (const problem of uploadCommandProblems(command)) context.addIssue({ code: 'custom', message: problem });
+    }),
+  timeoutSeconds: PositiveSeconds.default(DEFAULT_MEDIA_UPLOAD_TIMEOUT_SECONDS),
+});
+
 const NotificationsSchema = z
   .strictObject({
     dedupeWindowMinutes: PositiveMinutes.default(DEFAULT_NOTIFICATION_DEDUPE_MINUTES),
     channels: z.array(NotificationChannelSchema).default([]),
+    media: MediaSchema.optional(),
   })
   .prefault({});
 

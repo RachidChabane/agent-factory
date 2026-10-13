@@ -12,10 +12,10 @@ import {
 } from '@agent-factory/application';
 import { CommandSpawnError } from '../process/errors.ts';
 import { MILLISECONDS_PER_MINUTE, VIDEO_EXTENSIONS } from './constants.ts';
-import { failureOf } from './failureTail.ts';
+import { failureOf } from '../process/failureTail.ts';
 import { largestVideo, screenshotFiles, selectScreenshots, videoFiles } from './filmMedia.ts';
 import { parseReport } from './filmReportParsing.ts';
-import { niced } from './niceCommand.ts';
+import { niced } from '../process/niceCommand.ts';
 
 const UTF8 = 'utf8';
 const MISSING_FILE_CODE = 'ENOENT';

@@ -5,6 +5,7 @@ import { filmCommand } from './commands/film-command.ts';
 import { initCommand } from './commands/init-command.ts';
 import { issueAbandonCommand } from './commands/issue-abandon-command.ts';
 import { issueCreateCommand } from './commands/issue-create-command.ts';
+import { issueValidateCommand } from './commands/issue-validate-command.ts';
 import { mergeCommand } from './commands/merge-command.ts';
 import { prFeedbackCommand } from './commands/pr-feedback-command.ts';
 import { rehearsalAddIssueCommand, rehearsalInitCommand, rehearsalResetCommand } from './commands/rehearsal-command.ts';
@@ -51,9 +52,9 @@ async function dispatch({ project, command }: CommandLine, context: CliContext):
     case 'run-issue':
       return runIssueCommand(command.issueNumber, project, context);
     case 'resume':
-      return resumeCommand(command.issueNumber, { answer: command.answer, reviewAgain: command.reviewAgain }, project, context);
+      return resumeCommand(command.issueNumber, { answer: command.answer, reviewAgain: command.reviewAgain, delegation: command.delegation }, project, context);
     case 'merge':
-      return mergeCommand(command.pullRequestNumber, command.expectedHeadSha, project, context);
+      return mergeCommand(command.pullRequestNumber, command.expectedHeadSha, command.delegation, project, context);
     case 'rehearsal-init':
       return rehearsalInitCommand(command.sourceClonePath, project, context);
     case 'rehearsal-reset':
@@ -65,7 +66,9 @@ async function dispatch({ project, command }: CommandLine, context: CliContext):
     case 'request-challenge':
       return requestChallengeCommand(command.requestId, project, context);
     case 'issue-create':
-      return issueCreateCommand(command.specPath, { blockedBy: command.blockedBy, confirmed: command.confirmed, start: command.start }, project, context);
+      return issueCreateCommand(command.specPath, { blockedBy: command.blockedBy, confirmed: command.confirmed, start: command.start, delegation: command.delegation }, project, context);
+    case 'issue-validate':
+      return issueValidateCommand(command.issueNumber, command.delegation, project, context);
     case 'issue-abandon':
       return issueAbandonCommand(command.issueNumber, command.reason, project, context);
     case 'pr-feedback':

@@ -8,6 +8,7 @@ import type {
   CommandRunner,
   EventStore,
   FilmLedger,
+  MediaLinkCache,
   Notifier,
   OperationLog,
   ResourceGuard,
@@ -41,6 +42,8 @@ export interface InstallationContext {
   readonly listeningPorts: ListeningPorts;
   /** Delivers notices to the configured channels, without duplicates. */
   readonly notifier: Notifier;
+  /** The links of the media already uploaded, kept by content, whichever project's pull request they belong to. */
+  readonly mediaLinks: MediaLinkCache;
   /** Aborted when the installation closes: work the installation started in the background stops with it. */
   readonly lifetime: AbortSignal;
   /** When the gate of a local forge runs once a commit's checks are asked for. */

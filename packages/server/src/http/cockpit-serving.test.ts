@@ -25,6 +25,7 @@ describe('serving the cockpit', { timeout: TIMEOUT_MS }, () => {
   let rehearsal: RehearsalEnvironment;
   let installation: InstallationRuntime;
   let server: FactoryHttpServer;
+const lifetime = new AbortController();
   let base = '';
 
   beforeAll(async () => {
@@ -45,11 +46,12 @@ describe('serving the cockpit', { timeout: TIMEOUT_MS }, () => {
     const evidence = installation.project(FIRST_PROJECT).config.directories.evidence;
     await mkdir(join(evidence, `issue-${EVIDENCE_ISSUE}`, 'before'), { recursive: true });
     await writeFile(join(evidence, `issue-${EVIDENCE_ISSUE}`, EVIDENCE_FILE), 'png');
-    server = createHttpServer(installation, null, { cockpitDirectory, stream: FAST_STREAM });
+    server = createHttpServer(installation, null, lifetime.signal, { cockpitDirectory, stream: FAST_STREAM });
     base = `http://127.0.0.1:${(await server.start()).port}`;
   });
 
   afterAll(async () => {
+  lifetime.abort();
     await server.stop();
     installation.close();
     await rehearsal.cleanup();

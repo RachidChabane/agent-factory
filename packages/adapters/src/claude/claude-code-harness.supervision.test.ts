@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { AgentRunEvent, AgentRunRequest } from '@agent-factory/application';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { waitUntilGone } from '../process/testSupport.ts';
 import { ClaudeCodeHarness } from './claude-code-harness.ts';
 import { claudeHarnessConfig, type ClaudeHarnessSettings } from './claude-harness-config.ts';
 import type { ReferenceMount, ReferenceMounts } from './reference-access.ts';
@@ -26,8 +27,6 @@ const GRACE_MS = 200;
 const PATIENT_GRACE_MS = 2_000;
 const SHORT_TIMEOUT_MS = 1_500;
 const GENEROUS_TIMEOUT_MS = 30_000;
-const PROCESS_GONE_DEADLINE_MS = 3_000;
-const POLL_INTERVAL_MS = 50;
 const PROMPT = '- implement the sum function';
 
 const InvocationSchema = z.object({
@@ -39,26 +38,6 @@ const InvocationSchema = z.object({
 });
 
 const GrandchildSchema = z.object({ type: z.literal(FAKE_GRANDCHILD_TYPE), pid: z.number().int() });
-
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function waitUntilGone(pid: number): Promise<boolean> {
-  const deadline = Date.now() + PROCESS_GONE_DEADLINE_MS;
-  while (Date.now() < deadline) {
-    if (!isAlive(pid)) {
-      return true;
-    }
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-  }
-  return !isAlive(pid);
-}
 
 function rawLinesOf(events: readonly AgentRunEvent[]): readonly string[] {
   return events.flatMap((event) => (event.kind === 'raw' ? [event.line] : []));

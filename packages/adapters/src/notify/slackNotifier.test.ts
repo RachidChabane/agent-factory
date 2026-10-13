@@ -11,6 +11,11 @@ function sectionText(title: string, body: string): string {
   return buildSlackMessage(title, body, NOTICE_LINK).blocks[0].text.text;
 }
 
+const MEDIA = [
+  { label: 'checkout-flow · before · film.mp4', url: 'https://files.example.test/a/film.mp4' },
+  { label: 'checkout-flow · after · film.mp4', url: 'https://files.example.test/b/film.mp4' },
+];
+
 describe('SlackNotifier', () => {
   it('posts the title as the fallback text, a section with the body and a button to the cockpit', async () => {
     const calls: RecordedCall[] = [];
@@ -30,6 +35,39 @@ describe('SlackNotifier', () => {
         { type: 'actions', elements: [{ type: 'button', text: { type: 'plain_text', text: 'Open in cockpit' }, url: NOTICE_LINK }] },
       ],
     });
+  });
+
+  it('lists the links of the notice in a section of their own, before the button to the cockpit', () => {
+    const message = buildSlackMessage(NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK, MEDIA);
+    expect(message.blocks).toHaveLength(3);
+    expect(message.blocks[1]).toEqual({
+      type: 'section',
+      text: { type: 'mrkdwn', text: '• <https://files.example.test/a/film.mp4|checkout-flow · before · film.mp4>\n• <https://files.example.test/b/film.mp4|checkout-flow · after · film.mp4>' },
+    });
+    expect(message.blocks.at(-1)?.type).toBe('actions');
+  });
+
+  it('adds no section when the notice has no link', () => {
+    expect(buildSlackMessage(NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK, []).blocks.map((block) => block.type)).toEqual(['section', 'actions']);
+  });
+
+  it('keeps a label or an address from closing the link it stands in', () => {
+    const [, links] = buildSlackMessage(NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK, [{ label: 'a|b <c> & d', url: 'https://files.example.test/x y|z?q=1&r=2>' }]).blocks;
+    expect(links.type === 'section' ? links.text.text : '').toBe('• <https://files.example.test/x%20y%7Cz?q=1&amp;r=2&gt;|a|b &lt;c&gt; &amp; d>');
+  });
+
+  it('shows the first links and counts the others', () => {
+    const many = Array.from({ length: 25 }, (_, index) => ({ label: `file ${index}`, url: `https://files.example.test/${index}` }));
+    const [, links] = buildSlackMessage(NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK, many).blocks;
+    const lines = (links.type === 'section' ? links.text.text : '').split('\n');
+    expect(lines).toHaveLength(21);
+    expect(lines.at(-1)).toBe('• and 5 more in the cockpit');
+  });
+
+  it('posts the links when the notifier is given some', async () => {
+    const calls: RecordedCall[] = [];
+    await new SlackNotifier({ webhookUrl: SECRET_WEBHOOK_URL, fetch: recordingFetch(OK_STATUS, calls), timeoutMs: TIMEOUT_MS }).notify(NOTICE_TITLE, NOTICE_BODY, NOTICE_LINK, MEDIA);
+    expect((JSON.parse(calls[0]?.body ?? '') as { blocks: unknown[] }).blocks).toHaveLength(3);
   });
 
   it('keeps a mention or a link in an issue title from reaching the channel as one', () => {

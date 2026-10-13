@@ -31,3 +31,5 @@ export * from './release-version.ts';
 export * from './reference-repository.ts';
 export * from './film-scenario.ts';
 export * from './film-forecast.ts';
+export * from './autonomy-policy.ts';
+export * from './pull-request-readiness.ts';

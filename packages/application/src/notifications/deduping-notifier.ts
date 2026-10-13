@@ -1,6 +1,7 @@
-import type { Clock, Notifier } from '../ports.ts';
+import type { Clock, NoticeLink, Notifier } from '../ports.ts';
 
 const KEY_SEPARATOR = '\u0000';
+const NO_MEDIA: readonly NoticeLink[] = [];
 
 export class DedupingNotifier implements Notifier {
   private readonly inner: Notifier;
@@ -14,14 +15,14 @@ export class DedupingNotifier implements Notifier {
     this.windowMs = windowMs;
   }
 
-  async notify(title: string, body: string, link: string): Promise<void> {
+  async notify(title: string, body: string, link: string, media: readonly NoticeLink[] = NO_MEDIA): Promise<void> {
     const now = this.clock.now().getTime();
     this.forgetExpired(now);
-    const key = [title, body, link].join(KEY_SEPARATOR);
+    const key = [title, body, link, ...media.flatMap((item) => [item.label, item.url])].join(KEY_SEPARATOR);
     if (this.sentAt.has(key)) return;
     this.sentAt.set(key, now);
     try {
-      await this.inner.notify(title, body, link);
+      await this.inner.notify(title, body, link, media);
     } catch (error) {
       this.sentAt.delete(key);
       throw error;

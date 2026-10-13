@@ -124,5 +124,6 @@ export function buildLedger(clock: FixtureClock, runs: RunWorld): ProjectView {
       automations: [],
       releaseModel: 'tags',
     }),
+    delegatedDecisions: [],
   };
 }

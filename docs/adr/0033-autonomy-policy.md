@@ -55,5 +55,8 @@ Option 2.
   operator adds it to a rule.
 - Merges made by the delegate keep every guard of a merge: the head the reviewer saw,
   the checks and the films in progress.
+- A delegate never re-rolls the independent review: a new review of the same
+  implementation (`resume --review-again`) is the operator's to order, whatever `resume`
+  allows, and the factory refuses it to the delegate.
 - The operator reads what was decided without them in one place, with the reason each
   gesture gave.

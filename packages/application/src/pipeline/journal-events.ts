@@ -14,6 +14,7 @@ import { ScoreReportSchema } from '../acceptance/score-report.ts';
 import { AGENT_RUN_OUTCOMES } from '../ports.ts';
 import { ReviewFindingSchema } from '../review/review-findings.ts';
 import { IssueSpecSchema } from '../spec/issue-spec-schema.ts';
+import { DelegationFieldsSchema } from '../autonomy/delegation.ts';
 
 export const PIPELINE_EVENTS = {
   specCaptured: 'pipeline.spec-captured',
@@ -54,6 +55,7 @@ export const PIPELINE_EVENTS = {
   filmPushed: 'pipeline.film-pushed',
   filmFinished: 'pipeline.film-finished',
   filmFailed: 'pipeline.film-failed',
+  pullRequestReadyAnnounced: 'pipeline.pull-request-ready-announced',
 } as const;
 
 const Sha256Schema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -219,6 +221,7 @@ export const CheckRewrittenSchema = z.object({
 export const DecisionAnsweredSchema = z.object({
   runId: z.string().min(1),
   answer: z.string().min(1),
+  ...DelegationFieldsSchema,
 });
 
 export const GateStepResultSchema = z.object({
@@ -321,7 +324,7 @@ export const EvidenceRemovedSchema = z.object({
   headSha: z.string().min(1),
 });
 
-export const PullRequestMergedSchema = z.object({ mergeSha: z.string().min(1) });
+export const PullRequestMergedSchema = z.object({ mergeSha: z.string().min(1), ...DelegationFieldsSchema });
 
 export const WorktreeReleasedSchema = z.object({ path: z.string().min(1) });
 
@@ -394,7 +397,24 @@ export const FilmFinishedSchema = z.object({
   after: FilmPhaseRecordSchema,
 });
 
+/** A link to a file of a pull request that the operator's upload command made reachable. */
+export const MediaLinkSchema = z.object({ label: z.string().min(1), url: z.string().min(1) });
+
+/** A file the upload command could not make reachable, and why. */
+export const MediaFailureSchema = z.object({ label: z.string().min(1), reason: z.string().min(1) });
+
+/** The notice that a pull request is ready was sent for its head, with the links it carried. */
+export const PullRequestReadyAnnouncedSchema = z.object({
+  pullRequestNumber: z.number().int().positive(),
+  headSha: z.string().min(1),
+  links: z.array(MediaLinkSchema),
+  failures: z.array(MediaFailureSchema),
+});
+
 export type FilmFinishedRecord = z.infer<typeof FilmFinishedSchema>;
+export type PullRequestReadyAnnouncedRecord = z.infer<typeof PullRequestReadyAnnouncedSchema>;
+export type MediaLinkRecord = z.infer<typeof MediaLinkSchema>;
+export type MediaFailureRecord = z.infer<typeof MediaFailureSchema>;
 export type FilmPhaseRecord = z.infer<typeof FilmPhaseRecordSchema>;
 export type FilmStartedRecord = z.infer<typeof FilmStartedSchema>;
 

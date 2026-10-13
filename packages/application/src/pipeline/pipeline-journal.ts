@@ -35,6 +35,7 @@ import {
   PIPELINE_EVENTS,
   PullRequestMergedSchema,
   PullRequestOpenedSchema,
+  PullRequestReadyAnnouncedSchema,
   PullRequestUpdatedSchema,
   RetryDecidedSchema,
   ReviewCompletedSchema,
@@ -52,6 +53,7 @@ import {
   type FileFingerprint,
   type FilmFinishedRecord,
   type FilmRunningStage,
+  type PullRequestReadyAnnouncedRecord,
   FACTORY_FILM_OPERATOR,
   type EvidenceRecord,
   type EvidenceRemovalRecord,
@@ -90,8 +92,17 @@ export interface FilmOrderState {
   readonly reason: string | null;
 }
 
+/** The notice that the pull request is ready, as it was sent for one head. */
+export interface ReadyAnnouncement extends PullRequestReadyAnnouncedRecord {
+  readonly announcedAt: string;
+}
+
 export function isFilmPending(order: FilmOrderState): boolean {
   return order.status === 'queued' || order.status === 'running';
+}
+
+export function isFilmFailed(order: FilmOrderState): boolean {
+  return order.status === 'failed';
 }
 
 export interface PipelineJournal {
@@ -133,6 +144,7 @@ export interface PipelineJournal {
   readonly attemptEpoch: number;
   readonly films: readonly FilmFinishedRecord[];
   readonly filmOrders: readonly FilmOrderState[];
+  readonly readyAnnouncements: readonly ReadyAnnouncement[];
 }
 
 export class JournalCorruptError extends Error {
@@ -182,6 +194,7 @@ function emptyJournal(issueNumber: number): Draft {
     attemptEpoch: 0,
     films: [],
     filmOrders: [],
+    readyAnnouncements: [],
   };
 }
 
@@ -409,6 +422,10 @@ const REDUCERS: Readonly<Record<string, Reducer>> = {
     const failed = parse(FilmFailedSchema, event);
     settleFilmOrder(journal, failed.scenario, 'failed', failed.reason, event);
   },
+  [PIPELINE_EVENTS.pullRequestReadyAnnounced]: (journal, event) => {
+    const announced = parse(PullRequestReadyAnnouncedSchema, event);
+    journal.readyAnnouncements = [...journal.readyAnnouncements, { ...announced, announcedAt: event.occurredAt.toISOString() }];
+  },
   [PIPELINE_EVENTS.pullRequestMerged]: (journal, event) => {
     journal.mergeSha = parse(PullRequestMergedSchema, event).mergeSha;
   },
@@ -426,6 +443,15 @@ export function projectJournal(issueNumber: number, events: readonly FactoryEven
 
 export async function loadJournal(events: EventStore, issueNumber: number): Promise<PipelineJournal> {
   return projectJournal(issueNumber, await events.read(issueSubject(issueNumber), FIRST_SEQUENCE));
+}
+
+/** The head the pull request has now: the last commit the factory pushed. */
+export function currentHeadOf(journal: PipelineJournal): string | null {
+  return journal.pushedHead ?? journal.pullRequest?.headSha ?? null;
+}
+
+export function isAnnouncedReady(journal: PipelineJournal, headSha: string): boolean {
+  return journal.readyAnnouncements.some((announcement) => announcement.headSha === headSha);
 }
 
 export function decisionsOfEpoch(journal: PipelineJournal): readonly RetryRecord[] {

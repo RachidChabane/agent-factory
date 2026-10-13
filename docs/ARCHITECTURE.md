@@ -67,6 +67,21 @@ projects, while nothing else runs: the base, then the head, committed on the bra
 one evidence commit and announced in the pull request body. The merge waits for the
 films of its pull request.
 
+Once per head of an open pull request, the project daemon tells the operator that it is ready
+([ADR 0034](adr/0034-notification-media.md)): its required checks passed, by the rule that gates its
+merge, and none of its films is queued or recording; a failed film holds the notice. The scan runs
+beside the daemon's tick and never holds it. It uploads the films, their final screenshots and the
+evidence images with the operator's command, at most once per content, and records the notice with the
+links it carried. A failed upload leaves its link out; the notice still goes out.
+
+The operator's gestures are the ones the cycle waits on: validating a spec, answering a decision,
+resuming an issue, merging a pull request. A project may delegate them to an orchestrator
+([ADR 0033](adr/0033-autonomy-policy.md)). The command line takes `--as <actor> --reason "<why>"` on those
+gestures; the `AutonomyGate` checks the project's policy before anything else is read or written, refuses
+what it does not delegate, and records each gesture it accepts on the issue with its actor, reason and the
+rule that allowed it. The delegate's own events carry its name too, and a merge keeps every guard it has.
+The policy is not a security boundary: the delegate runs with the operator's account.
+
 Failures retry within bounds: two corrections in the same session, then one fresh
 restart, then `needs-human` with the reason. A decision only a person can take
 stops the run and comes back to the agent with the answer.
@@ -87,6 +102,7 @@ stops the run and comes back to the agent with the answer.
 | `ToolProber`, `ToolSessionCommands` | the declared checks, logins and keep-alives of the connected tools ([ADR 0014](adr/0014-declarative-tool-checks.md), [ADR 0017](adr/0017-tool-logins-and-session-keepers.md)) |
 | `ResourceGuard` | memory and memory pressure of the machine |
 | `FilmRecorder`, `VideoTranscoder` | `CommandFilmRecorder` runs the project's film command; `FfmpegTranscoder` turns a video that is not an MP4 into H.264 ([ADR 0030](adr/0030-films.md)) |
+| `MediaUploader`, `MediaLinkCache`, `FileFingerprints` | `CommandMediaUploader` runs the upload command the operator declares and reads the link it prints; `FileMediaLinkCache` keeps the links by the SHA-256 of the file's content in the state directory; `Sha256FileFingerprints` ([ADR 0034](adr/0034-notification-media.md)) |
 
 ## The cockpit
 
@@ -136,9 +152,9 @@ How the cockpit loads, caches and shares its stream:
 
 - Agent runs: Claude Code's own sandbox and permission settings, generated per run
   with the deny lists of credentials, other projects and the factory's state.
-- Film commands: the one command the factory runs outside the sandbox, with the operator's
-  environment, in the factory itself and in a process group stopped on timeout and on stop
-  ([ADR 0030](adr/0030-films.md)).
+- Film commands and the upload command of the notices: the commands the factory runs outside the
+  sandbox, with the operator's environment, in the factory itself, under `nice`, and in a process
+  group stopped on timeout and on stop ([ADR 0030](adr/0030-films.md), [ADR 0034](adr/0034-notification-media.md)).
 - Setup, gate and acceptance commands: the operating system's sandbox, no credential
   reads, writes limited to the worktree and the caches, no network unless a command
   declares why it needs it, and the factory's own ports refused.

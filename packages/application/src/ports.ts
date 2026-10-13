@@ -334,8 +334,14 @@ export interface Clock {
   now(): Date;
 }
 
+/** A link a notice carries besides the link to the cockpit, such as a file of the pull request it is about. */
+export interface NoticeLink {
+  readonly label: string;
+  readonly url: string;
+}
+
 export interface Notifier {
-  notify(title: string, body: string, link: string): Promise<void>;
+  notify(title: string, body: string, link: string, media?: readonly NoticeLink[]): Promise<void>;
 }
 
 export interface SpecReader {

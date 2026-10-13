@@ -129,6 +129,31 @@ describe('ResumeIssue', () => {
     expect(staleRequest).toBeUndefined();
   });
 
+  it('records the delegate and its reason on the answer and on the transition when the delegate resumes the issue', async () => {
+    const scenario = new PipelineScenario();
+    decisionAsker(scenario);
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+
+    const resumed = await scenario.resumer().resume(ISSUE_NUMBER, OPERATOR_ANSWER, { actor: 'orchestrator', reason: 'the spec already answers it' });
+
+    expect(resumed.decisionAnswered).toBe(true);
+    const journal = await scenario.journal();
+    expect(journal.decisionAnswers.at(-1)).toEqual({ runId: expect.any(String) as string, answer: OPERATOR_ANSWER, actor: 'orchestrator', reason: 'the spec already answers it' });
+    const transition = (await scenario.events.read(`issue/${ISSUE_NUMBER}`, 0)).findLast((record) => record.type === 'issue.transitioned');
+    expect(transition?.payload).toMatchObject({ to: 'implementing', reason: 'orchestrator resumed the issue' });
+  });
+
+  it('keeps the operator as the author of a resume made without a delegate', async () => {
+    const scenario = new PipelineScenario();
+    decisionAsker(scenario);
+    await scenario.pipeline().runIssue(ISSUE_NUMBER);
+    await scenario.resumer().resume(ISSUE_NUMBER, OPERATOR_ANSWER);
+    const journal = await scenario.journal();
+    expect(journal.decisionAnswers.at(-1)).toEqual({ runId: expect.any(String) as string, answer: OPERATOR_ANSWER });
+    const transition = (await scenario.events.read(`issue/${ISSUE_NUMBER}`, 0)).findLast((record) => record.type === 'issue.transitioned');
+    expect(transition?.payload).toMatchObject({ reason: 'the operator resumed the issue' });
+  });
+
   it('gives a fresh implementer session the question and the answer when the asking run has no session', async () => {
     const scenario = new PipelineScenario();
     scenario.harness.script('implementer', {
