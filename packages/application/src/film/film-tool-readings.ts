@@ -22,11 +22,10 @@ export type ReadRule = 'due' | 'now';
 const SEEDED_AT = Number.NEGATIVE_INFINITY;
 
 /**
- * The latest reading of each tool the films wait for. A tool is read at most once per recheck interval while nothing
- * asks for more, and again when a film is about to start unless it was read within the last minute; the tools asked
- * for are read at once. A tool that fails is
- * also compared with the checks the log records: the one the operator ran from the cockpit after a login is a newer
- * reading than the factory's own.
+ * The latest reading of each tool the films wait for. A tool is read when it was never read or when its reading is older
+ * than the recheck interval, and again when a film is about to start on it, unless it was read within the freshness
+ * window. A reading that fails is compared with the checks the log records: the check the operator runs from the
+ * cockpit after a login is a newer reading than the factory's own.
  */
 export class FilmToolReadings {
   private readonly clock: Clock;

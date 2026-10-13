@@ -73,7 +73,7 @@ describe('ProjectSettingsView films', () => {
       expect(within(section('Films')).queryByRole('region', { name: /^Films waiting for/ })).not.toBeInTheDocument();
     });
 
-    it('come with the tool the films wait for now, and the commands that check it and log in', async () => {
+    it('come with the tool the films wait for, and the commands that check it and log in', async () => {
       const wait = { tool: 'vault', scope: 'installation' as const, status: 'unauthenticated' as const, detail: 'token expired', loginCommand: 'vault login -method=oidc', fixCommand: null, since: '2026-10-12T07:55:00.000Z', checkedAt: '2026-10-12T09:56:00.000Z' };
       const snapshot = mapProject(films(['vault']), STOREFRONT, (project) => ({ ...project, filmToolWait: wait }));
       const view = await openProjectSettings(STOREFRONT, { snapshot });

@@ -181,7 +181,8 @@ own `timeoutSeconds`.
   tool`, finds it connected, the films start at the next tick of the factory instead of at the next reading.
 - A wait the factory recorded before a restart is read again at once.
 
-A tool that passes does not guarantee the film: a film that fails for any other reason fails, as before.
+A passing check does not guarantee the film: a film that fails for another reason fails, with its reason in the
+pull request body.
 
 ### Evidence limits
 
@@ -192,7 +193,7 @@ acceptance tests are not weighed.
 
 - A file over `maxFileBytes` is left out.
 - While the evidence of the pull request weighs more than `maxTotalBytes`, the largest file is left out. The
-  weight counts what the pull request already holds: its evidence and the films committed before.
+  weight counts what the pull request already holds: its evidence and the films already committed.
 - Each file left out is named, with its size and the limit it passed, in the pull request body: in the
   evidence table and the risks for the checks' evidence, in the block of the recording for a film. `agent-factory
   film` says so too.

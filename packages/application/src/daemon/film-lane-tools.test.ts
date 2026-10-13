@@ -396,7 +396,7 @@ describe('the films of a project that needs tools', () => {
     expect(context.checks.calls).toEqual(['vault', 'vault']);
   });
 
-  it('reads the tools again right before the film starts, and waits when they no longer pass', async () => {
+  it('reads the tools again right before the film starts, and waits when one of them fails at that reading', async () => {
     const context = world();
     const storefront = context.project('storefront', [VAULT]);
     queue(context.filmsOf('storefront'), 1, 'checkout-flow', 1);

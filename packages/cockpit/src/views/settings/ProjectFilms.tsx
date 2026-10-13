@@ -8,13 +8,13 @@ import { FilmToolWaitNotice } from '../../widgets/FilmToolWaitNotice.tsx';
 interface ProjectFilmsProps {
   readonly project: string;
   readonly films: ProjectSettingsView['films'];
-  /** The tool the project's films wait for now, if any. */
+  /** The tool the project's films wait for, if any. */
   readonly wait: FilmToolWaitView | null;
 }
 
 /**
  * Whether the project's pull requests are filmed, in which time zone the expected arrivals are told, how long a recording
- * may take, which tools must pass their checks before a film starts, and the tool the films wait for now.
+ * may take, which tools must pass their checks before a film starts, and the tool the films wait for, if any.
  */
 export function ProjectFilms({ project, films, wait }: ProjectFilmsProps) {
   const { t, fmt } = useI18n();
