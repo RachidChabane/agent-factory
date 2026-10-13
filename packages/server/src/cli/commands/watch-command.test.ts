@@ -1,9 +1,10 @@
-import { mkdtemp, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Sleeper } from '@agent-factory/application';
 import { parseAgentFactoryConfig } from '../../config/agent-factory-config.ts';
+import { WATCH_BLOCKERS_FILE } from '../../watch/file-blocker-memory.ts';
 import { FixtureFactory, jsonAnswer } from '../../watch/testing/fixture-factory.ts';
 import { issueView, storefrontWith } from '../../watch/testing/watched-snapshots.ts';
 import type { CliContext } from '../cli-context.ts';
@@ -85,6 +86,65 @@ describe('agent-factory watch', () => {
     expect(captured.lines).toEqual([]);
   });
 
+  describe('started again', () => {
+    const SECOND = issueView(13, { state: 'needs-human', escalation: { reason: 'the review blocks', diagnosis: 'the review blocks', since: '2026-10-12T13:45:00.000Z' } });
+    const SECOND_LINE = '2026-10-12T14:00:00Z blocked needs-human storefront#13: the review blocks';
+    const CLEARED_LINE = '2026-10-12T14:00:00Z cleared needs-human storefront#12';
+
+    /** A watch that reads the factory once, then is stopped, with the output of its own. */
+    async function watchOnce(args: readonly string[]): Promise<{ readonly lines: readonly string[]; readonly code: number }> {
+      const own = capturedOutput();
+      const sleeper: Sleeper = { sleep: () => Promise.resolve(void process.emit('SIGINT', 'SIGINT')) };
+      const loaded = () => Promise.resolve(parseAgentFactoryConfig(configText(), home, `${home}/config.yaml`, home));
+      const code = args.includes('--once')
+        ? await runCli([...args, '--port', String(port)], cliContext(home, own, loaded))
+        : await watchCommand({ kind: 'watch', intervalSeconds: 7, once: false, all: args.includes('--all'), json: false, port }, cliContext(home, own, loaded), { ...systemWatchPorts(), sleeper });
+      return { lines: own.lines, code };
+    }
+
+    const kept = async () => (JSON.parse(await readFile(join(home, 'state', WATCH_BLOCKERS_FILE), 'utf8')) as { blockers: { issue: number }[] }).blockers.map((blocker) => blocker.issue);
+
+    it('prints only what appeared or cleared since the watch before it', async () => {
+      factory.answer = jsonAnswer(storefrontWith([ESCALATED]));
+      expect(await watchOnce(['watch'])).toEqual({ lines: [BLOCKED_LINE], code: 0 });
+      expect(await kept()).toEqual([12]);
+
+      expect(await watchOnce(['watch'])).toEqual({ lines: [], code: 0 });
+
+      factory.answer = jsonAnswer(storefrontWith([SECOND]));
+      expect(await watchOnce(['watch'])).toEqual({ lines: [CLEARED_LINE, SECOND_LINE], code: 0 });
+      expect(await kept()).toEqual([13]);
+    });
+
+    it('reads what the watches reported without recording anything, and exits 1 while anything blocks work', async () => {
+      factory.answer = jsonAnswer(storefrontWith([ESCALATED]));
+      await watchOnce(['watch']);
+      factory.answer = jsonAnswer(storefrontWith([ESCALATED, SECOND]));
+
+      expect(await watchOnce(['watch', '--once'])).toEqual({ lines: [SECOND_LINE], code: 1 });
+      expect(await kept()).toEqual([12]);
+      expect(await watchOnce(['watch', '--once'])).toEqual({ lines: [SECOND_LINE], code: 1 });
+
+      expect(await watchOnce(['watch'])).toEqual({ lines: [SECOND_LINE], code: 0 });
+      expect(await kept()).toEqual([12, 13]);
+      expect(await watchOnce(['watch', '--once'])).toEqual({ lines: [], code: 1 });
+    });
+
+    it('records nothing for a single reading when no watch ran before', async () => {
+      factory.answer = jsonAnswer(storefrontWith([ESCALATED]));
+      expect(await watchOnce(['watch', '--once'])).toEqual({ lines: [BLOCKED_LINE], code: 1 });
+      await expect(readFile(join(home, 'state', WATCH_BLOCKERS_FILE), 'utf8')).rejects.toThrow();
+    });
+
+    it('prints every blocker present with --all, whatever the watches before it reported', async () => {
+      factory.answer = jsonAnswer(storefrontWith([ESCALATED]));
+      await watchOnce(['watch']);
+      expect(await watchOnce(['watch', '--once', '--all'])).toEqual({ lines: [BLOCKED_LINE], code: 1 });
+      expect(await watchOnce(['watch', '--all'])).toEqual({ lines: [BLOCKED_LINE], code: 0 });
+      expect(await watchOnce(['watch'])).toEqual({ lines: [], code: 0 });
+    });
+  });
+
   it('keeps reading at the interval, reports each change, and ends with the shutdown signal', async () => {
     const answers = [jsonAnswer(storefrontWith([ESCALATED])), jsonAnswer(storefrontWith([ESCALATED])), jsonAnswer(storefrontWith([]))];
     const intervals: number[] = [];
@@ -98,7 +158,7 @@ describe('agent-factory watch', () => {
       },
     };
     factory.answer = answers.shift() ?? factory.answer;
-    const command = { kind: 'watch', intervalSeconds: 7, once: false, json: false, port } as const;
+    const command = { kind: 'watch', intervalSeconds: 7, once: false, all: false, json: false, port } as const;
     expect(await watchCommand(command, context(), { ...systemWatchPorts(), sleeper })).toBe(0);
     expect(captured.lines).toEqual([BLOCKED_LINE, '2026-10-12T14:00:00Z cleared needs-human storefront#12']);
     expect(intervals).toEqual([7_000, 7_000, 7_000]);

@@ -3,6 +3,7 @@ import { BLOCKER_KINDS } from './blocker.ts';
 import { blockersOf } from './blockers-of.ts';
 import { HttpSnapshotSource, SnapshotUnavailableError } from './snapshot-source.ts';
 import { FixtureFactory, jsonAnswer } from './testing/fixture-factory.ts';
+import { InMemoryBlockerMemory } from './testing/in-memory-blocker-memory.ts';
 import { issueView, READ_AT, storefrontWith } from './testing/watched-snapshots.ts';
 import { WatchLoop, type TransitionSink } from './watch-loop.ts';
 import { watchSettings } from './watch-settings.ts';
@@ -88,8 +89,14 @@ describe('the watch of a factory over HTTP', () => {
     ];
     factory.answer = jsonAnswer(storefrontWith([ESCALATED]));
     const loop = new WatchLoop(
-      { source: new HttpSnapshotSource(`http://127.0.0.1:${port}`), clock: { now: () => READ_AT }, sleeper: { sleep: () => afterReading.shift()?.() ?? Promise.resolve() }, sink },
-      watchSettings(1),
+      {
+        source: new HttpSnapshotSource(`http://127.0.0.1:${port}`),
+        memory: new InMemoryBlockerMemory(),
+        clock: { now: () => READ_AT },
+        sleeper: { sleep: () => afterReading.shift()?.() ?? Promise.resolve() },
+        sink,
+      },
+      watchSettings(1, false),
     );
     try {
       await loop.run(controller.signal);
