@@ -45,6 +45,8 @@ export interface EnvironmentLane {
   readonly production: boolean;
   readonly promotion: EnvironmentView['promotion'];
   readonly status: EnvironmentView['status'];
+  /** When the health the status comes from was sampled: the oldest of the latest samples of its checks; null when no check was sampled. */
+  readonly statusSampledAt: string | null;
   /** What the environment holds now, whatever the reference. */
   readonly current: Deployment | null;
   /** The deployments since the reference, newest first. */
@@ -64,10 +66,17 @@ export interface ProjectChanges {
   readonly lanes: readonly EnvironmentLane[];
 }
 
+/**
+ * When the deployments counted were read: the oldest of the readings of the environments that declare a source, which is
+ * `null` when one of them was never read; or that no environment declares a source, so that nothing was read.
+ */
+export type DeploymentsRead = { readonly kind: 'none' } | { readonly kind: 'read'; readonly readAt: string | null };
+
 export interface ChangesSummary {
   readonly mergedPullRequests: number;
   readonly deployments: number;
   readonly failedDeployments: number;
+  readonly deploymentsRead: DeploymentsRead;
 }
 
 export interface Changes {
@@ -151,6 +160,11 @@ function changedDeployment({ newest, members }: RedeploymentGroup): ChangedDeplo
   };
 }
 
+function oldestSample(environment: EnvironmentView): string | null {
+  const sampled = environment.health.flatMap((check) => (check.latest === null ? [] : [check.latest.at]));
+  return sampled.toSorted((left, right) => toEpoch(left) - toEpoch(right))[0] ?? null;
+}
+
 function lane(environment: EnvironmentView, since: number): EnvironmentLane {
   const read = environment.deployments?.value ?? null;
   const pendingApplies = environment.promotion !== AUTOMATIC_PROMOTION;
@@ -159,12 +173,22 @@ function lane(environment: EnvironmentView, since: number): EnvironmentLane {
     production: environment.production,
     promotion: environment.promotion,
     status: environment.status,
+    statusSampledAt: oldestSample(environment),
     current: read?.current ?? null,
     deployments: groupRedeployments((read?.history ?? []).filter((deployment) => isSince(deployment.deployedAt, since))).map(changedDeployment),
     pendingApplies,
     pending: pendingApplies ? (read?.pending ?? null) : null,
     reading: environment.deployments,
   };
+}
+
+function oldestReading(lanes: readonly EnvironmentLane[]): DeploymentsRead {
+  const readings = lanes.flatMap((entry) => (entry.reading === null ? [] : [entry.reading]));
+  if (readings.length === 0) return { kind: 'none' };
+  const times = readings.map((reading) => reading.readAt);
+  const known = times.filter((readAt) => readAt !== null);
+  if (known.length < times.length) return { kind: 'read', readAt: null };
+  return { kind: 'read', readAt: known.toSorted((left, right) => toEpoch(left) - toEpoch(right))[0] ?? null };
 }
 
 function summarise(projects: readonly ProjectChanges[]): ChangesSummary {
@@ -176,6 +200,7 @@ function summarise(projects: readonly ProjectChanges[]): ChangesSummary {
       (total, entry) => total + entry.deployments.filter((deployment) => deployment.outcome === FAILED_OUTCOME).reduce((sum, deployment) => sum + deployment.occurrences, 0),
       0,
     ),
+    deploymentsRead: oldestReading(lanes),
   };
 }
 

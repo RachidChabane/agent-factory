@@ -91,3 +91,52 @@ describe('the changes since a moment', () => {
     expect(summary.mergedPullRequests).toBe(merged);
   });
 });
+
+describe('the reading the deployment counts come from', () => {
+  const READ_AT = '2026-10-12T09:20:00.000Z';
+
+  function withReadings(project: ProjectView, readAts: Readonly<Record<string, string | null>>): ProjectView {
+    return {
+      ...project,
+      environments: project.environments.map((environment) => {
+        const readAt = readAts[environment.name];
+        if (environment.deployments === null || readAt === undefined) return environment;
+        return { ...environment, deployments: { ...environment.deployments, readAt } };
+      }),
+    };
+  }
+
+  it('is the oldest of the readings of the environments that declare a source', () => {
+    const project = withReadings(storefront, { development: '2026-10-12T09:58:00.000Z', staging: READ_AT, production: '2026-10-12T09:57:00.000Z' });
+    expect(buildChanges([project], TEST_NOW - 90 * DAY_MS).summary.deploymentsRead).toEqual({ kind: 'read', readAt: READ_AT });
+  });
+
+  it('is unknown when one of the sources was never read', () => {
+    const project = withReadings(storefront, { development: '2026-10-12T09:58:00.000Z', staging: null, production: '2026-10-12T09:57:00.000Z' });
+    expect(buildChanges([project], TEST_NOW - 90 * DAY_MS).summary.deploymentsRead).toEqual({ kind: 'read', readAt: null });
+  });
+
+  it('says that nothing was read when no environment declares a source', () => {
+    const bare = { ...storefront, environments: storefront.environments.map((environment) => ({ ...environment, deployments: null })) };
+    expect(buildChanges([bare], TEST_NOW - 90 * DAY_MS).summary.deploymentsRead).toEqual({ kind: 'none' });
+    expect(buildChanges([], TEST_NOW).summary.deploymentsRead).toEqual({ kind: 'none' });
+  });
+});
+
+describe('the health the status of a lane comes from', () => {
+  it('was sampled when the oldest of the latest samples of its checks was taken', () => {
+    const staging = laneOf(storefront, 'staging', TEST_NOW - 90 * DAY_MS);
+    const samples = (storefront.environments.find((environment) => environment.name === 'staging')?.health ?? []).flatMap((check) => (check.latest === null ? [] : [check.latest.at]));
+    expect(samples.length).toBeGreaterThan(0);
+    expect(staging.statusSampledAt).toBe(samples.toSorted()[0]);
+  });
+
+  it('was never sampled when no check has a sample', () => {
+    const unsampled = {
+      ...storefront,
+      environments: storefront.environments.map((environment) => ({ ...environment, health: environment.health.map((check) => ({ ...check, latest: null, series: [] })) })),
+    };
+    expect(laneOf(unsampled, 'production', TEST_NOW).statusSampledAt).toBeNull();
+  });
+});
+

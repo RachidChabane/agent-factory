@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mapProject } from '../../test/fixtures/mutate.ts';
 import { LEDGER_ID, STOREFRONT_ID } from '../../test/fixtures/project-ids.ts';
 import { fixtureSnapshot, renderRoute, TEST_NOW } from '../../test/render.tsx';
-import { HOUR_MS } from '../../i18n/formatters.ts';
+import { HOUR_MS, MINUTE_MS } from '../../i18n/formatters.ts';
 import { SEEN_STORAGE_KEY } from './changes-since.ts';
 
 async function openChanges(path = '/', options: Parameters<typeof renderRoute>[1] = {}) {
@@ -32,6 +32,38 @@ describe('ChangesView', () => {
     const summary = screen.getByRole('group', { name: 'Summary of the period' });
     for (const label of ['Pull requests merged', 'Waiting for you', 'Deployments', 'Failed deployments']) expect(within(summary).getByText(label)).toBeInTheDocument();
     expect(within(summary).getByText('Waiting for you').nextElementSibling).toHaveTextContent('15');
+  });
+
+  it('says beside the deployment counts when the oldest reading they come from was made, in each language', async () => {
+    const staging = new Date(TEST_NOW - 40 * MINUTE_MS).toISOString();
+    await openChanges(`/?project=${STOREFRONT_ID}&since=2026-09-01T00:00:00.000Z`);
+    const summary = screen.getByRole('group', { name: 'Summary of the period' });
+    const stamps = within(summary).getAllByText(/^Read /);
+    expect(stamps).toHaveLength(2);
+    for (const stamp of stamps) expect(stamp).toHaveAttribute('datetime', staging);
+    expect(within(summary).getByText('Pull requests merged').parentElement).not.toHaveTextContent(/Read /);
+    expect(within(summary).getByText('Waiting for you').parentElement).not.toHaveTextContent(/Read /);
+  });
+
+  it('says beside the status of a lane when the health it comes from was sampled', async () => {
+    await openChanges(`/?project=${STOREFRONT_ID}&since=2026-09-01T00:00:00.000Z`);
+    expect(within(laneOf('Storefront', 'staging')).getByText(/^Sampled /)).toHaveAttribute('datetime', new Date(TEST_NOW - 30 * MINUTE_MS).toISOString());
+    expect(within(laneOf('Storefront', 'production')).getByText(/^Sampled /)).toHaveAttribute('datetime', new Date(TEST_NOW - 4 * MINUTE_MS).toISOString());
+  });
+
+  it('says nothing of a sample for an environment none of whose checks was sampled', async () => {
+    const snapshot = mapProject(fixtureSnapshot(), STOREFRONT_ID, (project) => ({
+      ...project,
+      environments: project.environments.map((environment) => ({ ...environment, health: environment.health.map((check) => ({ ...check, latest: null, series: [] })) })),
+    }));
+    await openChanges(`/?project=${STOREFRONT_ID}&since=2026-09-01T00:00:00.000Z`, { snapshot });
+    expect(within(laneOf('Storefront', 'production')).queryByText(/^Sampled /)).not.toBeInTheDocument();
+  });
+
+  it('puts no reading beside the counts of a project whose environments declare no source', async () => {
+    const snapshot = mapProject(fixtureSnapshot(), STOREFRONT_ID, (project) => ({ ...project, environments: project.environments.map((environment) => ({ ...environment, deployments: null })) }));
+    await openChanges(`/?project=${STOREFRONT_ID}&since=2026-09-01T00:00:00.000Z`, { snapshot });
+    expect(within(screen.getByRole('group', { name: 'Summary of the period' })).queryByText(/^Read /)).not.toBeInTheDocument();
   });
 
   it('lists what waits for the operator whatever the period, in every project', async () => {
@@ -122,7 +154,7 @@ describe('ChangesView', () => {
 
   it('is written in French on a French page', async () => {
     await openChanges('/?since=2026-09-01T00:00:00.000Z', { locale: 'fr' });
-    expect(screen.getByRole('group', { name: 'Synthèse de la période' })).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Synthèse de la période' })).getAllByText(/^Relevé /)).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Marquer comme vu' })).toBeInTheDocument();
     expect(screen.getAllByRole('region', { name: 'Voie de staging' }).length).toBeGreaterThan(0);
   });

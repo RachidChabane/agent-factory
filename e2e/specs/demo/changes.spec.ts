@@ -1,3 +1,6 @@
+import { DAY_MS } from '../../../packages/cockpit/src/i18n/formatters.ts';
+import { untilPageAgreesWithFactory } from '../../support/agreement.ts';
+import { expectAwaitingShown, expectEnvironmentLanesShown, expectPullRequestLanesShown, expectSummaryShown, sinceOf } from '../../support/changes-page.ts';
 import { openCockpit, sidebar } from '../../support/cockpit.ts';
 import { expect, test } from '../../support/test.ts';
 
@@ -27,5 +30,18 @@ test.describe('the landing page of the demonstration', () => {
     expect(await page.evaluate((key) => window.localStorage.getItem(key), SEEN_STORAGE_KEY)).not.toBeNull();
     await page.reload();
     await expect(page.getByText(/^Last seen:/)).toBeVisible();
+  });
+
+  test('counts the period, dates the pull requests that moved and what waits for the operator, and dates the status of each environment', async ({ page, factory }) => {
+    await page.getByRole('radio', { name: '7 days' }).click();
+    await expect.poll(() => sinceOf(page)).toBeLessThan(Date.now() - 6 * DAY_MS);
+    const since = sinceOf(page);
+    await untilPageAgreesWithFactory(async () => {
+      const state = await factory.api.state();
+      await expectSummaryShown(page, state, since);
+      await expectPullRequestLanesShown(page, state, since);
+      await expectAwaitingShown(page, state);
+      await expectEnvironmentLanesShown(page, state, since);
+    });
   });
 });
