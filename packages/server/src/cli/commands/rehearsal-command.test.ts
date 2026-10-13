@@ -8,7 +8,7 @@ import type { AgentFactoryConfig } from '../../config/agent-factory-config.ts';
 import { openInstallation } from '../../composition/installation/installation-runtime.ts';
 import type { CliContext } from '../cli-context.ts';
 import { runCli } from '../factory-cli.ts';
-import { capturedOutput, cliContext, configText, gitIn, healthyRunner, parseConfig, REAL_GIT_TEST_TIMEOUT_MS, seedRepository, SPEC_FILE, type CapturedOutput } from '../testing/cli-harness.ts';
+import { capturedOutput, cliContext, configText, gitIn, healthyRunner, parseConfig, REAL_GIT_TEST_TIMEOUT_MS, seedRepository, SPEC_FILE, TableOverRealRunner, type CapturedOutput } from '../testing/cli-harness.ts';
 
 const LOCAL_ONLY = ['gadgets'] as const;
 
@@ -29,7 +29,7 @@ describe('rehearsal on a local forge', () => {
   function context(overrides: Partial<CliContext> = {}): CliContext {
     return cliContext(home, captured, () => Promise.resolve(config), {
       environment: { ...process.env, AGENT_FACTORY_HOME: home, USER: 'alex' },
-      runner: new SpawnCommandRunner(),
+      runner: new TableOverRealRunner(healthyRunner(home), new SpawnCommandRunner()),
       openInstallation: (loaded, overrides_ = {}) => openInstallation(loaded, { ...process.env, AGENT_FACTORY_HOME: home }, { userHome: home, ...overrides_ }),
       ...overrides,
     });

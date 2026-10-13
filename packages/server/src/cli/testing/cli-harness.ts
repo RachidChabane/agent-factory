@@ -82,11 +82,35 @@ export class TableRunner implements CommandRunner {
     return this;
   }
 
+  knows(command: readonly string[]): boolean {
+    return this.lookup(command) !== undefined;
+  }
+
   run(command: readonly string[]): Promise<CommandResult> {
     const key = command.join(' ');
     this.asked.push(key);
-    const result = this.shellLines.get(command.at(-1) ?? '') ?? this.results.get(key) ?? [...this.results].find(([prefix]) => key.startsWith(prefix))?.[1];
+    const result = this.lookup(command);
     return result === undefined ? Promise.reject(new Error(`unexpected ${key}`)) : Promise.resolve(result);
+  }
+
+  private lookup(command: readonly string[]): CommandResult | undefined {
+    const key = command.join(' ');
+    return this.shellLines.get(command.at(-1) ?? '') ?? this.results.get(key) ?? [...this.results].find(([prefix]) => key.startsWith(prefix))?.[1];
+  }
+}
+
+/** Answers the commands its table knows, such as the probes of the machine's tools, and runs every other command for real. */
+export class TableOverRealRunner implements CommandRunner {
+  private readonly table: TableRunner;
+  private readonly real: CommandRunner;
+
+  constructor(table: TableRunner, real: CommandRunner) {
+    this.table = table;
+    this.real = real;
+  }
+
+  run(command: readonly string[], cwd: string, timeoutMs: number, env: Readonly<Record<string, string>>): Promise<CommandResult> {
+    return (this.table.knows(command) ? this.table : this.real).run(command, cwd, timeoutMs, env);
   }
 }
 
