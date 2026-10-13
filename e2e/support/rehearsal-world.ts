@@ -6,7 +6,7 @@ import { buildGitEnvironment, localOnlyGitEnvironment, SpawnCommandRunner } from
 import { LocalGitHubFiles } from '../../packages/adapters/src/github-local/localGitHubFiles.ts';
 import { SystemClock } from '../../packages/server/src/composition/system.ts';
 import { startDemoHealthEndpoints } from '../../packages/server/src/demo/demo-health.ts';
-import { DEMO_ENVIRONMENTS, DEMO_INSTALLATION, DEMO_PROJECTS, LEDGER_ID, STOREFRONT_ID } from '../../packages/server/src/demo/demo-projects.ts';
+import { CATALOG_ADMIN, DEMO_ENVIRONMENTS, DEMO_INSTALLATION, DEMO_PROJECTS, LEDGER_ID, STOREFRONT_ID } from '../../packages/server/src/demo/demo-projects.ts';
 import { FAKE_CLAUDE_MAIN } from '../../packages/server/src/demo/demo-paths.ts';
 import { prepareDemoWorld, type DemoCommit, type DemoProject } from '../../packages/server/src/demo/demo-world.ts';
 import { storyScenario } from '../../packages/server/src/demo/story/scenario.ts';
@@ -82,6 +82,19 @@ function withOneWorktree(project: DemoProject): DemoProject {
   };
 }
 
+/** The storefront's films need the catalogue tool, whose session is a file that exists once the operator logs in. */
+function withFilmTool(project: DemoProject): DemoProject {
+  if (project.id !== STOREFRONT_ID) return project;
+  return {
+    ...project,
+    settings: (health) => {
+      const entry = project.settings(health);
+      const evidence = entry['evidence'] as { films: Record<string, unknown> };
+      return { ...entry, evidence: { ...evidence, films: { ...evidence.films, tools: [CATALOG_ADMIN] } } };
+    },
+  };
+}
+
 const home = await mkdtemp(join(tmpdir(), HOME_PREFIX));
 const health = await startDemoHealthEndpoints(DEMO_ENVIRONMENTS, port + HEALTH_PORT_OFFSET);
 const demoDirectory = join(home, 'demo');
@@ -119,7 +132,7 @@ const world = await prepareDemoWorld({
   clock: new SystemClock(),
   userHome: homedir(),
   health,
-  projects: DEMO_PROJECTS.map(withRehearsalDelivery).map(withOneWorktree),
+  projects: DEMO_PROJECTS.map(withRehearsalDelivery).map(withOneWorktree).map(withFilmTool),
   scenario: rehearsalScenario(storyScenario([STOREFRONT_STORY, LEDGER_STORY])),
   installation: { ...DEMO_INSTALLATION, claude },
 });

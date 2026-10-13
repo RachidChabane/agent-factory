@@ -4,7 +4,7 @@ import type { I18n } from '../../../packages/cockpit/src/i18n/create-i18n.ts';
 import type { Locale } from '../../../packages/cockpit/src/i18n/locale.ts';
 import { paths } from '../../../packages/cockpit/src/model/routes.ts';
 import { issueOf, projectOf } from '../../support/api.ts';
-import { openCockpit } from '../../support/cockpit.ts';
+import { openCockpit, switchLanguage } from '../../support/cockpit.ts';
 import { AGENT_WORK_TEST_TIMEOUT_MS } from '../../support/factory-activity.ts';
 import type { RunningFactory } from '../../support/factory.ts';
 import { LEDGER_POOL_SIZE } from '../../support/rehearsal-layout.ts';
@@ -15,8 +15,7 @@ import { expect, test } from '../../support/test.ts';
 import { wordsIn } from '../../support/words.ts';
 
 const LEDGER_NAME = 'Ledger';
-const FRENCH = 'Français';
-const FRENCH_LOCALE: Locale = 'fr';
+const FRENCH: Locale = 'fr';
 
 /** The two issues that fill the ledger's only worktree: the one whose open pull request holds it, and the one that waits for it. */
 interface Scene {
@@ -81,11 +80,6 @@ function overviewScope(page: Page, words: I18n): Locator {
   return page.getByRole('region', { name: words.t('pause.projectHeading'), exact: true });
 }
 
-async function switchToFrench(page: Page): Promise<void> {
-  await page.getByRole('radio', { name: FRENCH }).click();
-  await expect(page.locator('html')).toHaveAttribute('lang', FRENCH_LOCALE);
-}
-
 test.describe('a project whose worktrees are all held, in a rehearsal', () => {
   test.describe.configure({ mode: 'serial' });
   const english = wordsIn('en');
@@ -115,10 +109,10 @@ test.describe('a project whose worktrees are all held, in a rehearsal', () => {
   test('tells it in French once the operator switches the language', async ({ page, factory }) => {
     const shortage = await shortageOf(factory);
     await openCockpit(page, factory, paths.board());
-    await switchToFrench(page);
+    await switchLanguage(page, FRENCH);
     await expectShortageTold(boardScope(page), french);
     await expectConditionDated(boardScope(page), shortage);
-    await openCockpit(page, factory, paths.project(LEDGER), FRENCH_LOCALE);
+    await openCockpit(page, factory, paths.project(LEDGER), FRENCH);
     await expectShortageTold(overviewScope(page, french), french);
   });
 

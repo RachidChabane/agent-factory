@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { API_COMMANDS_PATH, API_STATE_PATH, CockpitSnapshotSchema, type CockpitSnapshot } from '../../packages/cockpit/src/contract/index.ts';
-import type { Locale } from '../../packages/cockpit/src/i18n/locale.ts';
+import { LOCALE_NAMES, type Locale } from '../../packages/cockpit/src/i18n/locale.ts';
 import type { RunningFactory } from './factory.ts';
 import { wordsIn } from './words.ts';
 
@@ -69,4 +69,26 @@ export function followSnapshots(page: Page): SnapshotTrail {
       return latest;
     },
   };
+}
+
+/** Switches the language of the page with the switch of the cockpit and waits for the page to say it speaks it. */
+export async function switchLanguage(page: Page, locale: Locale): Promise<void> {
+  await page.getByRole('radio', { name: LOCALE_NAMES[locale] }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', locale);
+}
+
+/** A command the page sent, with the body it sent it with. */
+export interface CommandSent {
+  readonly name: string;
+  readonly body: unknown;
+}
+
+/** The commands the page sends from now on, with their bodies, in the order it sends them. */
+export function recordCommandBodies(page: Page): CommandSent[] {
+  const sent: CommandSent[] = [];
+  page.on('request', (request) => {
+    const { pathname } = new URL(request.url());
+    if (request.method() === 'POST' && pathname.startsWith(`${API_COMMANDS_PATH}/`)) sent.push({ name: decodeURIComponent(pathname.slice(API_COMMANDS_PATH.length + 1)), body: request.postDataJSON() as unknown });
+  });
+  return sent;
 }
