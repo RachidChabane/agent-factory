@@ -62,7 +62,7 @@ export interface FilmToolWaitRecord {
   current(): Promise<FilmToolWait | null>;
   /** Records a reading of a tool that fails; the operator is told once, when the films begin to wait. */
   unavailable(finding: FilmToolFinding): Promise<void>;
-  /** Records that the films no longer wait; the operator is told when films were queued and start again. */
+  /** Records that the films stop waiting; the operator is told when films were queued and start again. */
   available(resumed: boolean): Promise<void>;
 }
 

@@ -329,7 +329,7 @@ export class FilmBehaviour {
     }
   }
 
-  /** Removes what an earlier film of the scenario left at the places its limits now keep files off; says which places held a file. */
+  /** Removes what an earlier film of the scenario left at the places its limits keep files off; says which places held a file. */
   private async removeLeftOut(worktree: Worktree, copies: readonly FilmFileCopy[], placed: PlacedFiles): Promise<readonly string[]> {
     const { files } = this.dependencies;
     const targets = copies.filter((copy) => !placed.kept.includes(copy)).map((copy) => copy.to);

@@ -152,7 +152,7 @@ export class FilmLane implements InstallationFilms {
     return waiting;
   }
 
-  /** The queued films whose project has no tool failing its check; the waits of the others are recorded, and closed for those that no longer wait. */
+  /** The queued films whose project has no tool failing its check; the waits of the others are recorded, and closed for those that stop waiting. */
   private async withoutToolWaits(eligible: readonly FilmLaneProject[], queued: readonly WaitingFilm[], workRunning: boolean): Promise<readonly WaitingFilm[]> {
     const needing = eligible.filter(needsTools);
     if (needing.length === 0) return queued;
