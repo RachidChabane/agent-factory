@@ -13,12 +13,14 @@ import {
   type FilmView,
   type PullRequestView,
 } from '../../../packages/cockpit/src/contract/index.ts';
+import type { I18n } from '../../../packages/cockpit/src/i18n/create-i18n.ts';
+import type { Locale } from '../../../packages/cockpit/src/i18n/locale.ts';
 import { FILM_SCENARIO_MAX_LENGTH } from '../../../packages/domain/src/index.ts';
 import { shortSha } from '../../../packages/cockpit/src/model/identifiers.ts';
 import { paths } from '../../../packages/cockpit/src/model/routes.ts';
 import { ONE_LOOK, untilPageAgreesWithFactory } from '../../support/agreement.ts';
 import { issueOf, projectOf, pullRequestOf } from '../../support/api.ts';
-import { followSnapshots, openCockpit, pullRequestDetail, recordCommandsSent, type SnapshotTrail } from '../../support/cockpit.ts';
+import { followSnapshots, openCockpit, pullRequestDetail, recordCommandsSent, switchLanguage, type SnapshotTrail } from '../../support/cockpit.ts';
 import { clickCommand, type ClickOptions, type CommandOutcome } from '../../support/commands.ts';
 import { AGENT_WORK_TEST_TIMEOUT_MS, AGENT_WORK_TIMEOUT_MS, untilNoAgentIsWorking } from '../../support/factory-activity.ts';
 import type { RunningFactory } from '../../support/factory.ts';
@@ -26,6 +28,7 @@ import { factValue, literally } from '../../support/facts.ts';
 import { english } from '../../support/formats.ts';
 import { isLater } from '../../support/instants.ts';
 import { firstOf, issueNamed, pullRequestOfIssue } from '../../support/project-facts.ts';
+import { holdWords } from '../../support/ready-holds.ts';
 import { pauseScheduler, resumeScheduler } from '../../support/scenes.ts';
 import {
   CART_BADGE_TOTAL,
@@ -59,6 +62,7 @@ const MP4_CONTENT_TYPE = 'video/mp4';
 const IMAGE_CONTENT_TYPE_PREFIX = 'image/';
 const FILM_PHASES = { before: 'Before', after: 'After' } as const;
 const words = wordsIn('en');
+const FRENCH: Locale = 'fr';
 
 type EvidenceOfKind<Kind extends Evidence['kind']> = Extract<Evidence, { kind: Kind }>;
 
@@ -216,6 +220,7 @@ test.describe('the pull requests of the demonstration', () => {
     await openPullRequest(page, factory, STOREFRONT, pullRequest);
     const notice = page.getByRole('region', { name: 'Ready notice', exact: true });
     await expect(notice).toContainText(`for head ${shortSha(readyNotice.headSha)}`);
+    await expect(notice).toContainText(words.t('pullRequests.ready.description'));
     await expect(notice.getByRole('time')).toHaveAttribute('datetime', readyNotice.sentAt);
     await expect(notice.getByRole('time')).toHaveAttribute('title', english.absolute(readyNotice.sentAt));
     expect(readyNotice.links.map((link) => link.label)).toEqual(expect.arrayContaining([expect.stringMatching(/ · before · film\.mp4$/), expect.stringMatching(/ · after · film\.mp4$/)]));
@@ -286,23 +291,22 @@ test.describe('the pull requests of the demonstration', () => {
       await form.getByRole('textbox', { name: 'Feedback', exact: true }).fill(FEEDBACK_BODY);
       await form.getByRole('button', { name: 'Send the feedback' }).click();
     });
-    const cycleStarted = outcome.effect?.startsWith(`Feedback recorded; issue #${issue.number} starts attempt `) === true;
-    if (!cycleStarted) expect(outcome.effect).toMatch(new RegExp(`^Feedback recorded; issue #${issue.number} needs a human: .+`));
+    expect(outcome.effect).toMatch(new RegExp(`^Feedback recorded; issue #${issue.number} starts attempt \\d+; the daemon picks it up at its next tick$`));
 
     const recorded = pullRequestOf(await factory.api.state(), LEDGER, pullRequest.number).externalFeedback;
     expect(recorded).toHaveLength(1);
-    expect(recorded[0]).toMatchObject({ author: REQUESTER_RILEY, body: FEEDBACK_BODY, source: FEEDBACK_SOURCE, cycleStarted });
+    expect(recorded[0]).toMatchObject({ author: REQUESTER_RILEY, body: FEEDBACK_BODY, source: FEEDBACK_SOURCE, cycleStarted: true });
     const entry = feedback.getByRole('list', { name: 'External feedback received' }).getByRole('listitem');
     await expect(entry).toHaveCount(1);
     await expect(entry).toContainText(REQUESTER_RILEY);
     await expect(entry).toContainText(FEEDBACK_SOURCE);
     await expect(entry).toContainText(FEEDBACK_BODY);
-    await expect(entry).toContainText(cycleStarted ? 'Started a new cycle' : 'No new cycle started');
+    await expect(entry).toContainText('Started a new cycle');
 
     const settled = await factory.api.until('the factory finished what the feedback started', (snapshot) => SETTLED_ISSUE_STATES.includes(issueOf(snapshot, LEDGER, issue.number).state), {
       timeoutMs: AGENT_WORK_TIMEOUT_MS,
     });
-    expect(issueOf(settled, LEDGER, issue.number).state).toBe(cycleStarted ? 'pr-open' : 'needs-human');
+    expect(issueOf(settled, LEDGER, issue.number).state, 'the cycle the feedback opened ends at a pull request again').toBe('pr-open');
     await untilNoAgentIsWorking(factory);
   });
 
@@ -439,6 +443,22 @@ async function expectFilmPhase(page: Page, factory: RunningFactory, card: Locato
   for (const fact of phase.facts) await expect(factValue(facts, fact.label)).toHaveText(fact.value);
 }
 
+/** The held ready notice as the factory describes it: its description, why it is held, each hold in the words of the language, and when the checks were read. */
+async function expectHeldNoticeTold(page: Page, factory: RunningFactory, language: I18n): Promise<void> {
+  const notice = page.getByRole('region', { name: language.t('pullRequests.ready.title'), exact: true });
+  await expect(notice).toContainText(language.t('pullRequests.ready.description'));
+  await expect(notice).toContainText(language.t('pullRequests.ready.held'));
+  await untilPageAgreesWithFactory(async () => {
+    const held = cartBadgePullRequest(await factory.api.state()).readyNotice;
+    if (held.status !== 'held') throw new Error(`the ready notice is ${held.status}, not held`);
+    await expect(notice.getByRole('list', { name: language.t('pullRequests.ready.holds') }).getByRole('listitem')).toHaveText(
+      held.holds.map((hold) => holdWords(hold, language)),
+      ONE_LOOK,
+    );
+    await expect(notice.getByRole('time')).toHaveAttribute('datetime', held.checksReadAt ?? '', ONE_LOOK);
+  });
+}
+
 test.describe('the films of a pull request that declares them', () => {
   test.describe.configure({ mode: 'serial' });
   let recordedBefore = '';
@@ -540,13 +560,9 @@ test.describe('the films of a pull request that declares them', () => {
     await expect(alert.getByRole('time')).toHaveAttribute('title', english.absolute(failed.since));
     await expect(filmsRegion(page).getByRole('article', { name: `Scenario ${UNAVAILABLE_SCENARIO}` })).toHaveCount(0);
 
-    const notice = page.getByRole('region', { name: 'Ready notice', exact: true });
-    await expect(notice).toContainText('Not sent yet');
-    await expect(notice.getByRole('list', { name: 'What holds the notice' })).toContainText(`The film of scenario ${UNAVAILABLE_SCENARIO} failed: order it again, or merge without it.`);
-    await untilPageAgreesWithFactory(async () => {
-      const held = cartBadgePullRequest(await factory.api.state()).readyNotice;
-      if (held.status !== 'held') throw new Error(`the ready notice is ${held.status}, not held`);
-      await expect(notice.getByRole('time')).toHaveAttribute('datetime', held.checksReadAt ?? '', ONE_LOOK);
-    });
+    expect(pullRequest.readyNotice).toMatchObject({ status: 'held', holds: expect.arrayContaining([{ kind: 'films-failed', scenarios: [UNAVAILABLE_SCENARIO] }]) });
+    await expectHeldNoticeTold(page, factory, words);
+    await switchLanguage(page, FRENCH);
+    await expectHeldNoticeTold(page, factory, wordsIn(FRENCH));
   });
 });
