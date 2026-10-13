@@ -101,7 +101,7 @@ describe('BubblewrapCommandSandbox', () => {
   it('hides a directory and a file of the credentials and nothing that does not exist', () => {
     const args = sandbox().confine(['true'], { workingDirectory: worktree, network: false });
     expect(sequence(args, '--tmpfs', credentials)).toBe(true);
-    expect(sequence(args, '--ro-bind', NULL_DEVICE, token)).toBe(true);
+    expect(sequence(args, '--dev-bind', NULL_DEVICE, token)).toBe(true);
     expect(args.some((argument) => argument.startsWith(join(root, 'absent')))).toBe(false);
   });
 

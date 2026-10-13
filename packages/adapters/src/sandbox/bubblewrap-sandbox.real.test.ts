@@ -134,6 +134,11 @@ describe.skipIf(process.platform !== 'linux' || !onPath(BUBBLEWRAP_EXECUTABLE))(
     expect(`${result.stdout}${result.stderr}`).not.toContain(SECRET);
   });
 
+  it('never lets a write reach a denied file', async () => {
+    await shell(`echo overwritten > '${deniedFile}'`);
+    expect(await readFile(deniedFile, 'utf8')).toBe(SECRET);
+  });
+
   it('writes the worktree and refuses every other place on the disk', async () => {
     const result = await shell(`echo built > '${worktree}/artifact' && echo wrote-worktree; echo leaked > '${outside}/probe' 2>/dev/null && echo escaped || echo refused`);
     expect(result.stdout.split('\n')).toEqual(['wrote-worktree', 'refused', '']);

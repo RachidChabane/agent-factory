@@ -33,7 +33,7 @@ function unfollowedEntry(path: string): readonly PresentEntry[] {
   }
 }
 
-function isBeneath(path: string, directory: string): boolean {
+export function isBeneath(path: string, directory: string): boolean {
   return path !== directory && path.startsWith(`${directory}${PATH_SEPARATOR}`);
 }
 

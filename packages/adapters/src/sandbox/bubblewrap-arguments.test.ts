@@ -28,7 +28,8 @@ const UNSAFE_POLICIES: readonly UnsafePolicy[] = [
   { name: 'a line feed', change: { hiddenFiles: ['/tmp/a\nb'] } },
   { name: 'a carriage return', change: { workingDirectory: '/tmp/a\rb' } },
   { name: 'a null character', change: { writableDirectories: ['/tmp/a\u0000b'] } },
-  { name: 'a relative engine socket', change: { engineSockets: ['docker.sock'] } },
+  { name: 'a relative engine socket', change: { engineSockets: [{ source: 'docker.sock', destination: 'docker.sock' }] } },
+  { name: 'a relative engine socket destination', change: { engineSockets: [{ source: '/run/docker.sock', destination: 'docker.sock' }] } },
   { name: 'a relative read-only directory', change: { readOnlyDirectories: ['references/tokens@v1'] } },
   { name: 'a quote in a read-only directory', change: { readOnlyDirectories: ['/tmp/a"b'] } },
 ];
@@ -44,6 +45,7 @@ const OPTION_OPERAND_COUNTS: Readonly<Record<string, number>> = {
   '--ro-bind-try': 2,
   '--bind': 2,
   '--bind-try': 2,
+  '--dev-bind': 2,
   '--dev': 1,
   '--proc': 1,
   '--tmpfs': 1,
@@ -82,7 +84,7 @@ describe('renderBubblewrapArguments', () => {
       '/home/operator/.ssh',
       '--tmpfs',
       '/run/user',
-      '--ro-bind',
+      '--dev-bind',
       NULL_DEVICE,
       '/home/operator/.netrc',
       '--chdir',
@@ -118,7 +120,7 @@ describe('renderBubblewrapArguments', () => {
   });
 
   it('binds each granted engine socket back in after the hidden paths, so a hidden runtime directory still lets it through', () => {
-    const args = renderBubblewrapArguments({ ...POLICY, engineSockets: ['/run/user/1000/docker.sock'] });
+    const args = renderBubblewrapArguments({ ...POLICY, engineSockets: [{ source: '/run/user/1000/docker.sock', destination: '/run/user/1000/docker.sock' }] });
     const socket = args.indexOf('/run/user/1000/docker.sock');
     expect(args.slice(socket - 1, socket + 2)).toEqual(['--bind-try', '/run/user/1000/docker.sock', '/run/user/1000/docker.sock']);
     expect(socket).toBeGreaterThan(args.indexOf('/run/user'));
@@ -149,7 +151,7 @@ describe('renderBubblewrapArguments', () => {
       fc.property(safePath(), fc.array(safePath()), fc.array(safePath()), fc.array(safePath()), fc.boolean(), (working, writable, directories, files, network) => {
         const args = renderBubblewrapArguments({ workingDirectory: working, writableDirectories: writable, hiddenDirectories: directories, hiddenFiles: files, engineSockets: [], readOnlyDirectories: [], network });
         const binds = [...indexesOf(args, '--bind'), ...indexesOf(args, '--bind-try')];
-        const hides = [...indexesOf(args, '--tmpfs'), ...args.flatMap((argument, index) => (argument === '--ro-bind' && args[index + 1] === NULL_DEVICE ? [index] : []))];
+        const hides = [...indexesOf(args, '--tmpfs'), ...args.flatMap((argument, index) => (argument === '--dev-bind' && args[index + 1] === NULL_DEVICE ? [index] : []))];
         const root = args.indexOf('--ro-bind');
         expect(args.slice(root, root + 3)).toEqual(['--ro-bind', '/', '/']);
         expect(binds.every((index) => index > root + 2)).toBe(true);

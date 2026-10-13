@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import type { CommandSandbox, SandboxScope } from '@agent-factory/application';
 import { BUBBLEWRAP_EXECUTABLE, renderBubblewrapArguments, type BubblewrapPolicy } from './bubblewrap-arguments.ts';
+import { engineSocketMounts } from './bubblewrap-engine-sockets.ts';
 import { hiddenPaths } from './bubblewrap-hidden-paths.ts';
 import { canonicalDirectory, canonicalFutureDirectory } from './canonical-directory.ts';
 import type { CommandSandboxSettings } from './command-sandbox-settings.ts';
@@ -40,7 +41,7 @@ export class BubblewrapCommandSandbox implements CommandSandbox {
       writableDirectories: [...new Set(shared)].filter((directory) => directory !== worktree),
       hiddenDirectories: hidden.directories,
       hiddenFiles: hidden.files,
-      engineSockets: (this.settings.engineSockets ?? NO_ENGINE_SOCKETS)(),
+      engineSockets: engineSocketMounts((this.settings.engineSockets ?? NO_ENGINE_SOCKETS)(), hidden.directories),
       readOnlyDirectories: [...new Set((this.settings.readOnlyDirectories ?? []).map(canonicalFutureDirectory))],
       network: scope.network || scope.hostLoopback === true,
     };
