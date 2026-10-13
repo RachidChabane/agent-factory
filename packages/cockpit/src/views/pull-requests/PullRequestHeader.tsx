@@ -12,6 +12,7 @@ import { Button } from '../../ui/components/Button.tsx';
 import { StatusMark } from '../../ui/components/StatusMark.tsx';
 import { DetailHeader, MetaItem } from '../../ui/layout/Page.tsx';
 import { Time } from '../../widgets/Time.tsx';
+import { mergeBlockerIds } from './MergeBlockers.tsx';
 import type { MergeAvailability } from './pull-request-model.ts';
 
 const ICON_SIZE = 14;
@@ -31,7 +32,7 @@ function ForgeLink({ url }: { readonly url: string }) {
 interface PullRequestHeaderProps {
   readonly pullRequest: PullRequestView;
   readonly availability: MergeAvailability;
-  /** The element that lists what blocks the merge, which the disabled button points to. */
+  /** What the ids of the reasons that block the merge start with: the disabled button points at them. */
   readonly blockersId: string;
   readonly onMerge: () => void;
 }
@@ -61,7 +62,7 @@ export function PullRequestHeader({ pullRequest, availability, blockersId, onMer
               variant="primary"
               icon={<GitMerge size={ICON_SIZE} />}
               disabled={availability.kind !== 'ready'}
-              aria-describedby={availability.kind === 'blocked' ? blockersId : undefined}
+              aria-describedby={availability.kind === 'blocked' ? mergeBlockerIds(blockersId, availability.blockers) : undefined}
               onClick={onMerge}
             >
               {t('pullRequests.merge.action')}
