@@ -58,6 +58,7 @@ const FILMS_IN_PROGRESS = 'films in progress';
 const MP4_CONTENT_TYPE = 'video/mp4';
 const IMAGE_CONTENT_TYPE_PREFIX = 'image/';
 const FILM_PHASES = { before: 'Before', after: 'After' } as const;
+const words = wordsIn('en');
 
 type EvidenceOfKind<Kind extends Evidence['kind']> = Extract<Evidence, { kind: Kind }>;
 
@@ -399,7 +400,7 @@ async function expectQueueShown(page: Page, received: SnapshotTrail, scenarios: 
     for (const order of pending) {
       const queued = films.getByRole('region', { name: `Film of scenario ${order.scenario}`, exact: true });
       await expect(queued).toContainText(`Queued · scenario ${order.scenario}`, ONE_LOOK);
-      await expect(queued).toContainText('Ordered by Alex Morgan.', ONE_LOOK);
+      await expect(queued).toContainText(words.t('pullRequests.films.orderedBy', { operator: order.operator }), ONE_LOOK);
       await expect(queued.getByRole('time')).toHaveAttribute('datetime', order.since, ONE_LOOK);
       await expect(queued.getByRole('time')).toHaveAttribute('title', english.absolute(order.since), ONE_LOOK);
       if (order.filmsAhead === 0) await expect(queued).not.toContainText('ahead of this one', ONE_LOOK);
@@ -440,7 +441,6 @@ async function expectFilmPhase(page: Page, factory: RunningFactory, card: Locato
 
 test.describe('the films of a pull request that declares them', () => {
   test.describe.configure({ mode: 'serial' });
-  const words = wordsIn('en');
   let recordedBefore = '';
   let headBefore = '';
 
