@@ -60,12 +60,14 @@ function oldestOf(waiting: readonly WaitingFilm[]): WaitingFilm | null {
   return waiting.toSorted((left, right) => left.queued.queuedSequence - right.queued.queuedSequence)[0] ?? null;
 }
 
-/** Whether the films of the project wait for the checks of some tools before they start. */
-function needsTools(project: FilmLaneProject): project is FilmLaneProject & { readonly tools: FilmLaneTools } {
+/** A project whose films wait for the checks of some tools before they start. */
+type ToolNeedingProject = FilmLaneProject & { readonly tools: FilmLaneTools };
+
+function needsTools(project: FilmLaneProject): project is ToolNeedingProject {
   return project.tools !== null && project.tools.required.length > 0;
 }
 
-function wantedBy(project: FilmLaneProject & { readonly tools: FilmLaneTools }): readonly WantedTool[] {
+function wantedBy(project: ToolNeedingProject): readonly WantedTool[] {
   return project.tools.required.map((tool) => ({ key: filmToolKey(project.projectId, tool), tool, checks: project.tools.checks }));
 }
 
@@ -150,31 +152,35 @@ export class FilmLane implements InstallationFilms {
     return waiting;
   }
 
-  /**
-   * The queued films whose project has no tool failing its check. The tools of the films that wait are read when
-   * they are missing or old; the tools of a film that could start now are read again first, since a film starts on a
-   * fresh reading. A project whose films wait has the wait recorded; one whose tools pass again, or whose queue
-   * emptied, has it closed.
-   */
+  /** The queued films whose project has no tool failing its check; the waits of the others are recorded, and closed for those that no longer wait. */
   private async withoutToolWaits(eligible: readonly FilmLaneProject[], queued: readonly WaitingFilm[], workRunning: boolean): Promise<readonly WaitingFilm[]> {
     const needing = eligible.filter(needsTools);
     if (needing.length === 0) return queued;
+    const decision = await this.decideOnReadings(queued, workRunning);
+    await this.recordWaits(needing, queued, decision.blocked);
+    const blocked = new Set(decision.blocked.map((block) => block.project));
+    return queued.filter(({ project }) => !blocked.has(project.projectId));
+  }
+
+  /**
+   * Decides on the readings of the tools: those of the films that wait are read when they are missing or old, and those
+   * of a film that could start now are read again first, since a film starts on a fresh reading.
+   */
+  private async decideOnReadings(queued: readonly WaitingFilm[], workRunning: boolean): Promise<FilmStartDecision> {
     this.readings.beginRound();
-    const waiting = queued.filter(({ project }) => needsTools(project));
-    await this.seedFromRecords(waiting.map(({ project }) => project));
-    await this.readings.read(waiting.flatMap(({ project }) => (needsTools(project) ? wantedBy(project) : [])), 'due');
+    const needing = queued.map(({ project }) => project).filter(needsTools);
+    await this.seedFromRecords(needing);
+    await this.readings.read(needing.flatMap(wantedBy), 'due');
     let decision = this.decide(queued);
     while (decision.start !== null && !workRunning) {
-      const candidate = queued.find(({ project }) => project.projectId === decision.start?.project);
-      if (candidate === undefined || !needsTools(candidate.project)) break;
-      await this.readings.read(wantedBy(candidate.project), 'now');
+      const candidate = needing.find((project) => project.projectId === decision.start?.project);
+      if (candidate === undefined) break;
+      await this.readings.read(wantedBy(candidate), 'now');
       const afterReading = this.decide(queued);
       if (afterReading.start?.project === decision.start.project) break;
       decision = afterReading;
     }
-    await this.recordWaits(needing, queued, decision.blocked);
-    const blocked = new Set(decision.blocked.map((block) => block.project));
-    return queued.filter(({ project }) => !blocked.has(project.projectId));
+    return decision;
   }
 
   private decide(queued: readonly WaitingFilm[]): FilmStartDecision {
@@ -187,19 +193,17 @@ export class FilmLane implements InstallationFilms {
   }
 
   /** A wait the log records that nobody has read since the factory started is read again at once. */
-  private async seedFromRecords(projects: readonly FilmLaneProject[]): Promise<void> {
+  private async seedFromRecords(projects: readonly ToolNeedingProject[]): Promise<void> {
     for (const { projectId, tools } of projects) {
-      const wait = tools === null ? null : await tools.wait.current();
-      const tool = wait === null ? undefined : tools?.required.find((candidate) => candidate.name === wait.tool);
+      const wait = await tools.wait.current();
+      const tool = wait === null ? undefined : tools.required.find((candidate) => candidate.name === wait.tool);
       if (wait === null || tool === undefined) continue;
       this.readings.seed(filmToolKey(projectId, tool), tool, { tool: tool.name, status: wait.status, version: null, detail: wait.detail, fixCommand: wait.fixCommand });
     }
   }
 
-  private async recordWaits(needing: readonly FilmLaneProject[], queued: readonly WaitingFilm[], blocked: readonly FilmToolBlock[]): Promise<void> {
-    for (const project of needing) {
-      const { projectId, tools } = project;
-      if (tools === null) continue;
+  private async recordWaits(needing: readonly ToolNeedingProject[], queued: readonly WaitingFilm[], blocked: readonly FilmToolBlock[]): Promise<void> {
+    for (const { projectId, tools } of needing) {
       const block = blocked.find((candidate) => candidate.project === projectId);
       if (block === undefined) {
         await tools.wait.available(queued.some((film) => film.project.projectId === projectId));
