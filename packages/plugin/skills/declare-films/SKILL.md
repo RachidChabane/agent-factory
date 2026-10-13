@@ -21,7 +21,8 @@ Add `Films: <scenario>[, <scenario>…]` right after `Labels:` in the spec file 
 - Once the pull request is open, the factory orders every declared scenario. The pull request opens at once and never waits for a film.
 - The film command runs twice in its working directory: first on the issue's base commit, then on the pull request head. Each run writes a video, screenshots and a report with facts; the pull request shows a Before and an After.
 - Films run one at a time across the installation, when no agent run is open and the machine has memory to spare. An operator pause holds them; a subscription budget pause does not.
-- The merge is refused while a film of the pull request is queued or running, with its expected arrival. A failed film, with its reason, does not hold the merge.
+- A project lists the tools its film command needs in `evidence.films.tools`. While one of them fails its check, the project's films stay queued and none fails; the operator is told which login to run, and `agent-factory status` names the tool and the command. The films start by themselves once every tool passes: do not order them again.
+- The merge is refused while a film of the pull request is queued or running, with its expected arrival, or with the tool the films wait for. A failed film, with its reason, does not hold the merge.
 - New feedback or a rewritten check drops the recorded films and orders the declared scenarios again for the new head. Merge only the head that holds the films.
 
 ## Order another film
