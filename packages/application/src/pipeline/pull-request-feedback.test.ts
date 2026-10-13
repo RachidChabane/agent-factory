@@ -92,6 +92,7 @@ describe('external feedback on a factory pull request', () => {
     const fresh = scenario.harness.requestsOf('implementer').at(-1);
     expect(fresh).toMatchObject({ resumeSessionId: null, model: 'opus', effort: 'xhigh' });
     expect(fresh?.prompt).toContain('# Earlier attempts');
+    expect(fresh?.prompt).toContain('Attempt 1 failed at the gate step');
     expect(fresh?.prompt).toContain('Dana: The link must open in a new tab.');
   });
 

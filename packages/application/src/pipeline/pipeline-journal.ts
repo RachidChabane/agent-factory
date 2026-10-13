@@ -469,6 +469,15 @@ export function decisionsOfEpoch(journal: PipelineJournal): readonly RetryRecord
   return journal.decisions.filter((record) => record.afterAttempt >= journal.attemptEpoch);
 }
 
+/**
+ * The decisions since the operator last had a frozen check rewritten: what a fresh session is told was rejected. Failures
+ * reported against the checks before the rewrite tell it nothing; the operator's feedback and answers do not end it.
+ */
+export function decisionsSinceRewrite(journal: PipelineJournal): readonly RetryRecord[] {
+  const rewrittenAt = journal.checkRewrites.at(-1)?.nextAttempt ?? 0;
+  return journal.decisions.filter((record) => record.afterAttempt >= rewrittenAt);
+}
+
 export function currentAttempt(journal: PipelineJournal): number {
   return journal.attemptEpoch + decisionsOfEpoch(journal).filter((record) => record.decision.action !== 'needs-human').length;
 }

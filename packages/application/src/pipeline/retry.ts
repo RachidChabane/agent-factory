@@ -3,7 +3,7 @@ import type { AttemptHistory, EffortLevel, RetryDecision } from '@agent-factory/
 import { distilFailures } from './failure-summary.ts';
 import type { AttemptMode, FailureSource, ImplementerAttemptRecord, RetryRecord } from './journal-events.ts';
 import { PIPELINE_EVENTS } from './journal-events.ts';
-import { attemptRecord, decisionAfter, decisionsOfEpoch, type PipelineJournal } from './pipeline-journal.ts';
+import { attemptRecord, decisionAfter, decisionsOfEpoch, decisionsSinceRewrite, type PipelineJournal } from './pipeline-journal.ts';
 import type { RoleProfile } from './pipeline-settings.ts';
 import type { StageContext } from './stages/stage.ts';
 
@@ -45,12 +45,6 @@ function decisionLeadingTo(journal: PipelineJournal, attempt: number): RetryReco
   return attempt === journal.attemptEpoch && decision?.opensCycle !== true ? null : decision;
 }
 
-/** What a fresh session hears was rejected: all the operator's feedback so far, then the failures of the current cycle. */
-function rejectionsBefore(journal: PipelineJournal, attempt: number): readonly RetryRecord[] {
-  const feedback = journal.decisions.filter((record) => record.opensCycle);
-  return [...feedback, ...decisionsOfEpoch(journal).filter((record) => record.afterAttempt < attempt)];
-}
-
 export function planAttempt(journal: PipelineJournal, attempt: number, profile: RoleProfile): AttemptPlan {
   const previousDecision = decisionLeadingTo(journal, attempt);
   const previousAttempt = previousDecision === null ? null : attemptRecord(journal, attempt - 1);
@@ -66,7 +60,7 @@ export function planAttempt(journal: PipelineJournal, attempt: number, profile: 
       effort: decision.profile.effort,
       resumeSessionId: null,
       correction: null,
-      earlierFailures: distilFailures(rejectionsBefore(journal, attempt)),
+      earlierFailures: distilFailures(decisionsSinceRewrite(journal).filter((record) => record.afterAttempt < attempt)),
     };
   }
   const model = previousAttempt?.model ?? profile.model;
