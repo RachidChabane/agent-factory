@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import type { CockpitSnapshot } from '../../packages/cockpit/src/contract/index.ts';
 import { CART_BADGE_TOTAL } from '../support/story.ts';
 
@@ -26,11 +26,30 @@ function cartBadgeRun(state: CockpitSnapshot) {
   return run;
 }
 
+/** The room the sticky top bar takes at the top of the page, so that a section scrolled to the top keeps its title in view. */
+const TOP_BAR_ROOM_PX = 72;
+
+async function scrollToStart(section: Locator): Promise<void> {
+  await section.evaluate((element, room) => {
+    element.style.scrollMarginTop = `${room}px`;
+    element.scrollIntoView({ block: 'start' });
+  }, TOP_BAR_ROOM_PX);
+}
+
 async function showHeading(page: Page, text: string | RegExp): Promise<void> {
   await page.getByRole('heading', { level: 1 }).filter({ hasText: text }).first().waitFor();
 }
 
 export const SCREENSHOTS: readonly Screenshot[] = [
+  {
+    file: 'changes.png',
+    path: () => '/',
+    compose: async (page) => {
+      await showHeading(page, 'Changes');
+      await page.getByRole('region', { name: 'Waiting for you', exact: true }).waitFor();
+      await page.getByRole('region', { name: 'Storefront', exact: true }).waitFor();
+    },
+  },
   {
     file: 'board.png',
     path: () => '/board',
@@ -44,7 +63,7 @@ export const SCREENSHOTS: readonly Screenshot[] = [
     compose: async (page) => {
       await showHeading(page, CART_BADGE_TOTAL.spec.title);
       await page.getByRole('region', { name: 'Attempts', exact: true }).waitFor();
-      await page.getByRole('region', { name: 'Acceptance checks', exact: true }).evaluate((element) => element.scrollIntoView({ block: 'start' }));
+      await scrollToStart(page.getByRole('region', { name: 'Acceptance checks', exact: true }));
     },
   },
   {
@@ -53,7 +72,7 @@ export const SCREENSHOTS: readonly Screenshot[] = [
     compose: async (page) => {
       const evidence = page.getByRole('region', { name: 'Evidence', exact: true });
       await evidence.getByRole('region', { name: 'After, on the branch' }).waitFor();
-      await evidence.evaluate((element) => element.scrollIntoView({ block: 'start' }));
+      await scrollToStart(evidence);
     },
   },
   {

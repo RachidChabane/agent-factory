@@ -9,7 +9,7 @@ import { imageDigest, inputDigests, inputHash } from './inputs.ts';
 const ROOT = join(import.meta.dirname, '..', '..');
 const DIRECTORY = join(ROOT, 'docs', 'screenshots');
 const MANIFEST = join(DIRECTORY, 'manifest.json');
-const MAX_IMAGE_BYTES = 400_000;
+const MAX_IMAGE_BYTES = 300_000;
 const VIEWPORT = { width: 1440, height: 900 };
 /** The demonstration makes its home under the temporary directory, whose paths the log of a run shows: one that names no machine and no user. */
 const NEUTRAL_TEMPORARY_DIRECTORY = '/tmp';
