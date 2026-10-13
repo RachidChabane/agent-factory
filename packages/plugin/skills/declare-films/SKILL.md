@@ -27,3 +27,14 @@ Add `Films: <scenario>[, <scenario>…]` right after `Labels:` in the spec file 
 ## Order another film
 
 `agent-factory film <issue> --scenario <name>` orders a scenario once the pull request is open. A scenario already queued or running is not queued twice. After a failed film, read its reason on the pull request, fix the cause, and order it again.
+
+## Write or review a scenario
+
+These rules are for whoever writes or reviews a scenario of the product's own film tooling: the code the film command runs.
+
+- **Fetch what is missing.** The command is given a commit by its sha. When the checkout it records from lacks that commit, it fetches the commit by that sha before it checks it out.
+- **Bound every gesture.** Every click and every input has a time limit. A disabled button fails the scenario at once, naming the element, instead of holding it until the timeout of the whole recording.
+- **Target within the panel.** Find an element inside the panel, dialog or region that holds it, never across the whole page: the same label can appear in several places, such as a "Save" in a dialog and another in the toolbar.
+- **Answer an idle turn by rule.** An assistant can end a turn waiting for a confirmation without asking a question. The scenario answers such a turn with a rule specific to the scenario, such as replying "yes, book it" when the assistant offers to book the table, and answers at most a few times. A generic "continue" in a loop hides a conversation that is stuck.
+- **Make each detector specific.** A detector of an outcome matches that outcome and nothing near it. A link to an upload form is not a link to a stored file: match the address of the stored file, not any link that mentions it.
+- **Report what masks a change.** The report says when the environment hides a difference the film should show, such as a font installed on the recording machine, a cached asset or a seeded account. The report counts the actions the scenario made: a request that a client library sends again after a reset is one action, not a duplicate.
