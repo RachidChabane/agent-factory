@@ -9,6 +9,7 @@ export const WATCH_BLOCKERS_FILE = 'watch-blockers.json';
 const UTF8 = 'utf8';
 const MISSING_FILE_CODE = 'ENOENT';
 const JSON_INDENT = 2;
+const PRIVATE_DIRECTORY_MODE = 0o700;
 
 const ReportedBlockerSchema = z.object({
   key: z.string().min(1),
@@ -39,7 +40,7 @@ export class FileBlockerMemory implements BlockerMemory {
 
   async remember(reported: readonly ReportedBlocker[]): Promise<void> {
     const blockers = reported.map(({ blocker, reportedAt }) => ({ ...blocker, reportedAt: reportedAt.toISOString() }));
-    await writeFileAtomically(this.path, `${JSON.stringify({ blockers }, null, JSON_INDENT)}\n`);
+    await writeFileAtomically(this.path, `${JSON.stringify({ blockers }, null, JSON_INDENT)}\n`, { directoryMode: PRIVATE_DIRECTORY_MODE });
   }
 
   private async read(): Promise<unknown> {

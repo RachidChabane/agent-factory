@@ -53,7 +53,7 @@ export {
   type HttpHealthTarget,
 } from './health/httpHealthProbe.ts';
 export { NodeWorkspaceFiles } from './fs/nodeWorkspaceFiles.ts';
-export { writeFileAtomically } from './fs/writeFileAtomically.ts';
+export { writeFileAtomically, type AtomicWriteOptions } from './fs/writeFileAtomically.ts';
 export { FileLogArchive, UnsafeLogNameError, ISSUE_LOG_DIRECTORY_PREFIX } from './fs/fileLogArchive.ts';
 export { MacosResourceGuard, parseFreeMemoryPercent, parsePressureLevel, MEMORY_PRESSURE_COMMAND, PRESSURE_LEVEL_COMMAND } from './resources/macosResourceGuard.ts';
 export { ResourceProbeError } from './resources/errors.ts';

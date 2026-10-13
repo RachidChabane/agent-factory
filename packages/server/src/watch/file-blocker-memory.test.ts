@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -44,6 +44,12 @@ describe('FileBlockerMemory', () => {
     expect(JSON.parse(await readFile(join(state, WATCH_BLOCKERS_FILE), 'utf8'))).toEqual({
       blockers: [{ key: ESCALATED.key, kind: 'needs-human', project: 'storefront', issue: 12, detail: 'the gate failed', reportedAt: '2026-10-12T14:00:00.000Z' }],
     });
+  });
+
+  it('creates a state directory that is missing as a private one', async () => {
+    const fresh = join(state, 'installation', 'state');
+    await new FileBlockerMemory(fresh).remember([reported(ESCALATED)]);
+    expect((await stat(fresh)).mode & 0o777).toBe(0o700);
   });
 
   it('replaces what it kept, and keeps nothing once every blocker cleared', async () => {

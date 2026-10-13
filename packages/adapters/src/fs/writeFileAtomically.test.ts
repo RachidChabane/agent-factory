@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -18,6 +18,12 @@ describe('writeFileAtomically', () => {
     const path = join(directory, 'state', 'nested', 'blockers.json');
     await writeFileAtomically(path, '{"blockers":[]}\n');
     expect(await readFile(path, 'utf8')).toBe('{"blockers":[]}\n');
+  });
+
+  it('gives the directories it creates the permissions it was asked for', async () => {
+    const path = join(directory, 'private', 'blockers.json');
+    await writeFileAtomically(path, 'content\n', { directoryMode: 0o700 });
+    expect((await stat(join(directory, 'private'))).mode & 0o777).toBe(0o700);
   });
 
   it('replaces the content of a file that exists and leaves no temporary file next to it', async () => {
