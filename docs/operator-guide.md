@@ -271,12 +271,15 @@ and its skills.
 
 The orchestrator keeps `agent-factory watch` running and reacts to each line. It turns
 requests into specs and issues, answers what the repository and your earlier
-instructions answer, merges what needs no judgement, and prepares a one-line review of
-the rest. It never edits the factory's event log, its worktrees or the forge, changes
-`config.yaml` only for a cause that grants nothing new, and takes no step that widens
-what agents may reach unless you ask. It reports each morning: what merged, what waits
-for you, what is blocked and why, what it decided for you, and the subscription limits
-with their reset times.
+instructions answer, merges what needs no judgement, and prepares a short review of the
+rest: what you must decide or do first, each with its command, then a cropped screenshot of
+each visible change, then the details. It lists the non-blocking findings of a review for
+you to sort, and turns the findings of a failing quality check into a feedback file for you
+to record with `agent-factory pr feedback`. It never edits the factory's event log, its
+worktrees or the forge, changes `config.yaml` only for a cause that grants nothing new,
+and takes no step that widens what agents may reach unless you ask. It reports each
+morning: what merged, what waits for you, what is blocked and why, what it decided for
+you, and the subscription limits with their reset times.
 
 What it may do alone is yours to declare, per project, in `autonomy` ([ADR
 0033](adr/0033-autonomy-policy.md)): validating specs, answering decisions, resuming
