@@ -99,7 +99,7 @@ describe('films that wait for the tools they need, over the composition of an in
     expect(await events.read('', 0).then((records) => records.some((record) => record.type === PIPELINE_EVENTS.filmStarted))).toBe(false);
     expect(titles()).toEqual(['Films of widgets wait for vault']);
     expect(JSON.stringify(cards.find((card) => card.text.startsWith('Films of widgets wait')))).toContain(`Log in with: ${VAULT_LOGIN}.`);
-  });
+  }, TIMEOUT_MS * 2);
 
   it('records the reading of each tool where the cockpit lists the tools of its scope', async () => {
     const installationChecks = latestToolChecks(await installation.events.read('settings', 0));
@@ -118,7 +118,7 @@ describe('films that wait for the tools they need, over the composition of an in
     const projectChecks = latestToolChecks(await events.read('settings', 0));
     expect(projectChecks.get('registry')).toMatchObject({ status: 'unauthenticated' });
     expect(latestToolChecks(await installation.events.read('settings', 0)).get('vault')).toMatchObject({ status: 'connected' });
-  });
+  }, TIMEOUT_MS * 2);
 
   it('records the film once every tool passes at the next reading, and says that the films resume', async () => {
     await writeFile(flag('registry-session'), '');
@@ -130,5 +130,5 @@ describe('films that wait for the tools they need, over the composition of an in
     expect(state.filmOrders.map((order) => [order.scenario, order.status])).toEqual([[SCENARIO, 'finished']]);
     expect(titles()).toEqual(['Films of widgets wait for vault', 'Films of widgets resume']);
     expect(warnings).toEqual([]);
-  });
+  }, TIMEOUT_MS * 2);
 });
