@@ -12,3 +12,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      # The steps of one action repository run together and refuse to mix versions.
+      codeql:
+        patterns: ["github/codeql-action/*"]
