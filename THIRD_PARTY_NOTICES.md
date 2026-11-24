@@ -4,12 +4,12 @@ The production dependencies of Agent Factory and their licences: what the factor
 Each stays under its own licence, whose text is in its package; the lockfile holds the versions. This file is
 written by `script/third-party-notices` and checked by `script/third-party-notices --check`.
 
-## Licences (15 packages)
+## Licences (17 packages)
 
 | Licence | Packages |
 |---|---|
 | ISC | 2 |
-| MIT | 11 |
+| MIT | 13 |
 | OFL-1.1 | 2 |
 
 ## Packages
@@ -22,7 +22,9 @@ written by `script/third-party-notices` and checked by `script/third-party-notic
 | @fontsource-variable/jetbrains-mono | OFL-1.1 | https://fontsource.org/fonts/jetbrains-mono |
 | @tanstack/react-virtual | MIT | https://tanstack.com/virtual |
 | @tanstack/virtual-core | MIT | https://tanstack.com/virtual |
+| @types/react | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react |
 | cookie | MIT | https://github.com/jshttp/cookie#readme |
+| csstype | MIT | https://github.com/frenic/csstype#readme |
 | lucide-react | ISC | https://lucide.dev |
 | react | MIT | https://react.dev/ |
 | react-dom | MIT | https://react.dev/ |
