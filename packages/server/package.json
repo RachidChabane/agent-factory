@@ -16,7 +16,7 @@
     "@agent-factory/application": "workspace:*",
     "@agent-factory/cockpit": "workspace:*",
     "@agent-factory/domain": "workspace:*",
-    "yaml": "2.8.1",
+    "yaml": "2.9.1",
     "zod": "4.1.11"
   }
 }
