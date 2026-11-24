@@ -11,6 +11,7 @@ describe('engineSocketMounts', () => {
   let visibleLink: string;
   let hiddenLink: string;
   let danglingLink: string;
+  let throughLinkedDirectory: string;
 
   beforeAll(async () => {
     root = await realpath(await mkdtemp(join(tmpdir(), 'engine-mounts-')));
@@ -22,6 +23,8 @@ describe('engineSocketMounts', () => {
     hiddenLink = join(engineHome, 'engine.sock');
     danglingLink = join(engineHome, 'stopped.sock');
     await Promise.all([symlink(socket, visibleLink), symlink(socket, hiddenLink), symlink(join(root, 'absent.sock'), danglingLink)]);
+    await symlink(join(engineHome, 'run'), join(root, 'linked-run'));
+    throughLinkedDirectory = join(root, 'linked-run', 'engine.sock');
   });
 
   afterAll(async () => {
@@ -39,6 +42,10 @@ describe('engineSocketMounts', () => {
 
   it('mounts nothing on a link the command sees, which leads to its granted target', () => {
     expect(engineSocketMounts([visibleLink, socket], [engineHome])).toEqual([{ source: socket, destination: socket }]);
+  });
+
+  it('mounts nothing on a socket reached through a linked directory, as /var/run/docker.sock is on Linux', () => {
+    expect(engineSocketMounts([throughLinkedDirectory, socket], [engineHome])).toEqual([{ source: socket, destination: socket }]);
   });
 
   it('binds the target of a link beneath a hidden directory in the place of the link', () => {
