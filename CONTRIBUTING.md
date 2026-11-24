@@ -100,4 +100,4 @@ request.
   trailer for a tool and no "generated with" line. The `commit-msg` hook removes
   them.
 
-Contributions are licensed under Apache-2.0, like the rest of the repository.
+Contributions are licensed under AGPL-3.0-only, like the rest of the repository.
