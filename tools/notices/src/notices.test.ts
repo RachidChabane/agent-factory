@@ -16,7 +16,12 @@ describe('the third-party notices', () => {
     const text = renderNotices(entries);
     assert.match(text, /## Licences \(4 packages\)/);
     assert.match(text, /\| ISC \| 1 \|\n\| MIT \| 2 \|\n\| UNKNOWN \| 1 \|/);
-    assert.match(text, /\| react \| 19\.1\.1 \| MIT \| https:\/\/react\.dev\/ \|/);
-    assert.match(text, /\| yaml \| 2\.8\.1 \| ISC \|  \|/);
+    assert.match(text, /\| react \| MIT \| https:\/\/react\.dev\/ \|/);
+    assert.match(text, /\| yaml \| ISC \|  \|/);
+  });
+
+  it('names no version, so that a version bump leaves the file as it is', () => {
+    const listing = (version: string): unknown => ({ MIT: [{ name: 'zod', versions: [version], homepage: 'https://zod.dev' }] });
+    assert.equal(renderNotices(entriesOf(listing('4.1.11'))), renderNotices(entriesOf(listing('4.6.7'))));
   });
 });

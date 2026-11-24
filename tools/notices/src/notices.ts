@@ -1,7 +1,6 @@
 /** One production dependency as the notices list it. */
 export interface NoticeEntry {
   readonly name: string;
-  readonly versions: readonly string[];
   readonly license: string;
   readonly homepage: string | null;
 }
@@ -10,11 +9,10 @@ const HEADER = [
   '# Third-party notices',
   '',
   'The production dependencies of Agent Factory and their licences: what the factory and its cockpit ship.',
-  'Each stays under its own licence, whose text is in its package. This file is written by',
-  '`script/third-party-notices` and checked by `script/third-party-notices --check`.',
+  'Each stays under its own licence, whose text is in its package; the lockfile holds the versions. This file is',
+  'written by `script/third-party-notices` and checked by `script/third-party-notices --check`.',
 ].join('\n');
 const UNKNOWN = 'UNKNOWN';
-const VERSION_SEPARATOR = ', ';
 const NO_HOMEPAGE = '';
 const NEWLINE = '\n';
 const PARAGRAPH = '\n\n';
@@ -25,11 +23,9 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 
 function entryOf(license: string, value: unknown): NoticeEntry | null {
   if (!isRecord(value)) return null;
-  const versions = Array.isArray(value['versions']) ? value['versions'].filter((version): version is string => typeof version === 'string') : [];
   const homepage = value['homepage'];
   return {
     name: typeof value['name'] === 'string' ? value['name'] : UNKNOWN,
-    versions,
     license: license === '' ? UNKNOWN : license,
     homepage: typeof homepage === 'string' && homepage !== '' ? homepage : null,
   };
@@ -54,9 +50,9 @@ export function renderNotices(entries: readonly NoticeEntry[]): string {
   for (const entry of entries) counts.set(entry.license, (counts.get(entry.license) ?? 0) + 1);
   const summary = ['| Licence | Packages |', '|---|---|', ...[...counts].sort(([left], [right]) => left.localeCompare(right)).map(([license, count]) => `| ${cell(license)} | ${count} |`)];
   const rows = [
-    '| Package | Version | Licence | Home page |',
-    '|---|---|---|---|',
-    ...entries.map((entry) => `| ${cell(entry.name)} | ${cell(entry.versions.join(VERSION_SEPARATOR))} | ${cell(entry.license)} | ${entry.homepage ?? NO_HOMEPAGE} |`),
+    '| Package | Licence | Home page |',
+    '|---|---|---|',
+    ...entries.map((entry) => `| ${cell(entry.name)} | ${cell(entry.license)} | ${entry.homepage ?? NO_HOMEPAGE} |`),
   ];
   return [HEADER, `## Licences (${entries.length} packages)`, summary.join(NEWLINE), '## Packages', rows.join(NEWLINE)].join(PARAGRAPH) + NEWLINE;
 }

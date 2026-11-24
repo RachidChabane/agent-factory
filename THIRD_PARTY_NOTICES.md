@@ -1,8 +1,8 @@
 # Third-party notices
 
 The production dependencies of Agent Factory and their licences: what the factory and its cockpit ship.
-Each stays under its own licence, whose text is in its package. This file is written by
-`script/third-party-notices` and checked by `script/third-party-notices --check`.
+Each stays under its own licence, whose text is in its package; the lockfile holds the versions. This file is
+written by `script/third-party-notices` and checked by `script/third-party-notices --check`.
 
 ## Licences (15 packages)
 
@@ -14,20 +14,20 @@ Each stays under its own licence, whose text is in its package. This file is wri
 
 ## Packages
 
-| Package | Version | Licence | Home page |
-|---|---|---|---|
-| @dagrejs/dagre | 3.1.3 | MIT | https://github.com/dagrejs/dagre#readme |
-| @dagrejs/graphlib | 4.0.6 | MIT | https://github.com/dagrejs/graphlib#readme |
-| @fontsource-variable/inter | 5.3.0 | OFL-1.1 | https://fontsource.org/fonts/inter |
-| @fontsource-variable/jetbrains-mono | 5.3.0 | OFL-1.1 | https://fontsource.org/fonts/jetbrains-mono |
-| @tanstack/react-virtual | 3.14.13 | MIT | https://tanstack.com/virtual |
-| @tanstack/virtual-core | 3.17.11 | MIT | https://tanstack.com/virtual |
-| cookie | 1.1.1 | MIT | https://github.com/jshttp/cookie#readme |
-| lucide-react | 1.47.0 | ISC | https://lucide.dev |
-| react | 19.3.1 | MIT | https://react.dev/ |
-| react-dom | 19.3.1 | MIT | https://react.dev/ |
-| react-router | 7.18.4 | MIT | https://github.com/remix-run/react-router#readme |
-| scheduler | 0.28.0 | MIT | https://react.dev/ |
-| set-cookie-parser | 2.7.2 | MIT | https://github.com/nfriedly/set-cookie-parser |
-| yaml | 2.9.1 | ISC | https://eemeli.org/yaml/ |
-| zod | 4.6.7 | MIT | https://zod.dev |
+| Package | Licence | Home page |
+|---|---|---|
+| @dagrejs/dagre | MIT | https://github.com/dagrejs/dagre#readme |
+| @dagrejs/graphlib | MIT | https://github.com/dagrejs/graphlib#readme |
+| @fontsource-variable/inter | OFL-1.1 | https://fontsource.org/fonts/inter |
+| @fontsource-variable/jetbrains-mono | OFL-1.1 | https://fontsource.org/fonts/jetbrains-mono |
+| @tanstack/react-virtual | MIT | https://tanstack.com/virtual |
+| @tanstack/virtual-core | MIT | https://tanstack.com/virtual |
+| cookie | MIT | https://github.com/jshttp/cookie#readme |
+| lucide-react | ISC | https://lucide.dev |
+| react | MIT | https://react.dev/ |
+| react-dom | MIT | https://react.dev/ |
+| react-router | MIT | https://github.com/remix-run/react-router#readme |
+| scheduler | MIT | https://react.dev/ |
+| set-cookie-parser | MIT | https://github.com/nfriedly/set-cookie-parser |
+| yaml | ISC | https://eemeli.org/yaml/ |
+| zod | MIT | https://zod.dev |
