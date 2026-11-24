@@ -34,7 +34,7 @@ Every verb is a shebang script in `script/`, also reachable as `pnpm run <verb>`
 | `script/e2e` | both end-to-end suites below |
 | `script/e2e-example` | the fictional example project from spec to merge through the command line, with the fake `claude` |
 | `script/e2e-cockpit` | every cockpit command clicked in a real browser against a running factory, in demo and rehearsal modes |
-| `script/scan` | denylist scan of the working tree and the whole history, then gitleaks |
+| `script/scan` | denylist scan of the working tree and the whole history, then gitleaks. The denylist is the maintainer's list of confidential words and is not in the repository: without it that half says so and passes ([ADR 0004](docs/adr/0004-denylist-scanning.md)) |
 | `script/screenshots` | regenerate the README screenshots from the demonstration (`--check` verifies they are current) |
 | `script/schema` | regenerate `schema/config.schema.json` from the configuration's schema (`--check` verifies it) |
 | `script/demo-films` | regenerate the two sample videos the demonstration films with (needs `ffmpeg`); they are the only videos the repository holds |

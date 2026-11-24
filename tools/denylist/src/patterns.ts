@@ -1,8 +1,19 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 /**
  * The pattern file is read by the git hooks before any dependency is installed, so it is
  * validated by hand rather than with a schema library.
  */
 export const PATTERN_FILE_VERSION = 1;
+
+/** Where a clone keeps its pattern file. Git ignores it: the hashes of short terms can be reversed by brute force. */
+export const PATTERNS_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'patterns.json');
+/** Holds the content of a pattern file, for a run that has no file, such as a CI job reading a secret. */
+export const PATTERNS_VARIABLE = 'AGENT_FACTORY_DENYLIST';
+
+const UTF8 = 'utf8';
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 const SALT_HEX = /^[0-9a-f]{32,}$/;
@@ -68,4 +79,13 @@ export function parseDenylistFile(text: string): DenylistFile {
     throw new InvalidPatternFileError('patterns must be a non-empty array');
   }
   return { version: PATTERN_FILE_VERSION, salt, patterns: patterns.map(parsePattern) };
+}
+
+/** The patterns of this run: the variable's content when it is set, the file otherwise, null when there is neither. */
+export function loadDenylist(environment: Readonly<Record<string, string | undefined>>, path: string): DenylistFile | null {
+  const content = environment[PATTERNS_VARIABLE];
+  if (content !== undefined && content.trim() !== '') {
+    return parseDenylistFile(content);
+  }
+  return existsSync(path) ? parseDenylistFile(readFileSync(path, UTF8)) : null;
 }

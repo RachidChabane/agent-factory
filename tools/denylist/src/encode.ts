@@ -1,12 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import { argv, exit, stderr } from 'node:process';
-import { fileURLToPath } from 'node:url';
 import { digest, normalize, rollingHash } from './hashing.ts';
-import { PATTERN_FILE_VERSION, parseDenylistFile, type DenylistFile, type DenylistPattern } from './patterns.ts';
+import { PATTERN_FILE_VERSION, PATTERNS_PATH, parseDenylistFile, type DenylistFile, type DenylistPattern } from './patterns.ts';
 
-const PATTERNS_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'patterns.json');
 const SALT_BYTES = 16;
 const UTF8 = 'utf8';
 const HEX = 'hex';
@@ -17,7 +14,7 @@ const JSON_INDENT = 2;
 
 const USAGE = `Usage: encode.ts <plain-list>
 Reads "category<TAB>term" lines (blank lines and # comments ignored) from a file kept outside the repository,
-and rewrites tools/denylist/patterns.json with salted hashes only. The existing salt is kept.`;
+and rewrites tools/denylist/patterns.json, which git ignores, with salted hashes only. The existing salt is kept.`;
 
 function currentSalt(): string {
   return existsSync(PATTERNS_PATH) ? parseDenylistFile(readFileSync(PATTERNS_PATH, UTF8)).salt : randomBytes(SALT_BYTES).toString(HEX);

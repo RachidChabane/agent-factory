@@ -41,6 +41,7 @@ jobs:
         env:
           VERB: ${{ inputs.verb }}
           ARGS: ${{ inputs.args }}
+          AGENT_FACTORY_DENYLIST: ${{ secrets.DENYLIST_PATTERNS }}
         run: |
           set -f
           # shellcheck disable=SC2086 # ARGS is a list of arguments by contract; globbing is off.

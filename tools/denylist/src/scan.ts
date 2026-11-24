@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { argv, exit, stderr, stdin, stdout } from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { argv, env, exit, stderr, stdin, stdout } from 'node:process';
 import { DenylistMatcher, type DenylistMatch } from './matcher.ts';
-import { parseDenylistFile } from './patterns.ts';
+import { loadDenylist, PATTERNS_PATH, PATTERNS_VARIABLE } from './patterns.ts';
 import { historySubjects, messageFileSubject, pushRangeSubjects, stagedSubjects, workingTreeSubjects, type ScanSubject } from './sources.ts';
 
-const PATTERNS_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'patterns.json');
+/** Set to "1" by a run that must not pass without patterns, such as CI on the default branch. */
+const REQUIRED_VARIABLE = 'AGENT_FACTORY_DENYLIST_REQUIRED';
+const REQUIRED = '1';
+const EXIT_NO_PATTERNS = 3;
 const EXIT_CLEAN = 0;
 const EXIT_FINDINGS = 1;
 const EXIT_USAGE = 2;
@@ -19,7 +20,10 @@ const USAGE = `Usage: scan.ts <mode>
   --staged            staged content and paths
   --message <file>    a commit message file
   --history [<range>] every blob, path, commit message, author and reference reachable from all refs (or the range)
-  --pre-push          the ranges git sends on standard input to a pre-push hook`;
+  --pre-push          the ranges git sends on standard input to a pre-push hook
+
+The patterns come from the ${PATTERNS_VARIABLE} variable, else from tools/denylist/patterns.json. With neither, nothing is
+scanned and the run passes, unless ${REQUIRED_VARIABLE}=${REQUIRED}.`;
 
 interface Finding {
   readonly subject: string;
@@ -77,12 +81,18 @@ function subjectsFor(mode: string | undefined, argument: string | undefined, roo
 function main(): number {
   const [, , mode, argument] = argv;
   const root = process.cwd();
+  const denylist = loadDenylist(env, PATTERNS_PATH);
+  if (denylist === null) {
+    const required = env[REQUIRED_VARIABLE] === REQUIRED;
+    stderr.write(`denylist: no patterns in ${PATTERNS_VARIABLE} or in tools/denylist/patterns.json; ${required ? 'this run requires them' : 'nothing scanned'}\n`);
+    return required ? EXIT_NO_PATTERNS : EXIT_CLEAN;
+  }
   const subjects = subjectsFor(mode, argument, root);
   if (subjects === null) {
     stderr.write(`${USAGE}\n`);
     return EXIT_USAGE;
   }
-  const matcher = new DenylistMatcher(parseDenylistFile(readFileSync(PATTERNS_PATH, UTF8)));
+  const matcher = new DenylistMatcher(denylist);
   const found = findings(matcher, subjects);
   for (const finding of found) {
     stdout.write(`${finding.subject}:${finding.match.line}:${finding.match.column} denylisted ${finding.match.category} term: ${finding.snippet}\n`);

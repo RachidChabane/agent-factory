@@ -39,6 +39,11 @@ jobs:
       - name: Lint the workflows
         run: actionlint
       - name: Scan the working tree and the whole history
+        env:
+          # The guarded terms stay out of the repository. A pull request from a fork or from Dependabot reads no
+          # secret and passes the denylist step unscanned; a push to the repository's own default branch needs them.
+          AGENT_FACTORY_DENYLIST: ${{ secrets.DENYLIST_PATTERNS }}
+          AGENT_FACTORY_DENYLIST_REQUIRED: ${{ github.event_name == 'push' && !github.event.repository.fork && '1' || '' }}
         run: script/scan
 
   check:
