@@ -28,7 +28,8 @@ one to take the code, close it and present it as their own product.
 
 ## Decision
 
-AGPL-3.0-only, with the unmodified license text in `LICENSE`. Contributions are
+AGPL-3.0-only, with the unmodified license text in `LICENSE`. Every revision in the
+repository's history is offered under that license and no other. Contributions are
 accepted under the same license (stated in `CONTRIBUTING.md`).
 
 ## Consequences
@@ -36,8 +37,9 @@ accepted under the same license (stated in `CONTRIBUTING.md`).
 - Running the factory, unmodified or modified, on one's own repositories carries no
   obligation: the license binds whoever conveys a version or serves a modified one
   to other people.
-- A fork that is distributed, or offered to others over a network, publishes its
-  source under AGPL-3.0 and keeps the copyright and license notices.
+- A fork that is distributed, or a modified version offered to others over a
+  network, offers its source to those recipients and users under AGPL-3.0 and keeps
+  the copyright and license notices.
 - The code the factory's agents write in a user's repository belongs to that
   repository; it is not a derivative of the factory.
 - Some organisations forbid AGPL software; they are the adoption this choice gives
@@ -45,5 +47,5 @@ accepted under the same license (stated in `CONTRIBUTING.md`).
 - The license is declared in `package.json`, in the plugin manifest and in the
   README.
 - Third-party licenses of the shipped dependencies are listed in
-  `THIRD_PARTY_NOTICES.md`, generated from the lockfile. They are permissive
-  (MIT, ISC, OFL-1.1) and compatible with AGPL-3.0.
+  `THIRD_PARTY_NOTICES.md`, generated from the lockfile: MIT and ISC, which are
+  permissive, and OFL-1.1 for two fonts shipped as separate files.

@@ -9,9 +9,8 @@
 <p align="center">
   <a href="https://github.com/RachidChabane/agent-factory/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/RachidChabane/agent-factory/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <a href="https://github.com/RachidChabane/agent-factory/releases"><img alt="Release" src="https://img.shields.io/github/v/release/RachidChabane/agent-factory?sort=semver"></a>
-  <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>
+  <a href="LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-blue"></a>
   <img alt="Node.js 24.11 or later" src="https://img.shields.io/badge/node-%E2%89%A5%2024.11-339933">
-  <a href="https://codecov.io/gh/RachidChabane/agent-factory"><img alt="Coverage" src="https://img.shields.io/codecov/c/github/RachidChabane/agent-factory"></a>
 </p>
 
 <p align="center">
@@ -146,6 +145,7 @@ past.
 
 Copyright (C) 2026 Rachid Chabane.
 
-[AGPL-3.0](LICENSE): use it, fork it and change it; a version you distribute or offer
-to others over a network stays open under the same license, with its notices.
+[AGPL-3.0-only](LICENSE): use it, fork it and change it; a version you distribute, or
+a modified version you offer to others over a network, stays open under the same
+license, with its notices.
 Third-party licences: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

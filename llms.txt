@@ -1,6 +1,6 @@
 # Agent Factory
 
-> An agentic software factory for any repository: it drives Claude Code agents from a validated issue specification to a pull request that carries its own proof (checks that failed on the base and pass on the branch, evidence before and after, an independent review), merged only on the operator's order, with a live cockpit to follow and steer every step across several projects. TypeScript on Node.js 24, macOS and Linux, AGPL-3.0.
+> An agentic software factory for any repository: it drives Claude Code agents from a validated issue specification to a pull request that carries its own proof (checks that failed on the base and pass on the branch, evidence before and after, an independent review), merged only on the operator's order, with a live cockpit to follow and steer every step across several projects. TypeScript on Node.js 24, macOS and Linux, AGPL-3.0-only.
 
 Run it from a clone: `script/setup` (dependencies and the cockpit build), then `script/factory start --demo` plays two fictional projects with a fake Claude and no account, cockpit on http://127.0.0.1:7431. On a real repository: `script/factory init` inspects it and writes `~/.agent-factory/config.yaml`, `script/factory validate` checks the tools, the forge and the gate, `script/factory start` runs the factory and serves the cockpit on http://127.0.0.1:7430. Agents and check commands run confined by the operating system's sandbox (sandbox-exec, bubblewrap); subscription usage is read from Claude Code's own report and pauses the factory before a limit.
 
